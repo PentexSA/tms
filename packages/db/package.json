@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",
-    "codegen": "kysely-codegen --out src/types.ts --dialect postgres \"$DATABASE_URL\""
+    "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -20,7 +20,7 @@
   "devDependencies": {
     "@tms/tsconfig": "workspace:*",
     "@types/pg": "^8.11.10",
-    "kysely-codegen": "^0.17.3",
+    "kysely-codegen": "^0.19.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

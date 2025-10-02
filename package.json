@@ -19,6 +19,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.17.1",
   "devDependencies": {
+    "@sinclair/typebox": "^0.34.41",
     "turbo": "^2.5.8"
   }
 }
