@@ -37,16 +37,45 @@ pnpm dev
 tms/
 ├── apps/
 │   ├── api/          # API REST com Elysia (Bun)
-│   └── expo/         # App React Native + Web (Expo Router)
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── frontend/     # App React Native + Web (Expo Router)
+│       ├── app/
+│       ├── assets/
+│       ├── App.tsx
+│       ├── app.json
+│       ├── metro.config.js
+│       ├── package.json
+│       └── tsconfig.json
 ├── packages/
 │   ├── config/       # Configurações e variáveis de ambiente
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   ├── db/           # Kysely + migrations + codegen
-│   ├── eslint-config # Configs ESLint compartilhadas
+│   │   ├── src/
+│   │   │   ├── client.ts
+│   │   │   ├── migrate.ts
+│   │   │   ├── types.ts
+│   │   │   └── migrations/
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── eslint-config/ # Configs ESLint compartilhadas
+│   │   └── package.json
 │   ├── tsconfig/     # Configs TypeScript base
+│   │   └── package.json
 │   └── ui/           # Componentes UI universais (RN + Web)
+│       ├── src/
+│       ├── package.json
+│       └── tsconfig.json
+├── .env.example
+├── .eslintrc.cjs
+├── .prettierrc
 ├── docker-compose.yml
-├── turbo.json
-└── pnpm-workspace.yaml
+├── package.json
+├── pnpm-workspace.yaml
+└── turbo.json
 ```
 
 ## 🔧 Variáveis de Ambiente
@@ -86,8 +115,8 @@ bun run dev           # Modo desenvolvimento com hot reload
 bun run build         # Build para produção
 bun run start         # Executa build de produção
 
-# Expo (React Native + Web)
-cd apps/expo
+# Frontend (React Native + Web com Expo)
+cd apps/frontend
 npx expo start        # Inicia Expo dev server
 npx expo start --web  # Inicia apenas para Web
 npx expo run:android  # Build e roda no Android
@@ -122,7 +151,7 @@ taskkill /PID <PID> /F
 
 **Solução**:
 1. Verifique se o Metro bundler está rodando
-2. Limpe o cache: `cd apps/expo && npx expo start --clear`
+2. Limpe o cache: `cd apps/frontend && npx expo start --clear`
 3. Verifique a URL da API no `.env`
 
 ### Problema: Database connection failed
