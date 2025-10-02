@@ -4,13 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "echo \"Starting development...\"",
-    "build": "echo \"Building project...\"",
-    "test": "echo \"Running tests...\"",
-    "lint": "echo \"Linting code...\""
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down -v",
+    "db:migrate": "pnpm -C packages/db migrate:up",
+    "db:codegen": "pnpm -C packages/db codegen"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.17.1"
+  "packageManager": "pnpm@10.17.1",
+  "devDependencies": {
+    "turbo": "^2.5.8"
+  }
 }
