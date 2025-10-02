@@ -1,0 +1,20 @@
+{
+  "name": "@tms/config",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./env": "./dist/env.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@tms/tsconfig": "workspace:*",
+    "typescript": "^5.7.3"
+  }
+}
