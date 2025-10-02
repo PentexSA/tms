@@ -1,0 +1,27 @@
+{
+  "name": "@tms/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "migrate:up": "tsx src/migrate.ts up",
+    "migrate:down": "tsx src/migrate.ts down",
+    "codegen": "kysely-codegen --out src/types.ts --dialect postgres \"$DATABASE_URL\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "kysely": "^0.27.5",
+    "pg": "^8.14.0"
+  },
+  "devDependencies": {
+    "@tms/tsconfig": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "kysely-codegen": "^0.17.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
