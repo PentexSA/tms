@@ -31,6 +31,116 @@ pnpm db:codegen
 pnpm dev
 ```
 
+## 📖 Passo a Passo Detalhado
+
+### 1️⃣ Pré-requisitos
+
+Antes de começar, certifique-se de ter instalado:
+
+- **Node.js** (v18 ou superior): [nodejs.org](https://nodejs.org)
+- **pnpm** (v8 ou superior):
+  ```bash
+  npm install -g pnpm
+  ```
+- **Bun** (v1.2 ou superior): [bun.sh](https://bun.sh)
+  ```bash
+  curl -fsSL https://bun.sh/install | bash
+  ```
+- **Docker Desktop**: [docker.com/get-started](https://www.docker.com/get-started)
+
+### 2️⃣ Clone e Configuração Inicial
+
+```bash
+# Clone o repositório
+git clone <url-do-repositorio>
+cd tms
+
+# Instale todas as dependências do monorepo
+pnpm install
+```
+
+### 3️⃣ Configuração do Banco de Dados
+
+```bash
+# 1. Copie o arquivo de exemplo de variáveis de ambiente
+cp .env.example .env
+
+# 2. (Opcional) Edite o .env se precisar customizar portas ou credenciais
+# Padrões: postgres:postgres@localhost:5432/tms
+
+# 3. Inicie o PostgreSQL via Docker Compose
+pnpm db:up
+
+# Aguarde alguns segundos para o banco inicializar completamente
+
+# 4. Execute as migrations para criar as tabelas
+pnpm db:migrate
+
+# 5. Gere os tipos TypeScript a partir do schema do banco
+pnpm db:codegen
+```
+
+### 4️⃣ Iniciando a Aplicação
+
+#### Opção A: Rodar Tudo Simultaneamente
+
+```bash
+# Inicia API + Frontend em paralelo
+pnpm dev
+```
+
+Aguarde até ver as mensagens:
+- ✓ API rodando em `http://localhost:3001`
+- ✓ Expo pronto - pressione 'w' para abrir no navegador
+
+#### Opção B: Rodar Apps Separadamente
+
+**Terminal 1 - API:**
+```bash
+cd apps/api
+bun run dev
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd apps/frontend
+npx expo start
+```
+
+### 5️⃣ Acessando a Aplicação
+
+- **API REST**: http://localhost:3001
+- **Documentação Swagger**: http://localhost:3001/swagger
+- **Frontend Web**: Pressione `w` no terminal do Expo ou acesse http://localhost:8081
+- **Frontend Mobile**:
+  - Android: Pressione `a` no terminal do Expo
+  - iOS: Pressione `i` no terminal do Expo (apenas macOS)
+  - Expo Go App: Escaneie o QR Code com o app Expo Go
+
+### 6️⃣ Verificação
+
+Execute os seguintes comandos para garantir que está tudo funcionando:
+
+```bash
+# Type check
+pnpm typecheck
+
+# Lint
+pnpm lint
+
+# Build (opcional - testa se o build funciona)
+pnpm build
+```
+
+### 7️⃣ Parando a Aplicação
+
+```bash
+# Parar os apps (Ctrl+C nos terminais)
+
+# Parar e remover o banco de dados Docker
+pnpm db:down
+```
+
 ## 📁 Estrutura do Monorepo
 
 ```
