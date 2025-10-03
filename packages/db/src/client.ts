@@ -7,8 +7,7 @@ import type { Database } from './types'
 config()
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  'postgres://postgres:postgres@localhost:5432/tms'
+  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/tms'
 
 export const db = new Kysely<Database>({
   dialect: new PostgresDialect({

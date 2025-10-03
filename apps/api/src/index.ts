@@ -1,10 +1,9 @@
-import { config } from 'dotenv'
-import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
-
 import { API_PORT } from '@tms/config'
 import { db } from '@tms/db'
+import { config } from 'dotenv'
+import { Elysia } from 'elysia'
 
 config()
 

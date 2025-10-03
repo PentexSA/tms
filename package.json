@@ -8,6 +8,8 @@
     "dev:expo": "turbo run dev --filter=frontend",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:up": "docker compose up -d",
@@ -20,6 +22,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.17.1",
   "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
     "@sinclair/typebox": "^0.34.41",
     "turbo": "^2.5.8"
   }

@@ -1,14 +1,18 @@
 import { config } from 'dotenv'
-import * as path from 'path'
 import { promises as fs } from 'fs'
-import { Kysely, Migrator, FileMigrationProvider, PostgresDialect } from 'kysely'
+import {
+  FileMigrationProvider,
+  Kysely,
+  Migrator,
+  PostgresDialect,
+} from 'kysely'
+import * as path from 'path'
 import { Pool } from 'pg'
 
 config()
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  'postgres://postgres:postgres@localhost:5432/tms'
+  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/tms'
 
 async function migrateToLatest() {
   const db = new Kysely({
@@ -69,7 +73,9 @@ async function migrateDown() {
 
   results?.forEach(it => {
     if (it.status === 'Success') {
-      console.log(`migration "${it.migrationName}" was rolled back successfully`)
+      console.log(
+        `migration "${it.migrationName}" was rolled back successfully`
+      )
     } else if (it.status === 'Error') {
       console.error(`failed to roll back migration "${it.migrationName}"`)
     }

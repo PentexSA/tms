@@ -11,7 +11,9 @@
       "outputs": ["dist/**", "build/**", ".frontend/**"]
     },
     "lint": {
-      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "format": {
       "outputs": []
     },
     "typecheck": {

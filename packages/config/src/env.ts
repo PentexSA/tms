@@ -1,6 +1,5 @@
 export const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  'postgres://postgres:postgres@localhost:5432/tms'
+  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/tms'
 
 export const API_PORT = process.env.API_PORT
   ? parseInt(process.env.API_PORT, 10)

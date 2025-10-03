@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import {
-  View,
-  StyleSheet,
-  ViewStyle,
-  SafeAreaView,
   Platform,
+  SafeAreaView,
+  StyleSheet,
+  View,
+  ViewStyle,
 } from 'react-native'
 
 export interface ScreenProps {
@@ -18,11 +18,7 @@ export function Screen({ children, style, safe = true }: ScreenProps) {
 
   return (
     <Container
-      style={[
-        styles.container,
-        Platform.OS === 'web' && styles.web,
-        style,
-      ]}
+      style={[styles.container, Platform.OS === 'web' && styles.web, style]}
     >
       {children}
     </Container>
