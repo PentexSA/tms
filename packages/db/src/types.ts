@@ -3,21 +3,84 @@
  * Please do not edit it manually.
  */
 
-import type { ColumnType } from 'kysely'
+import type { ColumnType } from "kysely";
 
-export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
-  ? ColumnType<S, I | undefined, U>
-  : ColumnType<T, T | undefined, T>
+export type Generated<T> =
+  T extends ColumnType<infer S, infer I, infer U>
+    ? ColumnType<S, I | undefined, U>
+    : ColumnType<T, T | undefined, T>;
 
-export type Timestamp = ColumnType<Date, Date | string, Date | string>
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
+export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export interface Characters {
+  chronicle_id: string;
+  created_at: Generated<Timestamp | null>;
+  deleted_at: Timestamp | null;
+  id: Generated<string>;
+  name: string;
+  sheet_data: Json | null;
+  system_id: string;
+  updated_at: Generated<Timestamp | null>;
+  user_id: string;
+}
+
+export interface Chronicles {
+  created_at: Generated<Timestamp | null>;
+  id: Generated<string>;
+  name: string;
+  storyteller_id: string;
+  system_id: string;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface GameSystems {
+  code: string;
+  created_at: Generated<Timestamp | null>;
+  family: string | null;
+  id: Generated<string>;
+  name: string;
+}
 
 export interface Todos {
-  created_at: Generated<Timestamp | null>
-  done: Generated<boolean>
-  id: Generated<number>
-  title: string
+  created_at: Generated<Timestamp | null>;
+  done: Generated<boolean>;
+  id: Generated<number>;
+  title: string;
+}
+
+export interface TraitTemplates {
+  id: Generated<string>;
+  system_id: string;
+  template_data: Json | null;
+}
+
+export interface Users {
+  created_at: Generated<Timestamp | null>;
+  deleted_at: Timestamp | null;
+  email: string;
+  hashed_password: string;
+  id: Generated<string>;
+  updated_at: Generated<Timestamp | null>;
+  username: string;
 }
 
 export interface DB {
-  todos: Todos
+  characters: Characters;
+  chronicles: Chronicles;
+  game_systems: GameSystems;
+  todos: Todos;
+  trait_templates: TraitTemplates;
+  users: Users;
 }
