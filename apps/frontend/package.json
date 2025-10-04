@@ -9,9 +9,9 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~54.0.12",
-    "expo-router": "~6.0.10",
-    "expo-status-bar": "~3.0.8",
+    "expo": "54.0.12",
+    "expo-router": "6.0.10",
+    "expo-status-bar": "3.0.8",
     "react": "catalog:",
     "react-native": "catalog:"
   },

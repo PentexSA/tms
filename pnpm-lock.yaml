@@ -70,13 +70,13 @@ importers:
   apps/frontend:
     dependencies:
       expo:
-        specifier: ~54.0.12
+        specifier: 54.0.12
         version: 54.0.12(@babel/core@7.28.4)(@expo/metro-runtime@6.1.2)(expo-router@6.0.10)(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0)
       expo-router:
-        specifier: ~6.0.10
+        specifier: 6.0.10
         version: 6.0.10(@expo/metro-runtime@6.1.2)(@types/react@19.1.10)(expo-constants@18.0.9)(expo-linking@8.0.8)(expo@54.0.12)(react-dom@19.1.0(react@19.1.0))(react-native-gesture-handler@2.28.0(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native-reanimated@4.1.2(@babel/core@7.28.4)(react-native-worklets@0.6.0(@babel/core@7.28.4)(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.1(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native-screens@4.16.0(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native-web@0.19.13(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0)
       expo-status-bar:
-        specifier: ~3.0.8
+        specifier: 3.0.8
         version: 3.0.8(react-native@0.81.4(@babel/core@7.28.4)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0)
       react:
         specifier: 'catalog:'
@@ -107,14 +107,14 @@ importers:
   packages/db:
     dependencies:
       dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
+        specifier: 16.4.7
+        version: 16.4.7
       kysely:
-        specifier: ^0.27.5
-        version: 0.27.6
+        specifier: 0.27.5
+        version: 0.27.5
       pg:
-        specifier: ^8.14.0
-        version: 8.16.3
+        specifier: 8.14.0
+        version: 8.14.0
     devDependencies:
       '@tms/tsconfig':
         specifier: workspace:*
@@ -124,7 +124,7 @@ importers:
         version: 8.11.10
       kysely-codegen:
         specifier: 0.19.0
-        version: 0.19.0(kysely@0.27.6)(pg@8.16.3)(typescript@5.9.3)
+        version: 0.19.0(kysely@0.27.5)(pg@8.14.0)(typescript@5.9.3)
       tsx:
         specifier: 4.19.2
         version: 4.19.2
@@ -1963,10 +1963,6 @@ packages:
     resolution: {integrity: sha512-47qPchRCykZC03FhkYAhrvwU4xDBFIj1QPqaarj6mdM/hgUzfPHcpkHJOn3mJAufFeeAxAzeGsr5X0M4k6fLZQ==}
     engines: {node: '>=12'}
 
-  dotenv@16.6.1:
-    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
-    engines: {node: '>=12'}
-
   dotenv@17.2.3:
     resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
     engines: {node: '>=12'}
@@ -2521,8 +2517,8 @@ packages:
       tedious:
         optional: true
 
-  kysely@0.27.6:
-    resolution: {integrity: sha512-FIyV/64EkKhJmjgC0g2hygpBv5RNWVPyNCqSAD7eTCv6eFWNIi4PN1UvdSJGicN/o35bnevgis4Y0UDC0qi8jQ==}
+  kysely@0.27.5:
+    resolution: {integrity: sha512-s7hZHcQeSNKpzCkHRm8yA+0JPLjncSWnjb+2TIElwS2JAqYr+Kv3Ess+9KFfJS0C1xcQ1i9NkNHpWwCYpHMWsA==}
     engines: {node: '>=14.0.0'}
 
   lan-network@0.1.7:
@@ -2965,9 +2961,9 @@ packages:
     resolution: {integrity: sha512-o2XFanIMy/3+mThw69O8d4n1E5zsLhdO+OPqswezu7Z5ekP4hYDqlDjlmOpYMbzY2Br0ufCwJLdDIXeNVwcWFg==}
     engines: {node: '>=10'}
 
-  pg@8.16.3:
-    resolution: {integrity: sha512-enxc1h0jA/aq5oSDMvqyW3q89ra6XIIDZgCX9vkMrnz5DFTw/Ny3Li2lFQ+pt3L6MCgm/5o2o8HW9hiJji+xvw==}
-    engines: {node: '>= 16.0.0'}
+  pg@8.14.0:
+    resolution: {integrity: sha512-nXbVpyoaXVmdqlKEzToFf37qzyeeh7mbiXsnoWvstSqohj88yaa/I/Rq/HEVn2QPSZEuLIJa/jSpRDyzjEx4FQ==}
+    engines: {node: '>= 8.0.0'}
     peerDependencies:
       pg-native: '>=3.0.1'
     peerDependenciesMeta:
@@ -5986,8 +5982,6 @@ snapshots:
 
   dotenv@16.4.7: {}
 
-  dotenv@16.6.1: {}
-
   dotenv@17.2.3: {}
 
   eastasianwidth@0.2.0: {}
@@ -6567,24 +6561,24 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  kysely-codegen@0.19.0(kysely@0.27.6)(pg@8.16.3)(typescript@5.9.3):
+  kysely-codegen@0.19.0(kysely@0.27.5)(pg@8.14.0)(typescript@5.9.3):
     dependencies:
       chalk: 4.1.2
       cosmiconfig: 9.0.0(typescript@5.9.3)
       dotenv: 17.2.3
       dotenv-expand: 12.0.3
       git-diff: 2.0.6
-      kysely: 0.27.6
+      kysely: 0.27.5
       micromatch: 4.0.8
       minimist: 1.2.8
       pluralize: 8.0.0
       zod: 4.1.11
     optionalDependencies:
-      pg: 8.16.3
+      pg: 8.14.0
     transitivePeerDependencies:
       - typescript
 
-  kysely@0.27.6: {}
+  kysely@0.27.5: {}
 
   lan-network@0.1.7: {}
 
@@ -7057,9 +7051,9 @@ snapshots:
 
   pg-numeric@1.0.2: {}
 
-  pg-pool@3.10.1(pg@8.16.3):
+  pg-pool@3.10.1(pg@8.14.0):
     dependencies:
-      pg: 8.16.3
+      pg: 8.14.0
 
   pg-protocol@1.10.3: {}
 
@@ -7081,10 +7075,10 @@ snapshots:
       postgres-interval: 3.0.0
       postgres-range: 1.1.4
 
-  pg@8.16.3:
+  pg@8.14.0:
     dependencies:
       pg-connection-string: 2.9.1
-      pg-pool: 3.10.1(pg@8.16.3)
+      pg-pool: 3.10.1(pg@8.14.0)
       pg-protocol: 1.10.3
       pg-types: 2.2.0
       pgpass: 1.0.5
