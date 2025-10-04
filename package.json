@@ -2,7 +2,6 @@
   "name": "tms",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:expo": "turbo run dev --filter=frontend",
