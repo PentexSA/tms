@@ -3,3 +3,9 @@ packages:
   - packages/*
 
 nodeLinker: hoisted
+
+catalog:
+  "typescript": 5.9.3
+  "react": 19.1.0
+  "react-native": 0.81.4
+  "@types/react": 19.1.10
