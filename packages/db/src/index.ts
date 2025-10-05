@@ -1,2 +1,2 @@
 export { db } from './client'
-export type { Database } from './types'
+export type { DB } from './types'

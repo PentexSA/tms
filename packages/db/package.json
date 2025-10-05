@@ -13,15 +13,15 @@
     "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms"
   },
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "kysely": "^0.27.5",
-    "pg": "^8.14.0"
+    "dotenv": "16.4.7",
+    "kysely": "0.27.5",
+    "pg": "8.14.0"
   },
   "devDependencies": {
     "@tms/tsconfig": "workspace:*",
-    "@types/pg": "^8.11.10",
-    "kysely-codegen": "^0.19.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "@types/pg": "8.11.10",
+    "kysely-codegen": "0.19.0",
+    "tsx": "4.19.2",
+    "typescript": "catalog:"
   }
 }
