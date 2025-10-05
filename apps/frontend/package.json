@@ -14,7 +14,9 @@
     "expo-router": "6.0.10",
     "expo-status-bar": "3.0.8",
     "react": "catalog:",
-    "react-native": "catalog:"
+    "react-native": "catalog:",
+    "@elysiajs/eden": "catalog:",
+    "@tms/db": "workspace:*"
   },
   "devDependencies": {
     "@rnx-kit/metro-resolver-symlinks": "0.2.6",
