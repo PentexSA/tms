@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react'
+import { config } from '@tms/config/env'
+import { StatusBar } from 'expo-status-bar'
+import { useEffect, useState } from 'react'
 import {
-  View,
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  Platform,
+  View,
 } from 'react-native'
-import { StatusBar } from 'expo-status-bar'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL
 
 interface Todo {
   id: number
@@ -36,7 +35,7 @@ export default function TodosScreen() {
   const fetchTodos = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_URL}/todos`)
+      const response = await fetch(`${config.EXPO_PUBLIC_API_URL}/todos`)
       const data = await response.json()
       setTodos(data)
     } catch (error) {
@@ -51,7 +50,7 @@ export default function TodosScreen() {
 
     try {
       setCreating(true)
-      const response = await fetch(`${API_URL}/todos`, {
+      const response = await fetch(`${config.EXPO_PUBLIC_API_URL}/todos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

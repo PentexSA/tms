@@ -1,13 +1,8 @@
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
-import { API_PORT } from '@tms/config'
+import { config } from '@tms/config/env'
 import { db } from '@tms/db'
-import { config } from 'dotenv'
 import { Elysia } from 'elysia'
-
-config()
-
-const port = API_PORT
 
 const app = new Elysia()
   .use(cors())
@@ -41,7 +36,7 @@ const app = new Elysia()
 
     return todo
   })
-  .listen(port)
+  .listen(config.API_PORT)
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
