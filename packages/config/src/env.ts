@@ -15,7 +15,7 @@ const parseResult = configSchema.safeParse(process.env)
 
 if (!parseResult.success) {
   console.error(
-    '❌ Invalid environment variables:',
+    '❌ Invalid environment variables:\n',
     z.prettifyError(parseResult.error)
   )
 

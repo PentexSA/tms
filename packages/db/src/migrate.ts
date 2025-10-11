@@ -1,4 +1,4 @@
-import { config } from 'dotenv'
+import { config } from '@tms/config/env'
 import { promises as fs } from 'fs'
 import {
   FileMigrationProvider,
@@ -9,16 +9,11 @@ import {
 import * as path from 'path'
 import { Pool } from 'pg'
 
-config()
-
-const DATABASE_URL =
-  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/tms'
-
 async function migrateToLatest() {
   const db = new Kysely({
     dialect: new PostgresDialect({
       pool: new Pool({
-        connectionString: DATABASE_URL,
+        connectionString: config.DATABASE_URL,
       }),
     }),
   })
@@ -55,7 +50,7 @@ async function migrateDown() {
   const db = new Kysely({
     dialect: new PostgresDialect({
       pool: new Pool({
-        connectionString: DATABASE_URL,
+        connectionString: config.DATABASE_URL,
       }),
     }),
   })
