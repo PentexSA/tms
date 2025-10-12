@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -62,30 +61,30 @@ export default function TodosScreen() {
   }
 
   const renderTodo = ({ item }: { item: Todo }) => (
-    <View style={styles.todoItem}>
-      <Text style={styles.todoTitle}>{item.title}</Text>
-      <Text style={styles.todoDate}>
-        {item.created_at
-          ? new Date(item.created_at).toLocaleDateString()
-          : 'N/A'}
+    <View className="bg-white p-4 rounded-lg mb-3 border border-gray-200">
+      <Text className="text-base text-gray-800 font-medium">{item.title}</Text>
+      <Text className="text-xs text-gray-400 mt-1">
+        {new Date(item.created_at).toLocaleDateString()}
       </Text>
     </View>
   )
 
   return (
-    <View style={styles.container}>
+    <View
+      className={`flex-1 bg-gray-100 ${Platform.OS === 'ios' ? 'pt-[50px]' : 'pt-[30px]'}`}
+    >
       <StatusBar style="auto" />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Todos</Text>
-        <Text style={styles.headerSubtitle}>
+      <View className="px-5 py-5 bg-white border-b border-gray-200">
+        <Text className="text-[32px] font-bold text-gray-800">My Todos</Text>
+        <Text className="text-sm text-gray-600 mt-1">
           {Platform.OS === 'web' ? 'Web' : 'Mobile'} • {todos.length} items
         </Text>
       </View>
 
-      <View style={styles.inputContainer}>
+      <View className="flex-row p-4 bg-white border-b border-gray-200">
         <TextInput
-          style={styles.input}
+          className="flex-1 h-11 border border-gray-300 rounded-lg px-3 text-base bg-white"
           placeholder="What needs to be done?"
           value={newTodoTitle}
           onChangeText={setNewTodoTitle}
@@ -93,20 +92,20 @@ export default function TodosScreen() {
           editable={!creating}
         />
         <TouchableOpacity
-          style={[styles.addButton, creating && styles.addButtonDisabled]}
+          className={`ml-3 bg-blue-500 px-5 rounded-lg justify-center items-center min-w-[70px] ${creating ? 'opacity-50' : ''}`}
           onPress={createTodo}
           disabled={creating || !newTodoTitle.trim()}
         >
           {creating ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.addButtonText}>Add</Text>
+            <Text className="text-white text-base font-semibold">Add</Text>
           )}
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
+        <View className="flex-1 justify-center items-center py-10">
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
       ) : (
@@ -114,10 +113,12 @@ export default function TodosScreen() {
           data={todos}
           renderItem={renderTodo}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={{ padding: 16, flexGrow: 1 }}
           ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.emptyText}>No todos yet. Create one!</Text>
+            <View className="flex-1 justify-center items-center py-10">
+              <Text className="text-base text-gray-400">
+                No todos yet. Create one!
+              </Text>
             </View>
           }
         />
@@ -125,94 +126,3 @@ export default function TodosScreen() {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  input: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  addButton: {
-    marginLeft: 12,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 70,
-  },
-  addButtonDisabled: {
-    opacity: 0.5,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  listContent: {
-    padding: 16,
-    flexGrow: 1,
-  },
-  todoItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  todoTitle: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  todoDate: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
-})
