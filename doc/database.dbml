@@ -1,0 +1,48 @@
+Project {
+  database_type: "PostgreSQL"
+}
+
+Table users {
+  id uuid [pk]
+  email text [not null, unique]
+  username text [not null, unique]
+  hashed_password text [not null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table game_systems {
+  id uuid [pk]
+  code text [not null, unique]
+  name text [not null]
+  family text
+  created_at timestamp
+}
+
+Table chronicles {
+  id uuid [pk]
+  storyteller_id uuid [not null, ref: > users.id]
+  system_id uuid [not null, ref: > game_systems.id]
+  name text [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table characters {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  chronicle_id uuid [not null, ref: > chronicles.id]
+  system_id uuid [not null, ref: > game_systems.id]
+  name text [not null]
+  sheet_data jsonb
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table trait_templates {
+  id uuid [pk]
+  system_id uuid [not null, ref: > game_systems.id]
+  template_data jsonb
+}

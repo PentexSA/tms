@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture Overview
 
 This is a Turborepo monorepo with:
+
 - **API**: Elysia (Bun runtime) REST API in `apps/api`
 - **Frontend**: Expo (React Native + Web) with Expo Router in `apps/frontend`
 - **Database**: PostgreSQL with Kysely query builder + migrations
@@ -28,7 +29,7 @@ packages/
 
 **Workspace Dependencies**: All internal packages use `workspace:*` protocol in package.json. Shared packages are imported as `@tms/config`, `@tms/db`, `@tms/ui`.
 
-**Database Layer**: Kysely provides type-safe SQL queries. The DB schema is defined in migrations (`packages/db/src/migrations/*.ts`). After schema changes, run `pnpm db:codegen` to regenerate TypeScript types in `packages/db/src/types.ts`.
+**Database Layer**: Kysely provides type-safe SQL queries. The DB schema is defined in migrations (`packages/db/src/migrations/*.ts`). After schema changes, run `npx pnpm db:codegen` to regenerate TypeScript types in `packages/db/src/types.ts`.
 
 **Environment Variables**: Centralized in `@tms/config` package (`packages/config/src/env.ts`). Provides defaults for DATABASE_URL, API_PORT, and EXPO_PUBLIC_API_URL.
 
@@ -39,18 +40,20 @@ packages/
 ## Development Commands
 
 ### Initial Setup
+
 ```bash
-pnpm install                    # Install all dependencies
+npx pnpm install                    # Install all dependencies
 cp .env.example .env           # Copy environment template
-pnpm db:up                     # Start PostgreSQL via Docker
-pnpm db:migrate                # Run migrations
-pnpm db:codegen                # Generate TypeScript types from DB schema
+npx pnpm db:up                     # Start PostgreSQL via Docker
+npx pnpm db:migrate                # Run migrations
+npx pnpm db:codegen                # Generate TypeScript types from DB schema
 ```
 
 ### Development
+
 ```bash
-pnpm dev                       # Start all apps in parallel
-pnpm dev:expo                  # Start only frontend
+npx pnpm dev                       # Start all apps in parallel
+npx pnpm dev:expo                  # Start only frontend
 
 # Individual apps
 cd apps/api && bun run dev     # API only (hot reload)
@@ -58,23 +61,26 @@ cd apps/frontend && npx expo start  # Frontend only
 ```
 
 ### Database Operations
+
 ```bash
-pnpm db:up                     # Start PostgreSQL container
-pnpm db:down                   # Stop and remove PostgreSQL + volumes
-pnpm db:migrate                # Run migrations (up)
-pnpm db:codegen                # Regenerate types from schema
-cd packages/db && pnpm migrate:down  # Rollback last migration
+npx pnpm db:up                     # Start PostgreSQL container
+npx pnpm db:down                   # Stop and remove PostgreSQL + volumes
+npx pnpm db:migrate                # Run migrations (up)
+npx pnpm db:codegen                # Regenerate types from schema
+cd packages/db && npx pnpm migrate:down  # Rollback last migration
 ```
 
 ### Quality Checks
+
 ```bash
-pnpm typecheck                 # Type check all packages
-pnpm lint                      # Lint all packages
-pnpm build                     # Build all packages
-pnpm test                      # Run all tests
+npx pnpm typecheck                 # Type check all packages
+npx pnpm lint                      # Lint all packages
+npx pnpm build                     # Build all packages
+npx pnpm test                      # Run all tests
 ```
 
 ### Individual Package Commands
+
 ```bash
 # API (must use Bun)
 cd apps/api
@@ -92,31 +98,35 @@ npx expo run:ios               # Build and run iOS (macOS only)
 
 # Database package
 cd packages/db
-pnpm build                     # Compile TypeScript
-pnpm migrate:up                # Run migrations
-pnpm migrate:down              # Rollback migration
-pnpm codegen                   # Generate types
+npx pnpm build                     # Compile TypeScript
+npx pnpm migrate:up                # Run migrations
+npx pnpm migrate:down              # Rollback migration
+npx pnpm codegen                   # Generate types
 ```
 
 ## Workflow Guidelines
 
 **Adding Database Schema Changes**:
+
 1. Create new migration in `packages/db/src/migrations/` following pattern `XXXX_description.ts`
-2. Run `pnpm db:migrate` to apply migration
-3. Run `pnpm db:codegen` to regenerate types
-4. Rebuild db package: `cd packages/db && pnpm build`
+2. Run `npx pnpm db:migrate` to apply migration
+3. Run `npx pnpm db:codegen` to regenerate types
+4. Rebuild db package: `cd packages/db && npx pnpm build`
 
 **Adding API Routes**:
+
 - Edit `apps/api/src/index.ts`
 - Import and use `db` from `@tms/db`
 - Use Elysia's chainable API pattern
 - Swagger automatically updates at `/swagger`
 
 **Shared Package Changes**:
-- After modifying shared packages (`@tms/config`, `@tms/db`, `@tms/ui`), rebuild them with `pnpm build` or individual package `pnpm build`
+
+- After modifying shared packages (`@tms/config`, `@tms/db`, `@tms/ui`), rebuild them with `npx pnpm build` or individual package `npx pnpm build`
 - Turborepo handles build order via `dependsOn` in `turbo.json`
 
 **Environment Variables**:
+
 - API and DB packages: use process.env directly or import from `@tms/config`
 - Expo frontend: must prefix with `EXPO_PUBLIC_` to be available in app
 
@@ -133,7 +143,7 @@ pnpm codegen                   # Generate types
 
 ## Troubleshooting
 
-**Types not found after codegen**: Rebuild the db package with `cd packages/db && pnpm build`
+**Types not found after codegen**: Rebuild the db package with `cd packages/db && npx pnpm build`
 
 **API won't start**: Ensure Bun is installed and PostgreSQL is running (`docker ps | grep postgres`)
 
