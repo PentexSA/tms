@@ -2,7 +2,6 @@ import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
 import { config } from '@tms/config/env'
 import { db } from '@tms/db'
-
 import { Elysia, t } from 'elysia'
 
 const app = new Elysia()
