@@ -78,8 +78,7 @@ async function migrateDown() {
   })
 
   if (error) {
-    logger.error('failed to migrate down')
-    logger.error(error)
+    logger.error(error, 'failed to migrate down')
     process.exit(1)
   }
 
