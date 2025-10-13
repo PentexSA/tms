@@ -19,7 +19,7 @@ export const loggerMiddleware = new Elysia({ name: 'logger' })
           body: response,
           statusCode: set.status,
         },
-        error: serializeError(error, { maxDepth: 1 }),
+        ...(error ? { error: serializeError(error, { maxDepth: 1 }) } : {}),
         responseTime,
       }
 
