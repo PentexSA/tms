@@ -3,8 +3,11 @@ import { swagger } from '@elysiajs/swagger'
 import { config } from '@tms/config/env'
 import { db } from '@tms/db'
 import { Elysia } from 'elysia'
+import { logger } from './logger'
+import { loggerMiddleware } from './middlewares/loggerMiddleware'
 
 const app = new Elysia()
+  .use(loggerMiddleware)
   .use(cors())
   .use(
     swagger({
@@ -38,6 +41,6 @@ const app = new Elysia()
   })
   .listen(config.API_PORT)
 
-console.log(
+logger.info(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
 )
