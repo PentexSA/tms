@@ -8,6 +8,7 @@ import {
 } from 'kysely'
 import * as path from 'path'
 import { Pool } from 'pg'
+import { kyselyLogger, logger } from './logger'
 
 async function migrateToLatest() {
   const db = new Kysely({
@@ -16,6 +17,7 @@ async function migrateToLatest() {
         connectionString: config.DATABASE_URL,
       }),
     }),
+    log: kyselyLogger,
   })
 
   const migrator = new Migrator({
@@ -31,15 +33,14 @@ async function migrateToLatest() {
 
   results?.forEach(it => {
     if (it.status === 'Success') {
-      console.log(`migration "${it.migrationName}" was executed successfully`)
+      logger.info(`migration "${it.migrationName}" was executed successfully`)
     } else if (it.status === 'Error') {
-      console.error(`failed to execute migration "${it.migrationName}"`)
+      logger.error(`failed to execute migration "${it.migrationName}"`)
     }
   })
 
   if (error) {
-    console.error('failed to migrate')
-    console.error(error)
+    logger.error(error, 'failed to migrate')
     process.exit(1)
   }
 
@@ -68,17 +69,17 @@ async function migrateDown() {
 
   results?.forEach(it => {
     if (it.status === 'Success') {
-      console.log(
+      logger.info(
         `migration "${it.migrationName}" was rolled back successfully`
       )
     } else if (it.status === 'Error') {
-      console.error(`failed to roll back migration "${it.migrationName}"`)
+      logger.error(`failed to roll back migration "${it.migrationName}"`)
     }
   })
 
   if (error) {
-    console.error('failed to migrate down')
-    console.error(error)
+    logger.error('failed to migrate down')
+    logger.error(error)
     process.exit(1)
   }
 
@@ -92,6 +93,6 @@ if (command === 'up') {
 } else if (command === 'down') {
   migrateDown()
 } else {
-  console.log('Usage: tsx src/migrate.ts [up|down]')
+  logger.info('Usage: tsx src/migrate.ts [up|down]')
   process.exit(1)
 }

@@ -18,7 +18,9 @@
     "@tms/db": "workspace:*",
     "dotenv": "16.4.7",
     "elysia": "catalog:",
-    "@elysiajs/eden": "catalog:"
+    "@elysiajs/eden": "catalog:",
+    "@tms/logger": "workspace:*",
+    "serialize-error": "12.0.0"
   },
   "devDependencies": {
     "bun-types": "1.2.5",
