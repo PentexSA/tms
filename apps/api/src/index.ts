@@ -2,7 +2,7 @@ import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
 import { config } from '@tms/config/env'
 import { db } from '@tms/db'
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 
 const app = new Elysia()
   .use(cors())
@@ -25,18 +25,28 @@ const app = new Elysia()
       .execute()
     return todos
   })
-  .post('/todos', async ({ body }) => {
-    const { title } = body as { title: string }
+  .post(
+    '/todos',
+    async ({ body }) => {
+      const { title } = body as { title: string }
 
-    const [todo] = await db
-      .insertInto('todos')
-      .values({ title })
-      .returningAll()
-      .execute()
+      const [todo] = await db
+        .insertInto('todos')
+        .values({ title })
+        .returningAll()
+        .execute()
 
-    return todo
-  })
+      return todo
+    },
+    {
+      body: t.Object({
+        title: t.String(),
+      }),
+    }
+  )
   .listen(config.API_PORT)
+
+export type App = typeof app
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`

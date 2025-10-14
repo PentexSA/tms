@@ -1,4 +1,6 @@
+import { treaty } from '@elysiajs/eden'
 import { config } from '@tms/config/env'
+import type { Todo } from '@tms/db'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import {
@@ -12,32 +14,25 @@ import {
   View,
 } from 'react-native'
 
-interface Todo {
-  id: number
-  title: string
-  completed: boolean
-  created_at: string
-  updated_at: string | null
-}
+import type { App } from '../../api/src/index'
 
 export default function TodosScreen() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [newTodoTitle, setNewTodoTitle] = useState('')
+  const client = treaty<App>(`${config.EXPO_PUBLIC_API_URL}`)
 
   useEffect(() => {
-    console.warn('!23123123')
-
     fetchTodos()
   }, [])
 
   const fetchTodos = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${config.EXPO_PUBLIC_API_URL}/todos`)
-      const data = await response.json()
-      setTodos(data)
+      const { data } = await client.todos.get()
+
+      setTodos(data ?? [])
     } catch (error) {
       console.error('Error fetching todos:', error)
     } finally {
@@ -50,15 +45,14 @@ export default function TodosScreen() {
 
     try {
       setCreating(true)
-      const response = await fetch(`${config.EXPO_PUBLIC_API_URL}/todos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title: newTodoTitle }),
+      const response = await client.todos.post({
+        title: newTodoTitle,
       })
-      const newTodo = await response.json()
-      setTodos([newTodo, ...todos])
+      const newTodo = response.data as Todo | null
+
+      if (newTodo) {
+        setTodos([newTodo, ...todos])
+      }
       setNewTodoTitle('')
     } catch (error) {
       console.error('Error creating todo:', error)
@@ -71,7 +65,9 @@ export default function TodosScreen() {
     <View style={styles.todoItem}>
       <Text style={styles.todoTitle}>{item.title}</Text>
       <Text style={styles.todoDate}>
-        {new Date(item.created_at).toLocaleDateString()}
+        {item.created_at
+          ? new Date(item.created_at).toLocaleDateString()
+          : 'N/A'}
       </Text>
     </View>
   )

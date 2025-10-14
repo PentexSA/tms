@@ -16,7 +16,9 @@
     "@sinclair/typebox": "0.34.41",
     "@tms/config": "workspace:*",
     "@tms/db": "workspace:*",
-    "elysia": "1.2.20"
+    "dotenv": "16.4.7",
+    "elysia": "catalog:",
+    "@elysiajs/eden": "catalog:"
   },
   "devDependencies": {
     "bun-types": "1.2.5",
