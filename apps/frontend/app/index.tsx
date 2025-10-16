@@ -29,9 +29,13 @@ export default function TodosScreen() {
   const fetchTodos = async () => {
     try {
       setLoading(true)
-      const { data } = await client.todos.get()
+      const response = await client.todos.get()
 
-      setTodos(data ?? [])
+      if (response.data && Array.isArray(response.data)) {
+        setTodos(response.data)
+      } else {
+        setTodos([])
+      }
     } catch (error) {
       console.error('Error fetching todos:', error)
     } finally {
@@ -64,7 +68,9 @@ export default function TodosScreen() {
     <View className="bg-white p-4 rounded-lg mb-3 border border-gray-200">
       <Text className="text-base text-gray-800 font-medium">{item.title}</Text>
       <Text className="text-xs text-gray-400 mt-1">
-        {new Date(item.created_at).toLocaleDateString()}
+        {item.created_at
+          ? new Date(item.created_at).toLocaleDateString()
+          : 'N/A'}
       </Text>
     </View>
   )
