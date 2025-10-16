@@ -21,7 +21,74 @@
       "outputs": []
     },
     "test": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "vitest.config.ts",
+        "vitest.config.base.ts",
+        "vitest.config.ui.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "outputs": [
+        "coverage/**",
+        "node_modules/.vitest/**"
+      ]
+    },
+    "test:watch": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "persistent": true,
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "vitest.config.ts",
+        "vitest.config.base.ts",
+        "vitest.config.ui.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
       "outputs": []
+    },
+    "test:coverage": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "vitest.config.ts",
+        "vitest.config.base.ts",
+        "vitest.config.ui.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "outputs": [
+        "coverage/**",
+        "node_modules/.vitest/**"
+      ]
     }
   }
 }
