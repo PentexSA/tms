@@ -4,7 +4,7 @@
 const path = require('path')
 const { getDefaultConfig } = require('expo/metro-config')
 const symlinkResolver = require('@rnx-kit/metro-resolver-symlinks')
-
+const { withNativeWind } = require('nativewind/metro')
 const projectRoot = __dirname
 const workspaceRoot = path.resolve(projectRoot, '../..')
 
@@ -26,4 +26,4 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, 'cjs'],
 }
 
-module.exports = config
+module.exports = withNativeWind(config, { input: './global.css' })
