@@ -1,14 +1,13 @@
 import baseConfig from '@tms/test-config/vitest.config.base'
-import { dirname, resolve } from 'path'
-import { fileURLToPath } from 'url'
-import { defineConfig, mergeConfig } from 'vitest/config'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { defineProject, mergeConfig } from 'vitest/config'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default mergeConfig(
   baseConfig,
-  defineConfig({
+  defineProject({
     test: {
       // Setup file específico da API
       setupFiles: ['./src/test/setup.ts'],
@@ -16,10 +15,14 @@ export default mergeConfig(
       // Environment Node.js para testes de API
       environment: 'node',
 
-      // Opcional: rodar testes em sequência para evitar conflitos de DB
-      // Descomente se tiver problemas com testes paralelos
-      // pool: 'forks',
-      // poolOptions: { forks: { singleFork: true } },
+      // Pool configuration para evitar race conditions com banco de dados
+      // Executar testes em sequência para garantir isolamento
+      pool: 'forks',
+      poolOptions: {
+        forks: {
+          singleFork: true,
+        },
+      },
     },
 
     resolve: {
