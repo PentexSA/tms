@@ -13,6 +13,7 @@
     "@vitest/coverage-v8": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@tms/tsconfig": "workspace:*"
   }
 }
