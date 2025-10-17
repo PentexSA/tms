@@ -1,5 +1,9 @@
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
 import { defineConfig } from 'vitest/config'
-import { resolve } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 /**
  * Base Vitest configuration for Node.js/backend packages
@@ -62,20 +66,10 @@ export default defineConfig({
     },
 
     // Test file patterns
-    include: [
-      'src/**/*.test.ts',
-      'src/**/*.spec.ts',
-      'src/__tests__/**/*.ts',
-    ],
+    include: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/__tests__/**/*.ts'],
 
     // Exclude patterns
-    exclude: [
-      'node_modules',
-      'dist',
-      'build',
-      '.frontend',
-      'coverage',
-    ],
+    exclude: ['node_modules', 'dist', 'build', '.frontend', 'coverage'],
 
     // Timeout settings
     testTimeout: 10000,
