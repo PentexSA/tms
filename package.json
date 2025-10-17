@@ -17,8 +17,8 @@
     "test": "turbo run test",
     "test:watch": "turbo run test:watch --parallel",
     "test:coverage": "turbo run test:coverage",
-    "test:api": "turbo run test --filter=api",
-    "test:frontend": "turbo run test --filter=frontend",
+    "test:api": "turbo run test --filter=@tms/api",
+    "test:frontend": "turbo run test --filter=@tms/frontend",
     "test:packages": "turbo run test --filter='./packages/*'"
   },
   "keywords": [],
