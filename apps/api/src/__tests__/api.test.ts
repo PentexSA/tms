@@ -57,10 +57,6 @@ describe('TMS API Tests', () => {
   // TODOS ENDPOINTS - INTEGRATION TESTS
   // ============================================================================
   describe('Todos API - Integration Tests', () => {
-    beforeEach(async () => {
-      // Limpar DB antes de cada teste
-      // await clearDatabase()
-    })
 
     // --------------------------------------------------------------------------
     // GET /todos
@@ -174,7 +170,7 @@ describe('TMS API Tests', () => {
         expect(response.status).toBe(400)
       })
 
-      it('should accept empty string title (API does not validate this currently)', async () => {
+      it('should accept empty string title', async () => {
         // Arrange
         const app = createTestApp()
 
@@ -183,8 +179,6 @@ describe('TMS API Tests', () => {
         const data = await response.json()
 
         // Assert
-        // NOTE: A API atual aceita strings vazias. Isso poderia ser melhorado
-        // adicionando validação no schema do Elysia com minLength
         expect(response.status).toBe(200)
         expect(data.title).toBe('')
       })
@@ -248,9 +242,6 @@ describe('TMS API Tests', () => {
   // E2E FLOWS
   // ============================================================================
   describe('E2E Flows', () => {
-    beforeEach(async () => {
-      // await clearDatabase()
-    })
 
     describe('Todo CRUD', () => {
       it('should complete full CRUD flow for a todo', async () => {
@@ -279,7 +270,6 @@ describe('TMS API Tests', () => {
           expect.objectContaining({ title: 'Buy groceries' })
         )
 
-        // TODO: Adicionar UPDATE e DELETE quando implementados
       })
 
       it('should handle multiple todos in sequence', async () => {
@@ -386,8 +376,7 @@ describe('TMS API Tests', () => {
         const noTitleResponse = await makeRequest(app, 'POST', '/todos', {})
         expect(noTitleResponse.status).toBe(400)
 
-        // Act & Assert: Can create todo with empty title (API accepts this currently)
-        // NOTE: This could be improved by adding minLength validation
+        // Act & Assert: Can create todo with empty title
         const emptyTitleResponse = await makeRequest(app, 'POST', '/todos', {
           title: '',
         })
@@ -414,8 +403,7 @@ describe('TMS API Tests', () => {
         })
         expect(longTitleResponse.status).toBe(200)
 
-        // Test 2: Title with only whitespace (API accepts this currently)
-        // NOTE: Could be improved with trim validation
+        // Test 2: Title with only whitespace
         const whitespaceResponse = await makeRequest(app, 'POST', '/todos', {
           title: '   ',
         })

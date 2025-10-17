@@ -54,20 +54,8 @@ export function createTestClient(app: Elysia) {
 
 /**
  * Limpa todas as tabelas do banco de dados
- *
- * Usa o DB real para testes
  */
 export async function clearDatabase() {
   const { db } = await import('@tms/db')
   await db.deleteFrom('todos').execute()
-}
-
-/**
- * Popula o banco com dados de teste
- *
- * TODO: Implementar quando necessário
- */
-export async function seedDatabase(data: any) {
-  // Inserir dados de teste no DB
-  // Por enquanto não é necessário, pois os testes criam seus próprios dados
 }
