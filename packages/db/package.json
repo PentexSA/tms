@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",
-    "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms"
+    "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "kysely": "0.27.5",
@@ -18,10 +22,12 @@
     "@tms/config": "workspace:*"
   },
   "devDependencies": {
+    "@tms/test-config": "workspace:*",
     "@tms/tsconfig": "workspace:*",
     "@types/pg": "8.11.10",
     "kysely-codegen": "0.19.0",
     "tsx": "4.19.2",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

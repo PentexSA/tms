@@ -1,0 +1,19 @@
+{
+  "name": "@tms/test-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Vitest configuration for TMS monorepo",
+  "exports": {
+    "./vitest.config.base": "./vitest.config.base.ts",
+    "./vitest.config.ui": "./vitest.config.ui.ts"
+  },
+  "dependencies": {
+    "vitest": "catalog:",
+    "@vitest/ui": "catalog:",
+    "@vitest/coverage-v8": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@tms/tsconfig": "workspace:*"
+  }
+}

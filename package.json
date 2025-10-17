@@ -10,11 +10,16 @@
     "format": "biome format --write .",
     "check": "biome check --write .",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down -v",
     "db:migrate": "pnpm -C packages/db migrate:up",
-    "db:codegen": "pnpm -C packages/db codegen"
+    "db:codegen": "pnpm -C packages/db codegen",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch --parallel",
+    "test:coverage": "turbo run test:coverage",
+    "test:api": "turbo run test --filter=@tms/api",
+    "test:frontend": "turbo run test --filter=@tms/frontend",
+    "test:packages": "turbo run test --filter='./packages/*'"
   },
   "keywords": [],
   "author": "",
