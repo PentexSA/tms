@@ -1,0 +1,6 @@
+{
+  "extends": "@tms/tsconfig/base.json",
+  "compilerOptions": {
+    "allowJs": true
+  }
+}
