@@ -14,6 +14,6 @@ export const createLogger = (loggerConfig: LoggerOptions) =>
         : undefined,
     timestamp: () => `,"time":"${new Date().toLocaleString('pt-BR')}"`,
     base: { pid: false },
-    level: 'debug',
+    level: config.NODE_ENV === 'production' ? 'info' : 'debug',
     ...loggerConfig,
   })
