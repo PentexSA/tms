@@ -2,12 +2,23 @@ packages:
   - apps/*
   - packages/*
 
-nodeLinker: hoisted
-
 catalog:
-  "typescript": 5.9.3
-  "react": 19.1.0
-  "react-native": 0.81.4
-  "@types/react": 19.1.10
-  "elysia": 1.4.9
-  "@elysiajs/eden": 1.4.1
+  '@elysiajs/eden': 1.4.1
+  '@testing-library/jest-dom': 6.6.3
+  '@testing-library/react-native': 13.3.3
+  '@types/jest': 29.5.14
+  '@types/react': 19.1.10
+  elysia: 1.4.9
+  jest: 29.7.0
+  'jest-environment-node': 29.7.0
+  'jest-expo': 54.0.12
+  jsdom: 26.0.0
+  react: 19.1.0
+  react-dom: 19.1.0
+  react-native: 0.81.4
+  react-native-web: 0.19.13
+  react-test-renderer: 19.1.0
+  'ts-jest': 29.2.5
+  typescript: 5.9.3
+
+nodeLinker: hoisted

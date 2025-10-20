@@ -1,14 +1,7 @@
 {
   "extends": "../../packages/tsconfig/base.json",
   "compilerOptions": {
-    "types": [
-      "expo-router"
-    ]
+    "types": ["expo-router", "jest"]
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.d.ts",
-    "nativewind-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", "nativewind-env.d.ts"]
 }

@@ -2,7 +2,8 @@
   "extends": "@tms/tsconfig/react.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "types": ["jest", "react-native"]
   },
   "include": ["src/**/*"]
 }
