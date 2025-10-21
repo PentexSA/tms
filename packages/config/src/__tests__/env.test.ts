@@ -1,8 +1,11 @@
+/// <reference types="bun-types" />
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+
 describe('@tms/config - Environment Configuration', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    jest.resetModules()
+    // Bun isolates modules per test, but we still need to restore env vars
     process.env = { ...originalEnv }
   })
 

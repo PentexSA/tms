@@ -11,16 +11,14 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "devDependencies": {
-    "@tms/jest-config": "workspace:*",
+    "@tms/bun-test-config": "workspace:*",
     "@tms/tsconfig": "workspace:*",
-    "@types/jest": "catalog:",
-    "jest": "catalog:",
-    "ts-jest": "catalog:",
+    "bun-types": "^1.2.5",
     "typescript": "catalog:"
   },
   "dependencies": {

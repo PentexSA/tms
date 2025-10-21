@@ -11,15 +11,32 @@ const configSchema = z.object({
   EXPO_PUBLIC_API_URL: z.url().default('http://localhost:3001'),
 })
 
-const parseResult = configSchema.safeParse(process.env)
+function parseConfig(env: NodeJS.ProcessEnv = process.env) {
+  const parseResult = configSchema.safeParse(env)
 
-if (!parseResult.success) {
-  console.error(
-    '❌ Invalid environment variables:\n',
-    z.prettifyError(parseResult.error)
-  )
+  if (!parseResult.success) {
+    console.error(
+      '❌ Invalid environment variables:\n',
+      z.prettifyError(parseResult.error)
+    )
 
-  process.exit(1)
+    // Only exit in production, not in tests
+    if (env.NODE_ENV !== 'test') {
+      process.exit(1)
+    }
+  }
+
+  return parseResult.data
 }
 
-export const config = parseResult.data
+// Lazy getter that re-parses on each access during tests
+// For production: ESM caches at module load time
+// For tests: Bun isolates each import, so re-parsing picks up env var changes
+export const config = new Proxy({} as z.infer<typeof configSchema>, {
+  get(_target, prop: string | symbol) {
+    // Always parse fresh to pick up env var changes
+    const freshConfig = parseConfig(process.env)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (freshConfig as any)[prop]
+  },
+}) as z.infer<typeof configSchema>
