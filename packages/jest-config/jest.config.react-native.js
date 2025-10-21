@@ -20,9 +20,9 @@
 module.exports = {
   preset: 'jest-expo',
 
-  // Transform ignore patterns for React Native dependencies
+  // Transform ignore patterns for React Native dependencies and PGLite
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@electric-sql)',
   ],
 
   // Test file patterns

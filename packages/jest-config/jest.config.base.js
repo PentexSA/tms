@@ -35,7 +35,9 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
+        useESM: true,
         tsconfig: {
+          module: 'esnext',
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
           resolveJsonModule: true,
@@ -44,8 +46,11 @@ module.exports = {
     ],
   },
 
-  // Transform @tms/* packages (monorepo dependencies)
-  transformIgnorePatterns: ['node_modules/(?!(@tms)/)'],
+  // Transform @tms/* packages (monorepo dependencies) and PGLite
+  transformIgnorePatterns: ['node_modules/(?!(@tms|@electric-sql)/)'],
+
+  // ESM support for PGLite
+  extensionsToTreatAsEsm: ['.ts'],
 
   // Module resolution
   moduleNameMapper: {
