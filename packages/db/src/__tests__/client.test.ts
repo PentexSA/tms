@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+import { describe, expect, it } from 'bun:test'
 import { db } from '../client'
 import { checkConnection } from '../test/helpers'
 

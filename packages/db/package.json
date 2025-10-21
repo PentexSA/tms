@@ -11,23 +11,22 @@
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",
     "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.3.11",
     "kysely": "0.27.5",
     "pg": "8.14.0",
     "@tms/config": "workspace:*"
   },
   "devDependencies": {
-    "@tms/jest-config": "workspace:*",
+    "@tms/bun-test-config": "workspace:*",
     "@tms/tsconfig": "workspace:*",
-    "@types/jest": "catalog:",
     "@types/pg": "8.11.10",
-    "jest": "catalog:",
+    "bun-types": "^1.2.5",
     "kysely-codegen": "0.19.0",
-    "ts-jest": "catalog:",
     "tsx": "4.19.2",
     "typescript": "catalog:"
   }
