@@ -1,33 +1,46 @@
 /// <reference types="bun-types" />
-import { describe, expect, it } from 'bun:test'
-import { db } from '../client'
-import { checkConnection } from '../test/helpers'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import type { Kysely } from 'kysely'
+import { createPGliteTestDb } from '../test/pglite'
+import type { DB } from '../types'
 
 describe('@tms/db - Database Client', () => {
+  let testDb: Kysely<DB>
+  let destroy: () => Promise<void>
+
+  beforeEach(async () => {
+    const result = await createPGliteTestDb()
+    testDb = result.db
+    destroy = result.destroy
+  })
+
+  afterEach(async () => {
+    await destroy()
+  })
+
   describe('Connection', () => {
-    it('should connect to PostgreSQL database', async () => {
-      const isConnected = await checkConnection()
-      expect(isConnected).toBe(true)
+    it('should have PGLite database instance', async () => {
+      expect(testDb).toBeDefined()
+      expect(testDb).toHaveProperty('selectFrom')
     })
 
-    it('should have db instance defined', () => {
-      expect(db).toBeDefined()
-      expect(db).toHaveProperty('selectFrom')
-      expect(db).toHaveProperty('insertInto')
-      expect(db).toHaveProperty('updateTable')
-      expect(db).toHaveProperty('deleteFrom')
+    it('should have query builder methods defined', () => {
+      expect(testDb).toHaveProperty('selectFrom')
+      expect(testDb).toHaveProperty('insertInto')
+      expect(testDb).toHaveProperty('updateTable')
+      expect(testDb).toHaveProperty('deleteFrom')
     })
   })
 
   describe('Query Builder', () => {
     it('should execute SELECT query', async () => {
-      const result = await db.selectFrom('todos').selectAll().execute()
+      const result = await testDb.selectFrom('todos').selectAll().execute()
 
       expect(Array.isArray(result)).toBe(true)
     })
 
     it('should execute INSERT query', async () => {
-      const result = await db
+      const result = await testDb
         .insertInto('todos')
         .values({ title: 'Test Todo' })
         .returningAll()
@@ -40,13 +53,13 @@ describe('@tms/db - Database Client', () => {
     })
 
     it('should execute UPDATE query', async () => {
-      const inserted = await db
+      const inserted = await testDb
         .insertInto('todos')
         .values({ title: 'Update Test' })
         .returningAll()
         .executeTakeFirstOrThrow()
 
-      const updated = await db
+      const updated = await testDb
         .updateTable('todos')
         .set({ done: true })
         .where('id', '=', inserted.id)
@@ -58,15 +71,15 @@ describe('@tms/db - Database Client', () => {
     })
 
     it('should execute DELETE query', async () => {
-      const inserted = await db
+      const inserted = await testDb
         .insertInto('todos')
         .values({ title: 'Delete Test' })
         .returningAll()
         .executeTakeFirstOrThrow()
 
-      await db.deleteFrom('todos').where('id', '=', inserted.id).execute()
+      await testDb.deleteFrom('todos').where('id', '=', inserted.id).execute()
 
-      const found = await db
+      const found = await testDb
         .selectFrom('todos')
         .selectAll()
         .where('id', '=', inserted.id)
@@ -78,7 +91,7 @@ describe('@tms/db - Database Client', () => {
 
   describe('Type Safety', () => {
     it('should have typed query results', async () => {
-      const result = await db
+      const result = await testDb
         .selectFrom('todos')
         .select(['id', 'title', 'done', 'created_at'])
         .limit(1)
@@ -95,7 +108,7 @@ describe('@tms/db - Database Client', () => {
     })
 
     it('should enforce column names at compile time', async () => {
-      const result = await db
+      const result = await testDb
         .selectFrom('todos')
         .select('title')
         .limit(1)
@@ -107,7 +120,7 @@ describe('@tms/db - Database Client', () => {
 
   describe('Transactions', () => {
     it('should support transactions', async () => {
-      await db.transaction().execute(async trx => {
+      await testDb.transaction().execute(async trx => {
         const inserted = await trx
           .insertInto('todos')
           .values({ title: 'Transaction Test' })
@@ -119,13 +132,13 @@ describe('@tms/db - Database Client', () => {
     })
 
     it('should rollback on error', async () => {
-      const initialCount = await db
+      const initialCount = await testDb
         .selectFrom('todos')
-        .select(db.fn.count('id').as('count'))
+        .select(testDb.fn.count('id').as('count'))
         .executeTakeFirstOrThrow()
 
       try {
-        await db.transaction().execute(async trx => {
+        await testDb.transaction().execute(async trx => {
           await trx
             .insertInto('todos')
             .values({ title: 'Rollback Test' })
@@ -141,9 +154,9 @@ describe('@tms/db - Database Client', () => {
         expect((error as Error).message).toBe('Test rollback')
       }
 
-      const finalCount = await db
+      const finalCount = await testDb
         .selectFrom('todos')
-        .select(db.fn.count('id').as('count'))
+        .select(testDb.fn.count('id').as('count'))
         .executeTakeFirstOrThrow()
 
       expect(finalCount.count).toBe(initialCount.count)
@@ -152,7 +165,7 @@ describe('@tms/db - Database Client', () => {
 
   describe('Schema', () => {
     it('should have todos table with correct columns', async () => {
-      const todo = await db
+      const todo = await testDb
         .insertInto('todos')
         .values({ title: 'Schema Test' })
         .returningAll()
@@ -165,7 +178,7 @@ describe('@tms/db - Database Client', () => {
     })
 
     it('should set default value for done column', async () => {
-      const todo = await db
+      const todo = await testDb
         .insertInto('todos')
         .values({ title: 'Default Test' })
         .returningAll()
@@ -177,7 +190,7 @@ describe('@tms/db - Database Client', () => {
     it('should set default value for created_at column', async () => {
       const beforeInsert = new Date()
 
-      const todo = await db
+      const todo = await testDb
         .insertInto('todos')
         .values({ title: 'Timestamp Test' })
         .returningAll()

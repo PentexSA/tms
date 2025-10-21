@@ -2,8 +2,11 @@
   "extends": "@tms/tsconfig/server.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "types": ["bun-types", "jest", "node"]
+    "types": ["bun-types", "jest", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@tms/*": ["../../packages/*/src"]
+    }
   },
   "include": ["src/**/*"]
 }

@@ -23,3 +23,6 @@ export {
   migration_0006_trait_templates_down,
   migration_0006_trait_templates_up,
 } from './migrations'
+
+// Export PGLite test utilities for centralized test database configuration
+export { clearPGliteTodos, createPGliteTestDb } from './test/pglite'

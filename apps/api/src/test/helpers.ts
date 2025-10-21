@@ -1,7 +1,7 @@
 import { treaty } from '@elysiajs/eden'
+import { clearPGliteTodos, createPGliteTestDb } from '@tms/db'
 import { Elysia } from 'elysia'
 import { type App, createApp } from '../index'
-import { clearTestDb, createTestDb } from './db'
 
 // Global test state for managing DB lifecycle
 let testDbInstance: any = null
@@ -19,7 +19,8 @@ let testDbCleanup: (() => Promise<void>) | null = null
  */
 export async function createTestApp() {
   // Create new test DB for each test to ensure isolation
-  const { db, destroy } = await createTestDb()
+  // Uses PGLite from @tms/db for centralized test database configuration
+  const { db, destroy } = await createPGliteTestDb()
   testDbInstance = db
   testDbCleanup = destroy
 
@@ -71,7 +72,7 @@ export function createTestClient(app: Elysia) {
  */
 export async function clearDatabase() {
   if (testDbInstance) {
-    await clearTestDb(testDbInstance)
+    await clearPGliteTodos(testDbInstance)
   }
 }
 
