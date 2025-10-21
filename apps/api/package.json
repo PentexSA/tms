@@ -9,9 +9,9 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "jest --forceExit",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage --forceExit"
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "@elysiajs/cors": "1.4.0",
@@ -24,11 +24,8 @@
     "elysia": "catalog:"
   },
   "devDependencies": {
-    "@tms/jest-config": "workspace:*",
-    "@types/jest": "catalog:",
+    "@tms/bun-test-config": "workspace:*",
     "bun-types": "1.2.5",
-    "jest": "catalog:",
-    "ts-jest": "catalog:",
     "typescript": "catalog:"
   }
 }
