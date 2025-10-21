@@ -1,13 +1,11 @@
 import { Kysely } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
-import {
-  migration_0001_init_up,
-  migration_0002_users_up,
-  migration_0003_game_systems_up,
-  migration_0004_chronicles_up,
-  migration_0005_characters_up,
-  migration_0006_trait_templates_up,
-} from '../migrations'
+import { up as migration_0001_init_up } from '../migrations/0001_init'
+import { up as migration_0002_users_up } from '../migrations/0002_users'
+import { up as migration_0003_game_systems_up } from '../migrations/0003_game_systems'
+import { up as migration_0004_chronicles_up } from '../migrations/0004_chronicles'
+import { up as migration_0005_characters_up } from '../migrations/0005_characters'
+import { up as migration_0006_trait_templates_up } from '../migrations/0006_trait_templates'
 import type { DB } from '../types'
 
 /**
