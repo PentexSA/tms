@@ -1,14 +1,18 @@
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
 import { config } from '@tms/config/env'
-import { db } from '@tms/db'
+import { db as defaultDb } from '@tms/db'
 import { Elysia, t } from 'elysia'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
  * Exportado para ser usado em testes
+ *
+ * @param database - Opcional. Use para injetar um banco mock nos testes
  */
-export const createApp = () => {
+export const createApp = (database?: any) => {
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
+  const db = database || defaultDb
   return new Elysia()
     .use(cors())
     .use(

@@ -31,6 +31,7 @@
     "@sinclair/typebox": "0.34.41",
     "bun-types": "1.2.5",
     "husky": "^9.1.7",
+    "kysely-pglite": "^0.6.1",
     "lint-staged": "^16.2.5",
     "turbo": "2.5.8"
   },

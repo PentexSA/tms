@@ -1,18 +1,29 @@
 import { treaty } from '@elysiajs/eden'
 import { Elysia } from 'elysia'
 import { type App, createApp } from '../index'
+import { clearTestDb, createTestDb } from './db'
+
+// Global test state for managing DB lifecycle
+let testDbInstance: any = null
+let testDbCleanup: (() => Promise<void>) | null = null
 
 /**
- * Cria uma instância de teste da aplicação Elysia
+ * Cria uma instância de teste da aplicação Elysia com PGLite database
  *
  * IMPORTANTE: Não chama .listen() para não abrir porta real
+ * Usa um banco de dados em memória (PGLite) isolado para testes
  *
  * @example
  * const app = createTestApp()
  * const response = await app.handle(new Request('http://localhost/health'))
  */
-export function createTestApp() {
-  return createApp()
+export async function createTestApp() {
+  // Create new test DB for each test to ensure isolation
+  const { db, destroy } = await createTestDb()
+  testDbInstance = db
+  testDbCleanup = destroy
+
+  return createApp(db)
 }
 
 /**
@@ -56,9 +67,22 @@ export function createTestClient(app: Elysia) {
 }
 
 /**
- * Limpa todas as tabelas do banco de dados
+ * Limpa todos os dados do banco de testes
  */
 export async function clearDatabase() {
-  const { db } = await import('@tms/db')
-  await db.deleteFrom('todos').execute()
+  if (testDbInstance) {
+    await clearTestDb(testDbInstance)
+  }
+}
+
+/**
+ * Destroi o banco de dados de teste e libera recursos
+ * Deve ser chamado após cada teste
+ */
+export async function destroyTestDb() {
+  if (testDbCleanup) {
+    await testDbCleanup()
+    testDbInstance = null
+    testDbCleanup = null
+  }
 }
