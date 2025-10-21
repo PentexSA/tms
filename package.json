@@ -18,7 +18,7 @@
     "test:watch": "turbo run test:watch --parallel",
     "test:coverage": "turbo run test:coverage",
     "test:api": "turbo run test --filter=@tms/api",
-    "test:frontend": "turbo run test --filter=@tms/frontend",
+    "test:ui": "turbo run test --filter='./packages/ui' -- && turbo run test --filter=frontend",
     "test:packages": "turbo run test --filter='./packages/*'",
     "prepare": "husky"
   },
@@ -29,11 +29,15 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.5",
     "@sinclair/typebox": "0.34.41",
+    "bun-types": "1.2.5",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.5",
     "turbo": "2.5.8"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": ["biome check --write --no-errors-on-unmatched"]
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.11"
   }
 }
