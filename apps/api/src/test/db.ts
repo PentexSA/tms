@@ -1,4 +1,12 @@
-import { Kysely, sql } from 'kysely'
+import {
+  migration_0001_init_up,
+  migration_0002_users_up,
+  migration_0003_game_systems_up,
+  migration_0004_chronicles_up,
+  migration_0005_characters_up,
+  migration_0006_trait_templates_up,
+} from '@tms/db'
+import { Kysely } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
 
 /**
@@ -18,102 +26,28 @@ interface Database {
 
 /**
  * Apply all migrations from @tms/db to the test database
- * These migrations are defined in packages/db/src/migrations/
+ * These migrations are imported from packages/db/src/migrations/
+ * and reused to keep a single source of truth
  */
 async function applyMigrations(db: Kysely<Database>) {
-  // 0001_init: Create todos table
-  await db.schema
-    .createTable('todos')
-    .addColumn('id', 'serial', col => col.primaryKey())
-    .addColumn('title', 'text', col => col.notNull())
-    .addColumn('done', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('created_at', 'timestamptz', col => col.defaultTo(sql`now()`))
-    .execute()
+  const migrations = [
+    { name: '0001_init', up: migration_0001_init_up },
+    { name: '0002_users', up: migration_0002_users_up },
+    { name: '0003_game_systems', up: migration_0003_game_systems_up },
+    { name: '0004_chronicles', up: migration_0004_chronicles_up },
+    { name: '0005_characters', up: migration_0005_characters_up },
+    { name: '0006_trait_templates', up: migration_0006_trait_templates_up },
+  ]
 
-  // 0002_users: Create users table
-  try {
-    await db.schema
-      .createTable('users')
-      .addColumn('id', 'uuid', col =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
-      )
-      .addColumn('email', 'text', col => col.notNull().unique())
-      .addColumn('username', 'text', col => col.notNull().unique())
-      .addColumn('hashed_password', 'text', col => col.notNull())
-      .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('deleted_at', 'timestamp')
-      .execute()
-  } catch {
-    // Skip if table already exists or UUID is not supported
-  }
-
-  // 0003_game_systems: Create game_systems table
-  try {
-    await db.schema
-      .createTable('game_systems')
-      .addColumn('id', 'uuid', col =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
-      )
-      .addColumn('name', 'text', col => col.notNull())
-      .addColumn('description', 'text')
-      .addColumn('user_id', 'uuid', col => col.notNull())
-      .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .execute()
-  } catch {
-    // Skip if table already exists
-  }
-
-  // 0004_chronicles: Create chronicles table
-  try {
-    await db.schema
-      .createTable('chronicles')
-      .addColumn('id', 'uuid', col =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
-      )
-      .addColumn('name', 'text', col => col.notNull())
-      .addColumn('system_id', 'uuid', col => col.notNull())
-      .addColumn('description', 'text')
-      .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .execute()
-  } catch {
-    // Skip if table already exists
-  }
-
-  // 0005_characters: Create characters table
-  try {
-    await db.schema
-      .createTable('characters')
-      .addColumn('id', 'uuid', col =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
-      )
-      .addColumn('name', 'text', col => col.notNull())
-      .addColumn('chronicle_id', 'uuid', col => col.notNull())
-      .addColumn('user_id', 'uuid', col => col.notNull())
-      .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .execute()
-  } catch {
-    // Skip if table already exists
-  }
-
-  // 0006_trait_templates: Create trait_templates table
-  try {
-    await db.schema
-      .createTable('trait_templates')
-      .addColumn('id', 'uuid', col =>
-        col.primaryKey().defaultTo(sql`gen_random_uuid()`)
-      )
-      .addColumn('system_id', 'uuid', col => col.notNull())
-      .addColumn('name', 'text', col => col.notNull())
-      .addColumn('description', 'text')
-      .addColumn('created_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .addColumn('updated_at', 'timestamp', col => col.defaultTo(sql`now()`))
-      .execute()
-  } catch {
-    // Skip if table already exists
+  for (const migration of migrations) {
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: Migration functions accept unknown
+      await migration.up(db as any)
+    } catch (error) {
+      // Skip if table already exists or migration fails
+      // This is expected for optional tables that may not be supported in PGLite
+      console.debug(`Migration ${migration.name} skipped or failed:`, error)
+    }
   }
 }
 
@@ -132,7 +66,7 @@ export async function createTestDb() {
     dialect: pgliteDb.dialect,
   })
 
-  // Apply all migrations
+  // Apply all migrations from @tms/db
   await applyMigrations(db)
 
   const destroy = async () => {
