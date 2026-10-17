@@ -14,6 +14,7 @@ module.exports = {
     '<rootDir>/app/**/*.test.tsx',
     '<rootDir>/app/**/*.spec.ts',
     '<rootDir>/app/**/*.spec.tsx',
+    '<rootDir>/lib/**/*.test.ts',
     '<rootDir>/test/**/*.test.ts',
     '<rootDir>/test/**/*.test.tsx',
   ],
