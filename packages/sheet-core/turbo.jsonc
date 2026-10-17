@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Os testes leem os templates, as fichas de exemplo, a paleta e o validador
+    // de referência direto de design/: mudar algum deles invalida o cache.
+    "test": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/design/templates/**",
+        "$TURBO_ROOT$/design/scripts/validate.mjs",
+        "$TURBO_ROOT$/design/design-system/tokens.json"
+      ]
+    }
+  }
+}
