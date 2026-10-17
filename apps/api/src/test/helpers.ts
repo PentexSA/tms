@@ -1,4 +1,4 @@
-import { treaty } from '@elysiajs/eden'
+import { type Treaty, treaty } from '@elysiajs/eden'
 import { clearPGliteTodos, createPGliteTestDb } from '@tms/db'
 import { Elysia } from 'elysia'
 import { type App, createApp } from '../index'
@@ -63,7 +63,7 @@ export async function makeRequest(
  * const api = createTestClient(app)
  * const { data } = await api.health.get()
  */
-export function createTestClient(app: Elysia) {
+export function createTestClient(app: Elysia): Treaty.Create<App> {
   return treaty<App>(app as unknown as App)
 }
 
