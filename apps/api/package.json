@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@tms/bun-test-config": "workspace:*",
+    "@tms/tsconfig": "workspace:*",
     "bun-types": "1.2.5",
     "typescript": "catalog:"
   }

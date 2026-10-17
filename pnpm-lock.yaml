@@ -115,6 +115,9 @@ importers:
       '@tms/bun-test-config':
         specifier: workspace:*
         version: link:../../packages/bun-test-config
+      '@tms/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       bun-types:
         specifier: 1.2.5
         version: 1.2.5
