@@ -1,8 +1,6 @@
-import { treaty } from '@elysiajs/eden'
-import { config } from '@tms/config/env'
 import type { Todo } from '@tms/db'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -13,55 +11,20 @@ import {
   View,
 } from 'react-native'
 
-import type { App } from '../../api/src/index'
+import { useCreateTodo, useTodos } from '../hooks/useTodos'
 
 export default function TodosScreen() {
-  const [todos, setTodos] = useState<Todo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [newTodoTitle, setNewTodoTitle] = useState('')
-  const client = treaty<App>(`${config.EXPO_PUBLIC_API_URL}`)
+  const { data: todos = [], isPending, isError, refetch } = useTodos()
+  const createTodo = useCreateTodo()
+  const creating = createTodo.isPending
 
-  useEffect(() => {
-    fetchTodos()
-  }, [])
+  const handleCreateTodo = () => {
+    if (!newTodoTitle.trim() || creating) return
 
-  const fetchTodos = async () => {
-    try {
-      setLoading(true)
-      const response = await client.todos.get()
-
-      if (response.data && Array.isArray(response.data)) {
-        setTodos(response.data)
-      } else {
-        setTodos([])
-      }
-    } catch (error) {
-      console.error('Error fetching todos:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const createTodo = async () => {
-    if (!newTodoTitle.trim()) return
-
-    try {
-      setCreating(true)
-      const response = await client.todos.post({
-        title: newTodoTitle,
-      })
-      const newTodo = response.data as Todo | null
-
-      if (newTodo) {
-        setTodos([newTodo, ...todos])
-      }
-      setNewTodoTitle('')
-    } catch (error) {
-      console.error('Error creating todo:', error)
-    } finally {
-      setCreating(false)
-    }
+    createTodo.mutate(newTodoTitle, {
+      onSuccess: () => setNewTodoTitle(''),
+    })
   }
 
   const renderTodo = ({ item }: { item: Todo }) => (
@@ -94,12 +57,12 @@ export default function TodosScreen() {
           placeholder="What needs to be done?"
           value={newTodoTitle}
           onChangeText={setNewTodoTitle}
-          onSubmitEditing={createTodo}
+          onSubmitEditing={handleCreateTodo}
           editable={!creating}
         />
         <TouchableOpacity
           className={`ml-3 bg-blue-500 px-5 rounded-lg justify-center items-center min-w-[70px] ${creating ? 'opacity-50' : ''}`}
-          onPress={createTodo}
+          onPress={handleCreateTodo}
           disabled={creating || !newTodoTitle.trim()}
         >
           {creating ? (
@@ -110,9 +73,27 @@ export default function TodosScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {createTodo.isError && (
+        <Text className="px-4 pt-3 text-sm text-red-500">
+          Could not create todo. Try again.
+        </Text>
+      )}
+
+      {isPending ? (
         <View className="flex-1 justify-center items-center py-10">
           <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : isError ? (
+        <View className="flex-1 justify-center items-center py-10">
+          <Text className="text-base text-gray-500">Could not load todos.</Text>
+          <TouchableOpacity
+            className="mt-3 bg-blue-500 px-5 py-2 rounded-lg"
+            onPress={() => refetch()}
+          >
+            <Text className="text-white text-base font-semibold">
+              Try again
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList

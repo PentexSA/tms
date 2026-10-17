@@ -4,6 +4,8 @@
  * Configurações específicas do Expo e React Native
  */
 
+import { AppState } from 'react-native'
+
 // Mock do Expo Router para testes
 jest.mock('expo-router', () => ({
   Stack: 'Stack',
@@ -49,6 +51,14 @@ jest.mock('@elysiajs/eden', () => ({
     },
   })),
 }))
+
+// O resetMocks zera o mock do AppState (react-native/jest) antes de cada teste;
+// restaura o retorno de addEventListener usado pelo focusManager no _layout
+beforeEach(() => {
+  jest
+    .mocked(AppState.addEventListener)
+    .mockReturnValue({ remove: jest.fn() } as never)
+})
 
 // Suprimir console.error nos testes para evitar poluição do output
 // Os erros são tratados adequadamente pelo código no bloco try/catch
