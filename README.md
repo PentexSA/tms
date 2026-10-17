@@ -1,6 +1,17 @@
-# TMS - Task Management System
+# TMS - Gerenciador de Fichas de RPG
+
+Sistema de gerenciamento de fichas de personagem para RPG de mesa. A proposta é suportar qualquer sistema de jogo; esta versão tem foco no **World of Darkness (WoD)**.
 
 Monorepo fullstack com Turborepo, Expo (React Native + Web), Elysia (Bun) e PostgreSQL.
+
+## 🎲 Sobre o Projeto
+
+- **Usuários** criam personagens e participam de **crônicas** (campanhas) conduzidas por um **Storyteller** (narrador).
+- Cada crônica pertence a um **sistema de jogo** (`game_systems`), por exemplo Vampiro: A Máscara.
+- A estrutura da ficha de cada sistema é definida por um **template de traços** (`trait_templates`, jsonb): atributos, habilidades, disciplinas, virtudes etc.
+- Os valores de cada personagem ficam em `characters.sheet_data` (jsonb), seguindo o template do sistema.
+
+Com isso, adicionar um novo sistema é questão de cadastrar o sistema e seu template, sem alterar o schema do banco. O modelo completo está em [`doc/database.dbml`](doc/database.dbml).
 
 ## 📋 Requisitos
 

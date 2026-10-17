@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Goal
+
+TMS is a tabletop RPG character sheet manager. It is meant to support any game system, but the current version focuses on **World of Darkness (WoD)** (Storyteller System terminology: chronicles, storytellers, characters).
+
+Domain model (see `doc/database.dbml`):
+
+- `users`: players and storytellers
+- `game_systems`: supported RPG systems (`family` groups related systems/editions)
+- `chronicles`: campaigns, each with a `storyteller_id` and a `system_id`
+- `characters`: a user's character in a chronicle; sheet values stored in `sheet_data` (jsonb)
+- `trait_templates`: per-system sheet structure in `template_data` (jsonb)
+
+Keep the data model system-agnostic: sheet structure comes from `trait_templates`, not hardcoded WoD columns. Adding a new system should not require a migration. The `todos` table and routes are leftover template boilerplate.
+
 ## Architecture Overview
 
 This is a Turborepo monorepo with:
