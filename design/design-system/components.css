@@ -1,0 +1,700 @@
+/*
+ * TMS Grimório — CSS de referência dos componentes do core.
+ * Consome só variáveis de tokens.css (nenhuma cor literal). Sem @import de fontes externas:
+ * as fontes são hospedadas no app (LGPD). Aqui elas aparecem se estiverem instaladas; senão, cai
+ * no fallback da pilha.
+ * Nomes de classe com prefixo ds-. Componentes de skin (glifos) ficam em ds-glyph-*.
+ */
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+button,
+input,
+textarea,
+select { font: inherit; color: inherit; }
+
+button { cursor: pointer; }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: var(--border-width-focus) solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+.ds-muted { color: var(--ink-muted); }
+.ds-num { font-variant-numeric: tabular-nums; }
+
+/* Camadas de estado: qualquer alvo tocável ganha hover (com hover real) e pressed. */
+.ds-pressable { position: relative; -webkit-tap-highlight-color: transparent; }
+.ds-pressable::after {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: transparent;
+  pointer-events: none;
+  transition: background var(--duration-fast) var(--easing-standard);
+}
+@media (hover: hover) {
+  .ds-pressable:hover::after { background: var(--state-hover); }
+}
+.ds-pressable:active::after { background: var(--state-pressed); }
+.ds-pressable[aria-disabled="true"]::after,
+.ds-pressable:disabled::after { background: transparent; }
+
+/* ---------- Ícones ---------- */
+
+.ds-icon { width: var(--icon-size); height: var(--icon-size); flex: none; display: block; }
+.ds-icon--sm { width: 18px; height: 18px; }
+
+/* ---------- Botões ---------- */
+
+.ds-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: var(--hit-size); min-width: var(--hit-size);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: var(--border-width-control) solid var(--border-control);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700; font-size: 0.9375rem; line-height: 1.3;
+  text-align: center;
+}
+.ds-btn--block { width: 100%; }
+.ds-btn--lg { min-height: var(--stepper-size); font-size: 1rem; }
+.ds-btn--primary { background: var(--action); border-color: var(--action); color: var(--on-action); }
+.ds-btn--primary:focus-visible { outline-color: var(--focus-on-action); }
+.ds-btn--danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.ds-btn--ghost { border-color: transparent; color: var(--action); padding: 0 var(--space-3); }
+.ds-btn:disabled,
+.ds-btn[aria-disabled="true"] {
+  background: transparent; border-color: var(--border-subtle); color: var(--ink-disabled); cursor: not-allowed;
+}
+.ds-btn[aria-busy="true"] { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .ds-btn[aria-busy="true"]::before { animation: none; border-right-color: currentColor; opacity: 0.6; } }
+.ds-btn[aria-busy="true"]::before {
+  content: ""; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: ds-spin 800ms linear infinite;
+}
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+.ds-icon-btn {
+  display: inline-grid; place-items: center;
+  width: var(--hit-size); height: var(--hit-size);
+  border: 0; border-radius: var(--radius-pill);
+  background: transparent; color: var(--ink);
+  flex: none;
+}
+
+/* ---------- Superfícies ---------- */
+
+.ds-card {
+  background: var(--surface);
+  border: var(--border-width-hair) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1);
+}
+.ds-card--pad { padding: var(--space-3) var(--space-4); }
+
+/* ---------- Texto ---------- */
+
+/* --header-measured: altura real do header, se o app medir (breadcrumb, fonte grande). */
+.ds-section { margin-top: var(--space-6); scroll-margin-top: calc(var(--header-measured, calc(var(--header-height) + var(--chips-height))) + var(--space-2)); }
+.ds-section__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--type-display-lg-size); line-height: var(--type-display-lg-line); font-weight: var(--type-display-lg-weight);
+  overflow-wrap: anywhere; hyphens: auto;
+}
+/* A régua some quando o título ocupa a linha toda (fonte 200%), sem empurrar o texto. */
+.ds-section__header::after { content: ""; flex: 1 1 0; min-width: var(--space-4); height: 1px; background: var(--accent); }
+.ds-group-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: 700;
+}
+.ds-group-title:first-child { margin-top: 0; }
+
+/* ---------- Pips (RatingDots) ---------- */
+/* Os pips são só visuais (aria-hidden). O alvo de toque é a linha ou a célula inteira. */
+
+.ds-pips { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; }
+.ds-pips__gap { width: var(--space-2); }
+.ds-pip {
+  width: var(--pip-size); height: var(--pip-size);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-control) solid var(--pip-empty);
+  background: transparent;
+  flex: none;
+}
+.ds-pips--sm .ds-pip { width: var(--pip-size-sm); height: var(--pip-size-sm); }
+.ds-pip.is-on { background: var(--accent); border-color: var(--accent); }
+/* Bônus temporário: anel duplo em accent (e sempre texto "3 + 4" ao lado). */
+.ds-pip.is-bonus { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--pip-ring, var(--surface)), inset 0 0 0 5px var(--accent); }
+/* Dentro de sheet o fundo é surface-raised: o anel interno acompanha. */
+.ds-sheet .ds-pip.is-bonus, .ds-dialog .ds-pip.is-bonus { --pip-ring: var(--surface-raised); }
+/* Perdido por modificador: contorno neutro com traço diagonal. */
+.ds-pip.is-lost {
+  border-color: var(--ink-muted);
+  background: linear-gradient(135deg, transparent 44%, var(--ink-muted) 44%, var(--ink-muted) 56%, transparent 56%);
+}
+[data-skin="dnd"] .ds-pip { border-radius: 2px; transform: rotate(45deg) scale(0.82); }
+[data-skin="coc"] .ds-pip { border-radius: 2px; }
+
+/* ---------- FieldRow ---------- */
+
+.ds-rows { list-style: none; margin: 0; padding: 0 var(--space-4); }
+.ds-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: var(--row-min);
+  padding: var(--space-2) 0;
+  border: 0; border-bottom: var(--border-width-hair) solid var(--border-subtle);
+  background: transparent; text-align: left;
+}
+.ds-rows > li:last-child > .ds-row,
+.ds-rows > .ds-row:last-child { border-bottom: 0; }
+button.ds-row { border-radius: 0; }
+.ds-row__leading { flex: none; display: grid; place-items: center; }
+.ds-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ds-row__label { font-size: var(--type-field-label-size); line-height: var(--type-field-label-line); font-weight: 500; overflow-wrap: break-word; hyphens: auto; }
+.ds-row__sub { font-size: var(--type-caption-size); line-height: var(--type-caption-line); color: var(--ink-muted); }
+.ds-row__sub--spec { font-style: italic; }
+.ds-row__value { flex: none; display: flex; align-items: center; gap: var(--space-3); }
+.ds-row__num {
+  min-width: 2.2ch; text-align: right;
+  font-size: var(--type-number-size); line-height: var(--type-number-line); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ds-row__num small { font-size: var(--type-number-sm-size); font-weight: 500; color: var(--ink-muted); }
+.ds-row.is-inactive .ds-row__label { color: var(--ink-muted); }
+.ds-badge {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  font-size: var(--type-caption-size); line-height: var(--type-caption-line); font-weight: 700;
+  color: var(--accent-text);
+}
+
+/* Refluxo por fonte grande ou tela estreita (fontScale ≥ 1.3 ou largura < 360): nome em cima, valor embaixo. */
+.is-stacked .ds-row { flex-wrap: wrap; }
+.is-stacked .ds-row__text { flex-basis: 100%; }
+.is-stacked .ds-row__value { margin-left: auto; }
+
+/* ---------- Grade primária (atributos) ---------- */
+
+.ds-grid { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 1px; background: var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; border: var(--border-width-hair) solid var(--border-subtle); box-shadow: var(--elevation-1); }
+.ds-grid__head { background: var(--surface); padding: var(--space-2) var(--space-3) 0; font-size: var(--type-caption-size); color: var(--ink-muted); font-weight: 700; }
+.ds-cell {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--space-1);
+  min-height: 64px; padding: var(--space-2) var(--space-3);
+  background: var(--surface); border: 0; text-align: left;
+}
+.ds-cell__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.ds-cell__label { font-size: var(--type-field-label-size); line-height: 1.25; font-weight: 500; overflow-wrap: break-word; hyphens: auto; }
+.ds-cell__num { flex: none; font-size: var(--type-number-size); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Mais pips que cabem (Força 7 na forma Crinos): os pips quebram linha, o número nunca some. */
+.ds-cell .ds-pips { flex: 0 1 auto; flex-wrap: wrap; min-width: 0; }
+/* Grade estreita (celular de 360–430 dp): menos padding para o rótulo inteiro caber sem abreviar.
+   Fica depois das regras base (mesma especificidade: a ordem decide). No app, a regra usa a
+   largura medida da grade (onLayout); aqui, a da tela (@media em vez de @container, que o
+   parser do teste de fumaça não lê). */
+@media (max-width: 440px) {
+  .ds-cell { padding: var(--space-2); }
+  .ds-cell__label { font-size: 0.9375rem; }
+  .ds-cell .ds-pips { gap: 2px; }
+  .ds-cell .ds-pip { width: var(--pip-size-sm); height: var(--pip-size-sm); }
+  .ds-cell__top { gap: var(--space-1); }
+}
+.ds-cell__big { font-size: var(--type-number-lg-size); line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ds-cell__sub { font-size: var(--type-caption-size); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.is-stacked .ds-grid { grid-template-columns: minmax(0, 1fr); }
+.is-stacked .ds-grid__head { display: none; }
+
+/* ---------- Pirâmide (Fate) ---------- */
+
+.ds-pyramid { display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-pyramid__tier { display: grid; grid-template-columns: 7.5rem 1fr; gap: var(--space-2); align-items: start; }
+.ds-pyramid__rung { padding-top: var(--space-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ds-pyramid__skills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.is-stacked .ds-pyramid__tier { grid-template-columns: 1fr; }
+
+/* ---------- Chips e tags ---------- */
+
+.ds-chip {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: var(--hit-size); min-width: var(--hit-size); padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hair) solid var(--border-control);
+  background: transparent; color: var(--ink);
+  font-size: var(--type-label-size); font-weight: 700; letter-spacing: var(--type-label-spacing); text-transform: uppercase;
+  white-space: nowrap; text-decoration: none;
+}
+/* Fora da faixa rolável de seções, o chip quebra linha em vez de vazar (ex.: "Última: Força + Briga"). */
+.ds-list-item__chips > .ds-chip,
+.ds-filterbar > .ds-chip { max-width: 100%; white-space: normal; text-align: center; line-height: 1.2; padding-block: var(--space-1); }
+.ds-chip[aria-pressed="true"],
+.ds-chip[aria-current="true"],
+.ds-chip[aria-selected="true"],
+.ds-chip[aria-checked="true"] { background: var(--surface-raised); border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+/* Lista compacta (ValueChip): traços com valor em fluxo, quando o filtro "só investidos" está
+   ligado. Caixa normal; valor em negrito tabular; "•" marca especialização ou selo (o detalhe
+   e o nome acessível dizem qual). Alvo ≥ 44 px. */
+.ds-chipflow { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.ds-chip--value {
+  text-transform: none; letter-spacing: 0; font-size: var(--type-body-size); font-weight: 500;
+  background: var(--surface); border-color: var(--border-subtle); box-shadow: var(--elevation-1);
+  max-width: 100%; white-space: normal; text-align: left;
+}
+.ds-chip--value .ds-num { font-weight: 700; }
+.ds-chip__mark { color: var(--accent-text); font-weight: 700; }
+.ds-tag {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 28px; padding: 0 var(--space-2);
+  border-radius: var(--radius-pill); border: var(--border-width-hair) solid var(--border-control);
+  font-size: var(--type-caption-size); line-height: 1.2;
+}
+button.ds-tag { min-height: var(--hit-size); padding: 0 var(--space-3); background: transparent; }
+.ds-tag[aria-pressed="true"] { background: var(--surface-raised); border-color: var(--accent); font-weight: 700; }
+
+/* inline-block (não flex): só assim o text-overflow põe reticências no texto longo. */
+.ds-id-chip {
+  display: inline-block; vertical-align: middle;
+  max-width: 100%;
+  padding: 2px var(--space-3) 2px var(--space-2);
+  border: var(--border-width-hair) solid var(--accent); border-radius: var(--radius-pill);
+  font-size: var(--type-caption-size); line-height: 1.3; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-id-chip::before { content: ""; display: inline-block; vertical-align: -1px; width: 10px; height: 10px; margin-right: var(--space-2); border-radius: var(--radius-pill); background: var(--accent); }
+
+.ds-avatar {
+  display: grid; place-items: center; flex: none;
+  width: var(--avatar-sm); height: var(--avatar-sm);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--accent); background: var(--surface-raised);
+  font-weight: 700; font-size: min(0.9375rem, calc(var(--avatar-sm) * 0.36)); color: var(--ink);
+  line-height: 1; white-space: nowrap;
+}
+/* As iniciais são decorativas (aria-hidden): o tamanho tem teto para caber no círculo com fonte 200%. */
+.ds-avatar--lg { width: var(--avatar-lg); height: var(--avatar-lg); font-size: min(1.5rem, calc(var(--avatar-lg) * 0.36)); font-family: var(--font-display); }
+
+/* ---------- Header compacto da ficha ---------- */
+
+.ds-header {
+  position: sticky; top: 0; z-index: var(--layer-sticky);
+  background: var(--bg);
+  padding-top: env(safe-area-inset-top);
+}
+.ds-header__bar { display: flex; align-items: center; gap: var(--space-1); min-height: var(--header-height); padding: 0 var(--space-1); }
+.ds-header__title { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.ds-header__name {
+  margin: 0; min-width: 0;
+  font-family: var(--font-display); font-size: var(--type-display-sm-size); line-height: var(--type-display-sm-line); font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* O nome do personagem tem prioridade: não encolhe até reservar --chip-min para o chip; o chip
+   ocupa o que sobra (com reticências). */
+.ds-header__title { --chip-min: 4.5rem; }
+.ds-header__name { flex: none; max-width: calc(100% - var(--chip-min) - var(--space-2)); }
+.ds-header .ds-id-chip { flex: 0 1 auto; min-width: 0; }
+/* Fonte grande: o header fica só com o nome; o texto do chip passa para o resumo da identidade. */
+.is-stacked .ds-header .ds-id-chip { display: none; }
+.is-stacked .ds-header__name { max-width: 100%; }
+.ds-chips {
+  display: flex; gap: var(--space-2); overflow-x: auto; scrollbar-width: none;
+  padding: 0 var(--space-4) var(--space-1);
+  border-bottom: var(--border-width-hair) solid var(--border-subtle);
+  transition: margin-top var(--duration-base) var(--easing-standard), opacity var(--duration-base) var(--easing-standard);
+}
+.ds-chips::-webkit-scrollbar { display: none; }
+.ds-chips .ds-chip { position: relative; min-height: 36px; margin: 4px 0; }
+/* O chip desenha 36, mas o alvo cobre a faixa inteira de 44 (as margens). */
+.ds-chips .ds-chip::before { content: ""; position: absolute; inset: -4px 0; }
+.ds-header.is-collapsed .ds-chips { margin-top: calc(-1 * var(--chips-height)); opacity: 0; pointer-events: none; }
+/* SectionTabs: as 3 abas da ficha (uma por zona) dividem a largura e nunca rolam de lado: todas
+   ficam visíveis em 360 dp com fonte 200%. Caixa normal (mais curta que caixa alta); com fonte
+   muito grande o rótulo quebra em 2 linhas, com hífen. */
+.ds-chips[role="tablist"][data-fixed="true"] { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); overflow: visible; }
+.ds-chips[role="tablist"][data-fixed="true"] .ds-chip {
+  min-width: 0; padding: var(--space-1) var(--space-2);
+  white-space: normal; text-align: center; overflow-wrap: break-word; hyphens: auto;
+  text-transform: none; letter-spacing: 0; font-size: var(--type-body-size); line-height: 1.2;
+}
+/* Chip focado por teclado não pode ficar invisível: o header recolhido volta a mostrar a faixa. */
+.ds-header.is-collapsed:focus-within .ds-chips { margin-top: 0; opacity: 1; pointer-events: auto; }
+/* Anel de foco interno na grade: o overflow da grade e as células vizinhas cortariam o externo. */
+.ds-grid .ds-cell:focus-visible { outline-offset: -4px; }
+
+.ds-sync { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); padding: 0 var(--space-2); min-height: var(--hit-size); min-width: var(--hit-size); font-size: var(--type-caption-size); color: var(--ink-muted); white-space: nowrap; border: 0; background: transparent; }
+.ds-sync[data-state="saved"] .ds-sync__dot { background: var(--success); }
+.ds-sync[data-state="saving"] .ds-sync__dot { background: transparent; border: 2px solid var(--ink-muted); }
+.ds-sync[data-state="offline"] { color: var(--ink); }
+.ds-sync[data-state="offline"] .ds-sync__dot { background: transparent; border: 2px dashed var(--ink); }
+.ds-sync[data-state="error"] { color: var(--danger); }
+.ds-sync[data-state="error"] .ds-sync__dot { background: var(--danger); }
+.ds-sync__dot { flex: none; width: 10px; height: 10px; border-radius: var(--radius-pill); }
+/* Celular estreito: o indicador recolhe as palavras marcadas como .ds-sync__label (fica o ponto,
+   cuja forma muda por estado, e o número de pendentes offline), e o nome do personagem ganha
+   espaço. O rótulo acessível continua no botão; "erro ao salvar" não usa __label e nunca recolhe. */
+@media (max-width: 440px) {
+  .ds-sync__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ds-header__title { --chip-min: 3.5rem; }
+  .ds-header .ds-id-chip { padding: 2px var(--space-2) 2px 6px; }
+  .ds-header .ds-id-chip::before { width: 8px; height: 8px; margin-right: var(--space-1); }
+}
+
+.ds-modebar {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised); border-bottom: var(--border-width-hair) solid var(--border-subtle);
+  font-size: var(--type-caption-size);
+}
+.ds-modebar strong { font-size: var(--type-label-size); letter-spacing: var(--type-label-spacing); text-transform: uppercase; }
+.ds-modebar__actions { margin-left: auto; display: flex; gap: var(--space-2); }
+
+/* ---------- Bloco de identidade ---------- */
+
+.ds-identity { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 64px; padding: var(--space-3) var(--space-4); border: 0; background: transparent; text-align: left; border-radius: var(--radius-md); }
+.ds-identity__text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ds-identity__text > span { display: block; }
+.ds-identity__summary { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.ds-identity__more { padding: 0 var(--space-4) var(--space-3); }
+.ds-voice { margin: 0 0 var(--space-3); font-family: var(--font-voice); font-style: italic; font-weight: 600; font-size: var(--type-voice-size); line-height: var(--type-voice-line); }
+.ds-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: 0; }
+.ds-facts dt { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.ds-facts dd { margin: 0; font-size: var(--type-body-size); overflow-wrap: anywhere; }
+.ds-facts--wide { grid-template-columns: minmax(0, 1fr); }
+.is-stacked .ds-facts { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------- Filtro e busca ---------- */
+
+.ds-filterbar { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.ds-search {
+  flex: 1; min-width: 10rem; min-height: var(--hit-size);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control);
+  background: var(--surface); color: var(--ink);
+}
+.ds-search::placeholder { color: var(--ink-muted); }
+
+/* ---------- Trilhas, caixas e medidores ---------- */
+
+.ds-boxes { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.ds-box {
+  display: grid; place-items: center;
+  width: var(--box-size); height: var(--box-size);
+  border-radius: var(--radius-sm);
+  border: var(--border-width-control) solid var(--border-control);
+  font-size: 0.875rem; font-weight: 700; line-height: 1; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ds-box.is-filled { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* Segundo recurso de um par: cor quase neutra + hachura (nunca só a cor). */
+.ds-box.is-filled.is-alt-cool,
+.ds-box.is-filled.is-alt-warm {
+  background: repeating-linear-gradient(135deg, var(--alt) 0 3px, transparent 3px 6px);
+  border-color: var(--alt);
+}
+.is-alt-cool { --alt: var(--accent-alt-cool); }
+.is-alt-warm { --alt: var(--accent-alt-warm); }
+.ds-box.is-marked { background: var(--surface-raised); }
+button.ds-box { width: var(--box-hit); height: var(--box-hit); padding: 0; background: transparent; border: 0; }
+button.ds-box > span { display: grid; place-items: center; width: var(--box-size); height: var(--box-size); border-radius: var(--radius-sm); border: var(--border-width-control) solid var(--border-control); }
+button.ds-box[aria-pressed="true"] > span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ds-boxes--hit { gap: var(--space-2); }
+
+.ds-meter { height: 8px; border-radius: var(--radius-pill); background: var(--surface-raised); border: var(--border-width-hair) solid var(--border-control); overflow: hidden; }
+.ds-meter__fill { height: 100%; background: var(--accent); }
+.ds-meter__fill--temp { background: repeating-linear-gradient(135deg, var(--ink-muted) 0 3px, transparent 3px 6px); }
+.ds-meter { display: flex; }
+.ds-meter__fill { width: calc(var(--pct, 0) * 1%); }
+.ds-meter__fill--temp { width: calc(var(--pct-temp, 0) * 1%); }
+
+.ds-track { display: flex; flex-direction: column; }
+.ds-track__row { display: flex; align-items: center; gap: var(--space-3); min-height: 36px; border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+.ds-track__row:last-child { border-bottom: 0; }
+.ds-track__label { flex: 1; font-size: var(--type-body-size); }
+.ds-track__pen { min-width: 3ch; text-align: right; font-size: var(--type-caption-size); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.ds-track__type { min-width: 6.5em; font-size: var(--type-caption-size); color: var(--ink-muted); }
+
+.ds-minitrack { display: inline-flex; gap: 2px; }
+.ds-minitrack span { width: 8px; height: 12px; border-radius: 2px; border: 1px solid var(--border-control); }
+.ds-minitrack span.is-filled { background: var(--accent); border-color: var(--accent); }
+.ds-minitrack span.is-agg { background: var(--ink); border-color: var(--ink); }
+
+/* ---------- Stepper ---------- */
+
+.ds-stepper { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.ds-stepper__btn {
+  display: grid; place-items: center;
+  width: var(--stepper-size); height: var(--stepper-size);
+  border-radius: var(--radius-pill);
+  border: var(--border-width-control) solid var(--border-control);
+  background: var(--surface); color: var(--ink);
+}
+.ds-stepper__btn:disabled { color: var(--ink-disabled); border-color: var(--border-subtle); }
+.ds-stepper__value {
+  display: grid; place-items: center;
+  min-width: 4ch; min-height: var(--hit-size);
+  padding: 0 var(--space-2);
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  text-align: center;
+  font-size: var(--type-number-lg-size); line-height: var(--type-number-lg-line); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ds-stepper__value.is-editable { cursor: text; text-decoration: underline dotted var(--border-control); text-underline-offset: 4px; }
+.ds-stepper__input { width: 6ch; min-height: var(--hit-size); text-align: center; border-radius: var(--radius-md); border: var(--border-width-control) solid var(--action); background: var(--surface); font-size: var(--type-number-lg-size); font-weight: 700; }
+.ds-stepper--inline { gap: var(--space-1); }
+.ds-stepper--inline .ds-stepper__btn { width: var(--hit-size); height: var(--hit-size); }
+.ds-stepper--inline .ds-stepper__value { font-size: var(--type-number-size); min-width: 2.5ch; }
+
+/* ---------- Dock de jogo ---------- */
+
+.ds-dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--layer-dock);
+  background: var(--surface-raised);
+  border-top: var(--border-width-hair) solid var(--border-subtle);
+  box-shadow: var(--elevation-2);
+  padding: 0 var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom));
+}
+.ds-dock__handle {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-2);
+  width: 100%; min-height: var(--hit-size); border: 0; background: transparent;
+  color: var(--ink-muted); font-size: var(--type-caption-size);
+}
+.ds-dock__handle::before { content: ""; width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--border-control); }
+.ds-dock__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.1fr); gap: var(--space-2); }
+.ds-dock-chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 56px; padding: var(--space-1);
+  border-radius: var(--radius-md);
+  border: var(--border-width-hair) solid var(--border-control);
+  background: var(--surface); color: var(--ink);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+/* Caixa normal (não caixa alta): mais curto e mais legível em 13 px com fonte grande. */
+.ds-dock-chip__label { font-size: var(--type-label-size); font-weight: 700; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* O valor nunca vaza do chip: se não couber, quebra linha (o chip cresce) em vez de sair da borda. */
+.ds-dock-chip__value { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px var(--space-1); max-width: 100%; font-size: var(--type-number-size); line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; overflow-wrap: anywhere; }
+.ds-dock-chip__value--text { font-size: var(--type-label-size); }
+.ds-dock-chip .ds-minitrack { gap: 1px; }
+.ds-dock-chip .ds-minitrack span { width: 5px; }
+.ds-dock-chip--action { background: var(--action); border-color: var(--action); color: var(--on-action); }
+.ds-dock-chip--action .ds-dock-chip__label { color: var(--on-action); }
+.ds-dock-chip--action:focus-visible { outline-color: var(--focus-on-action); }
+.is-stacked .ds-dock__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ---------- Toast com Desfazer ---------- */
+
+.ds-toast-region {
+  position: fixed; left: var(--space-2); right: var(--space-2);
+  bottom: calc(var(--dock-offset, 0px) + var(--space-2) + env(safe-area-inset-bottom));
+  z-index: var(--layer-toast);
+  display: flex; justify-content: center; pointer-events: none;
+}
+.ds-toast {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; max-width: 520px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--ink); color: var(--bg);
+  box-shadow: var(--elevation-2);
+  pointer-events: auto;
+  animation: ds-rise var(--duration-base) var(--easing-standard);
+}
+.ds-toast__text { flex: 1; font-size: var(--type-body-size); font-variant-numeric: tabular-nums; }
+.ds-toast .ds-btn--ghost { color: var(--bg); text-decoration: underline; text-underline-offset: 3px; }
+.ds-toast .ds-btn--ghost:focus-visible { outline-color: var(--bg); }
+@keyframes ds-rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Bottom sheet e diálogo ---------- */
+
+.ds-scrim { position: fixed; inset: 0; z-index: var(--layer-sheet); background: var(--scrim); animation: ds-fade var(--duration-slow) var(--easing-standard); }
+.ds-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--layer-sheet);
+  display: flex; flex-direction: column;
+  max-height: 92vh; max-height: 92dvh;
+  background: var(--surface-raised);
+  border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);
+  border-top: var(--border-width-hair) solid var(--border-subtle);
+  box-shadow: var(--elevation-2);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: ds-slide var(--duration-slow) var(--easing-standard);
+}
+.ds-sheet__grabber { align-self: center; width: 36px; height: 4px; margin: var(--space-2) 0 0; border-radius: var(--radius-pill); background: var(--border-control); }
+.ds-sheet__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-1) 0 var(--space-5); }
+.ds-sheet__title:focus { outline: none; }
+.ds-sheet__title { flex: 1; margin: 0; font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: 700; }
+.ds-sheet__body { overflow-y: auto; padding: var(--space-3) var(--space-5) var(--space-5); overscroll-behavior: contain; }
+.ds-sheet__foot { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-4); border-top: var(--border-width-hair) solid var(--border-subtle); }
+.ds-sheet__foot > * { flex: 1; }
+/* Fonte grande: ações empilhadas (a principal embaixo, na zona do polegar), sem rótulo em 3 linhas. */
+.is-stacked .ds-sheet__foot,
+.is-stacked .ds-dialog__actions { flex-direction: column; }
+@media (min-width: 600px) {
+  .ds-sheet { left: 50%; right: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 48px)); max-height: 86vh; border-radius: var(--radius-lg); border: var(--border-width-hair) solid var(--border-subtle); animation: ds-fade var(--duration-slow) var(--easing-standard); }
+  .ds-sheet__grabber { display: none; }
+}
+.ds-dialog {
+  position: fixed; left: 50%; top: 50%; z-index: var(--layer-dialog);
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto;
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised); border: var(--border-width-hair) solid var(--border-subtle);
+  box-shadow: var(--elevation-2);
+}
+.ds-dialog__title { margin: 0 0 var(--space-2); font-size: var(--type-title-size); font-weight: 700; }
+.ds-dialog__actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+.ds-dialog__actions > * { flex: 1; }
+.ds-scrim--dialog { z-index: calc(var(--layer-dialog) - 1); }
+@keyframes ds-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ds-slide { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Escolha única (estado, forma) ---------- */
+
+.ds-radios { display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-radio {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 56px; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control);
+  background: transparent; text-align: left;
+}
+.ds-radio::before { content: ""; flex: none; width: 20px; height: 20px; border-radius: var(--radius-pill); border: var(--border-width-control) solid var(--border-control); }
+.ds-radio[aria-checked="true"] { border-color: var(--accent); background: var(--surface); }
+.ds-radio[aria-checked="true"]::before { border-color: var(--accent); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px var(--accent); }
+.ds-radio__text { display: flex; flex-direction: column; min-width: 0; }
+.ds-radio__label { font-weight: 700; }
+.ds-radio__hint { font-size: var(--type-caption-size); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+/* Quebra linha quando as opções não cabem (4 opções em 360 dp, fonte 200%), sem vazar do sheet. */
+.ds-seg { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-md); background: var(--surface); border: var(--border-width-hair) solid var(--border-subtle); }
+.ds-seg > button { flex: 1 1 auto; min-height: var(--hit-size); padding: 0 var(--space-2); border: 0; border-radius: calc(var(--radius-md) - 4px); background: transparent; color: var(--ink-muted); font-weight: 700; overflow-wrap: anywhere; }
+.ds-seg > button[aria-checked="true"],
+.ds-seg > button[aria-selected="true"] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--elevation-1), inset 0 -3px 0 var(--accent); }
+/* Segmentado de navegação (links): mesmo visual, estado por aria-current="page". */
+.ds-seg > a { flex: 1 1 auto; display: grid; place-items: center; min-height: var(--hit-size); padding: 0 var(--space-2); border-radius: calc(var(--radius-md) - 4px); color: var(--ink-muted); font-weight: 700; text-decoration: none; }
+.ds-seg > a[aria-current="page"] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--elevation-1), inset 0 -3px 0 var(--action); }
+/* Sem accent (fora da ficha), o sublinhado usa action: o selecionado precisa de ≥ 3:1 além do fundo. */
+[data-accent="accent-neutral"] .ds-seg > button[aria-checked="true"],
+[data-accent="accent-neutral"] .ds-seg > button[aria-selected="true"],
+body:not([data-accent]) .ds-seg > button[aria-checked="true"],
+body:not([data-accent]) .ds-seg > button[aria-selected="true"] { box-shadow: var(--elevation-1), inset 0 -3px 0 var(--action); }
+
+/* ---------- Campos de texto ---------- */
+
+.ds-field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-4); }
+.ds-field__label { font-size: var(--type-caption-size); font-weight: 700; color: var(--ink-muted); }
+.ds-input, .ds-textarea {
+  min-height: var(--hit-size); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control);
+  background: var(--surface); color: var(--ink);
+}
+.ds-textarea { min-height: 8rem; resize: vertical; }
+.ds-field__help { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.ds-field__error { display: flex; gap: var(--space-1); align-items: center; font-size: var(--type-caption-size); color: var(--danger); font-weight: 700; }
+.ds-field.has-error .ds-input { border-color: var(--danger); }
+
+/* ---------- Mensagens ---------- */
+
+.ds-banner { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); border: var(--border-width-hair) solid var(--border-control); }
+.ds-banner__text { flex: 1; font-size: var(--type-body-size); }
+.ds-banner--danger { border-color: var(--danger); }
+.ds-banner--danger .ds-icon { color: var(--danger); }
+.ds-banner--success .ds-icon { color: var(--success); }
+.ds-empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-10) var(--space-4); text-align: center; color: var(--ink-muted); }
+.ds-empty__title { margin: 0; color: var(--ink); font-size: var(--type-title-size); font-weight: 700; }
+
+.ds-skel { border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface) 0%, var(--surface-raised) 50%, var(--surface) 100%); background-size: 200% 100%; animation: ds-shimmer 1.4s linear infinite; }
+@keyframes ds-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ds-skel { animation: none; }
+  .ds-scrim, .ds-sheet, .ds-toast { animation: none; }
+}
+[data-reduced-motion="true"] .ds-skel,
+[data-reduced-motion="true"] .ds-scrim,
+[data-reduced-motion="true"] .ds-sheet,
+[data-reduced-motion="true"] .ds-toast { animation: none; }
+
+/* ---------- Listas (crônicas, personagens, mesa) ---------- */
+
+.ds-list { list-style: none; margin: 0; padding: 0; }
+.ds-list-item {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 72px; padding: var(--space-3) var(--space-4);
+  border: 0; border-bottom: var(--border-width-hair) solid var(--border-subtle);
+  background: transparent; text-align: left; color: inherit; text-decoration: none;
+}
+.ds-list-item__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-list-item__title { font-weight: 700; font-size: 1rem; }
+/* Na lista há espaço vertical: o chip quebra linha em vez de cortar o texto. */
+.ds-list-item .ds-id-chip { white-space: normal; overflow-wrap: anywhere; }
+.ds-list-item__meta { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.ds-list-item__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+/* inline-block: com fonte grande o valor quebra dentro do chip em vez de vazar da tela. */
+.ds-mini {
+  display: inline-block; max-width: 100%;
+  padding: 2px var(--space-2); border-radius: var(--radius-sm);
+  background: var(--surface); border: var(--border-width-hair) solid var(--border-subtle);
+  font-size: var(--type-caption-size); font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.ds-mini b { font-weight: 700; }
+
+.ds-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--layer-dock);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--surface-raised); border-top: var(--border-width-hair) solid var(--border-subtle);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.ds-tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; padding: var(--space-1) 2px; color: var(--ink-muted); text-decoration: none; font-size: var(--type-caption-size); line-height: 1.2; font-weight: 700; text-align: center; overflow-wrap: anywhere; hyphens: auto; }
+.ds-tabbar a[aria-current="page"] { color: var(--ink); box-shadow: inset 0 2px 0 var(--accent); }
+
+.ds-appbar { position: sticky; top: 0; z-index: var(--layer-sticky); display: flex; align-items: center; gap: var(--space-1); min-height: var(--header-height); padding: env(safe-area-inset-top) var(--space-1) 0; background: var(--bg); border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+/* Título quebra em vez de cortar: com fonte grande o nome da crônica continua inteiro. */
+.ds-appbar__title { flex: 1; min-width: 0; margin: var(--space-1) var(--space-3); font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: 700; overflow-wrap: anywhere; }
+.ds-back { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--hit-size); padding: 0 var(--space-3) 0 var(--space-1); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-decoration: none; font-size: var(--type-body-size); }
+.ds-breadcrumb { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin: 0; padding: 0; list-style: none; font-size: var(--type-caption-size); color: var(--ink-muted); }
+.ds-breadcrumb a { color: var(--ink-muted); min-height: var(--hit-size); display: inline-flex; align-items: center; }
+.ds-breadcrumb [aria-current="page"] { color: var(--ink); }
+
+/* ---------- Dados ---------- */
+
+.ds-dice { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ds-die {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: var(--radius-sm); border: var(--border-width-control) solid var(--border-control);
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ds-die.is-success { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ds-die.is-one { border-style: dashed; color: var(--danger); }
+.ds-die.is-dropped { opacity: 0.55; text-decoration: line-through; }
+.ds-result { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface); border: var(--border-width-hair) solid var(--border-subtle); }
+.ds-result__big { font-size: var(--type-number-lg-size); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- Glifos de skin ---------- */
+
+.ds-glyph-moon { width: 28px; height: 28px; }

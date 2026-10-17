@@ -1,0 +1,25 @@
+{
+  "id": "coc",
+  "name": "Arquivo",
+  "usage": "Skin para Call of Cthulhu e horror investigativo. Sem accent de linhagem (accent-neutral). A ficha é feita de porcentagens, e os números são sempre a sans do core.",
+  "type": {
+    "display": {
+      "web": "\"IM Fell English\", Georgia, serif",
+      "native": {
+        "600": "IMFellEnglish_400Regular",
+        "700": "IMFellEnglish_400Regular"
+      },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Nome e títulos de seção. A família tem um único peso; o RN usa o mesmo arquivo para 600 e 700."
+    },
+    "voice": {
+      "web": "\"IM Fell English\", Georgia, serif",
+      "native": { "600italic": "IMFellEnglish_400Regular_Italic" },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Histórico e citação."
+    }
+  },
+  "pip": "square",
+  "glyphs": [],
+  "color": {}
+}

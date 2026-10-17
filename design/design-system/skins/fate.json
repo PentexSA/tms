@@ -1,0 +1,25 @@
+{
+  "id": "fate",
+  "name": "Neutra",
+  "usage": "Skin neutra (Fate, PbtA e sistemas sem identidade visual própria). Usa a sans do core também nos títulos. É o mesmo visual que a opção de acessibilidade 'Títulos sem fonte decorativa' produz em qualquer skin.",
+  "type": {
+    "display": {
+      "web": "\"Alegreya Sans\", \"Trebuchet MS\", system-ui, sans-serif",
+      "native": {
+        "600": "AlegreyaSans_700Bold",
+        "700": "AlegreyaSans_700Bold"
+      },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Títulos em sans 700."
+    },
+    "voice": {
+      "web": "\"Alegreya Sans\", \"Trebuchet MS\", system-ui, sans-serif",
+      "native": { "600italic": "AlegreyaSans_400Regular_Italic" },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Aspectos e citação em itálico."
+    }
+  },
+  "pip": "circle",
+  "glyphs": [],
+  "color": {}
+}

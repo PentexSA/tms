@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="noite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Design system · TMS Grimório</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  /* Layout da vitrine (só desta página). */
+  body { padding-bottom: var(--space-12); }
+  .v-top { position: sticky; top: 0; z-index: var(--layer-sticky); background: var(--bg); border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+  .v-top__inner { max-width: 1100px; margin: 0 auto; padding: var(--space-3) var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .v-top h1 { margin: 0; flex: 1 1 14rem; font-size: var(--type-title-size); }
+  .v-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  .v-controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--type-caption-size); color: var(--ink-muted); }
+  .v-controls select { min-height: var(--hit-size); padding: 0 var(--space-2); border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control); background: var(--surface); color: var(--ink); }
+  .v-main { max-width: 1100px; margin: 0 auto; padding: 0 var(--space-4); }
+  .v-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0; }
+  .v-block { margin-top: var(--space-8); }
+  .v-block > h2 { font-family: var(--font-display); font-size: var(--type-display-lg-size); margin: 0 0 var(--space-2); display: flex; gap: var(--space-3); align-items: center; }
+  .v-block > h2::after { content: ""; flex: 1; height: 1px; background: var(--accent); }
+  .v-lead { color: var(--ink-muted); margin: 0 0 var(--space-4); max-width: 70ch; }
+  .v-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+  .v-demo { padding: var(--space-4); }
+  .v-demo > h3 { margin: 0 0 var(--space-1); font-size: var(--type-title-size); }
+  .v-demo > p { margin: 0 0 var(--space-3); font-size: var(--type-caption-size); color: var(--ink-muted); }
+  .v-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  .v-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+  table.v-table { width: 100%; border-collapse: collapse; font-size: var(--type-caption-size); }
+  .v-table th, .v-table td { text-align: left; padding: var(--space-2); border-bottom: var(--border-width-hair) solid var(--border-subtle); vertical-align: top; }
+  .v-table th { color: var(--ink-muted); font-weight: 700; }
+  .v-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .v-scroll { overflow-x: auto; }
+  .v-swatch { width: 28px; height: 28px; border-radius: var(--radius-sm); border: var(--border-width-hair) solid var(--border-subtle); }
+  .v-accents { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); }
+  .v-accent { padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface); border: var(--border-width-hair) solid var(--border-subtle); }
+  .v-accent__fill { height: 36px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 700; font-size: var(--type-caption-size); }
+  .v-accent__text { margin-top: var(--space-2); color: var(--accent-text); font-weight: 700; }
+  .v-pass { color: var(--success); font-weight: 700; }
+  .v-fail { color: var(--danger); font-weight: 700; }
+  .v-phone { position: relative; height: 140px; border-radius: var(--radius-md); overflow: hidden; border: var(--border-width-hair) solid var(--border-subtle); background: var(--bg); }
+  .v-phone .ds-dock { position: absolute; }
+  .v-elev { height: 64px; display: grid; place-items: center; border-radius: var(--radius-md); }
+  code { font-size: 0.875em; }
+  .p-kv { font-size: var(--type-caption-size); color: var(--ink-muted); margin-bottom: var(--space-1); }
+  .p-center { display: flex; justify-content: center; }
+</style>
+</head>
+<body>
+<header class="v-top">
+  <div class="v-top__inner">
+    <h1>TMS Grimório · design system</h1>
+    <div class="v-controls" id="controls"></div>
+  </div>
+</header>
+<main class="v-main" id="main">
+  <nav class="v-nav" aria-label="Seções da vitrine" id="nav"></nav>
+  <div id="content"></div>
+</main>
+<script src="tokens.js"></script>
+<script src="ui.js"></script>
+<script src="vitrine.js"></script>
+</body>
+</html>

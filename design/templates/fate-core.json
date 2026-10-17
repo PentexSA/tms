@@ -1,0 +1,344 @@
+{
+  "schema": 1,
+  "system": "fate-core",
+  "name": "Fate Básico",
+  "family": "fate",
+  "edition": "Core",
+  "templateVersion": "1.0.0",
+  "locale": "pt-BR",
+  "skin": "fate",
+  "license": "Fate Core System é publicado pela Evil Hat Productions sob a licença Creative Commons Attribution 3.0 Unported. Este template traz só nomes de perícias, a escada e a estrutura da ficha.",
+  "identity": {
+    "name": "name",
+    "chip": "highConcept",
+    "summary": ["highConcept"],
+    "voice": "trouble"
+  },
+  "accent": { "from": null, "map": {}, "fallback": "accent-neutral" },
+  "ladders": {
+    "fate": {
+      "8": "Lendário",
+      "7": "Épico",
+      "6": "Fantástico",
+      "5": "Excepcional",
+      "4": "Ótimo",
+      "3": "Bom",
+      "2": "Razoável",
+      "1": "Regular",
+      "0": "Medíocre",
+      "-1": "Ruim",
+      "-2": "Terrível"
+    }
+  },
+  "fields": {
+    "name": { "type": "text", "label": "Nome", "maxLength": 80 },
+    "highConcept": {
+      "type": "text",
+      "label": "Conceito",
+      "maxLength": 120,
+      "aspect": true
+    },
+    "trouble": {
+      "type": "text",
+      "label": "Dificuldade",
+      "maxLength": 120,
+      "aspect": true
+    },
+    "aspects": {
+      "type": "list",
+      "label": "Outros aspectos",
+      "itemLabel": "Aspecto",
+      "item": { "aspect": true }
+    },
+
+    "athletics": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Atletismo",
+      "min": -2,
+      "max": 8
+    },
+    "burglary": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Roubo",
+      "min": -2,
+      "max": 8
+    },
+    "contacts": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Contatos",
+      "min": -2,
+      "max": 8
+    },
+    "crafts": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Ofícios",
+      "min": -2,
+      "max": 8
+    },
+    "deceive": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Enganar",
+      "min": -2,
+      "max": 8
+    },
+    "drive": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Condução",
+      "min": -2,
+      "max": 8
+    },
+    "empathy": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Empatia",
+      "min": -2,
+      "max": 8
+    },
+    "fight": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Lutar",
+      "min": -2,
+      "max": 8
+    },
+    "investigate": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Investigar",
+      "min": -2,
+      "max": 8
+    },
+    "lore": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Conhecimentos",
+      "min": -2,
+      "max": 8
+    },
+    "notice": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Percepção",
+      "min": -2,
+      "max": 8
+    },
+    "physique": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Vigor",
+      "min": -2,
+      "max": 8
+    },
+    "provoke": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Provocar",
+      "min": -2,
+      "max": 8
+    },
+    "rapport": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Comunicação",
+      "min": -2,
+      "max": 8
+    },
+    "resources": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Recursos",
+      "min": -2,
+      "max": 8
+    },
+    "shoot": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Atirar",
+      "min": -2,
+      "max": 8
+    },
+    "stealth": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Furtividade",
+      "min": -2,
+      "max": 8
+    },
+    "will": {
+      "type": "number",
+      "display": "ladder",
+      "ladder": "fate",
+      "label": "Vontade",
+      "min": -2,
+      "max": 8
+    },
+
+    "stress": {
+      "type": "track",
+      "label": "Estresse",
+      "shortLabel": "Estresse",
+      "rule": "boxes",
+      "editableIn": ["play"],
+      "rows": [
+        {
+          "id": "physical",
+          "label": "Físico",
+          "boxes": 3,
+          "boxValues": [1, 2, 3]
+        },
+        { "id": "mental", "label": "Mental", "boxes": 2, "boxValues": [1, 2] }
+      ]
+    },
+    "refresh": { "type": "number", "label": "Recarga", "min": 1, "max": 10 },
+    "fatePoints": {
+      "type": "resource",
+      "label": "Pontos de Destino",
+      "shortLabel": "Destino",
+      "max": { "field": "refresh" },
+      "overMax": true,
+      "editableIn": ["play"],
+      "defaultAction": "spend1",
+      "help": "No início da sessão, volta à recarga se estiver abaixo dela."
+    },
+    "consequences": {
+      "type": "list",
+      "label": "Consequências",
+      "shortLabel": "Conseq.",
+      "itemLabel": "Consequência",
+      "editableIn": ["play"],
+      "fixed": [
+        { "id": "mild", "label": "Suave", "meta": "absorve 2" },
+        { "id": "moderate", "label": "Moderada", "meta": "absorve 4" },
+        { "id": "severe", "label": "Grave", "meta": "absorve 6" }
+      ],
+      "item": { "aspect": true }
+    },
+    "stunts": {
+      "type": "list",
+      "label": "Façanhas",
+      "itemLabel": "Façanha",
+      "item": { "notes": true }
+    },
+    "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "storytellerNotes": {
+      "type": "longText",
+      "label": "Notas do Narrador",
+      "maxLength": 4000
+    }
+  },
+  "sections": [
+    {
+      "id": "aspects",
+      "zone": "play",
+      "title": "Aspectos",
+      "layout": "fields",
+      "pinTop": true,
+      "fields": ["highConcept", "trouble", "aspects"]
+    },
+    {
+      "id": "play",
+      "zone": "play",
+      "title": "Em jogo",
+      "layout": "fields",
+      "fields": ["stress", "fatePoints", "consequences"]
+    },
+    {
+      "id": "skills",
+      "zone": "build",
+      "title": "Perícias",
+      "layout": "pyramid",
+      "filter": {
+        "rule": "invested",
+        "label": "Só com bônus",
+        "default": true
+      },
+      "fields": [
+        "athletics",
+        "burglary",
+        "contacts",
+        "crafts",
+        "deceive",
+        "drive",
+        "empathy",
+        "fight",
+        "investigate",
+        "lore",
+        "notice",
+        "physique",
+        "provoke",
+        "rapport",
+        "resources",
+        "shoot",
+        "stealth",
+        "will"
+      ]
+    },
+    {
+      "id": "stunts",
+      "zone": "powers",
+      "title": "Façanhas",
+      "layout": "groups",
+      "groups": [
+        { "id": "stunts", "title": "Façanhas", "fields": ["stunts", "refresh"] }
+      ]
+    },
+    {
+      "id": "about",
+      "zone": "lore",
+      "title": "Sobre",
+      "layout": "text",
+      "fields": ["notes"]
+    },
+    {
+      "id": "storyteller",
+      "zone": "lore",
+      "title": "Narrador",
+      "layout": "text",
+      "fields": ["storytellerNotes"],
+      "permissions": { "read": ["storyteller"], "write": ["storyteller"] }
+    }
+  ],
+  "zoneLabels": { "powers": "Façanhas" },
+  "dock": ["stress", "fatePoints", "consequences"],
+  "roll": {
+    "model": "fudge",
+    "label": "Dados",
+    "dice": "4dF",
+    "ladder": "fate",
+    "slots": [{ "id": "skill", "label": "Perícia", "from": ["skills"] }],
+    "target": { "label": "Oposição", "default": 0, "min": -2, "max": 8 },
+    "boosts": [
+      {
+        "id": "invoke",
+        "label": "Invocar aspecto (+2), gastando 1 Ponto de Destino",
+        "resource": "fatePoints",
+        "cost": 1,
+        "effect": "plus2"
+      }
+    ]
+  },
+  "actions": []
+}
