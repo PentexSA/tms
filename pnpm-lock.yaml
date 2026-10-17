@@ -172,6 +172,9 @@ importers:
       '@elysiajs/eden':
         specifier: 'catalog:'
         version: 1.4.9(elysia@1.4.30(@sinclair/typebox@0.34.52)(exact-mirror@0.2.2(@sinclair/typebox@0.34.52))(file-type@21.3.4)(openapi-types@12.1.3)(typescript@5.9.3))
+      '@tanstack/react-query':
+        specifier: 5.104.1
+        version: 5.104.1(react@19.1.0)
       '@tms/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -2047,6 +2050,14 @@ packages:
 
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
+
+  '@tanstack/query-core@5.104.1':
+    resolution: {integrity: sha512-TiRghcrGkUTE+M4JBxvpPSpBhxvIzQairw+cksrHYGr+2uwC77yW1SY9nYxnYRYOppvucf8rEg6b5byoz4rTpw==}
+
+  '@tanstack/react-query@5.104.1':
+    resolution: {integrity: sha512-Zz70EgjahNI7aCz8BZxM3vUGU44ycxEAzMuCUjLeA7SVhhOkg3ZgPjPJPvHjs6Rmky/dtmnu1WzjGHNHmhCoZQ==}
+    peerDependencies:
+      react: ^18 || ^19
 
   '@testing-library/jest-dom@6.9.1':
     resolution: {integrity: sha512-zIcONa+hVtVSSep9UT3jZ5rizo2BsxgyDYU7WFD5eICBE7no3881HGeb/QkGfsJs6JTkY1aQhT7rIPC7e+0nnA==}
@@ -6054,7 +6065,7 @@ snapshots:
 
   '@babel/helper-wrap-function@7.28.3':
     dependencies:
-      '@babel/template': 7.27.2
+      '@babel/template': 7.29.7
       '@babel/traverse': 7.28.4
       '@babel/types': 7.29.8
     transitivePeerDependencies:
@@ -7831,6 +7842,13 @@ snapshots:
   '@sinonjs/fake-timers@10.3.0':
     dependencies:
       '@sinonjs/commons': 3.0.1
+
+  '@tanstack/query-core@5.104.1': {}
+
+  '@tanstack/react-query@5.104.1(react@19.1.0)':
+    dependencies:
+      '@tanstack/query-core': 5.104.1
+      react: 19.1.0
 
   '@testing-library/jest-dom@6.9.1':
     dependencies:
@@ -10287,8 +10305,8 @@ snapshots:
   metro-transform-plugins@0.83.1:
     dependencies:
       '@babel/core': 7.29.7
-      '@babel/generator': 7.28.3
-      '@babel/template': 7.27.2
+      '@babel/generator': 7.29.8
+      '@babel/template': 7.29.7
       '@babel/traverse': 7.28.4
       flow-enums-runtime: 0.0.6
       nullthrows: 1.1.1
@@ -10309,9 +10327,9 @@ snapshots:
   metro-transform-worker@0.83.1:
     dependencies:
       '@babel/core': 7.29.7
-      '@babel/generator': 7.28.3
-      '@babel/parser': 7.28.4
-      '@babel/types': 7.28.4
+      '@babel/generator': 7.29.8
+      '@babel/parser': 7.29.9
+      '@babel/types': 7.29.8
       flow-enums-runtime: 0.0.6
       metro: 0.83.1
       metro-babel-transformer: 0.83.1
