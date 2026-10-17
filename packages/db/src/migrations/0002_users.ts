@@ -1,9 +1,11 @@
 import { Kysely, sql } from 'kysely'
 
-export async function up(db: Kysely<any>): Promise<void> {
+export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable('users')
-    .addColumn('id', 'uuid', col => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+    .addColumn('id', 'uuid', col =>
+      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+    )
     .addColumn('email', 'text', col => col.notNull().unique())
     .addColumn('username', 'text', col => col.notNull().unique())
     .addColumn('hashed_password', 'text', col => col.notNull())
@@ -13,6 +15,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     .execute()
 }
 
-export async function down(db: Kysely<any>): Promise<void> {
+export async function down(db: Kysely<unknown>): Promise<void> {
   await db.schema.dropTable('users').execute()
 }

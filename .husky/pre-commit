@@ -1,0 +1,5 @@
+# Run lint-staged (biome check on staged files)
+npx lint-staged
+
+# Run typecheck on entire codebase
+npx pnpm typecheck

@@ -1,0 +1,12 @@
+# Bun configuration
+# https://bun.sh/docs/runtime/configuration
+
+[test]
+# Test timeout
+timeout = 10000
+
+# Test preload files (can be overridden per package)
+# preload = ["./setup.ts"]
+
+# Output format
+output_format = "tap"

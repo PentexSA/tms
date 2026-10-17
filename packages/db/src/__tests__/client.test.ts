@@ -1,0 +1,210 @@
+/// <reference types="bun-types" />
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import type { Kysely } from 'kysely'
+import { createPGliteTestDb } from '../test/pglite'
+import type { DB } from '../types'
+
+describe('@tms/db - Database Client', () => {
+  let testDb: Kysely<DB>
+  let destroy: () => Promise<void>
+
+  beforeEach(async () => {
+    const result = await createPGliteTestDb()
+    testDb = result.db
+    destroy = result.destroy
+  })
+
+  afterEach(async () => {
+    await destroy()
+  })
+
+  describe('Connection', () => {
+    it('should have PGLite database instance', async () => {
+      expect(testDb).toBeDefined()
+      expect(testDb).toHaveProperty('selectFrom')
+    })
+
+    it('should have query builder methods defined', () => {
+      expect(testDb).toHaveProperty('selectFrom')
+      expect(testDb).toHaveProperty('insertInto')
+      expect(testDb).toHaveProperty('updateTable')
+      expect(testDb).toHaveProperty('deleteFrom')
+    })
+  })
+
+  describe('Query Builder', () => {
+    it('should execute SELECT query', async () => {
+      const result = await testDb.selectFrom('todos').selectAll().execute()
+
+      expect(Array.isArray(result)).toBe(true)
+    })
+
+    it('should execute INSERT query', async () => {
+      const result = await testDb
+        .insertInto('todos')
+        .values({ title: 'Test Todo' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      expect(result).toHaveProperty('id')
+      expect(result.title).toBe('Test Todo')
+      expect(result.done).toBe(false)
+      expect(result.created_at).toBeInstanceOf(Date)
+    })
+
+    it('should execute UPDATE query', async () => {
+      const inserted = await testDb
+        .insertInto('todos')
+        .values({ title: 'Update Test' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      const updated = await testDb
+        .updateTable('todos')
+        .set({ done: true })
+        .where('id', '=', inserted.id)
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      expect(updated.done).toBe(true)
+      expect(updated.id).toBe(inserted.id)
+    })
+
+    it('should execute DELETE query', async () => {
+      const inserted = await testDb
+        .insertInto('todos')
+        .values({ title: 'Delete Test' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      await testDb.deleteFrom('todos').where('id', '=', inserted.id).execute()
+
+      const found = await testDb
+        .selectFrom('todos')
+        .selectAll()
+        .where('id', '=', inserted.id)
+        .executeTakeFirst()
+
+      expect(found).toBeUndefined()
+    })
+  })
+
+  describe('Type Safety', () => {
+    it('should have typed query results', async () => {
+      const result = await testDb
+        .selectFrom('todos')
+        .select(['id', 'title', 'done', 'created_at'])
+        .limit(1)
+        .execute()
+
+      if (result.length > 0) {
+        const todo = result[0]
+        expect(todo).toBeDefined()
+        expect(typeof todo?.id).toBe('number')
+        expect(typeof todo?.title).toBe('string')
+        expect(typeof todo?.done).toBe('boolean')
+        expect(todo?.created_at).toBeInstanceOf(Date)
+      }
+    })
+
+    it('should enforce column names at compile time', async () => {
+      const result = await testDb
+        .selectFrom('todos')
+        .select('title')
+        .limit(1)
+        .execute()
+
+      expect(Array.isArray(result)).toBe(true)
+    })
+  })
+
+  describe('Transactions', () => {
+    it('should support transactions', async () => {
+      await testDb.transaction().execute(async trx => {
+        const inserted = await trx
+          .insertInto('todos')
+          .values({ title: 'Transaction Test' })
+          .returningAll()
+          .executeTakeFirstOrThrow()
+
+        expect(inserted.title).toBe('Transaction Test')
+      })
+    })
+
+    it('should rollback on error', async () => {
+      const initialCount = await testDb
+        .selectFrom('todos')
+        .select(testDb.fn.count('id').as('count'))
+        .executeTakeFirstOrThrow()
+
+      try {
+        await testDb.transaction().execute(async trx => {
+          await trx
+            .insertInto('todos')
+            .values({ title: 'Rollback Test' })
+            .execute()
+
+          throw new Error('Test rollback')
+        })
+        // Se chegou aqui, o teste falhou
+        expect(true).toBe(false)
+      } catch (error) {
+        // Verifica que o erro foi lançado corretamente
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toBe('Test rollback')
+      }
+
+      const finalCount = await testDb
+        .selectFrom('todos')
+        .select(testDb.fn.count('id').as('count'))
+        .executeTakeFirstOrThrow()
+
+      expect(finalCount.count).toBe(initialCount.count)
+    })
+  })
+
+  describe('Schema', () => {
+    it('should have todos table with correct columns', async () => {
+      const todo = await testDb
+        .insertInto('todos')
+        .values({ title: 'Schema Test' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      expect(todo).toHaveProperty('id')
+      expect(todo).toHaveProperty('title')
+      expect(todo).toHaveProperty('done')
+      expect(todo).toHaveProperty('created_at')
+    })
+
+    it('should set default value for done column', async () => {
+      const todo = await testDb
+        .insertInto('todos')
+        .values({ title: 'Default Test' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      expect(todo.done).toBe(false)
+    })
+
+    it('should set default value for created_at column', async () => {
+      const beforeInsert = new Date()
+
+      const todo = await testDb
+        .insertInto('todos')
+        .values({ title: 'Timestamp Test' })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+
+      const afterInsert = new Date()
+
+      expect(todo.created_at).toBeDefined()
+      expect(todo.created_at?.getTime()).toBeGreaterThanOrEqual(
+        beforeInsert.getTime()
+      )
+      expect(todo.created_at?.getTime()).toBeLessThanOrEqual(
+        afterInsert.getTime()
+      )
+    })
+  })
+})

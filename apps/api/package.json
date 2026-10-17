@@ -8,21 +8,26 @@
     "start": "bun run dist/index.js",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "@elysiajs/cors": "1.4.0",
+    "@elysiajs/eden": "catalog:",
     "@elysiajs/swagger": "1.2.2",
     "@sinclair/typebox": "0.34.41",
     "@tms/config": "workspace:*",
     "@tms/db": "workspace:*",
     "dotenv": "16.4.7",
     "elysia": "catalog:",
-    "@elysiajs/eden": "catalog:",
     "@tms/logger": "workspace:*",
     "serialize-error": "12.0.0"
   },
   "devDependencies": {
+    "@tms/bun-test-config": "workspace:*",
+    "@tms/tsconfig": "workspace:*",
     "bun-types": "1.2.5",
     "typescript": "catalog:"
   }

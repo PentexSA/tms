@@ -10,10 +10,15 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "devDependencies": {
+    "@tms/bun-test-config": "workspace:*",
     "@tms/tsconfig": "workspace:*",
+    "bun-types": "^1.2.5",
     "typescript": "catalog:"
   },
   "dependencies": {

@@ -76,8 +76,48 @@ cd packages/db && npx pnpm migrate:down  # Rollback last migration
 npx pnpm typecheck                 # Type check all packages
 npx pnpm lint                      # Lint all packages
 npx pnpm build                     # Build all packages
-npx pnpm test                      # Run all tests
+npx pnpm test                      # Run all tests (hybrid: Bun + Jest)
 ```
+
+### Testing
+
+The project uses a **hybrid test setup** for optimal performance and compatibility:
+
+**Backend (Bun Test Runner)** - Fast, no Docker needed:
+```bash
+npx pnpm test:packages             # All backend packages (@tms/config, @tms/db, @tms/api)
+bun test packages/config/src/__tests__      # Test specific package
+bun test --watch                   # Watch mode for development
+```
+
+**Frontend/UI (Jest)** - React Native compatibility:
+```bash
+npx pnpm test:ui                   # Test @tms/ui and frontend
+npm run test --filter=@tms/ui      # Test only UI package
+```
+
+**All Tests**:
+```bash
+npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
+```
+
+#### Key Features
+
+- **@tms/config**: 15 tests in 57ms (Bun)
+- **@tms/db**: 16 tests in 3.7s with PGLite in-memory database (Bun)
+- **@tms/api**: 20 tests in 752ms (Bun)
+- **@tms/ui**: 20 tests in 1.9s (Jest - React Native components)
+
+**Performance**: ~6.4 seconds total (vs ~20-25s with previous Jest setup)
+
+#### Test Infrastructure
+
+- **Bun Test Runner**: Backend packages use native Bun for ~70% faster execution
+- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker)
+- **Jest**: Frontend packages use Jest for React Native/Expo compatibility
+- **@tms/bun-test-config**: Shared Bun test utilities and helpers
+
+No NODE_OPTIONS workarounds needed anymore!
 
 ### Individual Package Commands
 

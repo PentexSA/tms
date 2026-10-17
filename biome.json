@@ -1,7 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
-  "vcs": { "enabled": false, "clientKind": "git", "useIgnoreFile": false },
-  "files": { "ignoreUnknown": false },
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,
@@ -134,6 +133,30 @@
             "noVar": "error",
             "useGetterReturn": "off"
           }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "javascript": {
+        "globals": [
+          "describe",
+          "it",
+          "test",
+          "expect",
+          "beforeAll",
+          "afterAll",
+          "beforeEach",
+          "afterEach",
+          "jest"
+        ]
+      }
+    },
+    {
+      "includes": ["**/test/setup.ts", "**/__tests__/**/setup.ts"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUndeclaredVariables": "off" }
         }
       }
     }

@@ -1,0 +1,15 @@
+{
+  "name": "@tms/jest-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Jest configuration for TMS monorepo",
+  "exports": {
+    "./base": "./jest.config.base.js",
+    "./react-native": "./jest.config.react-native.js"
+  },
+  "dependencies": {
+    "jest": "catalog:",
+    "@types/jest": "catalog:",
+    "ts-jest": "catalog:"
+  }
+}

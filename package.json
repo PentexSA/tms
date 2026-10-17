@@ -10,11 +10,17 @@
     "format": "biome format --write .",
     "check": "biome check --write .",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down -v",
     "db:migrate": "pnpm -C packages/db migrate:up",
-    "db:codegen": "pnpm -C packages/db codegen"
+    "db:codegen": "pnpm -C packages/db codegen",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch --parallel",
+    "test:coverage": "turbo run test:coverage",
+    "test:api": "turbo run test --filter=@tms/api",
+    "test:ui": "turbo run test --filter='./packages/ui' -- && turbo run test --filter=frontend",
+    "test:packages": "turbo run test --filter='./packages/*'",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +29,38 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.5",
     "@sinclair/typebox": "0.34.41",
+    "bun-types": "1.2.5",
+    "husky": "^9.1.7",
+    "kysely-pglite": "^0.6.1",
+    "lint-staged": "^16.2.5",
     "turbo": "2.5.8"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json}": ["biome check --write --no-errors-on-unmatched"]
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.11"
+  },
+  "workspaces": {
+    "packages": ["apps/*", "packages/*"],
+    "catalog": {
+      "@elysiajs/eden": "1.4.1",
+      "@testing-library/jest-dom": "6.6.3",
+      "@testing-library/react-native": "13.3.3",
+      "@types/jest": "29.5.14",
+      "@types/react": "19.1.10",
+      "elysia": "1.4.9",
+      "jest": "29.7.0",
+      "jest-environment-node": "29.7.0",
+      "jest-expo": "54.0.12",
+      "jsdom": "26.0.0",
+      "react": "19.1.0",
+      "react-dom": "19.1.0",
+      "react-native": "0.81.4",
+      "react-native-web": "0.19.13",
+      "react-test-renderer": "19.1.0",
+      "ts-jest": "29.2.5",
+      "typescript": "5.9.3"
+    }
   }
 }

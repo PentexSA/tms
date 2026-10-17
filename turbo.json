@@ -21,7 +21,68 @@
       "outputs": []
     },
     "test": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "test/**",
+        "jest.config.js",
+        "jest.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"]
+    },
+    "test:watch": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "persistent": true,
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "test/**",
+        "jest.config.js",
+        "jest.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
       "outputs": []
+    },
+    "test:coverage": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.{ts,tsx}",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "app/**/*.test.ts",
+        "app/**/*.test.tsx",
+        "src/__tests__/**",
+        "app/__tests__/**",
+        "test/**",
+        "jest.config.js",
+        "jest.config.ts",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"]
     }
   }
 }
