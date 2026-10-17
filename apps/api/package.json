@@ -21,7 +21,9 @@
     "@tms/config": "workspace:*",
     "@tms/db": "workspace:*",
     "dotenv": "16.4.7",
-    "elysia": "catalog:"
+    "elysia": "catalog:",
+    "@tms/logger": "workspace:*",
+    "serialize-error": "12.0.0"
   },
   "devDependencies": {
     "@tms/bun-test-config": "workspace:*",

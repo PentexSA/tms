@@ -1,6 +1,7 @@
 import { config } from '@tms/config/env'
 import { Kysely, PostgresDialect } from 'kysely'
 import { Pool } from 'pg'
+import { kyselyLogger } from './logger'
 import type { DB } from './types'
 
 export const db = new Kysely<DB>({
@@ -9,4 +10,5 @@ export const db = new Kysely<DB>({
       connectionString: config.DATABASE_URL,
     }),
   }),
+  log: kyselyLogger,
 })

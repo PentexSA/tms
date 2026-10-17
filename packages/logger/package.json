@@ -1,0 +1,21 @@
+{
+  "name": "@tms/logger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tms/config": "workspace:*",
+    "pino": "10.0.0"
+  },
+  "devDependencies": {
+    "@tms/tsconfig": "workspace:*",
+    "pino-pretty": "13.1.2"
+  }
+}

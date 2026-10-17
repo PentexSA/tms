@@ -3,6 +3,8 @@ import { swagger } from '@elysiajs/swagger'
 import { config } from '@tms/config/env'
 import { db as defaultDb } from '@tms/db'
 import { Elysia, t } from 'elysia'
+import { logger } from './logger'
+import { loggerMiddleware } from './middlewares/loggerMiddleware'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -14,6 +16,7 @@ export const createApp = (database?: any) => {
   // biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
   const db = database || defaultDb
   return new Elysia()
+    .use(loggerMiddleware)
     .use(cors())
     .use(
       swagger({
@@ -64,7 +67,7 @@ export type App = ReturnType<typeof createApp>
 if (process.env.NODE_ENV !== 'test') {
   const app = createApp().listen(config.API_PORT)
 
-  console.log(
+  logger.info(
     `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
   )
 }

@@ -19,7 +19,8 @@
     "@electric-sql/pglite": "^0.3.11",
     "kysely": "0.27.5",
     "pg": "8.14.0",
-    "@tms/config": "workspace:*"
+    "@tms/config": "workspace:*",
+    "@tms/logger": "workspace:*"
   },
   "devDependencies": {
     "@tms/bun-test-config": "workspace:*",
