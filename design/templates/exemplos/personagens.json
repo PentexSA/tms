@@ -1,0 +1,704 @@
+{
+  "description": "Dados fictícios para o protótipo. Os personagens de Vampiro, Mago e Lobisomem vêm das telas originais. sheet_data segue o formato { values, specialties }, com um valor por campo do template.",
+  "users": [
+    { "id": "u-ana", "name": "Ana" },
+    { "id": "u-bruno", "name": "Bruno" },
+    { "id": "u-carla", "name": "Carla" },
+    { "id": "u-davi", "name": "Davi" },
+    { "id": "u-rafael", "name": "Rafael" },
+    { "id": "u-livia", "name": "Lívia" }
+  ],
+  "chronicles": [
+    {
+      "id": "noites-sp",
+      "name": "Noites de São Paulo",
+      "system": "vtm-v20",
+      "storytellerId": "u-rafael",
+      "lastSession": "2026-10-10"
+    },
+    {
+      "id": "torre-marfim",
+      "name": "A Torre de Marfim",
+      "system": "mta-m20",
+      "storytellerId": "u-livia",
+      "lastSession": "2026-10-03"
+    },
+    {
+      "id": "serra-do-mar",
+      "name": "Seita da Serra do Mar",
+      "system": "wta-w20",
+      "storytellerId": "u-rafael",
+      "lastSession": "2026-09-26"
+    },
+    {
+      "id": "mar-de-cinzas",
+      "name": "Mar de Cinzas",
+      "system": "dnd5e-2014",
+      "storytellerId": "u-livia",
+      "lastSession": "2026-10-12"
+    },
+    {
+      "id": "ouro-preto",
+      "name": "Sombras sobre Ouro Preto",
+      "system": "coc7e",
+      "storytellerId": "u-rafael",
+      "lastSession": "2026-08-30"
+    },
+    {
+      "id": "neon",
+      "name": "Neon e Ferrugem",
+      "system": "fate-core",
+      "storytellerId": "u-livia",
+      "lastSession": "2026-10-01"
+    }
+  ],
+  "characters": [
+    {
+      "id": "helena",
+      "chronicleId": "noites-sp",
+      "system": "vtm-v20",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-10-17T21:40:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Helena Varga",
+          "concept": "Arquivista da Capela",
+          "clan": "tremere",
+          "generation": 8,
+          "sire": "Regente Aurélio Costa",
+          "nature": "Arquiteta",
+          "demeanor": "Pedante",
+          "quote": "Todo segredo tem um preço. Eu apenas anoto quem pagou.",
+          "strength": 2,
+          "dexterity": 2,
+          "stamina": 2,
+          "charisma": 2,
+          "manipulation": 3,
+          "appearance": 2,
+          "perception": 3,
+          "intelligence": 4,
+          "wits": 3,
+          "alertness": 2,
+          "athletics": 1,
+          "awareness": 2,
+          "empathy": 2,
+          "expression": 1,
+          "intimidation": 1,
+          "subterfuge": 2,
+          "drive": 1,
+          "etiquette": 2,
+          "larceny": 1,
+          "stealth": 2,
+          "academics": 3,
+          "computer": 1,
+          "investigation": 3,
+          "law": 1,
+          "occult": 4,
+          "politics": 2,
+          "science": 1,
+          "technology": 1,
+          "disciplines": [
+            {
+              "id": "d1",
+              "name": "Taumaturgia",
+              "value": 3,
+              "specialty": "Trilha do Sangue",
+              "notes": "Rituais preparados: Defesa do Refúgio Sagrado, Despertar com o Frescor da Noite."
+            },
+            { "id": "d2", "name": "Auspícios", "value": 2 },
+            { "id": "d3", "name": "Dominação", "value": 1 }
+          ],
+          "backgrounds": [
+            {
+              "id": "b1",
+              "name": "Mentor",
+              "value": 3,
+              "notes": "Regente Aurélio Costa."
+            },
+            { "id": "b2", "name": "Recursos", "value": 2 },
+            { "id": "b3", "name": "Status", "value": 1 }
+          ],
+          "conscience": 3,
+          "selfControl": 4,
+          "courage": 2,
+          "humanity": 6,
+          "willpower": { "current": 5, "permanent": 7 },
+          "blood": { "current": 9 },
+          "health": { "bashing": 1, "lethal": 1, "aggravated": 0 },
+          "notes": "Deve um favor ao Primógeno Nosferatu desde a noite do incêndio na Liberdade. Guarda as atas da Capela num cofre sob a Biblioteca Mário de Andrade.",
+          "storytellerNotes": "O Regente sabe do favor ao Nosferatu e vai cobrar na próxima sessão."
+        },
+        "specialties": {
+          "intelligence": "Memória eidética",
+          "occult": "Hermetismo"
+        }
+      }
+    },
+    {
+      "id": "caio",
+      "chronicleId": "noites-sp",
+      "system": "vtm-v20",
+      "ownerId": "u-bruno",
+      "updatedAt": "2026-10-17T21:38:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Caio Ventura",
+          "concept": "Agitador sindical",
+          "clan": "brujah",
+          "generation": 10,
+          "strength": 4,
+          "dexterity": 3,
+          "stamina": 3,
+          "charisma": 3,
+          "manipulation": 2,
+          "appearance": 2,
+          "perception": 2,
+          "intelligence": 2,
+          "wits": 3,
+          "brawl": 3,
+          "athletics": 2,
+          "intimidation": 2,
+          "leadership": 2,
+          "streetwise": 2,
+          "melee": 2,
+          "drive": 1,
+          "politics": 2,
+          "disciplines": [
+            { "id": "d1", "name": "Potência", "value": 2 },
+            { "id": "d2", "name": "Rapidez", "value": 2 },
+            { "id": "d3", "name": "Presença", "value": 1 }
+          ],
+          "conscience": 2,
+          "selfControl": 2,
+          "courage": 4,
+          "humanity": 6,
+          "willpower": { "current": 2, "permanent": 5 },
+          "blood": { "current": 6 },
+          "health": { "bashing": 0, "lethal": 3, "aggravated": 0 }
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "marta",
+      "chronicleId": "noites-sp",
+      "system": "vtm-v20",
+      "ownerId": "u-carla",
+      "updatedAt": "2026-10-17T21:12:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Marta Okabe",
+          "concept": "Curadora de galeria",
+          "clan": "toreador",
+          "generation": 9,
+          "strength": 1,
+          "dexterity": 3,
+          "stamina": 2,
+          "charisma": 4,
+          "manipulation": 3,
+          "appearance": 4,
+          "perception": 3,
+          "intelligence": 3,
+          "wits": 2,
+          "empathy": 3,
+          "expression": 3,
+          "subterfuge": 2,
+          "etiquette": 3,
+          "performance": 2,
+          "academics": 2,
+          "finance": 2,
+          "disciplines": [
+            { "id": "d1", "name": "Presença", "value": 3 },
+            { "id": "d2", "name": "Auspícios", "value": 1 },
+            { "id": "d3", "name": "Rapidez", "value": 1 }
+          ],
+          "conscience": 3,
+          "selfControl": 3,
+          "courage": 2,
+          "humanity": 7,
+          "willpower": { "current": 6, "permanent": 6 },
+          "blood": { "current": 13 },
+          "health": { "bashing": 0, "lethal": 0, "aggravated": 0 }
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "beto",
+      "chronicleId": "noites-sp",
+      "system": "vtm-v20",
+      "ownerId": "u-davi",
+      "updatedAt": "2026-10-17T20:51:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Beto Sombra",
+          "concept": "Corretor de informações",
+          "clan": "nosferatu",
+          "generation": 11,
+          "strength": 2,
+          "dexterity": 3,
+          "stamina": 3,
+          "charisma": 1,
+          "manipulation": 3,
+          "appearance": 0,
+          "perception": 4,
+          "intelligence": 3,
+          "wits": 3,
+          "alertness": 3,
+          "stealth": 4,
+          "streetwise": 3,
+          "larceny": 2,
+          "computer": 3,
+          "investigation": 2,
+          "disciplines": [
+            { "id": "d1", "name": "Ofuscação", "value": 3 },
+            { "id": "d2", "name": "Animalismo", "value": 2 }
+          ],
+          "conscience": 3,
+          "selfControl": 3,
+          "courage": 3,
+          "humanity": 5,
+          "willpower": { "current": 0, "permanent": 6 },
+          "blood": { "current": 4 },
+          "health": { "bashing": 2, "lethal": 0, "aggravated": 1 }
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "tomas",
+      "chronicleId": "torre-marfim",
+      "system": "mta-m20",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-10-03T23:05:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Tomás Arruda",
+          "concept": "Professor de latim",
+          "tradition": "ordem-de-hermes",
+          "essence": "dinamica",
+          "house": "Bonisagus",
+          "nature": "Visionário",
+          "demeanor": "Perfeccionista",
+          "quote": "O mundo é um texto. Eu só aprendi a ler as entrelinhas.",
+          "strength": 2,
+          "dexterity": 2,
+          "stamina": 2,
+          "charisma": 2,
+          "manipulation": 2,
+          "appearance": 2,
+          "perception": 3,
+          "intelligence": 4,
+          "wits": 3,
+          "alertness": 2,
+          "awareness": 3,
+          "empathy": 1,
+          "expression": 2,
+          "subterfuge": 1,
+          "etiquette": 2,
+          "meditation": 2,
+          "research": 3,
+          "technology": 1,
+          "academics": 4,
+          "cosmology": 2,
+          "enigmas": 2,
+          "esoterica": 3,
+          "investigation": 1,
+          "occult": 3,
+          "arete": 3,
+          "affinity": "forces",
+          "correspondence": 1,
+          "forces": 3,
+          "matter": 1,
+          "mind": 2,
+          "prime": 2,
+          "backgrounds": [
+            {
+              "id": "b1",
+              "name": "Avatar",
+              "value": 3,
+              "specialty": "O Escriba de Tinta"
+            },
+            { "id": "b2", "name": "Biblioteca", "value": 3 },
+            { "id": "b3", "name": "Capela", "value": 2 },
+            { "id": "b4", "name": "Mentor", "value": 2 },
+            { "id": "b5", "name": "Recursos", "value": 1 }
+          ],
+          "willpower": { "current": 5, "permanent": 6 },
+          "wheel": { "quintessence": 6, "paradox": 2 },
+          "health": { "bashing": 1, "lethal": 0, "aggravated": 0 },
+          "paradigm": "A Criação é um texto escrito na língua divina; quem conhece os nomes verdadeiros reescreve a página.",
+          "practice": "Alta Magia Ritual",
+          "instruments": "Grimório pessoal, selos em giz, nomes verdadeiros, tábuas astrológicas, latim enoquiano.",
+          "notes": "",
+          "storytellerNotes": ""
+        },
+        "specialties": {
+          "intelligence": "Erudição",
+          "academics": "Línguas mortas",
+          "esoterica": "Hermetismo"
+        }
+      }
+    },
+    {
+      "id": "iara",
+      "chronicleId": "serra-do-mar",
+      "system": "wta-w20",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-09-26T22:30:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Iara Moreira",
+          "deedName": "Canta-Tempestade",
+          "concept": "Contadora de histórias",
+          "breed": "hominideo",
+          "auspice": "galliard",
+          "tribe": "fianna",
+          "rank": 2,
+          "sept": "Seita da Serra do Mar",
+          "totem": "Corvo",
+          "quote": "Toda canção termina. Eu escolho como.",
+          "strength": 3,
+          "dexterity": 3,
+          "stamina": 3,
+          "charisma": 4,
+          "manipulation": 2,
+          "appearance": 3,
+          "perception": 3,
+          "intelligence": 2,
+          "wits": 3,
+          "alertness": 2,
+          "athletics": 2,
+          "brawl": 2,
+          "empathy": 2,
+          "expression": 4,
+          "leadership": 1,
+          "primalUrge": 1,
+          "subterfuge": 1,
+          "etiquette": 1,
+          "melee": 1,
+          "performance": 3,
+          "stealth": 1,
+          "survival": 2,
+          "enigmas": 2,
+          "medicine": 1,
+          "occult": 1,
+          "rituals": 2,
+          "form": "hominideo",
+          "rage": { "current": 3, "permanent": 4 },
+          "gnosis": { "current": 4, "permanent": 4 },
+          "willpower": { "current": 5, "permanent": 6 },
+          "glory": { "current": 4, "permanent": 3 },
+          "honor": { "current": 7, "permanent": 2 },
+          "wisdom": { "current": 2, "permanent": 1 },
+          "health": { "bashing": 0, "lethal": 0, "aggravated": 0 },
+          "gifts": [
+            {
+              "id": "g1",
+              "name": "Persuasão",
+              "meta": { "rank": 1, "source": "Raça · Hominídeo" }
+            },
+            {
+              "id": "g2",
+              "name": "Chamado do Selvagem",
+              "meta": { "rank": 1, "source": "Augúrio · Galliard" }
+            },
+            {
+              "id": "g3",
+              "name": "Luz das Fadas",
+              "meta": { "rank": 1, "source": "Tribo · Fianna" }
+            },
+            {
+              "id": "g4",
+              "name": "Distrações",
+              "meta": { "rank": 2, "source": "Augúrio · Galliard" }
+            }
+          ],
+          "backgrounds": [
+            { "id": "b1", "name": "Ancestrais", "value": 2 },
+            { "id": "b2", "name": "Parentes", "value": 3 },
+            {
+              "id": "b3",
+              "name": "Fetiche",
+              "value": 1,
+              "specialty": "Viola de Corda de Prata"
+            },
+            { "id": "b4", "name": "Totem", "value": 2 }
+          ],
+          "notes": "",
+          "storytellerNotes": ""
+        },
+        "specialties": {
+          "expression": "Canções de saga",
+          "performance": "Violão"
+        }
+      }
+    },
+    {
+      "id": "lia",
+      "chronicleId": "mar-de-cinzas",
+      "system": "dnd5e-2014",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-10-12T22:10:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Lia Brasa",
+          "race": "elfo",
+          "class": "mago",
+          "subclass": "Escola de Evocação",
+          "level": 5,
+          "background": "Sábia",
+          "alignment": "Neutra e boa",
+          "str": 8,
+          "dex": 14,
+          "con": 12,
+          "int": 18,
+          "wis": 12,
+          "cha": 10,
+          "saveInt": "proficient",
+          "saveWis": "proficient",
+          "arcana": "proficient",
+          "history": "proficient",
+          "investigation": "proficient",
+          "insight": "proficient",
+          "perception": "proficient",
+          "hp": { "current": 27, "max": 27, "temp": 5 },
+          "ac": 12,
+          "speed": "9 m",
+          "hitDice": { "current": 5 },
+          "deathSaves": {
+            "successes": [false, false, false],
+            "failures": [false, false, false]
+          },
+          "inspiration": 0,
+          "conditions": [],
+          "spellSlots": {
+            "1": { "max": 4, "used": 0 },
+            "2": { "max": 3, "used": 1 },
+            "3": { "max": 2, "used": 0 }
+          },
+          "attacks": [
+            {
+              "id": "a1",
+              "name": "Bordão",
+              "meta": { "bonus": 2, "damage": "1d6 − 1 contundente" }
+            },
+            {
+              "id": "a2",
+              "name": "Raio de Fogo",
+              "meta": { "bonus": 7, "damage": "2d10 fogo" }
+            }
+          ],
+          "spells": [
+            {
+              "id": "s1",
+              "name": "Raio de Fogo",
+              "meta": { "level": "Truque", "school": "Evocação" }
+            },
+            {
+              "id": "s2",
+              "name": "Mãos Mágicas",
+              "meta": { "level": "Truque", "school": "Conjuração" }
+            },
+            {
+              "id": "s3",
+              "name": "Prestidigitação",
+              "meta": { "level": "Truque", "school": "Transmutação" }
+            },
+            {
+              "id": "s4",
+              "name": "Armadura Arcana",
+              "meta": { "level": "1º", "school": "Abjuração" }
+            },
+            {
+              "id": "s5",
+              "name": "Mísseis Mágicos",
+              "meta": { "level": "1º", "school": "Evocação" }
+            },
+            {
+              "id": "s6",
+              "name": "Escudo",
+              "meta": { "level": "1º", "school": "Abjuração" }
+            },
+            {
+              "id": "s7",
+              "name": "Passo Nebuloso",
+              "meta": { "level": "2º", "school": "Conjuração" }
+            },
+            {
+              "id": "s8",
+              "name": "Raio Ardente",
+              "meta": { "level": "2º", "school": "Evocação" }
+            },
+            {
+              "id": "s9",
+              "name": "Bola de Fogo",
+              "meta": { "level": "3º", "school": "Evocação" }
+            },
+            {
+              "id": "s10",
+              "name": "Contramágica",
+              "meta": { "level": "3º", "school": "Abjuração" }
+            }
+          ],
+          "inventory": [
+            {
+              "id": "i1",
+              "name": "Grimório",
+              "meta": { "qty": 1, "weight": "1,5 kg" }
+            },
+            {
+              "id": "i2",
+              "name": "Bordão",
+              "meta": { "qty": 1, "weight": "2 kg" }
+            },
+            {
+              "id": "i3",
+              "name": "Bolsa de componentes",
+              "meta": { "qty": 1, "weight": "1 kg" }
+            },
+            {
+              "id": "i4",
+              "name": "Pergaminho em branco",
+              "meta": { "qty": 6, "weight": "—" }
+            },
+            {
+              "id": "i5",
+              "name": "Tinta e pena",
+              "meta": { "qty": 1, "weight": "—" }
+            }
+          ],
+          "gold": 45,
+          "personality": "Faço anotações sobre tudo, inclusive sobre quem faz anotações.",
+          "ideals": "Conhecimento. O caminho para o poder e o autoaperfeiçoamento passa pelo saber.",
+          "bonds": "Tenho um tomo antigo com segredos que não podem cair em mãos erradas.",
+          "flaws": "Sou facilmente distraída pela promessa de informação.",
+          "languages": "Comum, Élfico, Dracônico, Anão",
+          "notes": "",
+          "storytellerNotes": ""
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "joana",
+      "chronicleId": "ouro-preto",
+      "system": "coc7e",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-08-30T23:50:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Joana Prates",
+          "occupation": "Professora de Antropologia",
+          "age": 41,
+          "residence": "Ouro Preto, MG",
+          "birthplace": "Mariana, MG",
+          "str": 45,
+          "con": 60,
+          "siz": 55,
+          "dex": 65,
+          "app": 50,
+          "edu": 80,
+          "int": 75,
+          "pow": 60,
+          "hp": { "current": 9 },
+          "mp": { "current": 12 },
+          "sanity": { "current": 52 },
+          "luck": { "current": 45 },
+          "conditions": [],
+          "anthropology": 61,
+          "archaeology": 31,
+          "history": 50,
+          "libraryUse": 70,
+          "languageOther": 41,
+          "languageOwn": 80,
+          "psychology": 45,
+          "persuade": 30,
+          "occult": 25,
+          "firstAid": 40,
+          "spotHidden": 45,
+          "listen": 35,
+          "dodge": 32,
+          "creditRating": 30,
+          "mythos": 3,
+          "sciencePharmacy": 21,
+          "charm": 25,
+          "driveAuto": 30,
+          "weapons": [
+            {
+              "id": "w1",
+              "name": "Bengala",
+              "meta": { "skill": "Lutar (Briga) 25%", "damage": "1d6" }
+            }
+          ],
+          "equipment": [
+            { "id": "e1", "name": "Caderno de campo" },
+            { "id": "e2", "name": "Lanterna" },
+            { "id": "e3", "name": "Câmera fotográfica" }
+          ],
+          "ideology": "Toda lenda guarda um fato que alguém quis esquecer.",
+          "significantPeople": "O orientador de doutorado, desaparecido em 1998.",
+          "treasuredPossessions": "Um caderno de capa de couro com anotações do orientador.",
+          "notes": "",
+          "storytellerNotes": ""
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "dandara",
+      "chronicleId": "neon",
+      "system": "fate-core",
+      "ownerId": "u-ana",
+      "updatedAt": "2026-10-01T22:00:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Dandara Lume",
+          "highConcept": "Ex-detetive endividado com a pessoa errada",
+          "trouble": "Não consigo deixar um caso pela metade",
+          "aspects": [
+            { "id": "a1", "text": "Conheço todo camelô do centro" },
+            { "id": "a2", "text": "Meu velho distintivo ainda abre portas" },
+            { "id": "a3", "text": "Devo uma ao Dr. Kuroda" }
+          ],
+          "investigate": 4,
+          "notice": 3,
+          "contacts": 3,
+          "athletics": 2,
+          "physique": 2,
+          "stealth": 2,
+          "rapport": 1,
+          "fight": 1,
+          "will": 1,
+          "provoke": 1,
+          "stress": {
+            "physical": [false, true, false],
+            "mental": [false, false]
+          },
+          "refresh": 3,
+          "fatePoints": { "current": 2 },
+          "consequences": [
+            { "id": "mild", "text": "Costela trincada" },
+            { "id": "moderate", "text": "" },
+            { "id": "severe", "text": "" }
+          ],
+          "stunts": [
+            {
+              "id": "s1",
+              "name": "Faro para mentiras",
+              "notes": "+2 em Investigar para descobrir contradições em depoimentos."
+            },
+            {
+              "id": "s2",
+              "name": "Rede de informantes",
+              "notes": "Uma vez por sessão, Contatos revela um detalhe que ninguém sabia."
+            }
+          ],
+          "notes": "",
+          "storytellerNotes": ""
+        },
+        "specialties": {}
+      }
+    }
+  ]
+}

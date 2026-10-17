@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="noite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Telas · TMS (protótipo)</title>
+<link rel="stylesheet" href="../design-system/tokens.css">
+<link rel="stylesheet" href="../design-system/components.css">
+<style>
+  /* Canvas de boards: cada board é a mesma página do protótipo num iframe de largura fixa. */
+  body { padding-bottom: var(--space-12); }
+  .b-top { position: sticky; top: 0; z-index: var(--layer-sticky); background: var(--bg); border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+  .b-top__inner { padding: var(--space-3) var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .b-top h1 { margin: 0; flex: 1 1 12rem; font-size: var(--type-title-size); }
+  .b-controls { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .b-controls label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--type-caption-size); color: var(--ink-muted); }
+  .b-controls select { min-height: var(--hit-size); padding: 0 var(--space-2); border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control); background: var(--surface); color: var(--ink); }
+  .b-group { padding: 0 var(--space-4); }
+  .b-group > h2 { margin: var(--space-8) 0 var(--space-1); font-size: var(--type-title-size); }
+  .b-group > p { margin: 0 0 var(--space-4); color: var(--ink-muted); font-size: var(--type-caption-size); max-width: 80ch; }
+  .b-row { display: flex; gap: var(--space-6); overflow-x: auto; padding-bottom: var(--space-4); align-items: flex-start; }
+  figure { margin: 0; flex: none; }
+  figcaption { display: flex; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); font-size: var(--type-caption-size); }
+  figcaption a { color: var(--action); }
+  .b-frame { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--border-control); background: var(--bg); box-shadow: var(--elevation-1); }
+  .b-frame iframe { border: 0; display: block; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header class="b-top">
+  <div class="b-top__inner">
+    <h1>Telas · protótipo navegável</h1>
+    <div class="b-controls" id="controls"></div>
+    <a class="ds-btn" href="../design-system/index.html">Design system</a>
+  </div>
+</header>
+<main id="boards"></main>
+<script>
+;(() => {
+  // Controles da matriz de teste (C-09): tema × fonte × largura × papel.
+  const read = k => { try { return localStorage.getItem(`tms-boards:${k}`) } catch { return null } }
+  const write = (k, v) => { try { localStorage.setItem(`tms-boards:${k}`, v) } catch { /* sem storage */ } }
+  const state = { theme: read('theme') ?? 'noite', fs: read('fs') ?? '1', w: read('w') ?? '390', as: read('as') ?? 'owner', layout: read('layout') ?? 'zones' }
+  const el = (tag, props = {}, ...children) => {
+    const n = document.createElement(tag)
+    for (const [k, v] of Object.entries(props)) if (v != null) (k === 'text' ? (n.textContent = v) : k.startsWith('on') ? n.addEventListener(k.slice(2), v) : n.setAttribute(k, v))
+    n.append(...children.flat().filter(Boolean))
+    return n
+  }
+  const control = (label, key, options) => el('label', {}, label, el('select', { onchange: e => { state[key] = e.target.value; write(key, state[key]); render() } },
+    options.map(([v, t]) => el('option', { value: v, ...(state[key] === v ? { selected: '' } : {}) }, t))))
+  document.getElementById('controls').append(
+    control('Tema', 'theme', [['noite', 'Noite'], ['pergaminho', 'Pergaminho']]),
+    control('Fonte', 'fs', [['1', '100%'], ['1.3', '130%'], ['2', '200%']]),
+    control('Celular', 'w', [['360', '360 dp'], ['390', '390 dp'], ['430', '430 dp']]),
+    control('Ver como', 'as', [['owner', 'Dono da ficha'], ['player', 'Outro jogador'], ['storyteller', 'Narrador']]),
+    // Variantes do estudo de navegação (design/estudos/navegacao-da-ficha.md), para teste com usuários.
+    control('Navegação', 'layout', [['zones', 'Abas por zona (padrão)'], ['sections', 'Abas por seção (estudo)'], ['scroll', 'Rolagem única (estudo)']]),
+  )
+
+  const PHONE_H = 800
+  const groups = [
+    { title: 'Ficha no celular · seis sistemas, um renderizador', note: 'Mesmo esqueleto (header compacto, chips de seção, identidade recolhida, grade primária, lista com filtro, dock com 3 recursos + Dados). Muda só o que o template declara. Toque longo num chip do dock faz a ação padrão com Desfazer.', boards: [
+      ['Vampiro V20 · Helena Varga', 'ficha.html', 'c=helena'],
+      ['Mago M20 · Tomás Arruda', 'ficha.html', 'c=tomas'],
+      ['Lobisomem W20 · Iara Moreira', 'ficha.html', 'c=iara'],
+      ['D&D 5e (SRD) · Lia Brasa', 'ficha.html', 'c=lia'],
+      ['Call of Cthulhu 7e · Joana Prates', 'ficha.html', 'c=joana'],
+      ['Fate Básico · Dandara Lume', 'ficha.html', 'c=dandara'],
+    ] },
+    { title: 'Modos', note: 'Leitura (ficha de terceiros), Jogo (padrão do dono) e Evoluir (edição de permanentes, com resumo antes de salvar). O modo é UX: o servidor valida cada escrita.', boards: [
+      ['Evoluir · Vampiro', 'ficha.html', 'c=helena&mode=evolve'],
+      ['Leitura · outro jogador', 'ficha.html', 'c=helena&as=player'],
+      ['Narrador · leitura segura', 'ficha.html', 'c=caio&as=storyteller'],
+    ], fixedRole: true },
+    { title: 'Tablet e web', note: '600–899: uma coluna de até 640 com painel "Em jogo" no topo. ≥ 900: coluna "Em jogo" sticky e grupos lado a lado quando cada um tem ≥ 240 px e ≥ 17rem (rótulo inteiro ao lado dos pips).', boards: [
+      ['Vampiro · tablet 768', 'ficha.html', 'c=helena', 768, 1024, 0.6],
+      ['Vampiro · web 1280', 'ficha.html', 'c=helena', 1280, 860, 0.6],
+      ['D&D 5e · web 1280', 'ficha.html', 'c=lia', 1280, 860, 0.6],
+      ['Mago · web 1280', 'ficha.html', 'c=tomas', 1280, 860, 0.6],
+    ] },
+    { title: 'Listas e mesa', note: 'Crônicas e personagens, estado vazio, e o painel do narrador com os mesmos chips do dock (o template decide quais).', boards: [
+      ['Crônicas', 'cronicas.html', ''],
+      ['Crônicas · vazio', 'cronicas.html', 'vazio=1'],
+      ['Mesa do narrador · Vampiro', 'mesa.html', 'ch=noites-sp&as=storyteller&view=mesa'],
+      ['Crônica · visão do jogador', 'mesa.html', 'ch=noites-sp&as=player'],
+    ], fixedRole: true },
+    { title: 'Estados', note: 'Carregando, offline com fila, conflito, erro, sem permissão, ficha nova e arquivada.', boards: [
+      ['Carregando', 'ficha.html', 'c=helena&state=loading'],
+      ['Offline · 3 pendentes', 'ficha.html', 'c=helena&state=offline'],
+      ['Conflito', 'ficha.html', 'c=helena&state=conflict'],
+      ['Erro', 'ficha.html', 'c=helena&state=error'],
+      ['Sem permissão', 'ficha.html', 'c=helena&state=forbidden'],
+      ['Ficha nova', 'ficha.html', 'c=lia&state=empty'],
+      ['Arquivada', 'ficha.html', 'c=tomas&state=archived'],
+    ] },
+  ]
+
+  function render() {
+    document.documentElement.dataset.theme = state.theme
+    const main = document.getElementById('boards')
+    main.replaceChildren(...groups.map(g => el('section', { class: 'b-group' },
+      el('h2', { text: g.title }), el('p', { text: g.note }),
+      el('div', { class: 'b-row' }, g.boards.map(([title, file, hash, w, hgt, scale]) => {
+        const width = w ?? Number(state.w)
+        const height = hgt ?? PHONE_H
+        const s = scale ?? 1
+        const role = g.fixedRole || /as=/.test(hash) ? '' : `&as=${state.as}`
+        const src = `${file}#${hash}${role}&theme=${state.theme}&fs=${state.fs}&layout=${state.layout}`
+        const frame = el('iframe', { src, title, width: String(width), height: String(height), loading: 'lazy', style: `width:${width}px;height:${height}px;transform:scale(${s})` })
+        return el('figure', {},
+          el('figcaption', {}, el('span', { text: `${title} · ${width}px` }), el('a', { href: src, target: '_blank', rel: 'noopener', text: 'abrir' })),
+          el('div', { class: 'b-frame', style: `width:${Math.round(width * s)}px;height:${Math.round(height * s)}px` }, frame))
+      })))))
+  }
+  render()
+})()
+</script>
+</body>
+</html>

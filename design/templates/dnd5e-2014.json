@@ -1,0 +1,691 @@
+{
+  "schema": 1,
+  "system": "dnd5e-2014",
+  "name": "D&D 5ª edição (SRD 5.1)",
+  "family": "d20",
+  "edition": "5e 2014",
+  "templateVersion": "1.0.0",
+  "locale": "pt-BR",
+  "skin": "dnd",
+  "license": "Nomes e regras do System Reference Document 5.1, da Wizards of the Coast LLC, sob a licença Creative Commons Attribution 4.0 International (CC BY 4.0). Este template é o teste de aceitação da arquitetura: usa o mesmo esqueleto de tela da ficha de Vampiro.",
+  "identity": {
+    "name": "name",
+    "chip": "class",
+    "chipFormat": "{class} nv {level}",
+    "summary": ["race", "subclass", "background"],
+    "voice": "personality"
+  },
+  "accent": {
+    "from": "class",
+    "map": {
+      "barbaro": "accent-2",
+      "bardo": "accent-10",
+      "bruxo": "accent-9",
+      "clerigo": "accent-14",
+      "druida": "accent-4",
+      "feiticeiro": "accent-1",
+      "guerreiro": "accent-13",
+      "ladino": "accent-12",
+      "mago": "accent-8",
+      "monge": "accent-15",
+      "paladino": "accent-16",
+      "patrulheiro": "accent-3"
+    },
+    "fallback": "accent-neutral"
+  },
+  "fields": {
+    "name": { "type": "text", "label": "Nome", "maxLength": 80 },
+    "race": {
+      "type": "choice",
+      "label": "Raça",
+      "options": [
+        { "id": "anao", "label": "Anão" },
+        { "id": "draconato", "label": "Draconato" },
+        { "id": "elfo", "label": "Elfo" },
+        { "id": "gnomo", "label": "Gnomo" },
+        { "id": "halfling", "label": "Halfling" },
+        { "id": "humano", "label": "Humano" },
+        { "id": "meio-elfo", "label": "Meio-elfo" },
+        { "id": "meio-orc", "label": "Meio-orc" },
+        { "id": "tiferino", "label": "Tiferino" }
+      ]
+    },
+    "class": {
+      "type": "choice",
+      "label": "Classe",
+      "options": [
+        { "id": "barbaro", "label": "Bárbaro" },
+        { "id": "bardo", "label": "Bardo" },
+        { "id": "bruxo", "label": "Bruxo" },
+        { "id": "clerigo", "label": "Clérigo" },
+        { "id": "druida", "label": "Druida" },
+        { "id": "feiticeiro", "label": "Feiticeiro" },
+        { "id": "guerreiro", "label": "Guerreiro" },
+        { "id": "ladino", "label": "Ladino" },
+        { "id": "mago", "label": "Mago" },
+        { "id": "monge", "label": "Monge" },
+        { "id": "paladino", "label": "Paladino" },
+        { "id": "patrulheiro", "label": "Patrulheiro" }
+      ]
+    },
+    "subclass": { "type": "text", "label": "Subclasse", "maxLength": 60 },
+    "level": { "type": "number", "label": "Nível", "min": 1, "max": 20 },
+    "background": { "type": "text", "label": "Antecedente", "maxLength": 60 },
+    "alignment": { "type": "text", "label": "Tendência", "maxLength": 40 },
+
+    "str": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Força",
+      "shortLabel": "FOR",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveStr",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+    "dex": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Destreza",
+      "shortLabel": "DES",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveDex",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+    "con": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Constituição",
+      "shortLabel": "CON",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveCon",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+    "int": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Inteligência",
+      "shortLabel": "INT",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveInt",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+    "wis": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Sabedoria",
+      "shortLabel": "SAB",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveWis",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+    "cha": {
+      "type": "number",
+      "display": "score+mod",
+      "default": 10,
+      "label": "Carisma",
+      "shortLabel": "CAR",
+      "min": 1,
+      "max": 30,
+      "derive": "abilityModifier",
+      "badge": {
+        "field": "saveCha",
+        "label": "Salvaguarda proficiente",
+        "glyph": "◆"
+      }
+    },
+
+    "proficiencyBonus": {
+      "type": "number",
+      "display": "signed",
+      "label": "Bônus de proficiência",
+      "derive": "proficiencyBonus",
+      "from": "level",
+      "readOnly": true
+    },
+
+    "saveStr": {
+      "type": "mark",
+      "label": "Salvaguarda de Força",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "str" }
+    },
+    "saveDex": {
+      "type": "mark",
+      "label": "Salvaguarda de Destreza",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "dex" }
+    },
+    "saveCon": {
+      "type": "mark",
+      "label": "Salvaguarda de Constituição",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "con" }
+    },
+    "saveInt": {
+      "type": "mark",
+      "label": "Salvaguarda de Inteligência",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "saveWis": {
+      "type": "mark",
+      "label": "Salvaguarda de Sabedoria",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+    "saveCha": {
+      "type": "mark",
+      "label": "Salvaguarda de Carisma",
+      "states": "proficiency2",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "cha" }
+    },
+
+    "acrobatics": {
+      "type": "mark",
+      "label": "Acrobacia",
+      "sublabel": "Des",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "dex" }
+    },
+    "animalHandling": {
+      "type": "mark",
+      "label": "Adestrar Animais",
+      "sublabel": "Sab",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+    "arcana": {
+      "type": "mark",
+      "label": "Arcanismo",
+      "sublabel": "Int",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "athletics": {
+      "type": "mark",
+      "label": "Atletismo",
+      "sublabel": "For",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "str" }
+    },
+    "performance": {
+      "type": "mark",
+      "label": "Atuação",
+      "sublabel": "Car",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "cha" }
+    },
+    "deception": {
+      "type": "mark",
+      "label": "Enganação",
+      "sublabel": "Car",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "cha" }
+    },
+    "stealth": {
+      "type": "mark",
+      "label": "Furtividade",
+      "sublabel": "Des",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "dex" }
+    },
+    "history": {
+      "type": "mark",
+      "label": "História",
+      "sublabel": "Int",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "intimidation": {
+      "type": "mark",
+      "label": "Intimidação",
+      "sublabel": "Car",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "cha" }
+    },
+    "insight": {
+      "type": "mark",
+      "label": "Intuição",
+      "sublabel": "Sab",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+    "investigation": {
+      "type": "mark",
+      "label": "Investigação",
+      "sublabel": "Int",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "medicine": {
+      "type": "mark",
+      "label": "Medicina",
+      "sublabel": "Sab",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+    "nature": {
+      "type": "mark",
+      "label": "Natureza",
+      "sublabel": "Int",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "perception": {
+      "type": "mark",
+      "label": "Percepção",
+      "sublabel": "Sab",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+    "persuasion": {
+      "type": "mark",
+      "label": "Persuasão",
+      "sublabel": "Car",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "cha" }
+    },
+    "sleightOfHand": {
+      "type": "mark",
+      "label": "Prestidigitação",
+      "sublabel": "Des",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "dex" }
+    },
+    "religion": {
+      "type": "mark",
+      "label": "Religião",
+      "sublabel": "Int",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "int" }
+    },
+    "survival": {
+      "type": "mark",
+      "label": "Sobrevivência",
+      "sublabel": "Sab",
+      "states": "proficiency3",
+      "bonus": { "derive": "dnd5eCheckBonus", "ability": "wis" }
+    },
+
+    "hp": {
+      "type": "resource",
+      "label": "Pontos de Vida",
+      "shortLabel": "PV",
+      "max": { "stored": true, "min": 1, "max": 999 },
+      "temp": true,
+      "rule": "tempFirst",
+      "atZero": "deathSaves",
+      "allowInput": true,
+      "editableIn": ["play"],
+      "defaultAction": "damage1",
+      "help": "Dano consome primeiro os PV temporários. Com 0 PV, o personagem faz testes contra a morte."
+    },
+    "ac": {
+      "type": "number",
+      "label": "Classe de Armadura",
+      "shortLabel": "CA",
+      "min": 0,
+      "max": 40
+    },
+    "initiative": {
+      "type": "number",
+      "display": "signed",
+      "label": "Iniciativa",
+      "derive": "abilityModifier",
+      "from": "dex",
+      "readOnly": true
+    },
+    "speed": { "type": "text", "label": "Deslocamento", "maxLength": 20 },
+    "hitDice": {
+      "type": "resource",
+      "label": "Dados de vida",
+      "shortLabel": "DV",
+      "max": { "field": "level" },
+      "editableIn": ["play"],
+      "defaultAction": "spend1",
+      "help": "d6 por nível (Mago). Recuperam metade no descanso longo."
+    },
+    "deathSaves": {
+      "type": "track",
+      "label": "Testes contra a morte",
+      "shortLabel": "Morte",
+      "rule": "boxes",
+      "editableIn": ["play"],
+      "rows": [
+        { "id": "successes", "label": "Sucessos", "boxes": 3 },
+        { "id": "failures", "label": "Falhas", "boxes": 3 }
+      ]
+    },
+    "inspiration": {
+      "type": "rating",
+      "label": "Inspiração",
+      "min": 0,
+      "max": 1,
+      "editableIn": ["play"]
+    },
+    "conditions": {
+      "type": "tags",
+      "label": "Condições",
+      "editableIn": ["play"],
+      "options": [
+        { "id": "agarrado", "label": "Agarrado" },
+        { "id": "amedrontado", "label": "Amedrontado", "roll": "disadvantage" },
+        { "id": "atordoado", "label": "Atordoado" },
+        { "id": "caido", "label": "Caído" },
+        { "id": "cego", "label": "Cego", "roll": "disadvantage" },
+        { "id": "enfeiticado", "label": "Enfeitiçado" },
+        { "id": "envenenado", "label": "Envenenado", "roll": "disadvantage" },
+        { "id": "impedido", "label": "Impedido", "roll": "disadvantage" },
+        { "id": "incapacitado", "label": "Incapacitado" },
+        { "id": "invisivel", "label": "Invisível", "roll": "advantage" },
+        { "id": "paralisado", "label": "Paralisado" },
+        { "id": "petrificado", "label": "Petrificado" },
+        { "id": "surdo", "label": "Surdo" }
+      ]
+    },
+    "spellSlots": {
+      "type": "slots",
+      "label": "Espaços de magia",
+      "shortLabel": "Espaços",
+      "levels": 9,
+      "levelLabel": "{n}º",
+      "reset": "longRest",
+      "editableIn": ["play"],
+      "defaultAction": "use1"
+    },
+    "attacks": {
+      "type": "list",
+      "label": "Ataques",
+      "itemLabel": "Ataque",
+      "item": {
+        "meta": [
+          {
+            "id": "bonus",
+            "type": "number",
+            "display": "signed",
+            "label": "Ataque"
+          },
+          { "id": "damage", "type": "text", "label": "Dano" }
+        ]
+      },
+      "rollAs": "attack"
+    },
+    "spells": {
+      "type": "list",
+      "label": "Magias",
+      "itemLabel": "Magia",
+      "searchable": true,
+      "item": {
+        "meta": [
+          { "id": "level", "type": "text", "label": "Nível" },
+          { "id": "school", "type": "text", "label": "Escola" }
+        ],
+        "notes": true
+      }
+    },
+    "inventory": {
+      "type": "list",
+      "label": "Inventário",
+      "itemLabel": "Item",
+      "searchable": true,
+      "density": "compact",
+      "item": {
+        "meta": [
+          { "id": "qty", "type": "number", "label": "Qtd." },
+          { "id": "weight", "type": "text", "label": "Peso" }
+        ],
+        "notes": true
+      }
+    },
+    "gold": {
+      "type": "number",
+      "label": "Peças de ouro",
+      "shortLabel": "PO",
+      "min": 0,
+      "max": 999999,
+      "allowInput": true
+    },
+    "personality": {
+      "type": "text",
+      "label": "Traço de personalidade",
+      "maxLength": 200
+    },
+    "ideals": { "type": "longText", "label": "Ideais", "maxLength": 600 },
+    "bonds": { "type": "longText", "label": "Vínculos", "maxLength": 600 },
+    "flaws": { "type": "longText", "label": "Defeitos", "maxLength": 600 },
+    "languages": { "type": "text", "label": "Idiomas", "maxLength": 200 },
+    "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "storytellerNotes": {
+      "type": "longText",
+      "label": "Notas do Mestre",
+      "maxLength": 4000
+    }
+  },
+  "markStates": {
+    "proficiency2": [
+      {
+        "id": "none",
+        "label": "Sem proficiência",
+        "glyph": "",
+        "multiplier": 0
+      },
+      {
+        "id": "proficient",
+        "label": "Proficiente",
+        "glyph": "◆",
+        "multiplier": 1
+      }
+    ],
+    "proficiency3": [
+      {
+        "id": "none",
+        "label": "Sem proficiência",
+        "glyph": "",
+        "multiplier": 0
+      },
+      {
+        "id": "proficient",
+        "label": "Proficiente",
+        "glyph": "◆",
+        "multiplier": 1
+      },
+      {
+        "id": "expert",
+        "label": "Especialista",
+        "glyph": "◆◆",
+        "multiplier": 2
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "about-facts",
+      "zone": "identity",
+      "title": "Identidade",
+      "layout": "facts",
+      "fields": ["race", "subclass", "background", "alignment", "level"]
+    },
+    {
+      "id": "play",
+      "zone": "play",
+      "title": "Em jogo",
+      "layout": "fields",
+      "fields": [
+        "hp",
+        "ac",
+        "spellSlots",
+        "hitDice",
+        "deathSaves",
+        "inspiration",
+        "conditions"
+      ]
+    },
+    {
+      "id": "abilities",
+      "zone": "build",
+      "title": "Atributos",
+      "layout": "grid",
+      "columns": 3,
+      "fields": ["str", "dex", "con", "int", "wis", "cha"]
+    },
+    {
+      "id": "saves",
+      "zone": "build",
+      "title": "Salvaguardas",
+      "layout": "list",
+      "fields": [
+        "saveStr",
+        "saveDex",
+        "saveCon",
+        "saveInt",
+        "saveWis",
+        "saveCha"
+      ]
+    },
+    {
+      "id": "skills",
+      "zone": "build",
+      "title": "Perícias",
+      "layout": "list",
+      "filter": {
+        "rule": "proficient",
+        "label": "Só proficientes",
+        "default": true
+      },
+      "searchable": true,
+      "fields": [
+        "acrobatics",
+        "animalHandling",
+        "arcana",
+        "athletics",
+        "performance",
+        "deception",
+        "stealth",
+        "history",
+        "intimidation",
+        "insight",
+        "investigation",
+        "medicine",
+        "nature",
+        "perception",
+        "persuasion",
+        "sleightOfHand",
+        "religion",
+        "survival"
+      ]
+    },
+    {
+      "id": "combat",
+      "zone": "powers",
+      "title": "Combate",
+      "layout": "groups",
+      "groups": [
+        {
+          "id": "stats",
+          "title": "Estatísticas",
+          "fields": ["proficiencyBonus", "initiative", "speed"]
+        },
+        { "id": "attacks", "title": "Ataques", "fields": ["attacks"] }
+      ]
+    },
+    {
+      "id": "spells",
+      "zone": "powers",
+      "title": "Magias",
+      "layout": "groups",
+      "groups": [{ "id": "spells", "title": "Magias", "fields": ["spells"] }]
+    },
+    {
+      "id": "inventory",
+      "zone": "lore",
+      "title": "Inventário",
+      "layout": "groups",
+      "groups": [
+        { "id": "inventory", "title": "Itens", "fields": ["inventory", "gold"] }
+      ]
+    },
+    {
+      "id": "about",
+      "zone": "lore",
+      "title": "Sobre",
+      "layout": "text",
+      "fields": [
+        "personality",
+        "ideals",
+        "bonds",
+        "flaws",
+        "languages",
+        "notes"
+      ]
+    },
+    {
+      "id": "storyteller",
+      "zone": "lore",
+      "title": "Mestre",
+      "layout": "text",
+      "fields": ["storytellerNotes"],
+      "permissions": { "read": ["storyteller"], "write": ["storyteller"] }
+    }
+  ],
+  "zoneLabels": { "lore": "Itens e notas" },
+  "dock": ["hp", "ac", "spellSlots"],
+  "roll": {
+    "model": "sum-vs-target",
+    "label": "Dados",
+    "dice": "1d20",
+    "slots": [
+      {
+        "id": "check",
+        "label": "Teste",
+        "from": ["abilities", "saves", "skills", "combat"]
+      }
+    ],
+    "advantage": true,
+    "target": { "label": "CD", "default": 10, "min": 1, "max": 30 },
+    "conditions": { "field": "conditions" }
+  },
+  "actions": [
+    {
+      "id": "longRest",
+      "label": "Descanso longo",
+      "effect": "rest.long",
+      "help": "Recupera todos os PV, metade dos dados de vida e todos os espaços de magia. Mostra a prévia antes de aplicar."
+    },
+    {
+      "id": "shortRest",
+      "label": "Descanso curto",
+      "effect": "rest.short",
+      "help": "Permite gastar dados de vida para recuperar PV."
+    }
+  ]
+}

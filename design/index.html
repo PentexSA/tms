@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="noite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Design · TMS</title>
+<link rel="stylesheet" href="design-system/tokens.css">
+<link rel="stylesheet" href="design-system/components.css">
+<style>
+  .i-main { max-width: 860px; margin: 0 auto; padding: var(--space-8) var(--gutter) var(--space-12); }
+  .i-main h1 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--type-display-xl-size); line-height: var(--type-display-xl-line); }
+  .i-lead { margin: 0 0 var(--space-6); color: var(--ink-muted); max-width: 64ch; }
+  .i-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); }
+  .i-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); color: inherit; text-decoration: none; min-height: var(--hit-size); }
+  .i-card strong { font-size: var(--type-title-size); }
+  .i-card span { color: var(--ink-muted); font-size: var(--type-caption-size); }
+  .i-docs { margin-top: var(--space-8); }
+  .i-docs h2 { font-size: var(--type-title-size); margin: 0 0 var(--space-2); }
+  .i-docs a { color: var(--action); }
+  .i-docs li { margin: var(--space-1) 0; }
+</style>
+</head>
+<body data-skin="wod">
+<main class="i-main" id="main">
+  <h1>Design do TMS</h1>
+  <p class="i-lead">Design system e telas corrigidos a partir da avaliação de UI/UX (doc/avaliacao-ui-ux.md). Ainda não é a implementação: é a referência para o app em Expo. Um renderizador único monta a ficha de qualquer sistema a partir do template.</p>
+  <div class="i-cards">
+    <a class="ds-card i-card ds-pressable" href="telas/index.html"><strong>Telas</strong><span>Canvas de boards: Vampiro, Mago, Lobisomem, D&amp;D 5e, Call of Cthulhu e Fate no celular; modos; tablet e web; listas e mesa do narrador; estados. Com controles de tema, fonte e largura.</span></a>
+    <a class="ds-card i-card ds-pressable" href="telas/ficha.html#c=helena"><strong>Ficha em tela cheia</strong><span>Protótipo navegável: dock, sheets, parada de dados, Evoluir com resumo, Desfazer e histórico.</span></a>
+    <a class="ds-card i-card ds-pressable" href="design-system/index.html"><strong>Design system</strong><span>Tokens com contraste calculado nos dois temas, paleta de accent validada e componentes vivos.</span></a>
+    <a class="ds-card i-card ds-pressable" href="telas/cronicas.html"><strong>Crônicas e personagens</strong><span>Lista de crônicas, filtro por sistema e estado vazio.</span></a>
+  </div>
+  <section class="i-docs" aria-labelledby="docs-h">
+    <h2 id="docs-h">Documentação</h2>
+    <ul>
+      <li><a href="README.md">README.md</a>: como abrir, estrutura e o rastreamento de cada achado (C-01 a C-23).</li>
+      <li><a href="design-system/README.md">design-system/README.md</a>: princípios, tokens, tipografia, modos, acessibilidade e layout.</li>
+      <li><a href="design-system/components.md">design-system/components.md</a>: catálogo de componentes.</li>
+      <li><a href="templates/README.md">templates/README.md</a> e <a href="templates/schema.json">schema.json</a>: contrato de template e segurança.</li>
+      <li><a href="../doc/avaliacao-ui-ux.md">doc/avaliacao-ui-ux.md</a>: a avaliação completa.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

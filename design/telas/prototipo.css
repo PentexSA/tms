@@ -1,0 +1,160 @@
+/*
+ * Layout das telas do protótipo. Componentes vêm de design-system/components.css.
+ * Breakpoints: compact 0–599 (dock embaixo), medium 600–899 (painel "Em jogo" no topo, 2 colunas
+ * internas, sem dock), expanded ≥ 900 (coluna "Em jogo" sticky à esquerda).
+ */
+
+.p-app { min-height: 100vh; min-height: 100dvh; }
+/* O aviso com Desfazer flutua acima do dock no celular. --dock-measured vem do JS (altura real
+   do dock, que cresce com a fonte); o valor fixo é o fallback para fonte 100%. */
+body[data-page="ficha"] { --dock-offset: var(--dock-measured, 120px); }
+/* Foco por Tab nunca termina sob o header fixo ou o dock (WCAG 2.4.11). */
+html:has(body[data-page="ficha"]) {
+  scroll-padding-top: calc(var(--header-measured, calc(var(--header-height) + var(--chips-height))) + var(--space-2));
+  scroll-padding-bottom: calc(var(--dock-measured, 120px) + var(--space-2));
+}
+@media (min-width: 600px) { html:has(body[data-page="ficha"]) { scroll-padding-bottom: var(--space-4); } }
+.p-skip:focus { position: fixed; top: var(--space-2); left: var(--space-2); z-index: var(--layer-toast); width: auto; height: auto; clip: auto; padding: var(--space-2) var(--space-3); background: var(--surface-raised); border-radius: var(--radius-md); }
+
+/* #main recebe foco programático (destino de fallback); não é controle, então sem anel. */
+.p-main:focus-visible { outline: none; }
+.p-main { padding: 0 var(--gutter) calc(var(--dock-measured, calc(var(--dock-height) + var(--hit-size) + env(safe-area-inset-bottom))) + var(--space-12)); }
+.p-content { min-width: 0; }
+/* Vitalidade: uma linha por tipo de dano (glifo em caixa, nome, stepper −/+). */
+.p-dmg { margin-top: var(--space-4); border-top: var(--border-width-hair) solid var(--border-subtle); }
+.p-dmg-row { display: flex; align-items: center; gap: var(--space-3); min-height: var(--stepper-size); padding: var(--space-1) 0; border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+.p-dmg-row__label { flex: 1; min-width: 0; font-weight: 700; }
+.is-stacked .p-dmg-row { flex-wrap: wrap; }
+.is-stacked .p-dmg-row .ds-stepper { margin-left: auto; }
+
+/* Medidor dentro de bloco centralizado: ocupa a linha (sem isso, fica com largura zero). */
+.p-center > .ds-meter { flex: 1; }
+.p-identity-name { margin: 0 0 var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; }
+.p-section-body { min-width: 0; }
+
+.p-play-panel { display: none; }
+/* start: o card é um <button> e centralizaria o conteúdo se esticasse até a altura do vizinho. */
+.p-play-panel__grid { display: grid; gap: var(--space-3); align-items: start; }
+.p-play-panel > .p-actions { margin-top: var(--space-3); }
+.p-play-item { display: block; width: 100%; padding: var(--space-3) var(--space-4); text-align: left; border-radius: var(--radius-md); background: var(--surface); border: var(--border-width-hair) solid var(--border-subtle); box-shadow: var(--elevation-1); }
+.p-play-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+.p-play-item__title { font-size: var(--type-label-size); font-weight: 700; letter-spacing: var(--type-label-spacing); text-transform: uppercase; color: var(--ink-muted); }
+.p-play-item__value { font-size: var(--type-number-size); font-weight: 700; font-variant-numeric: tabular-nums; }
+.p-play-item__note { margin-top: var(--space-2); font-size: var(--type-caption-size); color: var(--ink-muted); }
+
+.p-pin { margin-top: var(--space-4); }
+.p-aspect { display: block; width: 100%; padding: var(--space-3) var(--space-4); border: 0; background: transparent; color: inherit; text-align: left; }
+.p-aspect + .p-aspect { border-top: var(--border-width-hair) solid var(--border-subtle); }
+.p-aspect__kind { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.p-aspect__text { font-family: var(--font-voice); font-style: italic; font-weight: 600; font-size: 1.0625rem; }
+
+.p-groups { display: grid; gap: var(--space-4); }
+/* "Mostrando N de M" ocupa a linha inteira, não uma célula da grade de grupos. */
+.p-groups > .p-hidden-note { grid-column: 1 / -1; }
+.p-text-block + .p-text-block { margin-top: var(--space-4); }
+.p-text-block h3 { margin: 0 0 var(--space-1); font-size: var(--type-caption-size); color: var(--ink-muted); font-weight: 700; }
+.p-text-block p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.p-more { display: flex; justify-content: center; margin-top: var(--space-2); }
+.p-hidden-note { padding: var(--space-3) var(--space-4); font-size: var(--type-caption-size); color: var(--ink-muted); }
+
+.p-sheet-value { display: flex; align-items: baseline; justify-content: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-3); }
+.p-sheet-value__big { font-size: 2.5rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.p-sheet-value__of { font-size: 1.25rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.p-sheet-section { margin-top: var(--space-5); }
+.p-sheet-section > h3 { margin: 0 0 var(--space-2); font-size: var(--type-caption-size); font-weight: 700; color: var(--ink-muted); letter-spacing: var(--type-label-spacing); text-transform: uppercase; }
+.p-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-2); }
+.p-kv { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: var(--border-width-hair) solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+.p-kv:last-child { border-bottom: 0; }
+.p-note { margin: var(--space-2) 0 0; font-size: var(--type-caption-size); color: var(--ink-muted); }
+.p-center { display: flex; justify-content: center; }
+.p-pick { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; min-height: var(--row-min); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: var(--border-width-control) solid var(--border-control); background: var(--surface); text-align: left; }
+.p-pick + .p-pick { margin-top: var(--space-2); }
+.p-pick__label { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.p-pick__value { font-weight: 700; }
+.p-picker { margin-top: var(--space-2); border-radius: var(--radius-md); border: var(--border-width-hair) solid var(--border-subtle); background: var(--surface); max-height: 18rem; overflow-y: auto; }
+.p-picker .ds-search { margin: var(--space-2); width: calc(100% - 2 * var(--space-2)); }
+.p-mods { list-style: none; margin: 0; padding: 0; }
+.p-mods li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; font-size: var(--type-caption-size); }
+.p-total { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: var(--border-width-hair) solid var(--border-subtle); margin-top: var(--space-3); }
+.p-total strong { min-width: 0; font-size: var(--type-number-lg-size); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+/* Fonte grande: "Parada" em cima e a frase da parada embaixo, em title (56 px não cabia). */
+.is-stacked .p-total { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.is-stacked .p-total strong { font-size: var(--type-title-size); text-align: left; }
+.p-toggle { display: flex; align-items: center; gap: var(--space-3); min-height: var(--row-min); width: 100%; padding: var(--space-2) 0; border: 0; background: transparent; text-align: left; }
+.p-toggle::before { content: ""; flex: none; width: 22px; height: 22px; border-radius: var(--radius-sm); border: var(--border-width-control) solid var(--border-control); }
+.p-toggle[aria-checked="true"]::before { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface-raised); }
+.p-history { list-style: none; margin: 0; padding: 0; }
+.p-history li { padding: var(--space-2) 0; border-bottom: var(--border-width-hair) solid var(--border-subtle); }
+.p-history__meta { font-size: var(--type-caption-size); color: var(--ink-muted); }
+.p-changes { list-style: none; margin: 0; padding: 0; }
+.p-changes li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: var(--border-width-hair) solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+
+.p-banners { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.p-state { padding: var(--space-6) var(--gutter); }
+.p-skel-title { width: 55%; height: 20px; margin-left: var(--space-3); }
+.p-skel-block { height: 64px; margin-bottom: var(--space-4); border-radius: var(--radius-md); }
+.p-skel-grid { height: 196px; margin-bottom: var(--space-6); border-radius: var(--radius-md); }
+.p-skel-line { height: 14px; margin: var(--space-3) 0; }
+.p-skel-line[data-w="0"] { width: 92%; }
+.p-skel-line[data-w="1"] { width: 74%; }
+.p-skel-line[data-w="2"] { width: 58%; }
+
+/* Amostras do dock (roda): cheia para o recurso principal, hachurada para o par. */
+.p-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
+.p-swatch.is-alt-cool,
+.p-swatch.is-alt-warm { background: repeating-linear-gradient(135deg, var(--alt) 0 2px, transparent 2px 4px); border: 1px solid var(--alt); }
+.p-inline-glyph { display: inline-flex; vertical-align: middle; margin-right: var(--space-2); }
+
+/* Breadcrumb só no web (≥ 900); no celular o voltar já leva o nome da crônica no rótulo. */
+.p-crumbs { display: none; }
+
+/* Telas de lista */
+.p-list-page { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+.p-list-section { margin: var(--space-6) 0 var(--space-2); padding: 0 var(--gutter); font-size: var(--type-title-size); font-weight: 700; }
+.p-page-actions { display: flex; gap: var(--space-2); padding: var(--space-3) var(--gutter); flex-wrap: wrap; }
+
+/* ---------- medium: 600–899 ---------- */
+@media (min-width: 600px) {
+  .ds-dock { display: none; }
+  body[data-page="ficha"] { --dock-offset: 0px; }
+  .p-main { max-width: var(--content-max-medium); margin: 0 auto; padding-bottom: var(--space-12); }
+  .p-play-panel { display: block; margin: var(--space-4) 0; }
+  /* Listas (crônicas, mesa) numa coluna legível, sem chevron a 1800 px do nome. */
+  .p-list-page { max-width: var(--content-max-medium); margin-inline: auto; }
+  .p-play-panel__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .p-pin { display: none; }
+}
+
+/* ---------- expanded: ≥ 900 ---------- */
+@media (min-width: 900px) {
+  .p-main { max-width: var(--content-max-expanded); display: grid; grid-template-columns: var(--play-column) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+  /* --header-measured vem do JS: no web o header também tem o breadcrumb, e o painel não pode
+     ficar com o topo escondido embaixo dele. */
+  .p-play-panel { margin-bottom: 0; position: sticky; top: calc(var(--header-measured, calc(var(--header-height) + var(--chips-height))) + var(--space-4)); max-height: calc(100vh - var(--header-measured, calc(var(--header-height) + var(--chips-height))) - var(--space-8)); overflow-y: auto; }
+  /* No web o header não recolhe (há espaço) e alinha com a coluna de conteúdo. */
+  .ds-header.is-collapsed .ds-chips { margin-top: 0; opacity: 1; pointer-events: auto; }
+  .ds-header__bar, .p-crumbs { max-width: var(--content-max-expanded); margin-inline: auto; }
+  .p-play-panel__grid { grid-template-columns: minmax(0, 1fr); }
+  /* minColWidth do template chega como número (vars só aceita número); vira px aqui. Sem ele,
+     vale o token ou 17rem, o que for maior: com 240 px o rótulo da linha (ao lado de 5 pips)
+     hifenizava ("Investiga-ção"). */
+  .p-groups--wide { --min-col-px: calc(var(--min-col) * 1px); grid-template-columns: repeat(auto-fit, minmax(var(--min-col-px, max(var(--min-col-width), 17rem)), 1fr)); align-items: start; }
+  .p-groups--wide .ds-group-title { margin-top: 0; }
+  .ds-header__bar { padding: 0 var(--space-4); }
+  .ds-chips { justify-content: center; }
+  .p-crumbs { display: flex; padding: 0 var(--space-6) var(--space-1); }
+}
+
+/* Fonte grande ou tela estreita: nada lado a lado. */
+.is-stacked .p-groups--wide { grid-template-columns: minmax(0, 1fr); }
+.is-stacked .p-play-panel__grid { grid-template-columns: minmax(0, 1fr); }
+
+/* Impressão: sem dock, sem header fixo, tema claro. */
+@media print {
+  /* Impressão e PDF: a ficha inteira, com todas as abas em sequência. */
+  .p-tabpanel[hidden] { display: block !important; }
+  [role="tablist"] { display: none !important; }
+  .ds-dock, .ds-chips, .ds-header .ds-icon-btn, .ds-sync, .ds-toast-region { display: none !important; }
+  .ds-header { position: static; }
+  .p-main { padding-bottom: 0; }
+}

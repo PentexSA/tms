@@ -1,0 +1,1920 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tms:schema:trait-template:1",
+  "title": "Template de sistema de RPG (trait_templates.template_data)",
+  "description": "Contrato de template do TMS, versão de schema 1. Descreve a FORMA do template: tipos de campo, seções, identidade, accent, dock, rolagem e ações. Toda referência por nome (type, derive, rule, effect, roll.model, layout, zone...) usa as listas fechadas do REGISTRY de design/scripts/validate.mjs. Integridade referencial (o campo citado existe, o accent está na paleta validada, a opção do accent.map existe no campo de origem) é checada por validateTemplate em validate.mjs, que roda junto com este schema. Fail secure: propriedade desconhecida é rejeitada.",
+  "type": "object",
+  "required": [
+    "schema",
+    "system",
+    "name",
+    "family",
+    "edition",
+    "templateVersion",
+    "locale",
+    "skin",
+    "license",
+    "identity",
+    "accent",
+    "fields",
+    "sections",
+    "dock",
+    "roll"
+  ],
+  "properties": {
+    "schema": {
+      "description": "Versão do contrato de template. Só existe a versão 1; uma mudança incompatível cria a versão 2 e um novo schema.",
+      "const": 1
+    },
+    "system": {
+      "description": "Código do sistema em kebab-case, com a edição no código (ex.: vtm-v20, dnd5e-2014). Corresponde à linha em game_systems.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 40
+    },
+    "name": {
+      "description": "Nome do sistema exibido ao usuário (texto puro).",
+      "$ref": "#/$defs/label"
+    },
+    "family": {
+      "description": "Família de sistemas (ex.: wod, d20, brp, fate). Corresponde a game_systems.family e agrupa edições e sistemas aparentados.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 40
+    },
+    "edition": {
+      "description": "Edição exibida ao usuário (ex.: V20, 5e 2014). Usada no filtro por sistema.",
+      "$ref": "#/$defs/label"
+    },
+    "templateVersion": {
+      "description": "Versão semântica do template. Sobe a cada alteração publicada.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "locale": {
+      "description": "Idioma dos rótulos do template (BCP 47 simplificado, ex.: pt-BR).",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+    },
+    "skin": {
+      "description": "Skin visual da família (fonte display, voz, forma do pip). Lista fechada REGISTRY.skins.",
+      "$ref": "#/$defs/skin"
+    },
+    "license": {
+      "description": "Declaração de licença e de conteúdo embutido. Obrigatória: registra o que pode e o que não pode estar no template (ex.: WoD só nomes; SRD 5.1 com atribuição CC BY 4.0).",
+      "$ref": "#/$defs/safeText",
+      "maxLength": 1000
+    },
+    "identity": { "$ref": "#/$defs/identity" },
+    "accent": { "$ref": "#/$defs/accent" },
+    "ladders": {
+      "description": "Escadas nomeadas de valores (ex.: escada do Fate, +3 = Bom). Referenciadas por number.display = ladder e por roll.ladder.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/ladder" },
+      "maxProperties": 8
+    },
+    "markStates": {
+      "description": "Conjuntos de estados nomeados para campos do tipo mark (ex.: sem proficiência / proficiente / especialista).",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/markStateSet" },
+      "maxProperties": 16
+    },
+    "fields": {
+      "description": "Catálogo de campos da ficha, indexado pelo id do campo. O id é a chave em sheet_data.values. Cada campo é discriminado por type.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/field" },
+      "minProperties": 1,
+      "maxProperties": 400
+    },
+    "sections": {
+      "description": "Seções da ficha, na ordem de exibição dentro de cada zona. As zonas têm ordem fixa no app.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/section" },
+      "minItems": 1,
+      "maxItems": 30
+    },
+    "zoneLabels": {
+      "description": "Opcional. A ficha tem 3 abas fixas, uma por zona: build (padrão 'Ficha'), powers ('Poderes') e lore ('Sobre'). O template só troca o rótulo quando o genérico não serve (ex.: 'Vantagens' em WoD, 'Equipamento' em CoC). Curto: as 3 abas precisam caber a 360 dp com fonte grande.",
+      "type": "object",
+      "properties": {
+        "build": { "$ref": "#/$defs/label", "maxLength": 14 },
+        "powers": { "$ref": "#/$defs/label", "maxLength": 14 },
+        "lore": { "$ref": "#/$defs/label", "maxLength": 14 }
+      },
+      "additionalProperties": false
+    },
+    "dock": {
+      "description": "De 1 a 3 campos jogáveis mostrados no dock (celular) e na mesa do narrador. O tipo precisa ser jogável (resource, track, slots, clock, state, number, list, tags, rating) e o campo não pode ser de seção com leitura restrita; validateTemplate checa.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldRef" },
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true
+    },
+    "roll": { "$ref": "#/$defs/roll" },
+    "actions": {
+      "description": "Ações nomeadas da ficha (menu ⋯), como descanso longo ou despertar. Sempre com prévia antes de aplicar.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/templateAction" },
+      "maxItems": 20
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "id": {
+      "description": "Identificador técnico: letra inicial, depois letras, dígitos ou hífen. Nomes herdados de Object.prototype são proibidos (defesa contra prototype pollution em lookups do tipo fields[id]).",
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$",
+      "maxLength": 64,
+      "not": {
+        "enum": [
+          "constructor",
+          "prototype",
+          "toString",
+          "toLocaleString",
+          "valueOf",
+          "hasOwnProperty",
+          "isPrototypeOf",
+          "propertyIsEnumerable"
+        ]
+      }
+    },
+    "fieldRef": {
+      "description": "Id de um campo declarado em fields. A existência é checada por validateTemplate.",
+      "$ref": "#/$defs/id"
+    },
+    "fieldRefs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldRef" },
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true
+    },
+    "sectionRef": {
+      "description": "Id de uma seção declarada em sections. A existência é checada por validateTemplate.",
+      "$ref": "#/$defs/id"
+    },
+    "safeText": {
+      "description": "Texto puro, nunca HTML, em uma linha: proíbe < e >, controles C0 (U+0000 a U+001F, inclusive tab e quebras), DEL e C1 (U+007F a U+009F), separadores U+2028 e U+2029 e controles bidirecionais (U+202A a U+202E, U+2066 a U+2069). É sempre renderizado como texto (textContent / <Text>). Mais estrito que isSafeText de validate.mjs, que aceita tab e quebras de linha.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^<>\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\u202a-\\u202e\\u2066-\\u2069]*$"
+    },
+    "label": {
+      "description": "Rótulo exibido ao usuário (texto puro, até 200 caracteres).",
+      "$ref": "#/$defs/safeText",
+      "maxLength": 200
+    },
+    "shortLabel": {
+      "description": "Rótulo curto para o dock e a grade (texto puro, até 16 caracteres).",
+      "$ref": "#/$defs/safeText",
+      "maxLength": 16
+    },
+    "helpText": {
+      "description": "Texto de ajuda exibido no detalhe do campo (texto puro, até 400 caracteres).",
+      "$ref": "#/$defs/safeText",
+      "maxLength": 400
+    },
+    "glyph": {
+      "description": "Glifo curto (até 3 caracteres), sempre acompanhado de texto: forma e cor nunca carregam significado sozinhas.",
+      "type": "string",
+      "maxLength": 3,
+      "pattern": "^[^<>\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\u202a-\\u202e\\u2066-\\u2069]*$"
+    },
+    "accentRef": {
+      "description": "Referência a um accent-N da paleta validada no CI (tokens.json) ou accent-neutral. Nenhuma cor livre vem do banco. A presença na paleta é checada por validateTemplate.",
+      "type": "string",
+      "pattern": "^accent-(neutral|[1-9][0-9]?)$"
+    },
+
+    "fieldType": {
+      "description": "REGISTRY.fieldTypes",
+      "enum": [
+        "rating",
+        "number",
+        "percent",
+        "resource",
+        "track",
+        "slots",
+        "clock",
+        "state",
+        "mark",
+        "text",
+        "longText",
+        "choice",
+        "tags",
+        "list"
+      ]
+    },
+    "numberDisplay": {
+      "description": "REGISTRY.numberDisplays",
+      "enum": ["plain", "score+mod", "signed", "ladder"]
+    },
+    "percentDisplay": {
+      "description": "REGISTRY.percentDisplays",
+      "enum": ["percent", "percent+half+fifth"]
+    },
+    "deriveName": {
+      "description": "REGISTRY.derive: derivações por nome, implementadas e testadas no código. Nunca expressão.",
+      "enum": [
+        "abilityModifier",
+        "proficiencyBonus",
+        "dnd5eCheckBonus",
+        "vtmBloodPool",
+        "vtmBloodPerTurn",
+        "cocHitPoints",
+        "cocMagicPoints",
+        "cocSanityMax",
+        "half",
+        "fifth"
+      ]
+    },
+    "trackRule": {
+      "description": "REGISTRY.trackRules",
+      "enum": ["wod-stacking", "boxes"]
+    },
+    "resourceRule": {
+      "description": "REGISTRY.resourceRules",
+      "enum": ["tempFirst"]
+    },
+    "clockRule": {
+      "description": "REGISTRY.clockRules",
+      "enum": ["mage-quint-paradox"]
+    },
+    "atZero": { "description": "REGISTRY.atZero", "enum": ["deathSaves"] },
+    "effect": {
+      "description": "REGISTRY.effects: efeitos de ações, implementados no código.",
+      "enum": [
+        "health.heal",
+        "resource.spend",
+        "resource.gain",
+        "rest.long",
+        "rest.short"
+      ]
+    },
+    "rollModel": {
+      "description": "REGISTRY.rollModels: mecânicas de rolagem implementadas no código (ROLLERS).",
+      "enum": [
+        "pool-success",
+        "sum-vs-target",
+        "roll-under-percent",
+        "fudge",
+        "pbta-2d6"
+      ]
+    },
+    "die": {
+      "description": "REGISTRY.dice: faces de dado aceitas em roll.die.",
+      "enum": [2, 3, 4, 6, 8, 10, 12, 20, 100]
+    },
+    "diceNotation": {
+      "description": "REGISTRY.diceNotation: notações aceitas em roll.dice (descritivas; o roller de cada modelo fixa os dados).",
+      "enum": ["1d20", "2d6", "1d100", "4dF"]
+    },
+    "boostEffect": {
+      "description": "REGISTRY.boostEffects",
+      "enum": ["autoSuccess", "plus2"]
+    },
+    "specialtyRule": {
+      "description": "REGISTRY.specialtyRules",
+      "enum": ["tenCountsDouble"]
+    },
+    "colorRole": {
+      "description": "REGISTRY.colorRoles: papel de cor semântico (o valor vem do token, nunca do template).",
+      "enum": ["accent", "alt-cool", "alt-warm", "neutral"]
+    },
+    "zone": {
+      "description": "REGISTRY.zones: zonas de ordem fixa no app.",
+      "enum": ["identity", "play", "build", "powers", "lore"]
+    },
+    "layout": {
+      "description": "REGISTRY.layouts",
+      "enum": ["grid", "groups", "list", "pyramid", "fields", "facts", "text"]
+    },
+    "filterRule": {
+      "description": "REGISTRY.filterRules",
+      "enum": ["invested", "proficient", "aboveBase"]
+    },
+    "mode": {
+      "description": "REGISTRY.modes: play = modo Jogo; edit = modo Evoluir.",
+      "enum": ["play", "edit"]
+    },
+    "role": {
+      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica; player = outro jogador da crônica.",
+      "enum": ["owner", "storyteller", "player"]
+    },
+    "defaultAction": {
+      "description": "REGISTRY.defaultActions: ação do toque longo no dock.",
+      "enum": ["spend1", "gain1", "damage1", "use1"]
+    },
+    "modifierOp": {
+      "description": "REGISTRY.modifierOps",
+      "enum": ["add", "set"]
+    },
+    "conditionRoll": {
+      "description": "REGISTRY.conditionRoll",
+      "enum": ["advantage", "disadvantage"]
+    },
+    "glyphName": {
+      "description": "REGISTRY.glyphs: glifos desenhados pela skin.",
+      "enum": ["augur-moon"]
+    },
+    "skin": {
+      "description": "REGISTRY.skins",
+      "enum": ["wod", "dnd", "coc", "fate"]
+    },
+    "slotReset": {
+      "description": "REGISTRY.slotResets",
+      "enum": ["longRest", "shortRest"]
+    },
+
+    "fromRef": {
+      "description": "Campo ou lista de campos (até 4) que alimentam uma derivação, na ordem dos argumentos da função.",
+      "oneOf": [
+        { "$ref": "#/$defs/fieldRef" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fieldRef" },
+          "minItems": 1,
+          "maxItems": 4
+        }
+      ]
+    },
+    "deriveRef": {
+      "description": "Valor calculado por uma derivação da lista fechada a partir de outros campos. Ex.: { derive: vtmBloodPool, from: generation }.",
+      "type": "object",
+      "required": ["derive", "from"],
+      "properties": {
+        "derive": { "$ref": "#/$defs/deriveName" },
+        "from": { "$ref": "#/$defs/fromRef" }
+      },
+      "additionalProperties": false
+    },
+    "fieldValueRef": {
+      "description": "Valor lido diretamente de outro campo (rating, number, percent ou resource).",
+      "type": "object",
+      "required": ["field"],
+      "properties": { "field": { "$ref": "#/$defs/fieldRef" } },
+      "additionalProperties": false
+    },
+
+    "fieldBase": {
+      "description": "Propriedades comuns a todos os tipos de campo.",
+      "type": "object",
+      "required": ["type", "label"],
+      "properties": {
+        "type": { "$ref": "#/$defs/fieldType" },
+        "label": {
+          "description": "Rótulo do campo, no idioma do template.",
+          "$ref": "#/$defs/label"
+        },
+        "shortLabel": {
+          "description": "Rótulo curto (dock, grade, mesa do narrador).",
+          "$ref": "#/$defs/shortLabel"
+        },
+        "sublabel": {
+          "description": "Linha secundária sob o rótulo (ex.: atributo-chave da perícia: Des, Sab).",
+          "$ref": "#/$defs/label"
+        },
+        "help": { "$ref": "#/$defs/helpText" },
+        "editableIn": {
+          "description": "Modos em que o campo pode ser alterado. Padrão: text/longText em play e edit; demais só em edit (Evoluir). Recursos de jogo declaram [play]. É UX, não controle de acesso: o servidor valida cada escrita.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/mode" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+
+    "field": {
+      "description": "Campo da ficha, discriminado por type. Cada type tem um $defs próprio com additionalProperties fechado (unevaluatedProperties: false).",
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "$ref": "#/$defs/fieldType" } },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "rating" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-rating" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "number" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-number" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "percent" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-percent" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "resource" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-resource" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "track" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-track" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "slots" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-slots" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "clock" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-clock" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "state" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-state" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "mark" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-mark" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "text" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-text" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "longText" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-longText" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "choice" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-choice" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "tags" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-tags" }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "list" } },
+            "required": ["type"]
+          },
+          "then": { "$ref": "#/$defs/field-list" }
+        }
+      ]
+    },
+
+    "field-rating": {
+      "description": "rating: pontos de 0 a N (RatingDots). Valor em sheet_data: inteiro entre min e max. Ex.: Atributos e Disciplinas (WoD), Inspiração (D&D 5e).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "rating" },
+        "min": {
+          "description": "Mínimo (padrão 0). Também é o valor exibido quando a ficha não tem valor.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "max": {
+          "description": "Máximo de pontos (padrão 5 no validador; aqui obrigatório). Acima de 5 os pips ficam menores.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "default": {
+          "description": "Valor de uma ficha nova (padrão: min). Ex.: atributos de WoD começam em 1.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "specialty": {
+          "description": "Aceita especialização (texto em sheet_data.specialties[id]).",
+          "type": "boolean"
+        },
+        "cap": {
+          "description": "Teto não destrutivo vindo de outro campo rating ou number (ex.: Esferas limitadas pelo Arete). O valor acima do teto é guardado e fica inativo; volta a valer quando o teto sobe.",
+          "type": "object",
+          "required": ["field"],
+          "properties": {
+            "field": { "$ref": "#/$defs/fieldRef" },
+            "label": {
+              "description": "Texto do teto (ex.: máx. pelo Arete).",
+              "$ref": "#/$defs/label"
+            }
+          },
+          "additionalProperties": false
+        },
+        "valueLabels": {
+          "description": "Nome por valor (ex.: Posto 2 = Fostern). Chave = valor inteiro como texto.",
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^(0|[1-9][0-9]?)$" },
+          "additionalProperties": { "$ref": "#/$defs/label" },
+          "minProperties": 1
+        }
+      },
+      "required": ["max"],
+      "unevaluatedProperties": false
+    },
+
+    "field-number": {
+      "description": "number: inteiro com notação do sistema (NumberField). Valor em sheet_data: inteiro entre min e max (sem eles, ±1.000.000); campos readOnly são derivados e o servidor rejeita qualquer valor gravado neles. Ex.: atributo 15 (+2) de D&D, CA, perícia +3 Bom do Fate, Geração (WoD).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "number" },
+        "display": {
+          "description": "plain (padrão), score+mod (valor e modificador derivado), signed (+2), ladder (+3 Bom).",
+          "$ref": "#/$defs/numberDisplay"
+        },
+        "min": {
+          "description": "Mínimo aceito pelo servidor (padrão −1.000.000).",
+          "type": "integer",
+          "minimum": -1000000,
+          "maximum": 1000000
+        },
+        "max": {
+          "description": "Máximo aceito pelo servidor (padrão 1.000.000).",
+          "type": "integer",
+          "minimum": -1000000,
+          "maximum": 1000000
+        },
+        "default": {
+          "description": "Valor de uma ficha nova (padrão: min). Ex.: atributos de D&D começam em 10, e não em 1 (que daria modificador −5).",
+          "type": "integer",
+          "minimum": -1000000,
+          "maximum": 1000000
+        },
+        "specialty": {
+          "description": "Aceita especialização (texto em sheet_data.specialties[id]).",
+          "type": "boolean"
+        },
+        "derive": {
+          "description": "Derivação da lista fechada. Com score+mod, calcula o modificador a partir do próprio valor; com readOnly, calcula o valor a partir de from.",
+          "$ref": "#/$defs/deriveName"
+        },
+        "from": {
+          "description": "Campos de entrada da derivação de um campo readOnly.",
+          "$ref": "#/$defs/fromRef"
+        },
+        "readOnly": {
+          "description": "Valor só calculado (ex.: bônus de proficiência, iniciativa). Exige derive e from.",
+          "type": "boolean"
+        },
+        "ladder": {
+          "description": "Id da escada em ladders (obrigatório com display = ladder).",
+          "$ref": "#/$defs/id"
+        },
+        "suffix": {
+          "description": "Sufixo exibido após o número (ex.: ª geração, anos).",
+          "$ref": "#/$defs/safeText",
+          "maxLength": 24
+        },
+        "allowInput": {
+          "description": "Dica de edição por teclado numérico (number já aceita digitação no stepper).",
+          "type": "boolean"
+        },
+        "badge": {
+          "description": "Selo exibido na célula da grade quando o campo citado (um mark) não está no primeiro estado. Ex.: salvaguarda proficiente no atributo de D&D.",
+          "type": "object",
+          "required": ["field", "label", "glyph"],
+          "properties": {
+            "field": { "$ref": "#/$defs/fieldRef" },
+            "label": { "$ref": "#/$defs/label" },
+            "glyph": { "$ref": "#/$defs/glyph", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "display": { "const": "ladder" } },
+            "required": ["display"]
+          },
+          "then": { "required": ["ladder"] }
+        },
+        {
+          "if": { "required": ["ladder"] },
+          "then": {
+            "properties": { "display": { "const": "ladder" } },
+            "required": ["display"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "display": { "const": "score+mod" } },
+            "required": ["display"]
+          },
+          "then": { "required": ["derive"] }
+        },
+        {
+          "if": { "required": ["from"] },
+          "then": {
+            "properties": { "readOnly": { "const": true } },
+            "required": ["readOnly"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "readOnly": { "const": true } },
+            "required": ["readOnly"]
+          },
+          "then": {
+            "required": ["derive", "from"],
+            "not": {
+              "anyOf": [
+                { "required": ["min"] },
+                { "required": ["max"] },
+                { "required": ["specialty"] }
+              ]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "field-percent": {
+      "description": "percent: valor em % com metade e quinto (PercentField). Valor em sheet_data: inteiro de 0 a max (padrão 99); sem valor, vale a base. Ex.: perícias e características de Call of Cthulhu.",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "percent" },
+        "display": {
+          "description": "percent ou percent+half+fifth (60 · 30 · 12).",
+          "$ref": "#/$defs/percentDisplay"
+        },
+        "max": {
+          "description": "Máximo (padrão 99).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "specialty": {
+          "description": "Aceita especialização (texto em sheet_data.specialties[id]).",
+          "type": "boolean"
+        },
+        "base": {
+          "description": "Valor-base da perícia: número fixo, outro campo (Idioma Nativo = EDU) ou derivação (Esquivar = metade de DES). Usado pelo filtro aboveBase.",
+          "oneOf": [
+            { "type": "integer", "minimum": 0, "maximum": 100 },
+            { "$ref": "#/$defs/fieldValueRef" },
+            { "$ref": "#/$defs/deriveRef" }
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "field-resource": {
+      "description": "resource: valor atual com máximo, permanente e temporários opcionais (Resource: caixas se o máximo é até 20, senão número com stepper). Valor em sheet_data: { current, permanent?, temp?, max? }. Ex.: Sangue e Força de Vontade (WoD), PV e dados de vida (D&D 5e), Sanidade (CoC), Pontos de Destino (Fate).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "resource" },
+        "permanent": {
+          "description": "Valor permanente guardado em sheet_data (muda só em Evoluir). Por padrão limita o atual.",
+          "type": "object",
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "max": { "type": "integer", "minimum": 1, "maximum": 100 }
+          },
+          "additionalProperties": false
+        },
+        "temp": {
+          "description": "Aceita pontos temporários (temp), consumidos primeiro com rule = tempFirst.",
+          "type": "boolean"
+        },
+        "tempUncapped": {
+          "description": "O atual não é limitado pelo permanente (Renome do W20). Exige permanent.",
+          "type": "boolean"
+        },
+        "overMax": {
+          "description": "O atual pode passar do máximo (Pontos de Destino acima da recarga). Exige max.",
+          "type": "boolean"
+        },
+        "max": {
+          "description": "Máximo: número fixo, derivação (vtmBloodPool de generation), outro campo (refresh) ou guardado na ficha (stored, com faixa).",
+          "oneOf": [
+            { "type": "integer", "minimum": 1, "maximum": 9999 },
+            { "$ref": "#/$defs/deriveRef" },
+            { "$ref": "#/$defs/fieldValueRef" },
+            {
+              "type": "object",
+              "required": ["stored", "min", "max"],
+              "properties": {
+                "stored": { "const": true },
+                "min": { "type": "integer", "minimum": 0, "maximum": 9999 },
+                "max": { "type": "integer", "minimum": 1, "maximum": 9999 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "perTurn": {
+          "description": "Gasto máximo por turno, derivado (vtmBloodPerTurn).",
+          "$ref": "#/$defs/deriveRef"
+        },
+        "rule": {
+          "description": "Regra de consumo da lista fechada (tempFirst: dano consome primeiro os temporários).",
+          "$ref": "#/$defs/resourceRule"
+        },
+        "atZero": {
+          "description": "O que acontece em 0 (deathSaves: aviso de testes contra a morte). Exige rule.",
+          "$ref": "#/$defs/atZero"
+        },
+        "allowInput": {
+          "description": "Permite digitar o valor (PV de D&D, Sanidade).",
+          "type": "boolean"
+        },
+        "spendLabel": {
+          "description": "Rótulo da ação rápida de diminuir 1 (padrão: Gastar 1). Ex.: Perder 1 na Sanidade do CoC. O verbo é do sistema, não do app.",
+          "$ref": "#/$defs/label",
+          "maxLength": 24
+        },
+        "gainLabel": {
+          "description": "Rótulo da ação rápida de aumentar 1 (padrão: Recuperar 1).",
+          "$ref": "#/$defs/label",
+          "maxLength": 24
+        },
+        "colorRole": {
+          "description": "Papel de cor do preenchimento. Um par de recursos (Fúria e Gnose) usa papéis diferentes, além de forma diferente.",
+          "$ref": "#/$defs/colorRole"
+        },
+        "defaultAction": {
+          "description": "Ação do toque longo no dock para um resource.",
+          "allOf": [
+            { "$ref": "#/$defs/defaultAction" },
+            { "enum": ["spend1", "gain1", "damage1"] }
+          ]
+        },
+        "actions": {
+          "description": "Ações com custo neste recurso (ex.: gastar 1 Sangue para curar 1 nível de dano).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/resourceAction" },
+          "maxItems": 8
+        }
+      },
+      "anyOf": [{ "required": ["permanent"] }, { "required": ["max"] }],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "tempUncapped": { "const": true } },
+            "required": ["tempUncapped"]
+          },
+          "then": { "required": ["permanent"] }
+        },
+        {
+          "if": {
+            "properties": { "overMax": { "const": true } },
+            "required": ["overMax"]
+          },
+          "then": { "required": ["max"] }
+        },
+        { "if": { "required": ["atZero"] }, "then": { "required": ["rule"] } }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "field-track": {
+      "description": "track: trilha de caixas com regra. wod-stacking (LeveledTrack): níveis com penalidade e tipos de dano empilhados; valor { <typeId>: contagem }. boxes (Track): linhas de caixas booleanas; valor { <rowId>: [bool, ...] }. Ex.: Vitalidade (WoD), testes contra a morte (D&D 5e), Estresse 1/2/3 (Fate).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "track" },
+        "rule": { "$ref": "#/$defs/trackRule" },
+        "levels": {
+          "description": "wod-stacking: níveis na ordem em que são preenchidos, com a penalidade de dados (null = incapacitado).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "penalty"],
+            "properties": {
+              "label": { "$ref": "#/$defs/label" },
+              "penalty": {
+                "oneOf": [
+                  { "type": "integer", "minimum": -10, "maximum": 0 },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "types": {
+          "description": "wod-stacking: tipos de dano em ORDEM DE GRAVIDADE, do mais grave para o menos grave (agravado, letal, contusivo). O mais grave ocupa as primeiras caixas; com a trilha cheia, novo dano agrava a caixa menos grave.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "glyph"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "glyph": { "$ref": "#/$defs/glyph", "minLength": 1 }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "rows": {
+          "description": "boxes: linhas de caixas. boxValues dá o valor de cada caixa (Estresse do Fate: 1, 2, 3) e deve ter o mesmo tamanho de boxes.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "boxes"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "boxes": { "type": "integer", "minimum": 1, "maximum": 20 },
+              "boxValues": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0, "maximum": 99 },
+                "minItems": 1,
+                "maxItems": 20
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 10
+        }
+      },
+      "required": ["rule"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "rule": { "const": "wod-stacking" } },
+            "required": ["rule"]
+          },
+          "then": {
+            "required": ["levels", "types"],
+            "not": { "required": ["rows"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "rule": { "const": "boxes" } },
+            "required": ["rule"]
+          },
+          "then": {
+            "required": ["rows"],
+            "not": {
+              "anyOf": [{ "required": ["levels"] }, { "required": ["types"] }]
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "field-slots": {
+      "description": "slots: espaços por nível (Track por nível). Valor em sheet_data: { \"<nível>\": { max, used } }. Ex.: espaços de magia (D&D 5e).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "slots" },
+        "levels": {
+          "description": "Quantidade de níveis (1 a 9).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "levelLabel": {
+          "description": "Rótulo do nível com o marcador {n} (ex.: {n}º).",
+          "$ref": "#/$defs/label",
+          "pattern": "\\{n\\}"
+        },
+        "reset": { "$ref": "#/$defs/slotReset" },
+        "defaultAction": {
+          "description": "Ação do toque longo no dock para slots.",
+          "$ref": "#/$defs/defaultAction",
+          "const": "use1"
+        }
+      },
+      "required": ["levels", "levelLabel"],
+      "unevaluatedProperties": false
+    },
+
+    "field-clock": {
+      "description": "clock: roda de N casas com até 2 preenchimentos opostos (Clock). Valor em sheet_data: { <fillId>: casas }. Ex.: roda de Quintessência e Paradoxo (Mago).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "clock" },
+        "rule": { "$ref": "#/$defs/clockRule" },
+        "segments": { "type": "integer", "minimum": 2, "maximum": 24 },
+        "fills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "colorRole", "from"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "colorRole": { "$ref": "#/$defs/colorRole" },
+              "from": {
+                "description": "De onde o preenchimento cresce na roda.",
+                "enum": ["start", "end"]
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 2
+        }
+      },
+      "required": ["rule", "segments", "fills"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "rule": { "const": "mage-quint-paradox" } },
+            "required": ["rule"]
+          },
+          "then": {
+            "properties": {
+              "fills": {
+                "minItems": 2,
+                "allOf": [
+                  {
+                    "contains": {
+                      "properties": { "from": { "const": "start" } },
+                      "required": ["from"]
+                    }
+                  },
+                  {
+                    "contains": {
+                      "properties": { "from": { "const": "end" } },
+                      "required": ["from"]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "field-state": {
+      "description": "state: escolha de estado com modificadores sobre outros campos (Choice + chip de estado). Valor em sheet_data: id da opção. Ex.: Formas do Garou (WoD), Fúria do Bárbaro (D&D 5e).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "state" },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "hint": { "$ref": "#/$defs/label" },
+              "note": { "$ref": "#/$defs/helpText" },
+              "modifiers": {
+                "description": "Modificadores aplicados enquanto o estado está ativo. add soma (resultado nunca abaixo de 0); set fixa o valor. A UI mostra a origem.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["field", "op", "value"],
+                  "properties": {
+                    "field": { "$ref": "#/$defs/fieldRef" },
+                    "op": { "$ref": "#/$defs/modifierOp" },
+                    "value": {
+                      "type": "integer",
+                      "minimum": -20,
+                      "maximum": 20
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 20
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 2,
+          "maxItems": 20
+        },
+        "cost": {
+          "description": "Custo opcional da troca de estado em um resource (ex.: gastar 1 Fúria para mudança instantânea).",
+          "type": "object",
+          "required": ["resource", "amount", "label"],
+          "properties": {
+            "resource": { "$ref": "#/$defs/fieldRef" },
+            "amount": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "optional": { "type": "boolean" },
+            "label": { "$ref": "#/$defs/label" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["options"],
+      "unevaluatedProperties": false
+    },
+
+    "field-mark": {
+      "description": "mark: marca de 2 a 3 estados (MarkToggle). Valor em sheet_data: id do estado em markStates. Ex.: proficiência e especialização (D&D 5e), move escolhido (PbtA).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "mark" },
+        "states": {
+          "description": "Id do conjunto em markStates.",
+          "$ref": "#/$defs/id"
+        },
+        "bonus": {
+          "description": "Bônus derivado do atributo-chave e do multiplicador do estado (dnd5eCheckBonus).",
+          "type": "object",
+          "required": ["derive", "ability"],
+          "properties": {
+            "derive": { "$ref": "#/$defs/deriveName" },
+            "ability": { "$ref": "#/$defs/fieldRef" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["states"],
+      "unevaluatedProperties": false
+    },
+
+    "field-text": {
+      "description": "text: texto de uma linha (TextField). Valor em sheet_data: string até maxLength (padrão 200). Com aspect, é um aspecto do Fate (TextAspect, primeira classe).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "text" },
+        "maxLength": {
+          "description": "Tamanho máximo do valor, aplicado pelo servidor (padrão 200).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "aspect": {
+          "description": "É um aspecto (Fate): exibido como bloco de texto no topo da zona de jogo.",
+          "type": "boolean"
+        },
+        "placeholder": {
+          "description": "Extensão documentada: texto de exemplo no campo vazio (ainda não consumido pelo protótipo).",
+          "$ref": "#/$defs/label"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "field-longText": {
+      "description": "longText: texto de várias linhas (NotesEditor). Valor em sheet_data: string até maxLength (padrão 4000). Notas nunca vão para logs.",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "longText" },
+        "maxLength": {
+          "description": "Tamanho máximo do valor, aplicado pelo servidor (padrão 4000).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "placeholder": {
+          "description": "Extensão documentada: texto de exemplo no campo vazio (ainda não consumido pelo protótipo).",
+          "$ref": "#/$defs/label"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "field-choice": {
+      "description": "choice: escolha única de uma lista fechada (Choice). Valor em sheet_data: id da opção. Ex.: Clã (WoD), Classe (D&D 5e).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "choice" },
+        "glyph": {
+          "description": "Glifo da skin desenhado junto do valor (augur-moon usa glyphParam de 0 a 1).",
+          "$ref": "#/$defs/glyphName"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "meta": {
+                "description": "Texto secundário da opção (ex.: lua cheia).",
+                "$ref": "#/$defs/label"
+              },
+              "glyphParam": {
+                "description": "Parâmetro numérico do glifo (fase da lua de 0 a 1).",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": ["options"],
+      "unevaluatedProperties": false
+    },
+
+    "field-tags": {
+      "description": "tags: seleção múltipla de uma lista fechada (Tags). Valor em sheet_data: array de ids. Ex.: Condições (D&D 5e, CoC).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "tags" },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "roll": {
+                "description": "Efeito automático na rolagem sum-vs-target via roll.conditions.",
+                "$ref": "#/$defs/conditionRoll"
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": ["options"],
+      "unevaluatedProperties": false
+    },
+
+    "field-list": {
+      "description": "list: lista de itens com esquema por item (Repeater). Valor em sheet_data: array de { id, name?, text?, value?, meta?, notes?, specialty? }. Ex.: Disciplinas e Antecedentes (WoD), magias e inventário (D&D 5e), equipamento (CoC), aspectos, consequências e façanhas (Fate).",
+      "$ref": "#/$defs/fieldBase",
+      "properties": {
+        "type": { "const": "list" },
+        "itemLabel": {
+          "description": "Nome de um item, no singular (ex.: Disciplina).",
+          "$ref": "#/$defs/label"
+        },
+        "item": { "$ref": "#/$defs/listItemSchema" },
+        "catalog": {
+          "description": "Sugestões ao adicionar um item. Só nomes: descrições protegidas por direito autoral não entram no template.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/safeText", "maxLength": 80 },
+          "maxItems": 200,
+          "uniqueItems": true
+        },
+        "fixed": {
+          "description": "Itens fixos (não se adiciona nem remove): cada um guarda só { id, text }. Ex.: consequências Suave, Moderada e Grave do Fate.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "meta": {
+                "description": "Texto secundário (ex.: absorve 2).",
+                "$ref": "#/$defs/label"
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 10
+        },
+        "searchable": {
+          "description": "Extensão documentada: dica de busca dentro da lista (a busca do protótipo é por seção).",
+          "type": "boolean"
+        },
+        "density": {
+          "description": "Extensão documentada: densidade visual das linhas.",
+          "enum": ["regular", "compact"]
+        },
+        "rollAs": {
+          "description": "Extensão documentada, fora do REGISTRY: dica de como os itens entram na parada. O protótipo não consome; a parada usa roll.slots[].from.",
+          "enum": ["ability", "attack"]
+        }
+      },
+      "required": ["itemLabel", "item"],
+      "unevaluatedProperties": false
+    },
+
+    "listItemSchema": {
+      "description": "Esquema de cada item da lista. name é sempre texto (até 80); os demais componentes são opcionais.",
+      "type": "object",
+      "properties": {
+        "value": {
+          "description": "Valor em pontos do item (ex.: Disciplina 3).",
+          "type": "object",
+          "required": ["type", "max"],
+          "properties": {
+            "type": { "const": "rating" },
+            "min": { "type": "integer", "minimum": 0, "maximum": 10 },
+            "max": { "type": "integer", "minimum": 1, "maximum": 10 }
+          },
+          "additionalProperties": false
+        },
+        "meta": {
+          "description": "Colunas extras do item (ex.: Ataque +7, Dano 2d10 fogo; Posto e Origem de um Dom).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/listMeta" },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "notes": {
+          "description": "Item tem notas livres do jogador (até 2000).",
+          "type": "boolean"
+        },
+        "specialty": {
+          "description": "Item aceita especialização.",
+          "type": "boolean"
+        },
+        "aspect": {
+          "description": "Item é um aspecto (texto, Fate).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "listMeta": {
+      "type": "object",
+      "required": ["id", "type", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["number", "text"] },
+        "label": { "$ref": "#/$defs/label" },
+        "display": {
+          "description": "Só para number: signed exibe +7.",
+          "const": "signed"
+        },
+        "min": { "type": "integer", "minimum": -999999, "maximum": 999999 },
+        "max": { "type": "integer", "minimum": -999999, "maximum": 999999 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "text" } },
+            "required": ["type"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["display"] },
+                { "required": ["min"] },
+                { "required": ["max"] }
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+
+    "markStateSet": {
+      "description": "Estados de um mark, na ordem do ciclo. O primeiro é o estado padrão.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "label": { "$ref": "#/$defs/label" },
+          "glyph": { "$ref": "#/$defs/glyph" },
+          "multiplier": {
+            "description": "Multiplicador do bônus de proficiência (0, 1, 2...). Meia proficiência exigiria mudança na derivação.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 2,
+      "maxItems": 3
+    },
+
+    "ladder": {
+      "description": "Escada: valor inteiro (como texto, ex.: \"-1\", \"3\") para nome (Bom).",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^-?(0|[1-9][0-9]{0,2})$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/label" },
+      "minProperties": 2
+    },
+
+    "section": {
+      "description": "Seção da ficha dentro de uma zona. Regras: identity usa layout facts; play usa layout fields (e só play usa fields); pinTop só em play; seções com fields não usam groups e vice-versa; filter e busca só em groups, list e pyramid.",
+      "type": "object",
+      "required": ["id", "zone", "title", "layout"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "zone": { "$ref": "#/$defs/zone" },
+        "title": {
+          "description": "Título da seção e do chip de navegação.",
+          "$ref": "#/$defs/label"
+        },
+        "layout": { "$ref": "#/$defs/layout" },
+        "fields": {
+          "description": "Campos da seção, em ordem.",
+          "$ref": "#/$defs/fieldRefs"
+        },
+        "groups": {
+          "description": "Grupos com título (ex.: Físicos, Sociais, Mentais; Talentos, Perícias, Conhecimentos).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "fields"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "title": { "$ref": "#/$defs/label" },
+              "fields": { "$ref": "#/$defs/fieldRefs" }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 12
+        },
+        "filter": {
+          "description": "Filtro por regra da lista fechada: invested (rating/number acima de 0), proficient (mark fora do primeiro estado), aboveBase (percent acima da base). Desligado em Evoluir.",
+          "type": "object",
+          "required": ["rule", "label"],
+          "properties": {
+            "rule": { "$ref": "#/$defs/filterRule" },
+            "label": { "$ref": "#/$defs/label" },
+            "default": {
+              "description": "Filtro ligado ao abrir a ficha.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "searchable": {
+          "description": "Mostra busca por rótulo na seção.",
+          "type": "boolean"
+        },
+        "badge": {
+          "description": "Marca a linha cujo id é o valor de um campo choice (ex.: Esfera de afinidade no Mago).",
+          "type": "object",
+          "required": ["field", "label"],
+          "properties": {
+            "field": { "$ref": "#/$defs/fieldRef" },
+            "label": { "$ref": "#/$defs/label" }
+          },
+          "additionalProperties": false
+        },
+        "permissions": {
+          "description": "Papéis que leem e escrevem a seção. Sem permissions: todos da crônica leem; dono e narrador escrevem. Com read restrito, o SERVIDOR remove os campos da seção antes de responder a quem não pode ler, e esses campos não podem aparecer em identity nem no dock (validateTemplate checa).",
+          "type": "object",
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/role" },
+              "maxItems": 3,
+              "uniqueItems": true
+            },
+            "write": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/role" },
+              "maxItems": 3,
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        },
+        "pinTop": {
+          "description": "Fixa a seção no topo da zona de jogo (aspectos do Fate). Só em zone = play.",
+          "type": "boolean"
+        },
+        "columns": {
+          "description": "Colunas do layout grid sem grupos (padrão 3).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "minColWidth": {
+          "description": "Extensão documentada do layout groups: largura mínima da coluna em px.",
+          "type": "integer",
+          "minimum": 120,
+          "maximum": 600
+        },
+        "collapsed": {
+          "description": "Extensão documentada: a seção começa recolhida (ainda não consumida pelo protótipo).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "layout": {
+                "enum": ["facts", "text", "list", "pyramid", "fields"]
+              }
+            },
+            "required": ["layout"]
+          },
+          "then": { "required": ["fields"], "not": { "required": ["groups"] } }
+        },
+        {
+          "if": {
+            "properties": { "layout": { "enum": ["grid", "groups"] } },
+            "required": ["layout"]
+          },
+          "then": {
+            "oneOf": [
+              { "required": ["fields"], "not": { "required": ["groups"] } },
+              { "required": ["groups"], "not": { "required": ["fields"] } }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": { "zone": { "const": "identity" } },
+            "required": ["zone"]
+          },
+          "then": { "properties": { "layout": { "const": "facts" } } }
+        },
+        {
+          "if": {
+            "properties": { "zone": { "const": "play" } },
+            "required": ["zone"]
+          },
+          "then": { "properties": { "layout": { "const": "fields" } } }
+        },
+        {
+          "if": {
+            "properties": { "layout": { "const": "fields" } },
+            "required": ["layout"]
+          },
+          "then": { "properties": { "zone": { "const": "play" } } }
+        },
+        {
+          "if": {
+            "properties": { "pinTop": { "const": true } },
+            "required": ["pinTop"]
+          },
+          "then": { "properties": { "zone": { "const": "play" } } }
+        },
+        {
+          "if": { "required": ["columns"] },
+          "then": { "properties": { "layout": { "const": "grid" } } }
+        },
+        {
+          "if": { "required": ["minColWidth"] },
+          "then": { "properties": { "layout": { "const": "groups" } } }
+        },
+        {
+          "if": {
+            "anyOf": [
+              { "required": ["filter"] },
+              { "required": ["searchable"] }
+            ]
+          },
+          "then": {
+            "properties": {
+              "layout": { "enum": ["groups", "list", "pyramid"] }
+            }
+          }
+        },
+        {
+          "if": { "required": ["badge"] },
+          "then": { "properties": { "layout": { "enum": ["groups", "list"] } } }
+        }
+      ]
+    },
+
+    "identity": {
+      "description": "Como a ficha se apresenta: nome, selo (chip), resumo, voz e subtítulo. Tudo aponta para campos.",
+      "type": "object",
+      "required": ["name", "chip"],
+      "properties": {
+        "name": {
+          "description": "Campo com o nome do personagem.",
+          "$ref": "#/$defs/fieldRef"
+        },
+        "chip": {
+          "description": "Campo do selo de identidade (Clã, Classe, Ocupação).",
+          "$ref": "#/$defs/fieldRef"
+        },
+        "chipFormat": {
+          "description": "Formato do selo com marcadores {campo} (ex.: {class} nv {level}). Os marcadores viram texto puro; os campos precisam existir.",
+          "$ref": "#/$defs/safeText",
+          "maxLength": 60
+        },
+        "summary": {
+          "description": "Campos do resumo sob o nome (até 4).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/fieldRef" },
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "voice": {
+          "description": "Campo exibido como citação (fonte de voz da skin).",
+          "$ref": "#/$defs/fieldRef"
+        },
+        "subtitle": {
+          "description": "Campo exibido acima do resumo (ex.: nome de feito do Garou).",
+          "$ref": "#/$defs/fieldRef"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "accent": {
+      "description": "Cor de identidade do personagem. from aponta para um campo choice; map leva cada opção a um accent-N da paleta validada; fallback cobre opção sem mapa. Sem accent: from = null e map vazio.",
+      "type": "object",
+      "required": ["from", "map", "fallback"],
+      "properties": {
+        "from": {
+          "oneOf": [{ "$ref": "#/$defs/fieldRef" }, { "type": "null" }]
+        },
+        "map": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/accentRef" },
+          "maxProperties": 100
+        },
+        "fallback": { "$ref": "#/$defs/accentRef" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "from": { "type": "null" } },
+            "required": ["from"]
+          },
+          "then": { "properties": { "map": { "maxProperties": 0 } } }
+        }
+      ]
+    },
+
+    "roll": {
+      "description": "Parada de dados: casca única no app; a mecânica vem de model (ROLLERS). Rolagem que vale para a mesa é feita no servidor; local usa crypto.getRandomValues.",
+      "type": "object",
+      "required": ["model", "label", "slots"],
+      "properties": {
+        "model": { "$ref": "#/$defs/rollModel" },
+        "label": {
+          "description": "Rótulo do botão de dados (até 24).",
+          "$ref": "#/$defs/safeText",
+          "maxLength": 24
+        },
+        "slots": {
+          "description": "Componentes da parada (ex.: Atributo + Habilidade). from lista as seções de onde vêm as opções.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "from"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "from": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/sectionRef" },
+                "minItems": 1,
+                "maxItems": 8,
+                "uniqueItems": true
+              },
+              "optional": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "presets": {
+          "description": "Atalhos de parada (ex.: Teste de Sanidade, Conjurar efeito). slots mapeia id do slot para id do campo.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "slots"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" },
+              "slots": {
+                "type": "object",
+                "propertyNames": { "$ref": "#/$defs/id" },
+                "additionalProperties": { "$ref": "#/$defs/fieldRef" },
+                "minProperties": 1,
+                "maxProperties": 3
+              },
+              "help": { "$ref": "#/$defs/helpText" }
+            },
+            "additionalProperties": false
+          },
+          "maxItems": 12
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "model": { "const": "pool-success" } },
+            "required": ["model"]
+          },
+          "then": { "$ref": "#/$defs/roll-pool-success" }
+        },
+        {
+          "if": {
+            "properties": { "model": { "const": "sum-vs-target" } },
+            "required": ["model"]
+          },
+          "then": { "$ref": "#/$defs/roll-sum-vs-target" }
+        },
+        {
+          "if": {
+            "properties": { "model": { "const": "roll-under-percent" } },
+            "required": ["model"]
+          },
+          "then": { "$ref": "#/$defs/roll-under-percent" }
+        },
+        {
+          "if": {
+            "properties": { "model": { "const": "fudge" } },
+            "required": ["model"]
+          },
+          "then": { "$ref": "#/$defs/roll-fudge" }
+        },
+        {
+          "if": {
+            "properties": { "model": { "const": "pbta-2d6" } },
+            "required": ["model"]
+          },
+          "then": { "$ref": "#/$defs/roll-pbta-2d6" }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "rollBoost": {
+      "description": "Gasto opcional de recurso na rolagem. O recurso é debitado ao rolar.",
+      "type": "object",
+      "required": ["id", "label", "resource", "cost", "effect"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label" },
+        "resource": { "$ref": "#/$defs/fieldRef" },
+        "cost": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "effect": { "$ref": "#/$defs/boostEffect" }
+      },
+      "additionalProperties": false
+    },
+    "rollTarget": {
+      "description": "Alvo ajustável na parada (CD do D&D, oposição do Fate).",
+      "type": "object",
+      "required": ["label", "default", "min", "max"],
+      "properties": {
+        "label": { "$ref": "#/$defs/safeText", "maxLength": 24 },
+        "default": { "type": "integer", "minimum": -10, "maximum": 100 },
+        "min": { "type": "integer", "minimum": -10, "maximum": 100 },
+        "max": { "type": "integer", "minimum": -10, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+
+    "roll-pool-success": {
+      "description": "pool-success (WoD): parada de dN, cada dado >= dificuldade é sucesso, cada 1 anula um sucesso. Ferimento reduz a parada (penalty). Boost: só autoSuccess. Com specialty (tenCountsDouble), o dado é d10.",
+      "properties": {
+        "die": {
+          "description": "Faces do dado (padrão 10).",
+          "$ref": "#/$defs/die"
+        },
+        "difficulty": {
+          "type": "object",
+          "required": ["default", "min", "max"],
+          "properties": {
+            "default": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "min": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "max": { "type": "integer", "minimum": 1, "maximum": 100 }
+          },
+          "additionalProperties": false
+        },
+        "penalty": {
+          "description": "Track wod-stacking cuja penalidade reduz a parada.",
+          "type": "object",
+          "required": ["field"],
+          "properties": { "field": { "$ref": "#/$defs/fieldRef" } },
+          "additionalProperties": false
+        },
+        "specialty": { "$ref": "#/$defs/specialtyRule" },
+        "boosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rollBoost",
+            "properties": { "effect": { "const": "autoSuccess" } }
+          },
+          "maxItems": 4
+        }
+      },
+      "required": ["difficulty"],
+      "allOf": [
+        {
+          "if": { "required": ["specialty"] },
+          "then": { "properties": { "die": { "const": 10 } } }
+        }
+      ]
+    },
+    "roll-sum-vs-target": {
+      "description": "sum-vs-target (d20): 1d20 + modificador contra o alvo. Condições (tags com roll) dão vantagem ou desvantagem automática.",
+      "properties": {
+        "dice": {
+          "description": "O roller rola sempre 1d20.",
+          "$ref": "#/$defs/diceNotation",
+          "const": "1d20"
+        },
+        "advantage": {
+          "description": "Mostra o seletor de vantagem.",
+          "type": "boolean"
+        },
+        "target": { "$ref": "#/$defs/rollTarget" },
+        "conditions": {
+          "description": "Campo tags cujas opções com roll alteram a rolagem.",
+          "type": "object",
+          "required": ["field"],
+          "properties": { "field": { "$ref": "#/$defs/fieldRef" } },
+          "additionalProperties": false
+        }
+      },
+      "required": ["target"]
+    },
+    "roll-under-percent": {
+      "description": "roll-under-percent (CoC): d100 contra o valor, com níveis regular, difícil (metade) e extremo (quinto); dados de bônus e penalidade.",
+      "properties": {
+        "dice": {
+          "description": "O roller rola sempre d100 (dezena e unidade).",
+          "$ref": "#/$defs/diceNotation",
+          "const": "1d100"
+        },
+        "bonusDice": {
+          "type": "object",
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer", "minimum": -3, "maximum": 0 },
+            "max": { "type": "integer", "minimum": 0, "maximum": 3 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["bonusDice"]
+    },
+    "roll-fudge": {
+      "description": "fudge (Fate): 4dF + perícia contra a oposição, resultado nomeado pela escada. Boost: só plus2 (invocar aspecto).",
+      "properties": {
+        "dice": {
+          "description": "O roller rola sempre 4dF.",
+          "$ref": "#/$defs/diceNotation",
+          "const": "4dF"
+        },
+        "ladder": {
+          "description": "Id da escada em ladders.",
+          "$ref": "#/$defs/id"
+        },
+        "target": { "$ref": "#/$defs/rollTarget" },
+        "boosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rollBoost",
+            "properties": { "effect": { "const": "plus2" } }
+          },
+          "maxItems": 4
+        }
+      },
+      "required": ["ladder", "target"]
+    },
+    "roll-pbta-2d6": {
+      "description": "pbta-2d6 (PbtA): 2d6 + stat; 10+ sucesso pleno, 7 a 9 sucesso com custo, 6- falha. Sem boosts no MVP.",
+      "properties": {
+        "dice": {
+          "description": "O roller rola sempre 2d6.",
+          "$ref": "#/$defs/diceNotation",
+          "const": "2d6"
+        }
+      }
+    },
+
+    "actionParams": {
+      "description": "Parâmetros de um efeito. field aponta para o campo afetado; amount é a quantidade; types são ids de tipos de dano da track.",
+      "type": "object",
+      "properties": {
+        "field": { "$ref": "#/$defs/fieldRef" },
+        "amount": { "type": "integer", "minimum": 1, "maximum": 99 },
+        "types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "effectParamsRules": {
+      "description": "Parâmetros exigidos por efeito: resource.spend e resource.gain pedem field e amount; health.heal pede field e types; rest.long e rest.short não têm parâmetros.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": { "enum": ["resource.spend", "resource.gain"] }
+            },
+            "required": ["effect"]
+          },
+          "then": {
+            "required": ["params"],
+            "properties": {
+              "params": {
+                "required": ["field", "amount"],
+                "not": { "required": ["types"] }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "effect": { "const": "health.heal" } },
+            "required": ["effect"]
+          },
+          "then": {
+            "required": ["params"],
+            "properties": {
+              "params": {
+                "required": ["field", "types"],
+                "not": { "required": ["amount"] }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "effect": { "enum": ["rest.long", "rest.short"] } },
+            "required": ["effect"]
+          },
+          "then": { "not": { "required": ["params"] } }
+        }
+      ]
+    },
+    "templateAction": {
+      "description": "Ação nomeada do menu da ficha. O app mostra a prévia (campo: de → para) antes de aplicar.",
+      "type": "object",
+      "required": ["id", "label", "effect"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label" },
+        "effect": { "$ref": "#/$defs/effect" },
+        "params": { "$ref": "#/$defs/actionParams" },
+        "help": { "$ref": "#/$defs/helpText" }
+      },
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/effectParamsRules" }]
+    },
+    "resourceAction": {
+      "description": "Ação com custo no próprio recurso (ex.: Curar 1 nível de dano por 1 Sangue).",
+      "type": "object",
+      "required": ["id", "label", "effect"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label" },
+        "cost": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "effect": { "$ref": "#/$defs/effect" },
+        "params": { "$ref": "#/$defs/actionParams" },
+        "help": { "$ref": "#/$defs/helpText" }
+      },
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/effectParamsRules" }]
+    }
+  }
+}

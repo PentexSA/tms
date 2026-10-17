@@ -1,0 +1,34 @@
+{
+  "id": "wod",
+  "name": "Grimório",
+  "usage": "Skin da família World of Darkness (Vampiro, Lobisomem, Mago, Aparição, Changeling, Caçador). É o visual do Grimório original: fonte gótica nos títulos, serifa itálica na voz do personagem e pips redondos. Não define cor de linhagem: isso vem do template.",
+  "type": {
+    "display": {
+      "web": "\"Grenze Gotisch\", Georgia, serif",
+      "native": {
+        "600": "GrenzeGotisch_600SemiBold",
+        "700": "GrenzeGotisch_700Bold"
+      },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Só em display-xl, display-lg e display-sm (nome e títulos de seção). Nunca em números. A Grenze 500 foi removida: nenhum estilo a usava."
+    },
+    "voice": {
+      "web": "\"Cormorant Garamond\", Georgia, serif",
+      "native": { "600italic": "CormorantGaramond_600SemiBold_Italic" },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Só no estilo voice (citação e conceito)."
+    }
+  },
+  "pip": "circle",
+  "glyphs": [
+    {
+      "id": "augur-moon",
+      "usage": "Fase da lua do augúrio (Lobisomem), em SVG com contorno border-control e terminador em elipse. Vai no slot leading de um FieldRow. Desenho genérico de lua, não símbolo oficial. aria-hidden: o nome do augúrio está no texto."
+    },
+    {
+      "id": "damage-glyphs",
+      "usage": "Glifos de tipo de dano (/ contusivo, X letal, ✱ agravado). Os glifos e os nomes vêm do template (track.types); a skin só define o traço."
+    }
+  ],
+  "color": {}
+}

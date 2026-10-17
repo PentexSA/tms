@@ -1,0 +1,755 @@
+{
+  "schema": 1,
+  "system": "wta-w20",
+  "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
+  "family": "wod",
+  "edition": "W20",
+  "templateVersion": "1.0.0",
+  "locale": "pt-BR",
+  "skin": "wod",
+  "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
+  "identity": {
+    "name": "name",
+    "subtitle": "deedName",
+    "chip": "tribe",
+    "summary": ["rank", "auspice"],
+    "voice": "quote"
+  },
+  "accent": {
+    "from": "tribe",
+    "map": {
+      "furias-negras": "accent-9",
+      "roedores-de-ossos": "accent-14",
+      "filhos-de-gaia": "accent-3",
+      "fianna": "accent-4",
+      "crias-de-fenris": "accent-13",
+      "andarilhos-do-asfalto": "accent-16",
+      "garras-vermelhas": "accent-1",
+      "senhores-das-sombras": "accent-12",
+      "peregrinos-silenciosos": "accent-15",
+      "presas-de-prata": "accent-7",
+      "observadores-das-estrelas": "accent-8",
+      "uktena": "accent-5",
+      "wendigo": "accent-6"
+    },
+    "fallback": "accent-neutral"
+  },
+  "fields": {
+    "name": { "type": "text", "label": "Nome", "maxLength": 80 },
+    "deedName": { "type": "text", "label": "Nome de feito", "maxLength": 80 },
+    "concept": { "type": "text", "label": "Conceito", "maxLength": 80 },
+    "breed": {
+      "type": "choice",
+      "label": "Raça",
+      "options": [
+        { "id": "hominideo", "label": "Hominídeo" },
+        { "id": "impuro", "label": "Impuro" },
+        { "id": "lupino", "label": "Lupino" }
+      ]
+    },
+    "auspice": {
+      "type": "choice",
+      "label": "Augúrio",
+      "glyph": "augur-moon",
+      "options": [
+        {
+          "id": "ragabash",
+          "label": "Ragabash",
+          "meta": "lua nova",
+          "glyphParam": 0
+        },
+        {
+          "id": "theurge",
+          "label": "Theurge",
+          "meta": "lua crescente",
+          "glyphParam": 0.25
+        },
+        {
+          "id": "philodox",
+          "label": "Philodox",
+          "meta": "meia-lua",
+          "glyphParam": 0.5
+        },
+        {
+          "id": "galliard",
+          "label": "Galliard",
+          "meta": "lua gibosa",
+          "glyphParam": 0.75
+        },
+        {
+          "id": "ahroun",
+          "label": "Ahroun",
+          "meta": "lua cheia",
+          "glyphParam": 1
+        }
+      ]
+    },
+    "tribe": {
+      "type": "choice",
+      "label": "Tribo",
+      "options": [
+        { "id": "furias-negras", "label": "Fúrias Negras" },
+        { "id": "roedores-de-ossos", "label": "Roedores de Ossos" },
+        { "id": "filhos-de-gaia", "label": "Filhos de Gaia" },
+        { "id": "fianna", "label": "Fianna" },
+        { "id": "crias-de-fenris", "label": "Crias de Fenris" },
+        { "id": "andarilhos-do-asfalto", "label": "Andarilhos do Asfalto" },
+        { "id": "garras-vermelhas", "label": "Garras Vermelhas" },
+        { "id": "senhores-das-sombras", "label": "Senhores das Sombras" },
+        { "id": "peregrinos-silenciosos", "label": "Peregrinos Silenciosos" },
+        { "id": "presas-de-prata", "label": "Presas de Prata" },
+        {
+          "id": "observadores-das-estrelas",
+          "label": "Observadores das Estrelas"
+        },
+        { "id": "uktena", "label": "Uktena" },
+        { "id": "wendigo", "label": "Wendigo" }
+      ]
+    },
+    "rank": {
+      "type": "rating",
+      "label": "Posto",
+      "min": 0,
+      "max": 5,
+      "valueLabels": {
+        "0": "Filhote",
+        "1": "Cliath",
+        "2": "Fostern",
+        "3": "Adren",
+        "4": "Athro",
+        "5": "Ancião"
+      }
+    },
+    "sept": { "type": "text", "label": "Seita", "maxLength": 80 },
+    "totem": { "type": "text", "label": "Totem da matilha", "maxLength": 60 },
+    "quote": { "type": "text", "label": "Citação", "maxLength": 160 },
+
+    "strength": {
+      "type": "rating",
+      "label": "Força",
+      "shortLabel": "For",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "dexterity": {
+      "type": "rating",
+      "label": "Destreza",
+      "shortLabel": "Des",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "stamina": {
+      "type": "rating",
+      "label": "Vigor",
+      "shortLabel": "Vig",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "charisma": {
+      "type": "rating",
+      "label": "Carisma",
+      "shortLabel": "Car",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "manipulation": {
+      "type": "rating",
+      "label": "Manipulação",
+      "shortLabel": "Man",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "appearance": {
+      "type": "rating",
+      "label": "Aparência",
+      "shortLabel": "Apa",
+      "min": 0,
+      "max": 5,
+      "specialty": true
+    },
+    "perception": {
+      "type": "rating",
+      "label": "Percepção",
+      "shortLabel": "Per",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "intelligence": {
+      "type": "rating",
+      "label": "Inteligência",
+      "shortLabel": "Int",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+    "wits": {
+      "type": "rating",
+      "label": "Raciocínio",
+      "shortLabel": "Rac",
+      "min": 1,
+      "max": 5,
+      "specialty": true
+    },
+
+    "alertness": {
+      "type": "rating",
+      "label": "Prontidão",
+      "max": 5,
+      "specialty": true
+    },
+    "athletics": {
+      "type": "rating",
+      "label": "Esportes",
+      "max": 5,
+      "specialty": true
+    },
+    "brawl": {
+      "type": "rating",
+      "label": "Briga",
+      "max": 5,
+      "specialty": true
+    },
+    "empathy": {
+      "type": "rating",
+      "label": "Empatia",
+      "max": 5,
+      "specialty": true
+    },
+    "expression": {
+      "type": "rating",
+      "label": "Expressão",
+      "max": 5,
+      "specialty": true
+    },
+    "intimidation": {
+      "type": "rating",
+      "label": "Intimidação",
+      "max": 5,
+      "specialty": true
+    },
+    "leadership": {
+      "type": "rating",
+      "label": "Liderança",
+      "max": 5,
+      "specialty": true
+    },
+    "primalUrge": {
+      "type": "rating",
+      "label": "Instinto Primitivo",
+      "max": 5,
+      "specialty": true
+    },
+    "streetwise": {
+      "type": "rating",
+      "label": "Manha",
+      "max": 5,
+      "specialty": true
+    },
+    "subterfuge": {
+      "type": "rating",
+      "label": "Lábia",
+      "max": 5,
+      "specialty": true
+    },
+
+    "animalKen": {
+      "type": "rating",
+      "label": "Empatia com Animais",
+      "max": 5,
+      "specialty": true
+    },
+    "crafts": {
+      "type": "rating",
+      "label": "Ofícios",
+      "max": 5,
+      "specialty": true
+    },
+    "drive": {
+      "type": "rating",
+      "label": "Condução",
+      "max": 5,
+      "specialty": true
+    },
+    "etiquette": {
+      "type": "rating",
+      "label": "Etiqueta",
+      "max": 5,
+      "specialty": true
+    },
+    "firearms": {
+      "type": "rating",
+      "label": "Armas de Fogo",
+      "max": 5,
+      "specialty": true
+    },
+    "larceny": {
+      "type": "rating",
+      "label": "Ladroagem",
+      "max": 5,
+      "specialty": true
+    },
+    "melee": {
+      "type": "rating",
+      "label": "Armas Brancas",
+      "max": 5,
+      "specialty": true
+    },
+    "performance": {
+      "type": "rating",
+      "label": "Performance",
+      "max": 5,
+      "specialty": true
+    },
+    "stealth": {
+      "type": "rating",
+      "label": "Furtividade",
+      "max": 5,
+      "specialty": true
+    },
+    "survival": {
+      "type": "rating",
+      "label": "Sobrevivência",
+      "max": 5,
+      "specialty": true
+    },
+
+    "academics": {
+      "type": "rating",
+      "label": "Acadêmicos",
+      "max": 5,
+      "specialty": true
+    },
+    "computer": {
+      "type": "rating",
+      "label": "Computador",
+      "max": 5,
+      "specialty": true
+    },
+    "enigmas": {
+      "type": "rating",
+      "label": "Enigmas",
+      "max": 5,
+      "specialty": true
+    },
+    "investigation": {
+      "type": "rating",
+      "label": "Investigação",
+      "max": 5,
+      "specialty": true
+    },
+    "law": {
+      "type": "rating",
+      "label": "Direito",
+      "max": 5,
+      "specialty": true
+    },
+    "medicine": {
+      "type": "rating",
+      "label": "Medicina",
+      "max": 5,
+      "specialty": true
+    },
+    "occult": {
+      "type": "rating",
+      "label": "Ocultismo",
+      "max": 5,
+      "specialty": true
+    },
+    "rituals": {
+      "type": "rating",
+      "label": "Rituais",
+      "max": 5,
+      "specialty": true
+    },
+    "science": {
+      "type": "rating",
+      "label": "Ciência",
+      "max": 5,
+      "specialty": true
+    },
+    "technology": {
+      "type": "rating",
+      "label": "Tecnologia",
+      "max": 5,
+      "specialty": true
+    },
+
+    "form": {
+      "type": "state",
+      "label": "Forma",
+      "editableIn": ["play"],
+      "options": [
+        {
+          "id": "hominideo",
+          "label": "Hominídeo",
+          "hint": "humana",
+          "modifiers": []
+        },
+        {
+          "id": "glabro",
+          "label": "Glabro",
+          "hint": "quase humana",
+          "modifiers": [
+            { "field": "strength", "op": "add", "value": 2 },
+            { "field": "stamina", "op": "add", "value": 2 },
+            { "field": "manipulation", "op": "add", "value": -2 },
+            { "field": "appearance", "op": "add", "value": -1 }
+          ]
+        },
+        {
+          "id": "crinos",
+          "label": "Crinos",
+          "hint": "lobisomem",
+          "note": "Humanos que veem a forma Crinos sofrem o Delírio.",
+          "modifiers": [
+            { "field": "strength", "op": "add", "value": 4 },
+            { "field": "dexterity", "op": "add", "value": 1 },
+            { "field": "stamina", "op": "add", "value": 3 },
+            { "field": "manipulation", "op": "add", "value": -3 },
+            { "field": "appearance", "op": "set", "value": 0 }
+          ]
+        },
+        {
+          "id": "hispo",
+          "label": "Hispo",
+          "hint": "lobo gigante",
+          "modifiers": [
+            { "field": "strength", "op": "add", "value": 3 },
+            { "field": "dexterity", "op": "add", "value": 2 },
+            { "field": "stamina", "op": "add", "value": 3 },
+            { "field": "manipulation", "op": "add", "value": -3 }
+          ]
+        },
+        {
+          "id": "lupino",
+          "label": "Lupino",
+          "hint": "lobo",
+          "modifiers": [
+            { "field": "dexterity", "op": "add", "value": 2 },
+            { "field": "stamina", "op": "add", "value": 2 },
+            { "field": "manipulation", "op": "add", "value": -3 }
+          ]
+        }
+      ],
+      "cost": {
+        "resource": "rage",
+        "amount": 1,
+        "optional": true,
+        "label": "Mudança instantânea: gastar 1 Fúria"
+      }
+    },
+    "rage": {
+      "type": "resource",
+      "label": "Fúria",
+      "permanent": { "min": 1, "max": 10 },
+      "editableIn": ["play"],
+      "defaultAction": "spend1",
+      "colorRole": "accent"
+    },
+    "gnosis": {
+      "type": "resource",
+      "label": "Gnose",
+      "permanent": { "min": 1, "max": 10 },
+      "editableIn": ["play"],
+      "defaultAction": "spend1",
+      "colorRole": "alt-warm",
+      "help": "Recurso par da Fúria: cor quase neutra e preenchimento hachurado, para nunca depender só da cor."
+    },
+    "willpower": {
+      "type": "resource",
+      "label": "Força de Vontade",
+      "shortLabel": "FdV",
+      "permanent": { "min": 1, "max": 10 },
+      "editableIn": ["play"],
+      "defaultAction": "spend1"
+    },
+    "glory": {
+      "type": "resource",
+      "label": "Glória",
+      "permanent": { "min": 0, "max": 10 },
+      "tempUncapped": true,
+      "max": 10,
+      "help": "O Renome temporário não é limitado pelo permanente (W20)."
+    },
+    "honor": {
+      "type": "resource",
+      "label": "Honra",
+      "permanent": { "min": 0, "max": 10 },
+      "tempUncapped": true,
+      "max": 10
+    },
+    "wisdom": {
+      "type": "resource",
+      "label": "Sabedoria",
+      "permanent": { "min": 0, "max": 10 },
+      "tempUncapped": true,
+      "max": 10
+    },
+    "health": {
+      "type": "track",
+      "label": "Vitalidade",
+      "shortLabel": "Vitalidade",
+      "rule": "wod-stacking",
+      "editableIn": ["play"],
+      "levels": [
+        { "label": "Escoriado", "penalty": 0 },
+        { "label": "Machucado", "penalty": -1 },
+        { "label": "Ferido", "penalty": -1 },
+        { "label": "Ferido gravemente", "penalty": -2 },
+        { "label": "Espancado", "penalty": -2 },
+        { "label": "Aleijado", "penalty": -5 },
+        { "label": "Incapacitado", "penalty": null }
+      ],
+      "types": [
+        { "id": "aggravated", "label": "Agravado", "glyph": "✱" },
+        { "id": "lethal", "label": "Letal", "glyph": "X" },
+        { "id": "bashing", "label": "Contusivo", "glyph": "/" }
+      ]
+    },
+    "gifts": {
+      "type": "list",
+      "label": "Dons",
+      "itemLabel": "Dom",
+      "item": {
+        "meta": [
+          {
+            "id": "rank",
+            "type": "number",
+            "label": "Posto",
+            "min": 1,
+            "max": 5
+          },
+          { "id": "source", "type": "text", "label": "Origem" }
+        ],
+        "notes": true
+      }
+    },
+    "backgrounds": {
+      "type": "list",
+      "label": "Antecedentes",
+      "itemLabel": "Antecedente",
+      "item": {
+        "value": { "type": "rating", "min": 0, "max": 5 },
+        "specialty": true,
+        "notes": true
+      },
+      "catalog": [
+        "Aliados",
+        "Ancestrais",
+        "Contatos",
+        "Fetiche",
+        "Parentes",
+        "Mentor",
+        "Recursos",
+        "Ritos",
+        "Totem",
+        "Raça Pura"
+      ]
+    },
+    "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "storytellerNotes": {
+      "type": "longText",
+      "label": "Notas do Narrador",
+      "maxLength": 4000
+    }
+  },
+  "sections": [
+    {
+      "id": "about-facts",
+      "zone": "identity",
+      "title": "Identidade",
+      "layout": "facts",
+      "fields": ["breed", "auspice", "sept", "totem"]
+    },
+    {
+      "id": "play",
+      "zone": "play",
+      "title": "Em jogo",
+      "layout": "fields",
+      "fields": ["health", "form", "rage", "gnosis", "willpower"]
+    },
+    {
+      "id": "attributes",
+      "zone": "build",
+      "title": "Atributos",
+      "layout": "grid",
+      "groups": [
+        {
+          "id": "physical",
+          "title": "Físicos",
+          "fields": ["strength", "dexterity", "stamina"]
+        },
+        {
+          "id": "social",
+          "title": "Sociais",
+          "fields": ["charisma", "manipulation", "appearance"]
+        },
+        {
+          "id": "mental",
+          "title": "Mentais",
+          "fields": ["perception", "intelligence", "wits"]
+        }
+      ]
+    },
+    {
+      "id": "abilities",
+      "zone": "build",
+      "title": "Habilidades",
+      "layout": "groups",
+      "filter": {
+        "rule": "invested",
+        "label": "Só com pontos",
+        "default": true
+      },
+      "searchable": true,
+      "groups": [
+        {
+          "id": "talents",
+          "title": "Talentos",
+          "fields": [
+            "alertness",
+            "athletics",
+            "brawl",
+            "empathy",
+            "expression",
+            "intimidation",
+            "leadership",
+            "primalUrge",
+            "streetwise",
+            "subterfuge"
+          ]
+        },
+        {
+          "id": "skills",
+          "title": "Perícias",
+          "fields": [
+            "animalKen",
+            "crafts",
+            "drive",
+            "etiquette",
+            "firearms",
+            "larceny",
+            "melee",
+            "performance",
+            "stealth",
+            "survival"
+          ]
+        },
+        {
+          "id": "knowledges",
+          "title": "Conhecimentos",
+          "fields": [
+            "academics",
+            "computer",
+            "enigmas",
+            "investigation",
+            "law",
+            "medicine",
+            "occult",
+            "rituals",
+            "science",
+            "technology"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "renown",
+      "zone": "powers",
+      "title": "Renome",
+      "layout": "groups",
+      "groups": [
+        { "id": "rank", "title": "Posto", "fields": ["rank"] },
+        {
+          "id": "renown",
+          "title": "Renome",
+          "fields": ["glory", "honor", "wisdom"]
+        }
+      ]
+    },
+    {
+      "id": "gifts",
+      "zone": "powers",
+      "title": "Dons",
+      "layout": "groups",
+      "groups": [{ "id": "gifts", "title": "Dons", "fields": ["gifts"] }]
+    },
+    {
+      "id": "backgrounds",
+      "zone": "powers",
+      "title": "Antecedentes",
+      "layout": "groups",
+      "groups": [
+        {
+          "id": "backgrounds",
+          "title": "Antecedentes",
+          "fields": ["backgrounds"]
+        }
+      ]
+    },
+    {
+      "id": "about",
+      "zone": "lore",
+      "title": "Sobre",
+      "layout": "text",
+      "fields": ["quote", "notes"]
+    },
+    {
+      "id": "storyteller",
+      "zone": "lore",
+      "title": "Narrador",
+      "layout": "text",
+      "fields": ["storytellerNotes"],
+      "permissions": { "read": ["storyteller"], "write": ["storyteller"] }
+    }
+  ],
+  "zoneLabels": { "powers": "Vantagens" },
+  "dock": ["health", "rage", "form"],
+  "roll": {
+    "model": "pool-success",
+    "label": "Dados",
+    "die": 10,
+    "slots": [
+      { "id": "attribute", "label": "Atributo", "from": ["attributes"] },
+      {
+        "id": "ability",
+        "label": "Habilidade",
+        "from": ["abilities", "backgrounds"],
+        "optional": true
+      }
+    ],
+    "difficulty": { "default": 6, "min": 2, "max": 10 },
+    "penalty": { "field": "health" },
+    "specialty": "tenCountsDouble",
+    "boosts": [
+      {
+        "id": "willpower",
+        "label": "Gastar 1 Força de Vontade: +1 sucesso automático",
+        "resource": "willpower",
+        "cost": 1,
+        "effect": "autoSuccess"
+      }
+    ],
+    "presets": [
+      {
+        "id": "rage",
+        "label": "Teste de Fúria",
+        "slots": { "attribute": "rage" },
+        "help": "Parada de Fúria permanente."
+      },
+      {
+        "id": "gnosis",
+        "label": "Teste de Gnose",
+        "slots": { "attribute": "gnosis" },
+        "help": "Parada de Gnose permanente."
+      }
+    ]
+  },
+  "actions": []
+}

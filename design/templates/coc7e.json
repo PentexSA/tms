@@ -1,0 +1,539 @@
+{
+  "schema": 1,
+  "system": "coc7e",
+  "name": "Chamado de Cthulhu — 7ª edição",
+  "family": "brp",
+  "edition": "7e",
+  "templateVersion": "1.0.0",
+  "locale": "pt-BR",
+  "skin": "coc",
+  "license": "O template traz só nomes de perícias, valores-base e regras numéricas. Textos de regras e descrições são protegidos e não são embutidos.",
+  "identity": {
+    "name": "name",
+    "chip": "occupation",
+    "summary": ["occupation", "age", "residence"],
+    "voice": "ideology"
+  },
+  "accent": { "from": null, "map": {}, "fallback": "accent-neutral" },
+  "fields": {
+    "name": { "type": "text", "label": "Nome", "maxLength": 80 },
+    "occupation": { "type": "text", "label": "Ocupação", "maxLength": 60 },
+    "age": {
+      "type": "number",
+      "label": "Idade",
+      "min": 15,
+      "max": 99,
+      "suffix": " anos"
+    },
+    "residence": { "type": "text", "label": "Residência", "maxLength": 60 },
+    "birthplace": {
+      "type": "text",
+      "label": "Local de nascimento",
+      "maxLength": 60
+    },
+
+    "str": {
+      "type": "percent",
+      "label": "Força",
+      "shortLabel": "FOR",
+      "display": "percent+half+fifth"
+    },
+    "con": {
+      "type": "percent",
+      "label": "Constituição",
+      "shortLabel": "CON",
+      "display": "percent+half+fifth"
+    },
+    "siz": {
+      "type": "percent",
+      "label": "Tamanho",
+      "shortLabel": "TAM",
+      "display": "percent+half+fifth"
+    },
+    "dex": {
+      "type": "percent",
+      "label": "Destreza",
+      "shortLabel": "DES",
+      "display": "percent+half+fifth"
+    },
+    "app": {
+      "type": "percent",
+      "label": "Aparência",
+      "shortLabel": "APA",
+      "display": "percent+half+fifth"
+    },
+    "edu": {
+      "type": "percent",
+      "label": "Educação",
+      "shortLabel": "EDU",
+      "display": "percent+half+fifth"
+    },
+    "int": {
+      "type": "percent",
+      "label": "Inteligência",
+      "shortLabel": "INT",
+      "display": "percent+half+fifth"
+    },
+    "pow": {
+      "type": "percent",
+      "label": "Poder",
+      "shortLabel": "POD",
+      "display": "percent+half+fifth"
+    },
+
+    "hp": {
+      "type": "resource",
+      "label": "Pontos de Vida",
+      "shortLabel": "PV",
+      "max": { "derive": "cocHitPoints", "from": ["con", "siz"] },
+      "editableIn": ["play"],
+      "allowInput": true,
+      "defaultAction": "damage1",
+      "spendLabel": "Perder 1"
+    },
+    "mp": {
+      "type": "resource",
+      "label": "Pontos de Magia",
+      "shortLabel": "PM",
+      "max": { "derive": "cocMagicPoints", "from": "pow" },
+      "editableIn": ["play"],
+      "defaultAction": "spend1"
+    },
+    "sanity": {
+      "type": "resource",
+      "label": "Sanidade",
+      "shortLabel": "SAN",
+      "max": { "derive": "cocSanityMax", "from": "mythos" },
+      "editableIn": ["play"],
+      "allowInput": true,
+      "defaultAction": "damage1",
+      "spendLabel": "Perder 1",
+      "help": "Sanidade máxima = 99 − Mitos de Cthulhu."
+    },
+    "luck": {
+      "type": "resource",
+      "label": "Sorte",
+      "max": 99,
+      "editableIn": ["play"],
+      "allowInput": true,
+      "defaultAction": "spend1"
+    },
+    "conditions": {
+      "type": "tags",
+      "label": "Condições",
+      "editableIn": ["play"],
+      "options": [
+        { "id": "ferimento-grave", "label": "Ferimento grave" },
+        { "id": "morrendo", "label": "Morrendo" },
+        { "id": "inconsciente", "label": "Inconsciente" },
+        { "id": "insanidade-temporaria", "label": "Insanidade temporária" },
+        { "id": "insanidade-indefinida", "label": "Insanidade indefinida" }
+      ]
+    },
+
+    "accounting": {
+      "type": "percent",
+      "label": "Contabilidade",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "anthropology": {
+      "type": "percent",
+      "label": "Antropologia",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "appraise": {
+      "type": "percent",
+      "label": "Avaliação",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "archaeology": {
+      "type": "percent",
+      "label": "Arqueologia",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "artCraft": {
+      "type": "percent",
+      "label": "Arte/Ofício (Fotografia)",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "charm": {
+      "type": "percent",
+      "label": "Charme",
+      "base": 15,
+      "display": "percent+half+fifth"
+    },
+    "climb": {
+      "type": "percent",
+      "label": "Escalar",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "creditRating": {
+      "type": "percent",
+      "label": "Crédito",
+      "base": 0,
+      "display": "percent+half+fifth"
+    },
+    "mythos": {
+      "type": "percent",
+      "label": "Mitos de Cthulhu",
+      "base": 0,
+      "display": "percent+half+fifth"
+    },
+    "disguise": {
+      "type": "percent",
+      "label": "Disfarce",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "dodge": {
+      "type": "percent",
+      "label": "Esquivar",
+      "base": { "derive": "half", "from": "dex" },
+      "display": "percent+half+fifth"
+    },
+    "driveAuto": {
+      "type": "percent",
+      "label": "Dirigir Automóveis",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "elecRepair": {
+      "type": "percent",
+      "label": "Consertos Elétricos",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "fastTalk": {
+      "type": "percent",
+      "label": "Lábia",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "fightingBrawl": {
+      "type": "percent",
+      "label": "Lutar (Briga)",
+      "base": 25,
+      "display": "percent+half+fifth"
+    },
+    "firearmsHandgun": {
+      "type": "percent",
+      "label": "Armas de Fogo (Pistola)",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "firstAid": {
+      "type": "percent",
+      "label": "Primeiros Socorros",
+      "base": 30,
+      "display": "percent+half+fifth"
+    },
+    "history": {
+      "type": "percent",
+      "label": "História",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "intimidate": {
+      "type": "percent",
+      "label": "Intimidação",
+      "base": 15,
+      "display": "percent+half+fifth"
+    },
+    "jump": {
+      "type": "percent",
+      "label": "Saltar",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "languageOther": {
+      "type": "percent",
+      "label": "Outro Idioma (Latim)",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "languageOwn": {
+      "type": "percent",
+      "label": "Idioma Nativo (Português)",
+      "base": { "field": "edu" },
+      "display": "percent+half+fifth"
+    },
+    "law": {
+      "type": "percent",
+      "label": "Direito",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "libraryUse": {
+      "type": "percent",
+      "label": "Usar Bibliotecas",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "listen": {
+      "type": "percent",
+      "label": "Escutar",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "locksmith": {
+      "type": "percent",
+      "label": "Chaveiro",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "mechRepair": {
+      "type": "percent",
+      "label": "Consertos Mecânicos",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "medicine": {
+      "type": "percent",
+      "label": "Medicina",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "naturalWorld": {
+      "type": "percent",
+      "label": "Mundo Natural",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "navigate": {
+      "type": "percent",
+      "label": "Navegação",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "occult": {
+      "type": "percent",
+      "label": "Ocultismo",
+      "base": 5,
+      "display": "percent+half+fifth"
+    },
+    "persuade": {
+      "type": "percent",
+      "label": "Persuasão",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "psychology": {
+      "type": "percent",
+      "label": "Psicologia",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+    "sciencePharmacy": {
+      "type": "percent",
+      "label": "Ciência (Farmácia)",
+      "base": 1,
+      "display": "percent+half+fifth"
+    },
+    "spotHidden": {
+      "type": "percent",
+      "label": "Encontrar",
+      "base": 25,
+      "display": "percent+half+fifth"
+    },
+    "stealth": {
+      "type": "percent",
+      "label": "Furtividade",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "swim": {
+      "type": "percent",
+      "label": "Natação",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "throw": {
+      "type": "percent",
+      "label": "Arremessar",
+      "base": 20,
+      "display": "percent+half+fifth"
+    },
+    "track": {
+      "type": "percent",
+      "label": "Rastrear",
+      "base": 10,
+      "display": "percent+half+fifth"
+    },
+
+    "weapons": {
+      "type": "list",
+      "label": "Armas",
+      "itemLabel": "Arma",
+      "item": {
+        "meta": [
+          { "id": "skill", "type": "text", "label": "Perícia" },
+          { "id": "damage", "type": "text", "label": "Dano" }
+        ]
+      }
+    },
+    "equipment": {
+      "type": "list",
+      "label": "Equipamento",
+      "itemLabel": "Item",
+      "searchable": true,
+      "item": { "notes": true }
+    },
+    "ideology": {
+      "type": "text",
+      "label": "Ideologia e crenças",
+      "maxLength": 200
+    },
+    "significantPeople": {
+      "type": "longText",
+      "label": "Pessoas significativas",
+      "maxLength": 600
+    },
+    "treasuredPossessions": {
+      "type": "longText",
+      "label": "Pertences preciosos",
+      "maxLength": 600
+    },
+    "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "storytellerNotes": {
+      "type": "longText",
+      "label": "Notas do Guardião",
+      "maxLength": 4000
+    }
+  },
+  "sections": [
+    {
+      "id": "about-facts",
+      "zone": "identity",
+      "title": "Identidade",
+      "layout": "facts",
+      "fields": ["occupation", "age", "residence", "birthplace"]
+    },
+    {
+      "id": "play",
+      "zone": "play",
+      "title": "Em jogo",
+      "layout": "fields",
+      "fields": ["hp", "sanity", "luck", "mp", "conditions"]
+    },
+    {
+      "id": "characteristics",
+      "zone": "build",
+      "title": "Características",
+      "layout": "grid",
+      "columns": 2,
+      "fields": ["str", "con", "siz", "dex", "app", "edu", "int", "pow"]
+    },
+    {
+      "id": "skills",
+      "zone": "build",
+      "title": "Perícias",
+      "layout": "list",
+      "filter": {
+        "rule": "aboveBase",
+        "label": "Acima da base",
+        "default": true
+      },
+      "searchable": true,
+      "fields": [
+        "accounting",
+        "anthropology",
+        "appraise",
+        "archaeology",
+        "artCraft",
+        "charm",
+        "climb",
+        "creditRating",
+        "mythos",
+        "disguise",
+        "dodge",
+        "driveAuto",
+        "elecRepair",
+        "fastTalk",
+        "fightingBrawl",
+        "firearmsHandgun",
+        "firstAid",
+        "history",
+        "intimidate",
+        "jump",
+        "languageOther",
+        "languageOwn",
+        "law",
+        "libraryUse",
+        "listen",
+        "locksmith",
+        "mechRepair",
+        "medicine",
+        "naturalWorld",
+        "navigate",
+        "occult",
+        "persuade",
+        "psychology",
+        "sciencePharmacy",
+        "spotHidden",
+        "stealth",
+        "swim",
+        "throw",
+        "track"
+      ]
+    },
+    {
+      "id": "gear",
+      "zone": "powers",
+      "title": "Equipamento",
+      "layout": "groups",
+      "groups": [
+        { "id": "weapons", "title": "Armas", "fields": ["weapons"] },
+        { "id": "equipment", "title": "Itens", "fields": ["equipment"] }
+      ]
+    },
+    {
+      "id": "about",
+      "zone": "lore",
+      "title": "Histórico",
+      "layout": "text",
+      "fields": [
+        "ideology",
+        "significantPeople",
+        "treasuredPossessions",
+        "notes"
+      ]
+    },
+    {
+      "id": "storyteller",
+      "zone": "lore",
+      "title": "Guardião",
+      "layout": "text",
+      "fields": ["storytellerNotes"],
+      "permissions": { "read": ["storyteller"], "write": ["storyteller"] }
+    }
+  ],
+  "zoneLabels": { "powers": "Equipamento", "lore": "Histórico" },
+  "dock": ["hp", "sanity", "luck"],
+  "roll": {
+    "model": "roll-under-percent",
+    "label": "Dados",
+    "slots": [
+      {
+        "id": "skill",
+        "label": "Perícia ou característica",
+        "from": ["characteristics", "skills"]
+      }
+    ],
+    "bonusDice": { "min": -2, "max": 2 },
+    "presets": [
+      {
+        "id": "sanity",
+        "label": "Teste de Sanidade",
+        "slots": { "skill": "sanity" }
+      },
+      { "id": "luck", "label": "Teste de Sorte", "slots": { "skill": "luck" } }
+    ]
+  },
+  "actions": []
+}

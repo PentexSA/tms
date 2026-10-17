@@ -1,0 +1,22 @@
+{
+  "id": "dnd",
+  "name": "Pergaminho de aventura",
+  "usage": "Skin para D&D 5e e outros d20. Serve de teste de aceitação da arquitetura: a ficha de D&D usa o mesmo esqueleto, os mesmos componentes e os mesmos tokens do core que a de Vampiro. Muda só a fonte de títulos, a voz e a forma do pip.",
+  "type": {
+    "display": {
+      "web": "\"Cinzel\", \"Book Antiqua\", Georgia, serif",
+      "native": { "600": "Cinzel_600SemiBold", "700": "Cinzel_700Bold" },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Nome e títulos de seção."
+    },
+    "voice": {
+      "web": "\"Alegreya\", Georgia, serif",
+      "native": { "600italic": "Alegreya_600SemiBold_Italic" },
+      "license": "SIL Open Font License 1.1",
+      "usage": "Traços de personalidade e citação."
+    }
+  },
+  "pip": "diamond",
+  "glyphs": [],
+  "color": {}
+}
