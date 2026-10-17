@@ -16,19 +16,19 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.3.11",
-    "kysely": "0.27.5",
-    "pg": "8.14.0",
+    "@electric-sql/pglite": "^0.3.16",
+    "kysely": "0.28.17",
+    "pg": "8.23.1",
     "@tms/config": "workspace:*",
     "@tms/logger": "workspace:*"
   },
   "devDependencies": {
     "@tms/bun-test-config": "workspace:*",
     "@tms/tsconfig": "workspace:*",
-    "@types/pg": "8.11.10",
-    "bun-types": "^1.2.5",
+    "@types/pg": "8.23.1",
+    "bun-types": "^1.4.2",
     "kysely-codegen": "0.19.0",
-    "tsx": "4.19.2",
+    "tsx": "4.23.15",
     "typescript": "catalog:"
   }
 }

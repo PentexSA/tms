@@ -25,7 +25,7 @@
     "@tms/tsconfig": "workspace:*",
     "@types/jest": "catalog:",
     "@types/react": "catalog:",
-    "@types/react-native-web": "^0.19.2",
+    "@types/react-native-web": "^0.19.3",
     "jest": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",

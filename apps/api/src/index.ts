@@ -12,8 +12,8 @@ import { loggerMiddleware } from './middlewares/loggerMiddleware'
  *
  * @param database - Opcional. Use para injetar um banco mock nos testes
  */
+// biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
 export const createApp = (database?: any) => {
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
   const db = database || defaultDb
   return new Elysia()
     .use(loggerMiddleware)

@@ -192,7 +192,7 @@ npx pnpm codegen                   # Generate types
 - **API Framework**: Elysia v1.2+ with @elysiajs/cors and @elysiajs/swagger
 - **Frontend**: Expo ~54.0 + Expo Router ~6.0 + React 19
 - **Database**: PostgreSQL 16 via Docker
-- **Query Builder**: Kysely v0.27 with kysely-codegen
+- **Query Builder**: Kysely v0.28 with kysely-codegen
 - **TypeScript**: v5.7+ across all packages
 
 ## Troubleshooting
