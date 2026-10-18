@@ -31,12 +31,18 @@ export function Banner({
         : tone === 'warning'
           ? colors.action
           : colors.borderControl
+  const urgent = tone === 'danger' || tone === 'warning'
+  // Sem botão, a faixa é um elemento só (título e mensagem juntos), anunciado
+  // ao aparecer. Com botão, os filhos continuam alcançáveis.
   return (
     <View
       testID={testID}
-      accessibilityRole={
-        tone === 'danger' || tone === 'warning' ? 'alert' : 'summary'
+      accessible={!action}
+      accessibilityLabel={
+        action ? undefined : [title, message].filter(Boolean).join('. ')
       }
+      accessibilityRole={urgent ? 'alert' : 'summary'}
+      accessibilityLiveRegion={urgent ? 'assertive' : 'polite'}
       style={[
         styles.banner,
         { borderLeftColor: edge, backgroundColor: colors.surface },

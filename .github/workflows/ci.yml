@@ -102,3 +102,49 @@ jobs:
       # O template da v0 publica num Postgres real (schema.json + contrato)
       - run: pnpm -C packages/sheet-core build
       - run: pnpm templates:publish design/templates/vtm-v20.json
+
+  e2e:
+    name: E2E web (Playwright, Chromium e WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Banco descartável do job; o global-setup recria o schema a cada rodada
+      E2E_DATABASE_URL: postgres://postgres:postgres@localhost:5432/tms_e2e
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm -C e2e exec playwright install --with-deps chromium webkit
+      # Exporta o app web com a URL da API do E2E e confere o bundle
+      - run: pnpm -C e2e build:web
+      - run: pnpm -C e2e test:e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

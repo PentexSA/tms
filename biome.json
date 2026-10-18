@@ -152,7 +152,7 @@
       }
     },
     {
-      "includes": ["**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "includes": ["**/*.{test,spec}.{js,jsx,ts,tsx}", "**/test/**/*.{ts,tsx}"],
       "javascript": {
         "globals": [
           "describe",

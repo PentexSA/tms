@@ -84,7 +84,6 @@ export function RatingDots(props: RatingDotsProps) {
               />
             )
           return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: posição fixa do pip
             <G key={i} testID={`pip-${kind}`}>
               {body}
               {/* bônus: anel duplo; perdido: traço diagonal (nunca só cor) */}

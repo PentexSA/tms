@@ -41,9 +41,11 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
-    AccessibilityInfo.isScreenReaderEnabled().then(on => {
-      if (alive) reader.current = on
-    })
+    Promise.resolve(AccessibilityInfo.isScreenReaderEnabled())
+      .then(on => {
+        if (alive) reader.current = Boolean(on)
+      })
+      .catch(() => undefined)
     return () => {
       alive = false
       clearTimeout(timer.current)

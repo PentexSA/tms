@@ -25,7 +25,6 @@ export function Skeleton({
     >
       {Array.from({ length: lines }, (_, i) => (
         <View
-          // biome-ignore lint/suspicious/noArrayIndexKey: linhas fixas
           key={i}
           style={[
             styles.line,

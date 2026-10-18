@@ -32,7 +32,6 @@ export function BoxTrack({ boxes, testID }: BoxTrackProps) {
         const tone = box.tone ?? (box.glyph ? 'filled' : 'empty')
         return (
           <View
-            // biome-ignore lint/suspicious/noArrayIndexKey: posição fixa da caixa
             key={i}
             testID={`box-${tone}`}
             style={[

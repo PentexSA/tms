@@ -1,0 +1,67 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render } from '@testing-library/react-native'
+import { ToastProvider } from '@tms/ui'
+import type { ReactElement } from 'react'
+import { SessionProvider } from '../lib/session/SessionProvider'
+import { Session } from '../lib/session/session'
+import type { TokenStore } from '../lib/session/tokenStore'
+
+export const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+
+export const tokens = (n = 1) => ({
+  accessToken: `access-${n}`,
+  refreshToken: `refresh-${n}`,
+  expiresIn: 900,
+  user: { id: '00000000-0000-4000-8000-000000000001', username: 'ana' },
+})
+
+export function memoryStore(native = true, initial: string | null = null) {
+  let value = initial
+  const store: TokenStore & { value(): string | null } = {
+    refreshInBody: native,
+    read: jest.fn(async () => (native ? value : null)),
+    write: jest.fn(async (t: string) => {
+      value = t
+    }),
+    clear: jest.fn(async () => {
+      value = null
+    }),
+    value: () => value,
+  }
+  return store
+}
+
+export function testSession(
+  responses: (url: string, init: RequestInit) => Response | Promise<Response>,
+  store = memoryStore()
+) {
+  const fetch = jest.fn(async (url: string, init: RequestInit) =>
+    responses(url, init)
+  )
+  const session = new Session({ apiUrl: 'http://api.test', store, fetch })
+  return { session, fetch, store }
+}
+
+/** Renderiza com QueryClient, sessão e toast de teste. */
+export function renderWithSession(ui: ReactElement, session: Session) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: Number.POSITIVE_INFINITY },
+      mutations: { retry: false },
+    },
+  })
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider session={session}>
+          <ToastProvider>{ui}</ToastProvider>
+        </SessionProvider>
+      </QueryClientProvider>
+    ),
+  }
+}
