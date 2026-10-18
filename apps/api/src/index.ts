@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely'
 import { authGuard } from './auth/guard'
 import { authRoutes, meRoutes } from './auth/routes'
 import { chronicleRoutes } from './chronicles/routes'
+import { tableRoutes } from './chronicles/table'
 import { onError } from './http/on-error'
 import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
@@ -58,6 +59,7 @@ export const createApp = (
       .use(chronicleRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
+      .use(tableRoutes(db, guard))
   )
 }
 

@@ -7,6 +7,7 @@ import {
   Screen,
   SectionHeader,
   Skeleton,
+  Tabs,
   Text,
   tokens,
 } from '@tms/ui'
@@ -16,6 +17,7 @@ import { ScrollView, StyleSheet, View } from 'react-native'
 
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
+import { TableView } from '../../../../components/chronicles/TableView'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { useChronicle } from '../../../../lib/queries/chronicles'
 
@@ -24,6 +26,7 @@ export default function ChronicleScreen() {
   const router = useRouter()
   const chronicle = useChronicle(id)
   const [inviting, setInviting] = useState(false)
+  const [view, setView] = useState<'sheets' | 'table'>('sheets')
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
   if (chronicle.isPending)
@@ -59,6 +62,8 @@ export default function ChronicleScreen() {
 
   const c = chronicle.data
   const narrating = c.role === 'storyteller'
+  // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
+  const showing = narrating ? view : 'sheets'
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
@@ -74,40 +79,26 @@ export default function ChronicleScreen() {
           </Text>
         </View>
 
-        <CharacterList chronicleId={c.id} systemCode={c.system.code} />
+        {narrating ? (
+          <Tabs
+            accessibilityLabel="Visão da crônica"
+            items={[
+              { id: 'sheets', label: 'Fichas' },
+              { id: 'table', label: 'Mesa' },
+            ]}
+            selected={showing}
+            onSelect={id => setView(id as typeof view)}
+          />
+        ) : null}
 
-        <SectionHeader
-          title="Mesa"
-          right={
-            narrating ? (
-              <Button
-                title="Convidar"
-                variant="secondary"
-                onPress={() => setInviting(true)}
-              />
-            ) : undefined
-          }
-        />
-        <ListItem
-          title={c.storyteller.username}
-          subtitle="Narrador"
-          leading={<Avatar name={c.storyteller.username} />}
-        />
-        {c.members.length === 0 ? (
-          <Text color="inkMuted" style={styles.empty}>
-            {narrating
-              ? 'Ninguém entrou ainda. Convide os jogadores com um código.'
-              : 'Você é o primeiro jogador.'}
-          </Text>
+        {showing === 'table' ? (
+          <TableView chronicleId={c.id} />
         ) : (
-          c.members.map(m => (
-            <ListItem
-              key={m.id}
-              title={m.username}
-              subtitle="Jogador"
-              leading={<Avatar name={m.username} />}
-            />
-          ))
+          <SheetsPanel
+            chronicle={c}
+            narrating={narrating}
+            onInvite={() => setInviting(true)}
+          />
         )}
       </ScrollView>
       {narrating ? (
@@ -119,6 +110,63 @@ export default function ChronicleScreen() {
         />
       ) : null}
     </Screen>
+  )
+}
+
+interface ChronicleData {
+  readonly id: string
+  readonly system: { readonly code: string }
+  readonly storyteller: { readonly username: string }
+  readonly members: readonly {
+    readonly id: string
+    readonly username: string
+  }[]
+}
+
+// Fichas da crônica e quem participa (com o convite, para o narrador)
+function SheetsPanel({
+  chronicle: c,
+  narrating,
+  onInvite,
+}: {
+  readonly chronicle: ChronicleData
+  readonly narrating: boolean
+  readonly onInvite: () => void
+}) {
+  return (
+    <>
+      <CharacterList chronicleId={c.id} systemCode={c.system.code} />
+
+      <SectionHeader
+        title="Participantes"
+        right={
+          narrating ? (
+            <Button title="Convidar" variant="secondary" onPress={onInvite} />
+          ) : undefined
+        }
+      />
+      <ListItem
+        title={c.storyteller.username}
+        subtitle="Narrador"
+        leading={<Avatar name={c.storyteller.username} />}
+      />
+      {c.members.length === 0 ? (
+        <Text color="inkMuted" style={styles.empty}>
+          {narrating
+            ? 'Ninguém entrou ainda. Convide os jogadores com um código.'
+            : 'Você é o primeiro jogador.'}
+        </Text>
+      ) : (
+        c.members.map(m => (
+          <ListItem
+            key={m.id}
+            title={m.username}
+            subtitle="Jogador"
+            leading={<Avatar name={m.username} />}
+          />
+        ))
+      )}
+    </>
   )
 }
 

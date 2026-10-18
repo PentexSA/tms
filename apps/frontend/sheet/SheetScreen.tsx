@@ -1,14 +1,19 @@
+import { useQueryClient } from '@tanstack/react-query'
 import type { RoleName, SheetMode } from '@tms/sheet-core'
 import { AppBar, Button, EmptyState, Screen, Skeleton } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 
 import { messageOf, statusOf } from '../lib/errors'
-import { type SheetState, useSheetData } from './data'
+import { useRefetchOnFocus } from '../lib/queries/focus'
+import { SheetProvider } from './context'
+import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
+import { HistorySheet } from './history/HistorySheet'
 import { SheetView } from './SheetView'
 import { createSheetStore } from './store/sheetStore'
+import { StorytellerBar } from './storyteller/StorytellerBar'
 import { useSync } from './sync/SyncProvider'
 
 export function SheetScreen({
@@ -20,7 +25,16 @@ export function SheetScreen({
   readonly initialMode?: SheetMode
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const state = useSheetData(id)
+  const [history, setHistory] = useState(false)
+  // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
+  useRefetchOnFocus(() =>
+    queryClient.invalidateQueries(
+      { queryKey: sheetKeys.character(id) },
+      { cancelRefetch: false }
+    )
+  )
   const chronicle = state.status === 'ready' ? state.character.chronicle : null
   const back = chronicle
     ? {
@@ -79,8 +93,28 @@ export function SheetScreen({
 
   return (
     <Screen>
-      <AppBar title={title} back={back} />
+      <AppBar
+        title={title}
+        back={back}
+        actions={
+          state.status === 'ready' ? (
+            <Button
+              title="Histórico"
+              variant="ghost"
+              accessibilityHint="Abre o histórico de alterações da ficha"
+              onPress={() => setHistory(true)}
+            />
+          ) : undefined
+        }
+      />
       {body}
+      {state.status === 'ready' ? (
+        <HistorySheet
+          characterId={id}
+          visible={history}
+          onClose={() => setHistory(false)}
+        />
+      ) : null}
     </Screen>
   )
 }
@@ -131,6 +165,9 @@ function LiveSheet({
   }, [store, sheet, sheetVersion])
   return (
     <>
+      <SheetProvider store={store}>
+        <StorytellerBar ownerName={state.character.owner.username} />
+      </SheetProvider>
       <SheetView store={store} editable />
       <LeaveGuard store={store} />
     </>

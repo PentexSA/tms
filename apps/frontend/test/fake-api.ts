@@ -13,6 +13,7 @@ export function createFakeApi() {
     get: jest.fn(),
     charactersGet: jest.fn(),
     charactersPost: jest.fn(),
+    tableGet: jest.fn(),
     invitesGet: jest.fn(),
     invitesPost: jest.fn(),
     invitesDelete: jest.fn(),
@@ -52,6 +53,7 @@ export function createFakeApi() {
             get: (...a: unknown[]) => chronicle.charactersGet(...a),
             post: (...a: unknown[]) => chronicle.charactersPost(...a),
           },
+          table: { get: (...a: unknown[]) => chronicle.tableGet(...a) },
           invites: Object.assign(
             ({ inviteId }: { inviteId: string }) => ({
               delete: () => chronicle.invitesDelete(inviteId),

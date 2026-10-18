@@ -52,6 +52,12 @@ export const MATRIX: readonly MatrixRow[] = [
     expect: { storyteller: 200, owner: 200, player: 200, ...denied },
   },
   {
+    // A Mesa é do narrador; para jogador a rota não existe (fail secure)
+    method: 'GET',
+    route: '/chronicles/:id/table',
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
     method: 'POST',
     route: '/chronicles/:id/characters',
     body: { values: { name: 'Nova' } },

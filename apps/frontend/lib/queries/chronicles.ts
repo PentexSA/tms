@@ -11,6 +11,7 @@ export const chronicleKeys = {
   one: (id: string) => ['chronicles', id] as const,
   invites: (id: string) => ['chronicles', id, 'invites'] as const,
   characters: (id: string) => ['chronicles', id, 'characters'] as const,
+  table: (id: string) => ['chronicles', id, 'table'] as const,
 }
 
 export const useSystems = () =>
@@ -110,3 +111,17 @@ export const useCreateCharacter = (id: string) => {
       ]),
   })
 }
+
+/**
+ * A Mesa do narrador (Etapa 19): todas as fichas da crônica numa requisição.
+ * A API responde 404 para quem não narra; a tela nem pede.
+ */
+export const useChronicleTable = (id: string, enabled: boolean) =>
+  useQuery({
+    queryKey: chronicleKeys.table(id),
+    enabled,
+    // Sem tempo real: toda volta à Mesa rebusca
+    staleTime: 0,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.chronicles({ id }).table.get({ fetch: { signal } })),
+  })
