@@ -26,13 +26,15 @@ test('excluir a conta: senha errada não exclui; com a senha, não entra mais', 
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Conta', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Conta' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Conta', exact: true })
+  ).toBeVisible()
 
-  await page.getByLabel('Senha').fill('senha errada qualquer')
+  await page.getByLabel('Senha', { exact: true }).fill('senha errada qualquer')
   await page.getByRole('button', { name: 'Excluir conta' }).click()
   await expect(page.getByText('Senha incorreta.')).toBeVisible()
 
-  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByLabel('Senha', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Excluir conta' }).click()
   await expect(page).toHaveURL(/\/login\?deleted=1$/)
   await expect(page.getByText('Conta excluída')).toBeVisible()
@@ -49,7 +51,7 @@ test('excluir a conta: senha errada não exclui; com a senha, não entra mais', 
   expect(login.status()).toBe(401)
 
   await page.getByLabel('E-mail').fill(`${user.username}@example.test`)
-  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByLabel('Senha', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('alert')).toContainText('e-mail ou senha')
 })
