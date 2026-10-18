@@ -7,6 +7,7 @@ import {
   type ResolvedResource,
   type ResourceValue,
   resourceRules,
+  short,
   stored,
 } from '@tms/sheet-core'
 import { Button, Stepper, Text, tokens } from '@tms/ui'
@@ -74,6 +75,7 @@ export function ResourceSheet({ resolved, sheet }: FieldViewProps) {
       <View
         accessible
         accessibilityLabel={describe(r, sheet)}
+        accessibilityValue={{ text: short(r, sheet) }}
         style={styles.value}
       >
         <Text variant="numberLg">{String(r.current)}</Text>

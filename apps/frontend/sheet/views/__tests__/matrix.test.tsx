@@ -113,8 +113,26 @@ describe.each(entries)('%s · %s · %s', (skin, type, variant) => {
       </ThemeProvider>
     )
     const root = screen.root
-    const visible = texts(root)
+    // O sheet aparece dentro do BottomSheet, que mostra o rótulo do campo no
+    // título; o chip fica dentro do alvo do dock (ou da linha da Mesa), que
+    // leva o rótulo e o valor. Fora desses hosts, o teste reproduz isso.
+    const visible =
+      variant === 'sheet'
+        ? [...texts(root), entry.resolved.field.def.label]
+        : texts(root)
     const targets = labelled(root)
+    if (variant === 'chip') {
+      for (const t of targets) {
+        const label = String(
+          t.props.accessibilityLabel ?? t.props['aria-label']
+        )
+        expect({ label, ok: visible.some(v => label.startsWith(v)) }).toEqual({
+          label,
+          ok: true,
+        })
+      }
+      return
+    }
     expect(targets.length).toBeGreaterThan(0)
     for (const t of targets) {
       const label = String(t.props.accessibilityLabel ?? t.props['aria-label'])

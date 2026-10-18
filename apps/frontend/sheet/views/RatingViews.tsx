@@ -1,6 +1,7 @@
 import { describe, type ResolvedRating, short } from '@tms/sheet-core'
 import { type PipSegment, RatingDots, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { FieldTarget } from './FieldTarget'
 import type { FieldViewProps } from './types'
 
 // rating (DS: FieldRow e Cell). Os pips são só visual: o número está ao lado
@@ -25,10 +26,10 @@ export function RatingRow({ resolved, sheet }: FieldViewProps) {
   if (resolved.type !== 'rating') return null
   const specialty = sheet.specialty(resolved.id)
   return (
-    <View
-      accessible
-      accessibilityLabel={describe(resolved, sheet)}
-      accessibilityValue={{ text: short(resolved, sheet) }}
+    <FieldTarget
+      id={resolved.id}
+      label={describe(resolved, sheet)}
+      value={short(resolved, sheet)}
       style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
     >
       <View style={styles.text}>
@@ -48,7 +49,7 @@ export function RatingRow({ resolved, sheet }: FieldViewProps) {
       <Text variant="number" style={styles.num}>
         {short(resolved, sheet)}
       </Text>
-    </View>
+    </FieldTarget>
   )
 }
 
@@ -62,10 +63,10 @@ export function RatingCell({
   if (resolved.type !== 'rating') return null
   const specialty = sheet.specialty(resolved.id)
   return (
-    <View
-      accessible
-      accessibilityLabel={describe(resolved, sheet)}
-      accessibilityValue={{ text: short(resolved, sheet) }}
+    <FieldTarget
+      id={resolved.id}
+      label={describe(resolved, sheet)}
+      value={short(resolved, sheet)}
       style={[styles.cell, { borderColor: colors.borderSubtle }]}
     >
       <Text variant="fieldLabel" numberOfLines={1}>
@@ -85,7 +86,7 @@ export function RatingCell({
           {specialty}
         </Text>
       ) : null}
-    </View>
+    </FieldTarget>
   )
 }
 

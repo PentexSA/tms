@@ -36,7 +36,12 @@ export function TrackRow({ resolved, sheet }: FieldViewProps) {
   const style = [styles.row, { borderBottomColor: colors.borderSubtle }]
   if (!open)
     return (
-      <View accessible accessibilityLabel={describe(r, sheet)} style={style}>
+      <View
+        accessible
+        accessibilityLabel={describe(r, sheet)}
+        accessibilityValue={{ text: short(r, sheet) }}
+        style={style}
+      >
         {content}
       </View>
     )
@@ -44,6 +49,7 @@ export function TrackRow({ resolved, sheet }: FieldViewProps) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={describe(r, sheet)}
+      accessibilityValue={{ text: short(r, sheet) }}
       accessibilityHint="Abre a trilha"
       onPress={open}
       style={style}

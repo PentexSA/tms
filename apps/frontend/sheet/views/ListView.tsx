@@ -7,6 +7,7 @@ import {
 import { RatingDots, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { noneOf } from '../evolve/text'
+import { FieldTarget } from './FieldTarget'
 import type { FieldViewProps } from './types'
 
 // list (DS: Repeater). Uma linha por item, com pips quando o item tem valor e
@@ -38,17 +39,17 @@ export function ListHeader({
   sheet,
 }: FieldViewProps & { readonly resolved: ResolvedList }) {
   return (
-    <View
-      accessible
-      accessibilityLabel={describe(resolved, sheet)}
-      accessibilityValue={{ text: short(resolved, sheet) }}
+    <FieldTarget
+      id={resolved.id}
+      label={describe(resolved, sheet)}
+      value={short(resolved, sheet)}
       style={styles.header}
     >
       <Text variant="fieldLabel">{resolved.field.def.label}</Text>
       <Text variant="caption" color="inkMuted">
         {short(resolved, sheet)}
       </Text>
-    </View>
+    </FieldTarget>
   )
 }
 
@@ -99,17 +100,17 @@ export function ListRow({ resolved, sheet }: FieldViewProps) {
   const border = { borderBottomColor: colors.borderSubtle }
   if (!resolved.items.length)
     return (
-      <View
-        accessible
-        accessibilityLabel={describe(resolved, sheet)}
-        accessibilityValue={{ text: short(resolved, sheet) }}
+      <FieldTarget
+        id={resolved.id}
+        label={describe(resolved, sheet)}
+        value={short(resolved, sheet)}
         style={[styles.row, border]}
       >
         <Text variant="fieldLabel" style={styles.flex}>
           {def.label}
         </Text>
         <Text color="inkMuted">{noneOf(def.itemLabel)}</Text>
-      </View>
+      </FieldTarget>
     )
   if (def.density === 'compact')
     return (

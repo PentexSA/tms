@@ -7,6 +7,7 @@ import {
   type ResolvedBoxes,
   type ResolvedStacking,
   type ResolvedTrack,
+  short,
   stored,
 } from '@tms/sheet-core'
 import {
@@ -70,6 +71,7 @@ function StackingSheet({
       <View
         accessible
         accessibilityLabel={describe(r, sheet)}
+        accessibilityValue={{ text: short(r, sheet) }}
         style={styles.head}
       >
         <Text variant="numberLg">
@@ -148,7 +150,11 @@ function BoxesSheet({
   }
   return (
     <View style={styles.box}>
-      <View accessible accessibilityLabel={describe(r, sheet)}>
+      <View
+        accessible
+        accessibilityLabel={describe(r, sheet)}
+        accessibilityValue={{ text: short(r, sheet) }}
+      >
         <Text variant="numberLg">{`${r.marked}/${r.total}`}</Text>
       </View>
       {r.rows.map(row => (
