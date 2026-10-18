@@ -1,3 +1,4 @@
+import type { FieldDefOf, Roll, Section, Template } from '../contract'
 import { type FieldTypeName, REGISTRY } from '../registry'
 import type { Issue } from './issues'
 import { isSafeText } from './safe-text'
@@ -107,7 +108,7 @@ const KEYS = {
       'fixed',
       'rollAs',
     ],
-  } satisfies Record<FieldTypeName, readonly string[]>,
+  } as const satisfies Record<FieldTypeName, readonly string[]>,
   section: [
     'id',
     'zone',
@@ -142,6 +143,42 @@ const KEYS = {
     'ladder',
   ],
 } as const
+
+// Paridade com os tipos do contrato, checada pelo compilador nos dois sentidos:
+// toda chave de um tipo está na allowlist, e a allowlist só cita chaves que o
+// tipo tem. `fieldCommon` é mais larga que o schema de propósito (o schema
+// restringe por tipo), então só conta no primeiro sentido. Se uma linha abaixo
+// não compilar, o tipo indica a chave que divergiu.
+type CommonKey = (typeof KEYS.fieldCommon)[number]
+type TypeKey<T extends FieldTypeName> = (typeof KEYS.field)[T][number]
+type MissingFieldKey = {
+  [T in FieldTypeName]: Exclude<keyof FieldDefOf<T>, CommonKey | TypeKey<T>>
+}[FieldTypeName]
+type ExtraFieldKey = {
+  [T in FieldTypeName]: Exclude<TypeKey<T>, keyof FieldDefOf<T>>
+}[FieldTypeName]
+type AllKeys<U> = U extends unknown ? keyof U : never
+type Mismatch<Allowed, Typed> =
+  | Exclude<Allowed, Typed>
+  | Exclude<Typed, Allowed>
+type Parity<K> = [K] extends [never] ? true : K
+const _missingFieldKeys: Parity<MissingFieldKey> = true
+const _extraFieldKeys: Parity<ExtraFieldKey> = true
+const _templateKeys: Parity<
+  Mismatch<(typeof KEYS.template)[number], keyof Template>
+> = true
+const _sectionKeys: Parity<
+  Mismatch<(typeof KEYS.section)[number], keyof Section>
+> = true
+const _rollKeys: Parity<Mismatch<(typeof KEYS.roll)[number], AllKeys<Roll>>> =
+  true
+void [
+  _missingFieldKeys,
+  _extraFieldKeys,
+  _templateKeys,
+  _sectionKeys,
+  _rollKeys,
+]
 
 const FORBIDDEN_KEYS: readonly string[] = [
   '__proto__',

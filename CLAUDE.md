@@ -14,7 +14,7 @@ Domain model (see `doc/database.dbml`):
 - `characters`: a user's character in a chronicle; sheet values stored in `sheet_data` (jsonb)
 - `trait_templates`: per-system sheet structure in `template_data` (jsonb)
 
-Keep the data model system-agnostic: sheet structure comes from `trait_templates`, not hardcoded WoD columns. Adding a new system should not require a migration. The `todos` table and routes are leftover template boilerplate.
+Keep the data model system-agnostic: sheet structure comes from `trait_templates`, not hardcoded WoD columns. Adding a new system should not require a migration.
 
 ## Architecture Overview
 
@@ -47,7 +47,7 @@ packages/
 
 **Environment Variables**: Centralized in `@tms/config` package (`packages/config/src/env.ts`). Provides defaults for DATABASE_URL, API_PORT, and EXPO_PUBLIC_API_URL.
 
-**API Routes**: Defined in `apps/api/src/index.ts` using Elysia with Swagger docs at `/swagger`.
+**API Routes**: Defined in `apps/api/src/index.ts` (`createApp`, no `.listen`) using Elysia with Swagger docs at `/swagger`. `apps/api/src/server.ts` is the server entry point.
 
 **Frontend Navigation**: Uses Expo Router (file-based routing) in `apps/frontend/app/`.
 
@@ -117,17 +117,38 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 
 #### Key Features
 
-- **@tms/config**: 15 tests in 57ms (Bun)
-- **@tms/db**: 16 tests in 3.7s with PGLite in-memory database (Bun)
-- **@tms/api**: 20 tests in 752ms (Bun)
-- **@tms/ui**: 20 tests in 1.9s (Jest - React Native components)
+- **@tms/sheet-core**: ~480 tests (Bun), incluindo property tests (fast-check)
+- **@tms/api**: ~295 tests (Bun) em PGLite, com a matriz de AuthZ de todas as rotas
+- **@tms/db**: ~19 tests (Bun): migrations sobem e descem
+- **@tms/ui**: ~71 tests (Jest)
+- **frontend**: ~470 tests (Jest + React Native Testing Library)
+- Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
-**Performance**: ~6.4 seconds total (vs ~20-25s with previous Jest setup)
+#### E2E (Playwright, Chromium e WebKit)
+
+Roda contra o export web servido com a CSP de produção (`dist/_headers`) e uma API real num Postgres descartável:
+
+```bash
+npx pnpm build && npx pnpm -C e2e build:web
+E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C e2e test:e2e
+```
+
+`journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
+
+#### Concorrência em Postgres real
+
+O PGLite tem uma conexão só; o `FOR UPDATE` só se prova num Postgres de verdade (job `postgres` do CI). O banco precisa terminar em `_test` (o teste apaga o schema):
+
+```bash
+cd apps/api
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_events_test bun test src/__tests__/events.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_rolls_test bun test src/rolls/__tests__/rolls.pg.test.ts
+```
 
 #### Test Infrastructure
 
 - **Bun Test Runner**: Backend packages use native Bun for ~70% faster execution
-- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker)
+- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry)
 - **Jest**: Frontend packages use Jest for React Native/Expo compatibility
 - **@tms/bun-test-config**: Shared Bun test utilities and helpers
 

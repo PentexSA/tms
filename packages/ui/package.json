@@ -5,8 +5,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",
@@ -15,8 +15,10 @@
     "test:coverage": "jest --coverage"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-native": "^0.76.0"
+    "react": "^19.1.0",
+    "react-native": "^0.81.0",
+    "react-native-safe-area-context": "^5.6.0",
+    "react-native-svg": "^15.12.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "catalog:",
@@ -27,8 +29,11 @@
     "@types/react": "catalog:",
     "@types/react-native-web": "^0.19.3",
     "jest": "catalog:",
+    "jest-expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
+    "react-native-safe-area-context": "5.6.2",
+    "react-native-svg": "15.12.1",
     "react-test-renderer": "catalog:",
     "ts-jest": "catalog:",
     "typescript": "catalog:"

@@ -1,0 +1,16 @@
+import { Kysely, sql } from 'kysely'
+
+// A tabela de todos era boilerplate do template do monorepo.
+export async function up(db: Kysely<unknown>): Promise<void> {
+  await db.schema.dropTable('todos').execute()
+}
+
+export async function down(db: Kysely<unknown>): Promise<void> {
+  await db.schema
+    .createTable('todos')
+    .addColumn('id', 'serial', col => col.primaryKey())
+    .addColumn('title', 'text', col => col.notNull())
+    .addColumn('done', 'boolean', col => col.notNull().defaultTo(false))
+    .addColumn('created_at', 'timestamptz', col => col.defaultTo(sql`now()`))
+    .execute()
+}

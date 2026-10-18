@@ -1,7 +1,10 @@
 {
   "extends": "../../packages/tsconfig/base.json",
   "compilerOptions": {
-    "types": ["expo-router", "jest"]
+    "types": ["expo-router", "jest"],
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", "nativewind-env.d.ts"]
 }

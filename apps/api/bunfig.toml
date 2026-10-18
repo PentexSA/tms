@@ -1,0 +1,7 @@
+[test]
+# Só src/: o build em dist/ nunca entra nos testes
+root = "./src"
+# Meta mínima aplicada no CI (bun test --coverage); doc/plano-v0.md §4
+coverageThreshold = { lines = 0.85, functions = 0.85 }
+# Só o código da API conta; os pacotes têm as próprias metas
+coveragePathIgnorePatterns = ["../../packages/**", "src/test/**"]

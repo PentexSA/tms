@@ -1,97 +1,57 @@
 import { config } from '@tms/config/env'
-import { promises as fs } from 'fs'
-import {
-  FileMigrationProvider,
-  Kysely,
-  Migrator,
-  PostgresDialect,
-} from 'kysely'
-import * as path from 'path'
+import { Kysely, Migrator, NO_MIGRATIONS, PostgresDialect } from 'kysely'
 import { Pool } from 'pg'
 import { kyselyLogger, logger } from './logger'
+import { migrationProvider } from './migrations'
 
-async function migrateToLatest() {
+type Step = (migrator: Migrator) => ReturnType<Migrator['migrateToLatest']>
+
+const STEPS: Record<string, Step[]> = {
+  up: [m => m.migrateToLatest()],
+  down: [m => m.migrateDown()],
+  // CI: prova que todo `down` desfaz o `up` correspondente num Postgres real
+  check: [
+    m => m.migrateToLatest(),
+    m => m.migrateTo(NO_MIGRATIONS),
+    m => m.migrateToLatest(),
+  ],
+}
+
+async function run(steps: Step[]) {
   const db = new Kysely({
     dialect: new PostgresDialect({
-      pool: new Pool({
-        connectionString: config.DATABASE_URL,
-      }),
+      pool: new Pool({ connectionString: config.DATABASE_URL }),
     }),
     log: kyselyLogger,
   })
+  const migrator = new Migrator({ db, provider: migrationProvider })
 
-  const migrator = new Migrator({
-    db,
-    provider: new FileMigrationProvider({
-      fs,
-      path,
-      migrationFolder: path.join(__dirname, 'migrations'),
-    }),
-  })
-
-  const { error, results } = await migrator.migrateToLatest()
-
-  results?.forEach(it => {
-    if (it.status === 'Success') {
-      logger.info(`migration "${it.migrationName}" was executed successfully`)
-    } else if (it.status === 'Error') {
-      logger.error(`failed to execute migration "${it.migrationName}"`)
+  try {
+    for (const step of steps) {
+      const { error, results } = await step(migrator)
+      for (const it of results ?? []) {
+        if (it.status === 'Success')
+          logger.info(`migration "${it.migrationName}" ${it.direction}: ok`)
+        else if (it.status === 'Error')
+          logger.error(
+            `migration "${it.migrationName}" ${it.direction}: falhou`
+          )
+      }
+      if (error) {
+        logger.error(error, 'falha nas migrations')
+        process.exitCode = 1
+        return
+      }
     }
-  })
-
-  if (error) {
-    logger.error(error, 'failed to migrate')
-    process.exit(1)
+  } finally {
+    await db.destroy()
   }
-
-  await db.destroy()
 }
 
-async function migrateDown() {
-  const db = new Kysely({
-    dialect: new PostgresDialect({
-      pool: new Pool({
-        connectionString: config.DATABASE_URL,
-      }),
-    }),
-  })
-
-  const migrator = new Migrator({
-    db,
-    provider: new FileMigrationProvider({
-      fs,
-      path,
-      migrationFolder: path.join(__dirname, 'migrations'),
-    }),
-  })
-
-  const { error, results } = await migrator.migrateDown()
-
-  results?.forEach(it => {
-    if (it.status === 'Success') {
-      logger.info(
-        `migration "${it.migrationName}" was rolled back successfully`
-      )
-    } else if (it.status === 'Error') {
-      logger.error(`failed to roll back migration "${it.migrationName}"`)
-    }
-  })
-
-  if (error) {
-    logger.error(error, 'failed to migrate down')
-    process.exit(1)
-  }
-
-  await db.destroy()
-}
-
-const command = process.argv[2]
-
-if (command === 'up') {
-  migrateToLatest()
-} else if (command === 'down') {
-  migrateDown()
+const steps = STEPS[process.argv[2] ?? '']
+if (steps) {
+  run(steps)
 } else {
-  logger.info('Usage: tsx src/migrate.ts [up|down]')
-  process.exit(1)
+  logger.info('Uso: tsx src/migrate.ts [up|down|check]')
+  process.exitCode = 1
 }

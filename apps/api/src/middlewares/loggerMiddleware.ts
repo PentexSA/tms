@@ -1,28 +1,41 @@
 import Elysia from 'elysia'
-import { serializeError } from 'serialize-error'
 import { logger } from '../logger'
 
+// Log de acesso sem conteúdo: nunca headers (Authorization, cookies), corpo da
+// requisição (senhas) nem corpo da resposta (tokens, fichas). A mensagem do erro
+// também fica de fora, porque o erro de validação repete o valor recebido.
 export const loggerMiddleware = new Elysia({ name: 'logger' })
-  .derive({ as: 'global' }, () => ({ startTime: performance.now() }))
+  .derive({ as: 'global' }, () => ({
+    startTime: performance.now(),
+    requestId: crypto.randomUUID(),
+  }))
+  .onAfterHandle({ as: 'global' }, ({ set, requestId }) => {
+    set.headers['x-request-id'] = requestId
+  })
   .onAfterResponse({ as: 'global' }, ctx => {
     // Elysia preenche `error` no contexto quando a requisição falha, mas não o declara no tipo
-    const { request, body, path, set, startTime, headers, response, error } =
+    const { request, path, set, startTime, requestId, error } =
       ctx as typeof ctx & { error?: unknown }
-    const responseTime = performance.now() - startTime
 
-    const logData = {
-      req: {
-        headers: headers,
-        body: body,
+    logger.info(
+      {
+        requestId,
+        method: request.method,
+        path,
+        status: set.status,
+        responseTime: Math.round(performance.now() - startTime),
+        ...(error ? { error: errorKind(error) } : {}),
       },
-      res: {
-        headers: set.headers,
-        body: response,
-        statusCode: set.status,
-      },
-      ...(error ? { error: serializeError(error, { maxDepth: 1 }) } : {}),
-      responseTime,
-    }
-
-    logger.info(logData, `${request.method} ${path} - ${set.status}`)
+      `${request.method} ${path} - ${set.status}`
+    )
   })
+
+export function errorKind(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number')
+      return String(code)
+    return error.constructor?.name ?? 'Error'
+  }
+  return typeof error
+}

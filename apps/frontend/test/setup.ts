@@ -4,74 +4,67 @@
  * Configurações específicas do Expo e React Native
  */
 
-import { AppState } from 'react-native'
+import { AccessibilityInfo, AppState } from 'react-native'
 
-// Mock do Expo Router para testes
+// Mock do Expo Router para testes. Redirect é um jest.fn: o teste confere o
+// href com toHaveBeenCalledWith (createElement aqui esbarra no babel do NativeWind)
 jest.mock('expo-router', () => ({
   Stack: 'Stack',
-  useRouter: jest.fn(),
-  useLocalSearchParams: jest.fn(),
+  Slot: 'Slot',
+  Redirect: jest.fn(() => null),
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+  })),
+  useLocalSearchParams: jest.fn(() => ({})),
+  // beforeRemove do LeaveGuard (Evoluir): o teste define o retorno
+  useNavigation: jest.fn(() => undefined),
+  useFocusEffect: jest.fn(),
   Link: 'Link',
 }))
+
+// Safe area sem módulo nativo
+jest.mock(
+  'react-native-safe-area-context',
+  () => require('react-native-safe-area-context/jest/mock').default
+)
+
+// NetInfo sem módulo nativo (o mock oficial do pacote)
+jest.mock('@react-native-community/netinfo', () =>
+  require('@react-native-community/netinfo/jest/netinfo-mock.js')
+)
+
+// expo-sqlite em memória, com SQLCipher simulado (o SQLite nativo não existe
+// no Jest)
+jest.mock('expo-sqlite', () => require('./__mocks__/expoSqlite'))
 
 // Mock do Expo Status Bar
 jest.mock('expo-status-bar', () => ({
   StatusBar: 'StatusBar',
 }))
 
-// Mock da config
-jest.mock('@tms/config/env', () => ({
-  config: {
-    EXPO_PUBLIC_API_URL: 'http://localhost:3001',
-  },
-}))
-
-// Mock completo do módulo @elysiajs/eden com implementação funcional
+// Eden sem rede: cada teste mocka as rotas que usa (ver app/__tests__)
 jest.mock('@elysiajs/eden', () => ({
-  treaty: jest.fn(() => ({
-    todos: {
-      get: jest.fn().mockResolvedValue({
-        data: [
-          {
-            id: 1,
-            title: 'Test Todo',
-            done: false,
-            created_at: new Date().toISOString(),
-          },
-        ],
-      }),
-      post: jest.fn().mockResolvedValue({
-        data: {
-          id: 2,
-          title: 'New Todo',
-          done: false,
-          created_at: new Date().toISOString(),
-        },
-      }),
-    },
-  })),
+  treaty: jest.fn(() => ({})),
 }))
 
-// O resetMocks zera o mock do AppState (react-native/jest) antes de cada teste;
-// restaura o retorno de addEventListener usado pelo focusManager no _layout
+// O resetMocks zera os mocks do react-native antes de cada teste: restaura o
+// AppState (usado pelo focusManager no _layout) e o AccessibilityInfo (Toast)
 beforeEach(() => {
   jest
     .mocked(AppState.addEventListener)
     .mockReturnValue({ remove: jest.fn() } as never)
+  jest
+    .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+    .mockResolvedValue(false)
 })
 
-// Suprimir console.error nos testes para evitar poluição do output
-// Os erros são tratados adequadamente pelo código no bloco try/catch
+// Erros esperados (respostas 4xx simuladas) não poluem a saída
 const originalError = console.error
 beforeAll(() => {
-  console.log('🧪 Starting Frontend test suite...')
-  console.log('📱 Testing Expo + React Native app')
   console.error = jest.fn()
 })
-
-// Cleanup global após todos os testes
 afterAll(() => {
-  console.log('✅ Frontend test suite finished')
-  // Restaurar console.error
   console.error = originalError
 })

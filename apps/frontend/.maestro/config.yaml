@@ -1,0 +1,11 @@
+# Smoke nativo de release (doc/plano-v0.md, Etapa 22). Os fluxos em
+# subflows/ são passos reaproveitados, não rodam sozinhos.
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - 01-login
+    - 02-open-sheet
+    - 03-spend-blood
+    - 04-airplane-mode

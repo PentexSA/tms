@@ -24,15 +24,68 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>
 
+export interface CharacterBatches {
+  by_role: string
+  character_id: string
+  client_batch_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  sheet_version: number
+}
+
+export interface CharacterEvents {
+  batch_id: string
+  from_value: Json | null
+  id: Generated<string>
+  path: string
+  seq: number
+  to_value: Json | null
+}
+
+export interface CharacterRolls {
+  batch_id: string | null
+  by_role: string
+  character_id: string
+  client_roll_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  label: string
+  manual: Generated<boolean>
+  request: Json
+  result: Json
+}
+
 export interface Characters {
   chronicle_id: string
   created_at: Generated<Timestamp | null>
   deleted_at: Timestamp | null
   id: Generated<string>
   name: string
-  sheet_data: Json | null
+  sheet_data: Json
+  sheet_version: Generated<number>
   system_id: string
+  template_version: string
   updated_at: Generated<Timestamp | null>
+  user_id: string
+}
+
+export interface ChronicleInvites {
+  chronicle_id: string
+  code_hash: string
+  created_at: Generated<Timestamp>
+  created_by: string
+  expires_at: Timestamp
+  id: Generated<string>
+  max_uses: number
+  revoked_at: Timestamp | null
+  uses: Generated<number>
+}
+
+export interface ChronicleMembers {
+  chronicle_id: string
+  joined_at: Generated<Timestamp>
   user_id: string
 }
 
@@ -53,17 +106,24 @@ export interface GameSystems {
   name: string
 }
 
-export interface Todos {
-  created_at: Generated<Timestamp | null>
-  done: Generated<boolean>
-  id: Generated<number>
-  title: string
+export interface RefreshTokens {
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  family_expires_at: Timestamp
+  family_id: string
+  id: Generated<string>
+  replaced_by: string | null
+  revoked_at: Timestamp | null
+  token_hash: string
+  user_id: string
 }
 
 export interface TraitTemplates {
   id: Generated<string>
+  published_at: Generated<Timestamp>
   system_id: string
-  template_data: Json | null
+  template_data: Json
+  version: string
 }
 
 export interface Users {
@@ -77,10 +137,15 @@ export interface Users {
 }
 
 export interface DB {
+  character_batches: CharacterBatches
+  character_events: CharacterEvents
+  character_rolls: CharacterRolls
   characters: Characters
+  chronicle_invites: ChronicleInvites
+  chronicle_members: ChronicleMembers
   chronicles: Chronicles
   game_systems: GameSystems
-  todos: Todos
+  refresh_tokens: RefreshTokens
   trait_templates: TraitTemplates
   users: Users
 }

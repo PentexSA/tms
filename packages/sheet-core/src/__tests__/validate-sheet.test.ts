@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
-import { validateSheet } from '../validate'
+import { formatIssue, validateSheet } from '../validate'
 import { character, type Json, paths, templates, vtm } from './fixtures'
 
 // Vampiro é o template da v0; os casos de D&D garantem que o validador não
@@ -125,5 +125,126 @@ describe('validateSheet: fixture de outra família (D&D 5e)', () => {
       path: 'values.initiative',
       message: 'campo derivado: o servidor calcula, o cliente não grava',
     })
+  })
+})
+
+describe('validateSheet: ramos de forma e de teto', () => {
+  const lia = () => character('lia')
+  const dndTemplate = () => templates['dnd5e-2014']
+
+  it('slots: não objeto, nível inexistente e nível malformado', () => {
+    const c = lia()
+    c.sheet.values.spellSlots = 'cheio'
+    expect(validateSheet(dndTemplate(), c.sheet)).toEqual([
+      { path: 'values.spellSlots', message: 'precisa ser objeto' },
+    ])
+    c.sheet.values.spellSlots = { '10': { max: 1, used: 0 }, '1': 4 }
+    expect(validateSheet(dndTemplate(), c.sheet)).toEqual([
+      { path: 'values.spellSlots.1', message: 'precisa ser objeto' },
+      { path: 'values.spellSlots.10', message: 'nível inexistente' },
+    ])
+  })
+
+  it('lista que não é lista', () => {
+    const c = helena()
+    c.sheet.values.disciplines = { d1: { name: 'Taumaturgia' } }
+    expect(validateSheet(vtmTemplate(), c.sheet)).toEqual([
+      { path: 'values.disciplines', message: 'precisa ser lista' },
+    ])
+  })
+
+  it('tipo sem validador é rejeitado (template não validado)', () => {
+    const t = { fields: { x: { type: 'formula', label: 'X' } } }
+    expect(validateSheet(t, { values: { x: 1 } })).toEqual([
+      { path: 'values.x', message: "tipo 'formula' sem validador (rejeitado)" },
+    ])
+  })
+
+  it('exceção ao ler um valor vira erro do campo', () => {
+    const c = helena()
+    c.sheet.values.willpower = {
+      get current(): number {
+        throw new Error('getter hostil')
+      },
+    }
+    expect(validateSheet(vtmTemplate(), c.sheet)).toContainEqual({
+      path: 'values.willpower',
+      message: 'valor malformado',
+    })
+  })
+
+  it('exceção fora dos campos vira erro da ficha', () => {
+    const sheet = {
+      values: {},
+      get specialties(): unknown {
+        throw new Error('getter hostil')
+      },
+    }
+    expect(validateSheet(vtmTemplate(), sheet)).toEqual([
+      { path: '', message: 'sheet_data malformado' },
+    ])
+  })
+
+  // Template mínimo: o teto de um resource vem de outro campo, que pode ser
+  // derivado, gravado (permanente ou atual) ou só ter padrão.
+  const capTemplate = (from: Json) => ({
+    fields: {
+      base: { type: 'number', label: 'Base', default: 8 },
+      half: {
+        type: 'number',
+        label: 'Metade',
+        readOnly: true,
+        derive: 'half',
+        from: 'base',
+      },
+      pool: {
+        type: 'resource',
+        label: 'Reserva',
+        permanent: { min: 0, max: 20 },
+      },
+      r: { type: 'resource', label: 'R', max: from },
+      free: { type: 'resource', label: 'Livre', temp: true },
+    },
+  })
+
+  it.each([
+    ['derivado (readOnly)', { field: 'half' }, {}, 4],
+    ['padrão de outro campo', { field: 'base' }, {}, 8],
+    [
+      'permanente de outro resource',
+      { field: 'pool' },
+      { pool: { current: 3, permanent: 6 } },
+      6,
+    ],
+    ['atual de outro resource', { field: 'pool' }, { pool: { current: 3 } }, 3],
+  ])('teto pelo campo: %s', (_, max, values, cap) => {
+    const t = capTemplate(max)
+    const ok = validateSheet(t, { values: { ...values, r: { current: cap } } })
+    expect(ok.filter(i => i.path.startsWith('values.r'))).toEqual([])
+    const over = validateSheet(t, {
+      values: { ...values, r: { current: cap + 1 } },
+    })
+    expect(over).toContainEqual({
+      path: 'values.r.current',
+      message: `acima do máximo (${cap})`,
+    })
+  })
+
+  it('resource sem teto conhecido aceita qualquer atual até o limite técnico', () => {
+    const t = capTemplate(undefined as unknown as Json)
+    expect(
+      validateSheet(t, { values: { free: { current: 9999, temp: 3 } } })
+    ).toEqual([])
+  })
+})
+
+describe('formatIssue', () => {
+  it('sem caminho, usa só o prefixo', () => {
+    expect(formatIssue('helena', { path: '', message: 'malformado' })).toBe(
+      'helena: malformado'
+    )
+    expect(formatIssue('helena', { path: 'values.x', message: 'm' })).toBe(
+      'helena values.x: m'
+    )
   })
 })

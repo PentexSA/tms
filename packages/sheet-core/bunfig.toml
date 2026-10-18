@@ -1,0 +1,7 @@
+[test]
+# Só src/: o build em dist/ nunca entra nos testes
+root = "./src"
+# Meta mínima aplicada no CI (bun test --coverage); doc/plano-v0.md §4
+coverageThreshold = { lines = 0.95, functions = 0.95 }
+# A referência de design/ é carregada pelos testes de paridade, mas não é código do pacote
+coveragePathIgnorePatterns = ["../../design/**"]

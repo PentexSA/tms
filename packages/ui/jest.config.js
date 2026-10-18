@@ -1,15 +1,11 @@
-const base = require('@tms/jest-config/base')
+const reactNative = require('@tms/jest-config/react-native')
 
 module.exports = {
-  ...base,
+  ...reactNative,
   displayName: '@tms/ui',
   rootDir: '.',
-
-  // Override for React Native type tests (no actual rendering)
-  testMatch: [
-    '<rootDir>/src/**/*.test.ts',
-    '<rootDir>/src/**/*.test.tsx',
-    '<rootDir>/src/**/*.spec.ts',
-    '<rootDir>/src/**/*.spec.tsx',
-  ],
+  // Meta da v0 (doc/plano-v0.md §4)
+  coverageThreshold: {
+    global: { lines: 80, functions: 80, branches: 80, statements: 80 },
+  },
 }

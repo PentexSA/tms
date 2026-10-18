@@ -1,73 +1,71 @@
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
-import { config } from '@tms/config/env'
-import { db as defaultDb } from '@tms/db'
-import { Elysia, t } from 'elysia'
-import { logger } from './logger'
+import { type DB, db as defaultDb } from '@tms/db'
+import { Elysia } from 'elysia'
+import type { Kysely } from 'kysely'
+import { accountRoutes } from './account/routes'
+import { authGuard } from './auth/guard'
+import { authRoutes, meRoutes } from './auth/routes'
+import { chronicleRoutes } from './chronicles/routes'
+import { tableRoutes } from './chronicles/table'
+import { onError } from './http/on-error'
+import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
+import { type AppOptions, resolveOptions } from './options'
+import { rollRoutes } from './rolls/routes'
+import { eventRoutes } from './sheets/events'
+import { sheetRoutes } from './sheets/routes'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
  * Exportado para ser usado em testes
  *
- * @param database - Opcional. Use para injetar um banco mock nos testes
+ * @param database - Opcional. Use para injetar o banco de teste (PGLite)
+ * @param overrides - Opcional. Relógio, limites e segredo para os testes
  */
-// biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
-export const createApp = (database?: any) => {
-  const db = database || defaultDb
-  return new Elysia()
-    .use(loggerMiddleware)
-    .use(cors())
-    .use(
-      swagger({
-        documentation: {
-          info: {
-            title: 'TMS API',
-            version: '1.0.0',
-          },
-        },
-      })
-    )
-    .get('/health', () => ({ ok: true }))
-    .get('/todos', async () => {
-      const todos = await db
-        .selectFrom('todos')
-        .selectAll()
-        .orderBy('created_at', 'desc')
-        .execute()
-      return todos
-    })
-    .post(
-      '/todos',
-      async ({ body }) => {
-        const { title } = body as { title: string }
-
-        const [todo] = await db
-          .insertInto('todos')
-          .values({ title })
-          .returningAll()
-          .execute()
-
-        return todo
-      },
-      {
-        body: t.Object({
-          title: t.String(),
-        }),
-      }
-    )
+export const createApp = (
+  database: Kysely<DB> = defaultDb,
+  overrides: Partial<AppOptions> = {}
+) => {
+  const db = database
+  const options = resolveOptions(overrides)
+  const guard = authGuard(options.tokens, options)
+  return (
+    new Elysia()
+      .decorate('db', db)
+      .use(securityHeaders(options))
+      .use(loggerMiddleware)
+      .onError({ as: 'global' }, onError)
+      .use(
+        cors({
+          // Allowlist explícita (nunca "*"): o cookie do refresh exige credenciais
+          origin: [...options.corsOrigins],
+          credentials: true,
+          methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+          allowedHeaders: ['content-type', 'authorization', 'x-tms-client'],
+          maxAge: 600,
+        })
+      )
+      // Documentação só fora de produção
+      .use(
+        options.swagger
+          ? swagger({
+              documentation: { info: { title: 'TMS API', version: '1.0.0' } },
+            })
+          : new Elysia({ name: 'no-swagger' })
+      )
+      .use(guard)
+      .get('/health', () => ({ ok: true }))
+      .use(authRoutes(db, options, guard))
+      .use(meRoutes(db, guard))
+      .use(accountRoutes(db, options, guard))
+      .use(chronicleRoutes(db, options, guard))
+      .use(sheetRoutes(db, guard))
+      .use(eventRoutes(db, options, guard))
+      .use(tableRoutes(db, guard))
+      .use(rollRoutes(db, options, guard))
+  )
 }
 
 // Exporta o tipo da app para Eden Treaty
 export type App = ReturnType<typeof createApp>
-
-// Inicia o servidor apenas quando executado diretamente
-// (não em testes)
-// Verifica se não estamos em ambiente de teste (Jest)
-if (process.env.NODE_ENV !== 'test') {
-  const app = createApp().listen(config.API_PORT)
-
-  logger.info(
-    `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-  )
-}

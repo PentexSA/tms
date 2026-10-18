@@ -181,4 +181,77 @@ writeFileSync(
   `// Gerado por design/scripts/build.mjs a partir de scripts/validate.mjs. Não edite à mão.\n;(() => {\n${validatorSource}\nwindow.TMSValidate = { REGISTRY, isSafeText, validateTemplate, validateSheet }\n})()\n`,
 )
 
+// ---------- tokens para o @tms/ui (React Native) ----------
+// Mesmo tokens.json, no formato que o RN usa: chaves em camelCase, medidas em
+// número e lineHeight absoluto (o RN não aceita razão).
+
+const camel = s => s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase())
+const strip = (prefix, name) => name.replace(new RegExp(`^${prefix}-`), '')
+const byTheme = list => Object.fromEntries(
+  tokens.themes.map(th => [th.id, Object.fromEntries(list.map(c => [camel(c.name), c.value[th.id]]))]),
+)
+const rn = {
+  themes: tokens.themes.map(th => th.id),
+  color: byTheme([...tokens.color.core, ...tokens.color.accentAlt]),
+  accents: Object.fromEntries(
+    tokens.color.accents.palette.map(a => [a.name, { label: a.label, ...a.value }]),
+  ),
+  space: Object.fromEntries(tokens.space.map(x => [strip('space', x.name).replace('-', '.'), x.value])),
+  radius: Object.fromEntries(tokens.radius.map(x => [strip('radius', x.name), x.value])),
+  size: Object.fromEntries(tokens.size.map(x => [camel(x.name), x.value])),
+  borderWidth: Object.fromEntries(tokens.border.map(x => [strip('border-width', x.name), x.value])),
+  elevation: Object.fromEntries(tokens.elevation.map(x => [strip('elevation', x.name), x.value])),
+  duration: Object.fromEntries(tokens.motion.duration.map(x => [strip('duration', x.name), x.value])),
+  breakpoint: Object.fromEntries(tokens.breakpoint.map(x => [x.name, { min: x.min, max: x.max }])),
+  layout: Object.fromEntries(tokens.layout.map(x => [camel(x.name), x.value])),
+  fonts: { sans: tokens.type.families.sans.native },
+  type: Object.fromEntries(
+    tokens.type.styles.map(x => [
+      camel(x.name),
+      {
+        family: x.family,
+        fontSize: x.size,
+        lineHeight: Math.round(x.size * x.lineHeight),
+        fontWeight: String(x.weight),
+        ...(x.letterSpacing ? { letterSpacing: x.letterSpacing } : {}),
+        ...(x.transform ? { textTransform: x.transform } : {}),
+        ...(x.italic ? { italic: true } : {}),
+        ...(x.numeric ? { tabular: true } : {}),
+        ...(x.maxFontSizeMultiplier ? { maxFontSizeMultiplier: x.maxFontSizeMultiplier } : {}),
+      },
+    ]),
+  ),
+  skins: Object.fromEntries(
+    skins.map(sk => [
+      sk.id,
+      { name: sk.name, pip: sk.pip, display: sk.type?.display?.native ?? {}, voice: sk.type?.voice?.native ?? {} },
+    ]),
+  ),
+}
+writeFileSync(
+  join(root, '../packages/ui/src/tokens.ts'),
+  `// Gerado por design/scripts/build.mjs a partir de design/design-system/tokens.json
+// e skins/*.json. Não edite à mão: rode \`node design/scripts/build.mjs\`.
+// (Fora do biome: o formato é o do JSON.stringify.)
+
+export const tokens = ${JSON.stringify(rn, null, 2)} as const
+`,
+)
+
+// ---------- paleta para o @tms/sheet-core ----------
+// O core não lê arquivo: a paleta validada (accent-N) vira uma constante TS.
+
+writeFileSync(
+  join(root, '../packages/sheet-core/src/palette.ts'),
+  `// Gerado por design/scripts/build.mjs a partir de design/design-system/tokens.json.
+// Não edite à mão: rode \`node design/scripts/build.mjs\`.
+
+// Paleta de accent validada no CI (contraste e daltonismo): o template só pode
+// citar estes nomes, além de accent-neutral.
+export const PALETTE = [
+${palette.map(n => `  '${n}',`).join('\n')}
+] as const
+`,
+)
+
 console.log(`tokens.css gerado; ${Object.keys(templates).length} templates e ${examples.characters.length} personagens válidos; telas/dados.js gerado.`)

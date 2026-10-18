@@ -1,6 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!design/**", "!packages/ui/src/tokens.ts"]
+  },
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,
@@ -88,6 +95,10 @@
         "noUselessRegexBackrefs": "error",
         "noWith": "error",
         "useGetterReturn": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "error",
+        "noDangerouslySetInnerHtmlWithChildren": "error"
       }
     }
   },
@@ -104,13 +115,19 @@
       "bracketSpacing": true
     }
   },
-  "html": { "formatter": { "selfCloseVoidElements": "always" } },
+  "html": {
+    "formatter": {
+      "selfCloseVoidElements": "always"
+    }
+  },
   "overrides": [
     {
       "includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
       "linter": {
         "rules": {
-          "complexity": { "noArguments": "error" },
+          "complexity": {
+            "noArguments": "error"
+          },
           "correctness": {
             "noConstAssign": "off",
             "noGlobalObjectCalls": "off",
@@ -121,7 +138,9 @@
             "noUnreachable": "off",
             "noUnreachableSuper": "off"
           },
-          "style": { "useConst": "error" },
+          "style": {
+            "useConst": "error"
+          },
           "suspicious": {
             "noDuplicateClassMembers": "off",
             "noDuplicateObjectKeys": "off",
@@ -137,7 +156,7 @@
       }
     },
     {
-      "includes": ["**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "includes": ["**/*.{test,spec}.{js,jsx,ts,tsx}", "**/test/**/*.{ts,tsx}"],
       "javascript": {
         "globals": [
           "describe",
@@ -156,13 +175,19 @@
       "includes": ["**/test/setup.ts", "**/__tests__/**/setup.ts"],
       "linter": {
         "rules": {
-          "correctness": { "noUndeclaredVariables": "off" }
+          "correctness": {
+            "noUndeclaredVariables": "off"
+          }
         }
       }
     }
   ],
   "assist": {
     "enabled": true,
-    "actions": { "source": { "organizeImports": "on" } }
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   }
 }

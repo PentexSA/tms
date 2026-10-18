@@ -353,8 +353,18 @@ Quando algo dá errado:
 - **Seções restritas nunca chegam** ao aparelho de quem não pode lê-las, porque o servidor as remove antes de responder (contrato §11).
 - **Tudo é separado por usuário.** A chave do storage leva o id do usuário, e o logout apaga o cache e o outbox.
 - **O que vem do disco é input hostil.** Ao reidratar, o template passa por `compileTemplate` e a ficha por `validateSheet`. Se falhar, o dado é descartado e rebuscado.
-- **Criptografia em repouso entra antes do lançamento público.** No nativo, o adapter passa a usar uma tabela num banco SQLCipher (`useSQLCipher` no plugin `expo-sqlite`), com chave aleatória gerada no primeiro uso e guardada no `expo-secure-store`. A interface do storage não muda. Isso exige dev build (não roda no Expo Go). No web não há equivalente; a mitigação é apagar tudo no logout.
-- **Android** com `allowBackup: false`.
+- **Criptografia em repouso no nativo** (Etapa 22, `apps/frontend/sheet/sync/encryptedStorage.ts`):
+  - **Banco:** o storage é uma tabela num banco SQLCipher próprio (`tms-offline.db`, plugin `expo-sqlite` com `useSQLCipher` no `app.json`). A interface `KeyValueStorage` não mudou. Exige dev build.
+  - **Chave:** 32 bytes aleatórios do `expo-crypto`, gerados no primeiro uso. Ficam só no `expo-secure-store` (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`, como o refresh token) e entram como raw key no `PRAGMA key`, a primeira instrução de cada conexão. Nunca aparecem em log, no banco nem em outro storage.
+  - **Fail secure:**
+    - sem chave (reinstalação, backup restaurado, o banco sem cifra da Etapa 20), o banco é apagado e recomeça vazio. O servidor é a fonte da verdade;
+    - chave que não abre o banco: apaga e recomeça;
+    - SecureStore com falha: nada é aberto sem chave; o storage fica em memória naquela sessão e o banco fica intacto;
+    - binário sem SQLCipher (Expo Go): em produção, memória; só em desenvolvimento abre sem cifra.
+  - **Log:** leva só o tipo do problema (`secure-store`, `wrong-key`, `no-sqlcipher`, `sqlite`).
+  - **Web:** não há equivalente; a mitigação é apagar tudo no logout.
+- **Android** com `allowBackup: false`, sem `usesCleartextTraffic` no manifest de release (cleartext só nos de debug, para o Metro), e o ATS do iOS ligado. `sheet/sync/__tests__/nativeConfig.test.ts` quebra se alguém mudar isso.
+- **Como verificar no aparelho:** o roteiro manual em modo avião e a conferência do arquivo cifrado ficam em `apps/frontend/.maestro/README.md`.
 
 ### 7.3 O outbox
 
@@ -420,59 +430,105 @@ O WatermelonDB é ótimo para muitos registros relacionais com consulta local. A
 
 ### 8.3 Mudanças mínimas no banco
 
+O que as migrations `0008` a `0013` criaram (a fonte é `packages/db/src/migrations/`, e os tipos saem do codegen):
+
 ```dbml
 Table trait_templates {
-  // + colunas
+  // + colunas (0008)
   version text [not null]                   // = templateVersion
-  published_at timestamp
-  indexes { (system_id, version) [unique] }
+  published_at timestamptz [not null]
+  indexes { (system_id, version) [unique] } // versão imutável
+}
+
+Table users {
+  indexes { (lower(email)) [unique] }       // 0009: e-mail sem caixa
+}
+
+Table refresh_tokens {                      // 0009: sessão
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]  // on delete cascade
+  family_id uuid [not null]                 // reuso revoga a família inteira
+  token_hash text [not null, unique]        // sha256; o token opaco não é guardado
+  expires_at timestamptz [not null]         // 30 dias por token
+  family_expires_at timestamptz [not null]  // 90 dias absolutos
+  revoked_at timestamptz
+  replaced_by uuid [ref: > refresh_tokens.id]
+}
+
+Table chronicle_members {                   // 0010: quem joga na crônica
+  chronicle_id uuid [ref: > chronicles.id]  // on delete cascade
+  user_id uuid [ref: > users.id]            // on delete cascade
+  joined_at timestamptz [not null]
+}
+
+Table chronicle_invites {                   // 0010: convite por código
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id]
+  code_hash text [not null, unique]         // o código não é guardado
+  created_by uuid [not null, ref: > users.id]
+  expires_at timestamptz [not null]
+  max_uses int [not null]
+  uses int [not null, default: 0]           // check: uses <= max_uses
+  revoked_at timestamptz
 }
 
 Table characters {
-  // + colunas
+  // + colunas (0011)
   template_version text [not null]          // versão com que a ficha nasceu
   sheet_version int [not null, default: 0]  // sobe a cada lote (concorrência otimista)
+  user_id uuid [ref: > users.id]            // 0013: on delete cascade
 }
 
-Table character_batches {
+Table character_batches {                   // 0011: um lote do outbox
   id uuid [pk]
   character_id uuid [not null, ref: > characters.id]
   client_batch_id uuid [not null]
-  created_by uuid [not null, ref: > users.id]
-  created_at timestamp [not null]
-  indexes { (character_id, client_batch_id) [unique] }
+  created_by uuid [ref: > users.id]         // 0013: null = conta excluída
+  by_role text [not null]                   // owner ou storyteller
+  sheet_version int [not null]
+  created_at timestamptz [not null]
+  indexes { (character_id, client_batch_id) [unique] } // idempotência
 }
 
-Table character_events {
+Table character_events {                    // 0011: o histórico
   id uuid [pk]
   batch_id uuid [not null, ref: > character_batches.id]
+  seq int [not null]
   path text [not null]                      // values.<campo> ou specialties.<campo>
-  from_value jsonb                          // null para text e longText
+  from_value jsonb                          // o "de" efetivo; null para texto
   to_value jsonb                            // null para text e longText
+}
+
+Table character_rolls {                     // 0012: rolagens
+  id uuid [pk]
+  character_id uuid [not null, ref: > characters.id]
+  client_roll_id uuid [not null]            // reenvio idempotente
+  created_by uuid [ref: > users.id]         // 0013: null = conta excluída
+  by_role text [not null]
+  manual bool [not null]                    // "Rolei na mão": informado, não sorteado
+  label text [not null]
+  request jsonb [not null]                  // slots, dificuldade e boosts (nunca o resultado)
+  result jsonb [not null]                   // sorteado no servidor (CSPRNG)
+  batch_id uuid [ref: > character_batches.id] // o custo da FdV, se houve
+  created_at timestamptz [not null]
 }
 ```
 
 - `template_version` só registra a versão. Migrar fichas entre versões fica para depois (§11).
 - `text` e `longText` entram no histórico **sem conteúdo** ("Notas atualizadas"). O valor fica só na ficha (contrato §10).
+- **Exclusão de conta** (migration `0013_account_deletion`, plano §7 decisão 8): `characters.user_id` é `on delete cascade` (as fichas do usuário saem com ele); `character_batches.created_by` e `character_rolls.created_by` passam a aceitar null, com `on delete set null` (o que ele fez em fichas de outras pessoas fica, anônimo: "Conta excluída"). `chronicles.storyteller_id` continua sem cascata: a API apaga a crônica explicitamente ou recusa a exclusão (409), e o banco recusa se algo escapar.
 
-### 8.4 O que corrigir na API atual antes de produção
+### 8.4 Correções de produção na API (feitas na Etapa 7)
 
-Em `apps/api/src/index.ts`, `cors()` sem opções aceita qualquer origem, e o `/swagger` fica sempre ligado. Correção:
+O que esta seção pedia já está no código:
 
-```ts
-// packages/config/src/env.ts: no configSchema
-CORS_ORIGINS: z.string().default('http://localhost:8081'),
+- **CORS por allowlist** (`CORS_ORIGINS`), com credenciais só para as origens listadas.
+- **`/swagger` desligado em produção** (`options.swagger`, padrão `NODE_ENV !== 'production'`).
+- **Cabeçalhos de segurança da API** num hook `onRequest` (`apps/api/src/http/security.ts`). O Elysia não usa o helmet.js, que é do Express.
+- **Erros genéricos, sem stack** (`http/on-error.ts`).
+- **Cookie de sessão `Secure`** em produção.
 
-// apps/api/src/index.ts
-.use(cors({ origin: config.CORS_ORIGINS.split(','), credentials: true }))
-.use(
-  config.NODE_ENV === 'production'
-    ? new Elysia()
-    : swagger({ documentation: { info: { title: 'TMS API', version: '1.0.0' } } })
-)
-```
-
-Também entram os cabeçalhos de segurança (CSP, HSTS, `nosniff`, `Referrer-Policy`) num hook `onAfterHandle`. O Elysia não usa o helmet.js, que é do Express.
+Os cabeçalhos do app web (CSP, HSTS e COOP) saem de `scripts/web-headers.mjs` para a hospedagem (Etapa 22).
 
 **Multi-sistema:** as rotas recebem qualquer template e nenhuma tem nome de sistema. AuthZ e remoção de seções vêm do contrato, não do jogo.
 
@@ -480,7 +536,7 @@ Também entram os cabeçalhos de segurança (CSP, HSTS, `nosniff`, `Referrer-Pol
 
 ## 9. Segurança: o que o motor garante
 
-Resumo. Os detalhes do contrato estão em [`design/templates/README.md`](../design/templates/README.md) §11.
+Resumo. Os detalhes do contrato estão em [`design/templates/README.md`](../design/templates/README.md) §11. Cada linha aponta para o teste que a prova em [`checklist-seguranca-v0.md`](checklist-seguranca-v0.md).
 
 | Ameaça | Defesa |
 |---|---|
@@ -495,6 +551,7 @@ Resumo. Os detalhes do contrato estão em [`design/templates/README.md`](../desi
 | Abuso do endpoint de eventos | Rate limit por usuário e por ficha; limite de corpo e de eventos por lote. |
 | Dado adulterado no aparelho | A reidratação passa por `compileTemplate` e `validateSheet`. |
 | Vazamento por log | Log com ids e números, nunca conteúdo de texto, tokens ou dados pessoais. |
+| Titular quer os dados apagados (LGPD art. 18, VI) | `DELETE /me` com a senha de novo (reautenticação, rate limit por usuário e IP): apaga a conta e o que é só dela numa transação, anonimiza o que ela fez em fichas alheias e recusa (409) se apagaria dado de outra pessoa sem confirmação. O app apaga cache, fila e último usuário do aparelho. |
 | Dependência vulnerável | `pnpm audit` no CI. |
 
 ---

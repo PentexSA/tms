@@ -4,13 +4,24 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/test/pglite.d.ts",
+      "default": "./dist/test/pglite.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",
-    "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url postgres://postgres:postgres@localhost:5432/tms",
+    "migrate:check": "tsx src/migrate.ts check",
+    "codegen": "kysely-codegen --out-file src/types.ts --dialect postgres --url \"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/tms}\" && biome format --write src/types.ts",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage"

@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 
 describe('@tms/config - Environment Configuration', () => {
   const originalEnv = process.env
@@ -42,6 +42,7 @@ describe('@tms/config - Environment Configuration', () => {
   describe('Environment variable parsing', () => {
     it('should parse valid environment variables', async () => {
       process.env.NODE_ENV = 'production'
+      process.env.JWT_SECRET = 'x'.repeat(32)
       process.env.DATABASE_URL = 'postgres://user:pass@db.example.com:5432/prod'
       process.env.API_PORT = '8080'
       process.env.EXPO_PUBLIC_API_URL = 'https://api.example.com'
@@ -83,6 +84,7 @@ describe('@tms/config - Environment Configuration', () => {
 
     it('should accept production environment', async () => {
       process.env.NODE_ENV = 'production'
+      process.env.JWT_SECRET = 'x'.repeat(32)
 
       const { config } = await import('../env')
 
@@ -160,6 +162,101 @@ describe('@tms/config - Environment Configuration', () => {
       const { config } = await import('../env')
 
       expect(config.API_PORT).toBe(9000)
+    })
+  })
+
+  describe('Auth and HTTP settings', () => {
+    it('should parse CORS_ORIGINS as a trimmed list', async () => {
+      process.env.CORS_ORIGINS = 'https://app.tms.test, http://localhost:8081 ,'
+      const { config } = await import('../env')
+      expect(config.CORS_ORIGINS).toEqual([
+        'https://app.tms.test',
+        'http://localhost:8081',
+      ])
+    })
+
+    it('should default JWT issuer, audience and proxy trust', async () => {
+      delete process.env.JWT_ISSUER
+      delete process.env.JWT_AUDIENCE
+      delete process.env.TRUST_PROXY
+      const { config } = await import('../env')
+      expect(config.JWT_ISSUER).toBe('tms-api')
+      expect(config.JWT_AUDIENCE).toBe('tms-app')
+      expect(config.TRUST_PROXY).toBe(false)
+    })
+
+    it('should parse TRUST_PROXY', async () => {
+      process.env.TRUST_PROXY = 'true'
+      const { config } = await import('../env')
+      expect(config.TRUST_PROXY).toBe(true)
+    })
+
+    it.each([
+      ['JWT_SECRET curto', { JWT_SECRET: 'curto' }],
+      ['CORS com *', { CORS_ORIGINS: '*' }],
+      ['produção sem JWT_SECRET', { NODE_ENV: 'production' }],
+    ])('should reject %s', async (_, env) => {
+      delete process.env.JWT_SECRET
+      Object.assign(process.env, { NODE_ENV: 'test', ...env })
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+        expect(() => config.JWT_ISSUER).toThrow()
+        expect(error).toHaveBeenCalled()
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
+    })
+
+    it('should accept production with a long JWT_SECRET', async () => {
+      process.env.NODE_ENV = 'production'
+      process.env.JWT_SECRET = 'x'.repeat(48)
+      const { config } = await import('../env')
+      expect(config.JWT_SECRET).toHaveLength(48)
+    })
+  })
+
+  describe('Invalid environment', () => {
+    it('should report invalid variables without exiting in tests', async () => {
+      process.env.NODE_ENV = 'test'
+      process.env.DATABASE_URL = 'not-a-url'
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+
+        // Sem config válida, ler qualquer chave falha (nunca um valor errado)
+        expect(() => config.DATABASE_URL).toThrow()
+        expect(error).toHaveBeenCalled()
+        expect(exit).not.toHaveBeenCalled()
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
+    })
+
+    it('should exit outside tests (fail fast on boot)', async () => {
+      process.env.NODE_ENV = 'production'
+      process.env.API_PORT = 'not-a-port'
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+
+        expect(() => config.API_PORT).toThrow('exit')
+        expect(exit).toHaveBeenCalledWith(1)
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
     })
   })
 })

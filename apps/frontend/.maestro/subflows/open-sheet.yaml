@@ -1,0 +1,19 @@
+# Abre a ficha CHARACTER da crônica CHRONICLE. A dona abre em Jogo: no
+# celular, o dock aparece embaixo
+appId: com.tms.app
+---
+- runFlow: login.yaml
+- tapOn:
+    text: "${CHRONICLE}, .*"
+- extendedWaitUntil:
+    visible:
+      text: "${CHARACTER}, .*"
+    timeout: 20000
+- tapOn:
+    text: "${CHARACTER}, .*"
+- extendedWaitUntil:
+    visible:
+      id: "dock-blood"
+    timeout: 20000
+- assertVisible:
+    id: "sync-saved"

@@ -4,7 +4,7 @@ import { fetchWithTimeout, REQUEST_TIMEOUT_MS, unwrap } from '../api'
  * Testes do cliente HTTP (timeout e tratamento de erro do Eden)
  */
 
-const TODOS_URL = 'http://localhost:3001/todos'
+const HEALTH_URL = 'http://localhost:3001/health'
 
 describe('fetchWithTimeout', () => {
   const originalFetch = global.fetch
@@ -31,7 +31,7 @@ describe('fetchWithTimeout', () => {
 
   it('should abort the request after the timeout', async () => {
     // Act
-    const request = fetchWithTimeout(TODOS_URL)
+    const request = fetchWithTimeout(HEALTH_URL)
     jest.advanceTimersByTime(REQUEST_TIMEOUT_MS)
 
     // Assert
@@ -40,7 +40,7 @@ describe('fetchWithTimeout', () => {
 
   it('should not abort the request before the timeout', async () => {
     // Act
-    const request = fetchWithTimeout(TODOS_URL)
+    const request = fetchWithTimeout(HEALTH_URL)
     jest.advanceTimersByTime(REQUEST_TIMEOUT_MS - 1)
 
     // Assert
@@ -56,7 +56,7 @@ describe('fetchWithTimeout', () => {
     const controller = new AbortController()
 
     // Act
-    const request = fetchWithTimeout(TODOS_URL, { signal: controller.signal })
+    const request = fetchWithTimeout(HEALTH_URL, { signal: controller.signal })
     controller.abort()
 
     // Assert
@@ -68,7 +68,7 @@ describe('fetchWithTimeout', () => {
     fetchMock.mockResolvedValueOnce({ ok: true })
 
     // Act
-    await fetchWithTimeout(TODOS_URL)
+    await fetchWithTimeout(HEALTH_URL)
 
     // Assert
     expect(jest.getTimerCount()).toBe(0)

@@ -14,12 +14,14 @@
     "db:down": "docker compose down -v",
     "db:migrate": "pnpm -C packages/db migrate:up",
     "db:codegen": "pnpm -C packages/db codegen",
+    "templates:publish": "pnpm -C apps/api templates:publish",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch --parallel",
     "test:coverage": "turbo run test:coverage",
     "test:api": "turbo run test --filter=@tms/api",
     "test:ui": "turbo run test --filter='./packages/ui' -- && turbo run test --filter=frontend",
     "test:packages": "turbo run test --filter='./packages/*'",
+    "test:e2e": "pnpm -C e2e build:web && pnpm -C e2e test:e2e",
     "prepare": "husky"
   },
   "keywords": [],
@@ -42,7 +44,7 @@
     "@electric-sql/pglite": "^0.3.16"
   },
   "workspaces": {
-    "packages": ["apps/*", "packages/*"],
+    "packages": ["apps/*", "packages/*", "e2e"],
     "catalog": {
       "@elysiajs/eden": "1.4.9",
       "@testing-library/jest-dom": "6.9.1",

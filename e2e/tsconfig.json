@@ -1,0 +1,12 @@
+{
+  "extends": "@tms/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node", "bun-types"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "playwright-report", "test-results"]
+}

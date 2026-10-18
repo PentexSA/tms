@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - e2e
 
 catalog:
   '@elysiajs/eden': 1.4.9
@@ -26,6 +27,10 @@ nodeLinker: hoisted
 # Só instala versões publicadas há pelo menos 14 dias (proteção contra supply chain).
 # Para um patch de segurança urgente, liste o pacote em minimumReleaseAgeExclude.
 minimumReleaseAge: 20160
+minimumReleaseAgeExclude:
+  # Patch das advisories críticas GHSA-8r5x-fm3f-whwj e GHSA-p8wg-vrv2-v86f
+  # (4.7.10, de 2026-10-05). Remover depois de 2026-10-19.
+  - handlebars
 
 # Correções de segurança em dependências transitivas (pnpm audit), sempre no mesmo major.
 # Remover cada entrada quando o pacote que a puxa passar a depender da versão corrigida.
@@ -42,6 +47,7 @@ overrides:
   'fflate@<0.8.3': ^0.8.3
   'form-data@>=4 <4.0.6': ^4.0.6
   'glob@>=10 <10.5.0': ^10.5.0
+  'handlebars@>=4 <4.7.10': ^4.7.10
   'js-yaml@<3.15.2': ^3.15.2
   'js-yaml@>=4 <4.3.2': ^4.3.2
   'lodash@<4.18.0': ^4.18.0
@@ -61,3 +67,18 @@ overrides:
   'ws@>=7 <7.5.11': ^7.5.11
   'ws@>=8 <8.21.0': ^8.21.0
   'yaml@>=2 <2.8.3': ^2.8.3
+
+# Advisories high sem correção no mesmo major, todas em ferramentas de build e
+# teste (nunca no bundle do app nem na API). Revisar a cada atualização do Expo.
+auditConfig:
+  ignoreGhsas:
+    # image-size 1.2.1 via metro: só lê as imagens do próprio repo no bundle.
+    # A correção (2.0.3) é major e o metro ainda depende da 1.x.
+    - GHSA-5p2g-fcmc-qvqq
+    - GHSA-w3rx-r6r6-pgpr
+    # node-forge via @expo/cli: gera o certificado do dev server; não verifica
+    # assinatura de terceiros. Sem versão corrigida.
+    - GHSA-86w9-cpqp-85rv
+    # braces via chokidar (kysely-pglite): padrões vêm do nosso código, não de
+    # input. Sem versão corrigida.
+    - GHSA-vfj7-8cjw-p6xm

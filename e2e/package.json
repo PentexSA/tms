@@ -1,0 +1,18 @@
+{
+  "name": "@tms/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build:web": "cd ../apps/frontend && EXPO_PUBLIC_API_URL=http://localhost:3101 expo export -p web --output-dir dist --source-maps && node ../../scripts/check-bundle.mjs dist && node ../../scripts/web-headers.mjs dist http://localhost:3101",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tms/tsconfig": "workspace:*",
+    "@types/pg": "8.23.1",
+    "bun-types": "1.4.2",
+    "pg": "8.23.1",
+    "typescript": "catalog:"
+  }
+}
