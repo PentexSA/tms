@@ -164,9 +164,30 @@ export type ResolvedField =
   | ResolvedTags
   | ResolvedList
 
+export interface ResolvedTypes {
+  rating: ResolvedRating
+  number: ResolvedNumber
+  percent: ResolvedPercent
+  resource: ResolvedResource
+  track: ResolvedTrack
+  slots: ResolvedSlots
+  clock: ResolvedClock
+  state: ResolvedState
+  mark: ResolvedMark
+  text: ResolvedText
+  longText: ResolvedText
+  choice: ResolvedChoice
+  tags: ResolvedTags
+  list: ResolvedList
+}
+
+export type ResolvedOf<T extends FieldTypeName> = ResolvedTypes[T]
+
 export interface ResolvedSheet {
   readonly model: SheetModel
   get(id: FieldId): ResolvedField | undefined
+  // Especialização guardada para o campo, se houver.
+  specialty(id: FieldId): string | undefined
   // Valor numérico de um campo (o que derivações, tetos e paradas usam).
   number(id: FieldId): number
   // Todos os campos, na ordem do template.
@@ -180,7 +201,7 @@ const int = (v: unknown): number | undefined =>
 
 export function resolve(
   model: SheetModel,
-  sheet: SheetData | { readonly values: Values }
+  sheet: SheetData | { readonly values: Values; readonly specialties?: unknown }
 ): ResolvedSheet {
   const values: Values = isObj(sheet?.values) ? sheet.values : {}
   const raw = (id: FieldId) => get(values, id)
@@ -471,9 +492,14 @@ export function resolve(
   const resolved = new Map<FieldId, ResolvedField>()
   for (const f of model.fields.values()) resolved.set(f.id, resolveField(f))
 
+  const specialties = rec(sheet?.specialties) ?? {}
   return Object.freeze({
     model,
     get: (id: FieldId) => resolved.get(id),
+    specialty: (id: FieldId) => {
+      const s = get(specialties, id)
+      return typeof s === 'string' && s ? s : undefined
+    },
     number,
     fields: Object.freeze([...resolved.values()]),
   })
