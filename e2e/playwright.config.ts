@@ -27,12 +27,15 @@ export default defineConfig({
     {
       command: 'bun ../apps/api/src/server.ts',
       url: `${API_URL}/health`,
-      reuseExistingServer: !CI,
+      // Sempre do zero: o rate limit em memória não acumula entre rodadas
+      reuseExistingServer: false,
       env: {
         API_PORT: String(API_PORT),
         DATABASE_URL,
         CORS_ORIGINS: WEB_URL,
         NODE_ENV: 'development',
+        // O E2E simula clientes diferentes pelo X-Forwarded-For (ver support/users.ts)
+        TRUST_PROXY: 'true',
       },
     },
     {

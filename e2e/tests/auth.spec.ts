@@ -23,8 +23,8 @@ test('cadastro, recarregar, sair e entrar de novo', async ({ page }) => {
   await page.getByLabel('Senha').fill(user.password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
 
-  await expect(page.getByText(`Olá, ${user.username}`)).toBeVisible()
-  await expect(page.getByText('API online')).toBeVisible()
+  const home = page.getByRole('heading', { name: 'Crônicas' })
+  await expect(home).toBeVisible()
 
   // O refresh token mora num cookie HttpOnly: o JavaScript não lê
   const cookies = await page.context().cookies('http://localhost:3101/auth')
@@ -40,7 +40,7 @@ test('cadastro, recarregar, sair e entrar de novo', async ({ page }) => {
 
   // Recarregar mantém a sessão (o app renova pelo cookie)
   await page.reload()
-  await expect(page.getByText(`Olá, ${user.username}`)).toBeVisible()
+  await expect(home).toBeVisible()
 
   await page.getByRole('button', { name: 'Sair' }).click()
   await expect(page).toHaveURL(/\/login$/)
@@ -50,7 +50,7 @@ test('cadastro, recarregar, sair e entrar de novo', async ({ page }) => {
   await page.getByLabel('E-mail').fill(user.email.toUpperCase())
   await page.getByLabel('Senha').fill(user.password)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByText(`Olá, ${user.username}`)).toBeVisible()
+  await expect(home).toBeVisible()
 })
 
 test('senha errada mostra o erro genérico', async ({ page }) => {

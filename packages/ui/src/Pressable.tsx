@@ -19,14 +19,13 @@ export function Pressable({
   style,
   minTarget = true,
   disabled,
-  accessibilityState,
   ...rest
 }: PressableProps) {
   const theme = useTheme()
   return (
     <RNPressable
       disabled={disabled}
-      accessibilityState={{ ...accessibilityState, disabled: !!disabled }}
+      aria-disabled={!!disabled}
       style={({ pressed }) =>
         StyleSheet.flatten([
           minTarget && styles.target,

@@ -41,7 +41,7 @@ export function Choice({
             key={o.id}
             accessibilityRole="radio"
             accessibilityLabel={o.meta ? `${o.label}, ${o.meta}` : o.label}
-            accessibilityState={{ checked }}
+            aria-checked={checked}
             onPress={() => onChange(o.id)}
             style={styles.row}
           >

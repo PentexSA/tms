@@ -24,8 +24,7 @@ export function Avatar({ name, size = 'sm' }: AvatarProps) {
   return (
     <View
       accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      aria-hidden
       style={[
         styles.avatar,
         { width: d, height: d, backgroundColor: accent.fill },

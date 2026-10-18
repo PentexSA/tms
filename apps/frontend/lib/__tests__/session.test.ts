@@ -125,6 +125,32 @@ describe('Session (nativo: refresh no corpo, secure store)', () => {
     expect(session.headers()).not.toHaveProperty('authorization')
   })
 
+  it('sair com um refresh em voo é definitivo', async () => {
+    const store = memoryStore(true, 'refresh-0')
+    let release: (r: Response) => void = () => undefined
+    const { session, fetch } = testSession(
+      url =>
+        url.endsWith('/auth/refresh')
+          ? new Promise<Response>(r => {
+              release = r
+            })
+          : new Response(null, { status: 204 }),
+      store
+    )
+    const restoring = session.restore()
+    await new Promise(r => setTimeout(r, 0))
+    await session.logout()
+    release(json(200, tokens(2)))
+    await restoring
+    expect(session.getState().status).toBe('signedOut')
+    expect(session.accessToken).toBeNull()
+    expect(store.value()).toBeNull()
+    expect(fetch.mock.calls.map(c => c[0])).toEqual([
+      'http://api.test/auth/refresh',
+      'http://api.test/auth/logout',
+    ])
+  })
+
   it('logout sem rede sai do mesmo jeito', async () => {
     const store = memoryStore(true, 'refresh-1')
     const { session } = testSession(() => {

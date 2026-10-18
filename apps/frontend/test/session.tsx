@@ -51,7 +51,7 @@ export function renderWithSession(ui: ReactElement, session: Session) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: Number.POSITIVE_INFINITY },
-      mutations: { retry: false },
+      mutations: { retry: false, gcTime: Number.POSITIVE_INFINITY },
     },
   })
   return {

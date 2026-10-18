@@ -8,7 +8,7 @@ import { useTheme } from './theme'
 import { tokens } from './tokens'
 
 // Sheet modal (design system §9.5): o voltar do Android fecha, o fundo fica
-// inerte para o leitor de tela (accessibilityViewIsModal) e o título é heading.
+// inerte para o leitor de tela (aria-modal) e o título é heading.
 // Com "reduzir movimento", aparece sem animar.
 
 export interface BottomSheetProps {
@@ -48,7 +48,7 @@ export function BottomSheet({
         />
         <View
           testID={testID}
-          accessibilityViewIsModal
+          aria-modal
           style={[
             styles.sheet,
             {

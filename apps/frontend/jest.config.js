@@ -16,8 +16,16 @@ module.exports = {
     '<rootDir>/app/**/*.spec.tsx',
     '<rootDir>/lib/**/*.test.ts',
     '<rootDir>/lib/**/*.test.tsx',
+    '<rootDir>/components/**/*.test.tsx',
     '<rootDir>/test/**/*.test.ts',
     '<rootDir>/test/**/*.test.tsx',
+  ],
+
+  collectCoverageFrom: [
+    'app/**/*.{ts,tsx}',
+    'components/**/*.{ts,tsx}',
+    'lib/**/*.{ts,tsx}',
+    '!**/__tests__/**',
   ],
 
   // Mock static assets

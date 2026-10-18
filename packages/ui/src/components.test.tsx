@@ -8,6 +8,7 @@ import {
 import {
   AccessibilityInfo,
   Modal,
+  Platform,
   Text as RNText,
   StyleSheet,
   type ViewStyle,
@@ -168,8 +169,7 @@ describe('RatingDots e BoxTrack (só visual)', () => {
     // Escondido do leitor de tela: só aparece pedindo os elementos ocultos
     expect(screen.queryByTestId('dots')).toBeNull()
     const dots = screen.getByTestId('dots', { includeHiddenElements: true })
-    expect(dots.props.importantForAccessibility).toBe('no-hide-descendants')
-    expect(dots.props.accessibilityElementsHidden).toBe(true)
+    expect(dots.props['aria-hidden']).toBe(true)
   })
 
   it('valor e segmentos viram pips', () => {
@@ -284,7 +284,9 @@ describe('Stepper', () => {
 
   it('toque simples muda 1', () => {
     const { onChange } = renderStepper()
-    const dec = screen.getByTestId('stepper-dec')
+    const dec = screen.getByTestId('stepper-dec', {
+      includeHiddenElements: true,
+    })
     fireEvent(dec, 'pressIn')
     fireEvent(dec, 'pressOut')
     expect(onChange).toHaveBeenCalledWith(8)
@@ -292,7 +294,9 @@ describe('Stepper', () => {
 
   it('segurar repete no visual e grava uma mudança ao soltar', () => {
     const { onChange } = renderStepper({ value: 2 })
-    const inc = screen.getByTestId('stepper-inc')
+    const inc = screen.getByTestId('stepper-inc', {
+      includeHiddenElements: true,
+    })
     fireEvent(inc, 'pressIn')
     act(() => {
       jest.advanceTimersByTime(400 + 5 * 100)
@@ -312,11 +316,47 @@ describe('Stepper', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('no app, os botões ficam fora do leitor de tela (quem ajusta é o controle)', () => {
+    renderStepper()
+    expect(screen.queryByTestId('stepper-inc')).toBeNull()
+  })
+
+  it('no web: grupo com botões Diminuir e Aumentar de verdade', () => {
+    const os = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      const onChange = jest.fn()
+      render(
+        <Stepper
+          label="Sangue"
+          value={9}
+          min={0}
+          max={13}
+          onChange={onChange}
+          valueText={n => `${n} de 13`}
+        />
+      )
+      const more = screen.getByRole('button', { name: 'Aumentar Sangue' })
+      fireEvent(more, 'pressIn')
+      fireEvent(more, 'pressOut')
+      expect(onChange).toHaveBeenCalledWith(10)
+      expect(
+        screen.getByRole('button', { name: 'Diminuir Sangue' })
+      ).toBeTruthy()
+      expect(screen.getByLabelText('Sangue, 9 de 13')).toBeTruthy()
+      expect(screen.queryByRole('adjustable')).toBeNull()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
+  })
+
   it('no sheet, botões de 56', () => {
     renderStepper({ size: 'sheet' })
-    expect(styleOf(screen.getByTestId('stepper-inc')).width).toBe(
-      tokens.size.stepperSize
-    )
+    expect(
+      styleOf(
+        screen.getByTestId('stepper-inc', { includeHiddenElements: true })
+      ).width
+    ).toBe(tokens.size.stepperSize)
   })
 })
 

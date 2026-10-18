@@ -25,7 +25,7 @@ export function Chip({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected }}
+      aria-selected={selected}
       onPress={onPress}
       disabled={!onPress}
       style={[

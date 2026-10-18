@@ -45,12 +45,7 @@ export function RatingDots(props: RatingDotsProps) {
   const empty = theme.colors.pipEmpty
   const shape = props.shape ?? tokens.skins[theme.skin].pip
   return (
-    <View
-      testID={props.testID}
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
+    <View testID={props.testID} accessible={false} aria-hidden>
       <Svg width={pips.length * (d + gap) - gap} height={d}>
         {pips.map((kind, i) => {
           const x = i * (d + gap)

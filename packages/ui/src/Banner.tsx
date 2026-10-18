@@ -42,7 +42,7 @@ export function Banner({
         action ? undefined : [title, message].filter(Boolean).join('. ')
       }
       accessibilityRole={urgent ? 'alert' : 'summary'}
-      accessibilityLiveRegion={urgent ? 'assertive' : 'polite'}
+      aria-live={urgent ? 'assertive' : 'polite'}
       style={[
         styles.banner,
         { borderLeftColor: edge, backgroundColor: colors.surface },

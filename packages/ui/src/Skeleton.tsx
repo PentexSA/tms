@@ -20,7 +20,7 @@ export function Skeleton({
       testID={testID}
       accessible
       accessibilityLabel={label}
-      accessibilityState={{ busy: true }}
+      aria-busy
       style={styles.root}
     >
       {Array.from({ length: lines }, (_, i) => (

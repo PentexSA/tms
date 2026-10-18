@@ -42,7 +42,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ busy }}
+      aria-busy={busy}
       disabled={disabled || busy}
       onPress={onPress}
       style={[styles.button, { backgroundColor: p.bg, borderColor: p.border }]}

@@ -45,6 +45,9 @@ export class Session {
   #state: SessionState = { status: 'loading', user: null }
   #accessToken: string | null = null
   #refreshing: Promise<boolean> | null = null
+  // Sobe a cada saída: resposta de refresh ou login iniciado antes dela é
+  // descartada (sair é definitivo, mesmo com uma renovação em voo)
+  #epoch = 0
   readonly #listeners = new Set<() => void>()
   readonly #signOutListeners = new Set<() => void>()
   readonly #deps: SessionDeps
@@ -128,6 +131,7 @@ export class Session {
 
   /** Sai localmente (refresh recusado ou logout): apaga tudo do usuário. */
   async signOut(): Promise<void> {
+    this.#epoch++
     this.#accessToken = null
     await this.#deps.store.clear()
     this.#set({ status: 'signedOut', user: null })
@@ -135,6 +139,7 @@ export class Session {
   }
 
   async #doRefresh(): Promise<boolean> {
+    const epoch = this.#epoch
     const stored = this.#deps.store.refreshInBody
       ? await this.#deps.store.read()
       : null
@@ -149,11 +154,14 @@ export class Session {
       // Sem rede não é sessão inválida: mantém o estado e tenta depois
       return false
     }
+    if (epoch !== this.#epoch) return false
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) await this.signOut()
       return false
     }
-    await this.#accept((await res.json()) as TokenResponse)
+    const data = (await res.json()) as TokenResponse
+    if (epoch !== this.#epoch) return false
+    await this.#accept(data)
     return true
   }
 

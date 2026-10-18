@@ -28,7 +28,7 @@ export function IconButton({
       onPress={onPress}
       style={styles.button}
     >
-      <Text variant="title" accessible={false} importantForAccessibility="no">
+      <Text variant="title" accessible={false} aria-hidden>
         {glyph}
       </Text>
     </Pressable>

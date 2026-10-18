@@ -21,13 +21,7 @@ export interface BoxTrackProps {
 export function BoxTrack({ boxes, testID }: BoxTrackProps) {
   const { colors, accent } = useTheme()
   return (
-    <View
-      testID={testID}
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.row}
-    >
+    <View testID={testID} accessible={false} aria-hidden style={styles.row}>
       {boxes.map((box, i) => {
         const tone = box.tone ?? (box.glyph ? 'filled' : 'empty')
         return (

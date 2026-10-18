@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { type AccessibilityActionEvent, StyleSheet, View } from 'react-native'
+import {
+  type AccessibilityActionEvent,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
 
-// Stepper (design system §8 e §11): muda 1 por toque e nunca salta. Para o
-// leitor de tela é um controle "adjustable" com increment e decrement. Segurar
+// Stepper (design system §8 e §11): muda 1 por toque e nunca salta. Segurar
 // − ou + repete só no visual e grava UMA mudança ao soltar.
+//
+// Acessibilidade por plataforma (DS §11): no app, um controle "adjustable"
+// com increment e decrement (os botões ficam escondidos do leitor de tela);
+// no web, um grupo com os botões "Diminuir" e "Aumentar" de verdade, porque o
+// react-native-web não liga as setas do teclado às ações de acessibilidade.
 
 export interface StepperProps {
   readonly label: string
@@ -84,13 +93,19 @@ export function Stepper({
   }
 
   const big = size === 'sheet'
+  const web = Platform.OS === 'web'
+  const spoken = valueText ? valueText(display) : String(display)
   const button = (delta: 1 | -1) => {
     const off = disabled || (delta < 0 ? display <= min : display >= max)
     return (
       <Pressable
         testID={testID ? `${testID}-${delta > 0 ? 'inc' : 'dec'}` : undefined}
-        accessible={false}
-        importantForAccessibility="no"
+        {...(web
+          ? {
+              accessibilityRole: 'button' as const,
+              accessibilityLabel: `${delta > 0 ? 'Aumentar' : 'Diminuir'} ${label}`,
+            }
+          : { accessible: false, 'aria-hidden': true })}
         disabled={off}
         onPressIn={() => pressIn(delta)}
         onPressOut={() => pressOut(delta)}
@@ -107,27 +122,33 @@ export function Stepper({
     )
   }
 
+  const container = web
+    ? { role: 'group' as const, 'aria-label': label }
+    : {
+        accessible: true,
+        accessibilityRole: 'adjustable' as const,
+        accessibilityLabel: label,
+        'aria-valuemin': min,
+        'aria-valuemax': max,
+        'aria-valuenow': display,
+        'aria-valuetext': valueText ? valueText(display) : undefined,
+        'aria-disabled': disabled,
+        accessibilityActions: [{ name: 'increment' }, { name: 'decrement' }],
+        onAccessibilityAction: disabled ? undefined : onAction,
+      }
+
   return (
-    <View
-      testID={testID}
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel={label}
-      accessibilityValue={{
-        min,
-        max,
-        now: display,
-        text: valueText ? valueText(display) : undefined,
-      }}
-      accessibilityState={{ disabled }}
-      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={disabled ? undefined : onAction}
-      style={styles.row}
-    >
+    <View testID={testID} {...container} style={styles.row}>
       {button(-1)}
       <Text
         variant={big ? 'numberLg' : 'number'}
         style={[styles.value, big && styles.valueBig]}
+        {...(web
+          ? {
+              accessibilityLabel: `${label}, ${spoken}`,
+              'aria-live': 'polite' as const,
+            }
+          : {})}
       >
         {String(display)}
       </Text>

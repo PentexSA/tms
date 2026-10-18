@@ -98,7 +98,7 @@ function ToastView({
       style={[styles.host, { bottom: tokens.space[4] + insets.bottom }]}
     >
       <View
-        accessibilityLiveRegion="polite"
+        aria-live="polite"
         style={[
           styles.toast,
           {

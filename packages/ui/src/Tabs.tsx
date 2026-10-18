@@ -40,7 +40,7 @@ export function Tabs({
             key={item.id}
             accessibilityRole="tab"
             accessibilityLabel={item.label}
-            accessibilityState={{ selected: active }}
+            aria-selected={active}
             onPress={() => onSelect(item.id)}
             style={[styles.tab, active && { borderBottomColor: colors.action }]}
           >
