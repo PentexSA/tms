@@ -185,6 +185,9 @@ importers:
       '@tanstack/react-query':
         specifier: 5.104.1
         version: 5.104.1(react@19.1.0)
+      '@tms/sheet-core':
+        specifier: workspace:*
+        version: link:../../packages/sheet-core
       '@tms/ui':
         specifier: workspace:*
         version: link:../../packages/ui

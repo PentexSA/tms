@@ -22,5 +22,24 @@ export async function signUp(context: BrowserContext, prefix: string) {
   })
   if (res.status() !== 201)
     throw new Error(`cadastro falhou: ${res.status()} ${await res.text()}`)
-  return { username }
+  const { accessToken } = (await res.json()) as { accessToken: string }
+  return { username, accessToken }
+}
+
+/** Chamada à API como o usuário (token de acesso do cadastro). */
+export async function apiAs<T>(
+  context: BrowserContext,
+  user: { accessToken: string },
+  method: 'GET' | 'POST',
+  path: string,
+  data?: unknown
+): Promise<T> {
+  const res = await context.request.fetch(`${API_URL}${path}`, {
+    method,
+    data,
+    headers: { authorization: `Bearer ${user.accessToken}` },
+  })
+  if (!res.ok())
+    throw new Error(`${method} ${path}: ${res.status()} ${await res.text()}`)
+  return (await res.json()) as T
 }

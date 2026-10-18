@@ -16,6 +16,8 @@ export function createFakeApi() {
     invitesDelete: jest.fn(),
   }
   const calls = {
+    characterGet: jest.fn(),
+    templateGet: jest.fn(),
     systemsGet: jest.fn(),
     chroniclesGet: jest.fn(),
     chroniclesPost: jest.fn(),
@@ -26,7 +28,15 @@ export function createFakeApi() {
   }
   const api = {
     health: { get: (...a: unknown[]) => calls.healthGet(...a) },
-    systems: { get: (...a: unknown[]) => calls.systemsGet(...a) },
+    systems: Object.assign(
+      ({ code }: { code: string }) => ({
+        template: { get: (...a: unknown[]) => calls.templateGet(code, ...a) },
+      }),
+      { get: (...a: unknown[]) => calls.systemsGet(...a) }
+    ),
+    characters: ({ id }: { id: string }) => ({
+      get: (...a: unknown[]) => calls.characterGet(id, ...a),
+    }),
     chronicles: Object.assign(
       ({ id }: { id: string }) => {
         calls.chronicleIds.push(id)

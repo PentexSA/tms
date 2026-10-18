@@ -13,3 +13,17 @@ describe('apiUrlOf', () => {
     expect(() => apiUrlOf(raw)).toThrow('http(s)')
   })
 })
+
+describe('shouldRetry', () => {
+  const { shouldRetry } =
+    require('../queryClient') as typeof import('../queryClient')
+  it.each([
+    [0, { status: 404 }, false],
+    [0, { status: 401 }, false],
+    [0, { status: 500 }, true],
+    [1, new TypeError('offline'), true],
+    [2, { status: 503 }, false],
+  ])('tentativa %i com %p → %p', (count, error, expected) => {
+    expect(shouldRetry(count, error)).toBe(expected)
+  })
+})

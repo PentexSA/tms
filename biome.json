@@ -95,6 +95,10 @@
         "noUselessRegexBackrefs": "error",
         "noWith": "error",
         "useGetterReturn": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "error",
+        "noDangerouslySetInnerHtmlWithChildren": "error"
       }
     }
   },

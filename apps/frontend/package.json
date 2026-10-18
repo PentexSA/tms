@@ -16,6 +16,7 @@
   "dependencies": {
     "@elysiajs/eden": "catalog:",
     "@tanstack/react-query": "5.104.1",
+    "@tms/sheet-core": "workspace:*",
     "@tms/ui": "workspace:*",
     "expo": "54.0.37",
     "expo-clipboard": "8.0.8",
