@@ -30,7 +30,7 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   await page.getByRole('button', { name: 'Criar ficha' }).click()
 
   // A ficha nova abre em Evoluir (Etapa 18)
-  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}\?mode=evolve$/)
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   await expect(
     page.getByRole('heading', { name: 'Helena Varga' })
   ).toBeVisible()

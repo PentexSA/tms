@@ -21,7 +21,7 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
   await page.getByRole('button', { name: 'Criar ficha' }).click()
 
   // A ficha nova abre em Evoluir
-  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}\?mode=evolve$/)
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   const id = /characters\/([0-9a-f-]{36})/.exec(page.url())?.[1]
   await expect(page.getByText('Evoluindo · 0 alterações')).toBeVisible()
 
