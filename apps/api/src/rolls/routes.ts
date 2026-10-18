@@ -9,7 +9,9 @@ import {
   poolRollOf,
   rollPool,
   type SheetData,
+  type SheetModel,
   stripRestricted,
+  withEffectiveFrom,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely, Transaction } from 'kysely'
@@ -91,6 +93,8 @@ async function recordCost(
     characterId: string
     userId: string
     byRole: string
+    model: SheetModel
+    before: SheetData
     sheet: SheetData
     sheetVersion: number
     events: Extract<PoolPlan, { ok: true }>['events']
@@ -122,7 +126,9 @@ async function recordCost(
   await trx
     .insertInto('character_events')
     .values(
-      args.events.map((e, seq) => ({
+      // O "de" efetivo, como no endpoint de eventos ("FdV 7 → 6" com a FdV
+      // ainda no padrão)
+      withEffectiveFrom(args.model, args.before, args.events).map((e, seq) => ({
         batch_id: batch.id,
         seq,
         path: e.path,
@@ -248,6 +254,8 @@ export function rollRoutes(
               characterId: params.id,
               userId: me,
               byRole,
+              model,
+              before: current,
               sheet,
               sheetVersion,
               events: plan.events,

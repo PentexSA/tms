@@ -422,6 +422,23 @@ describe('o que muda em Jogo', () => {
     expect(defaultMode(['player'])).toBe('read')
   })
 
+  it('Dados ficam na barra de Jogo, ao lado do ⋯', () => {
+    setup(helena())
+    expect(screen.getByRole('button', { name: 'Dados' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ações da ficha' })).toBeTruthy()
+  })
+
+  it('em Leitura não há Dados', () => {
+    setup(helena(), { roles: ['storyteller'], mode: 'read' })
+    expect(screen.queryByRole('button', { name: 'Dados' })).toBeNull()
+  })
+
+  it('template sem rolagem (D&D) não mostra Dados, com o mesmo código', () => {
+    const lia = example('lia')
+    setup(lia.sheet, { model: modelOf(lia.system) })
+    expect(screen.queryByRole('button', { name: 'Dados' })).toBeNull()
+  })
+
   it('em Leitura: sem dock, sem ⋯ e o sheet só mostra', () => {
     setup(helena(), { roles: ['storyteller'], mode: 'read' })
     expect(screen.queryByTestId('dock-blood')).toBeNull()

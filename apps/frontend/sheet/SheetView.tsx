@@ -15,6 +15,7 @@ import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
+import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
@@ -126,6 +127,11 @@ function SheetBody({
               <ConflictBanner />
               {mode === 'play' ? (
                 <View style={styles.toolbar}>
+                  {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
+                  <DiceButton
+                    characterId={store.getState().characterId}
+                    store={store}
+                  />
                   <ActionsButton />
                 </View>
               ) : null}
@@ -174,6 +180,8 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
   },
   content: { paddingBottom: tokens.space[12] },

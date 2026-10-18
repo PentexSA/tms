@@ -203,6 +203,25 @@ describe('POST /characters/:id/rolls', () => {
     })
   })
 
+  it('FdV ainda no padrão: o histórico mostra o efetivo (1 → 0)', async () => {
+    queue = [7, 7, 7]
+    const fresh = await createCharacter(ctx, owner, chronicleId, {
+      name: 'Nova',
+    })
+    const res = await as(ctx, owner, 'POST', `/characters/${fresh}/rolls`, {
+      clientRollId: crypto.randomUUID(),
+      ...dexAthletics,
+      boosts: ['willpower'],
+    })
+    expect(res.status).toBe(201)
+    const history = (await (
+      await as(ctx, owner, 'GET', `/characters/${fresh}/history`)
+    ).json()) as { items: { changes: { label: string; change: string }[] }[] }
+    expect(history.items[0]?.changes).toEqual([
+      { label: 'FdV', change: '1 → 0' },
+    ])
+  })
+
   it('o mesmo clientRollId reenviado não rola nem cobra de novo', async () => {
     queue = [7, 7, 7, 7, 7]
     const body = {

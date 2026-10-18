@@ -34,12 +34,13 @@ test('montar Destreza + Esportes e rolar', async ({ page }) => {
   await page.getByRole('button', { name: 'Dados', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Dados' })).toBeVisible()
 
+  // Nome exato: a ficha atrás do sheet também tem "Destreza, 3 de 5"
   await page.getByRole('button', { name: /^Atributo:/ }).click()
   await page.getByLabel('Buscar atributo').fill('destreza')
-  await page.getByRole('button', { name: /^Destreza, 3/ }).click()
+  await page.getByRole('button', { name: 'Destreza, 3', exact: true }).click()
   await page.getByRole('button', { name: /^Habilidade ou Disciplina:/ }).click()
   await page.getByLabel('Buscar habilidade ou disciplina').fill('esportes')
-  await page.getByRole('button', { name: /^Esportes, 2/ }).click()
+  await page.getByRole('button', { name: 'Esportes, 2', exact: true }).click()
   await expect(page.getByLabel('Parada: 5 dados')).toBeVisible()
 
   await page.getByRole('button', { name: 'Rolar no app' }).click()
