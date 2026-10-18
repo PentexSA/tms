@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Sem tipos de plataforma: o core não pode usar APIs de Node, Bun ou DOM.
+    "types": []
+  },
+  "exclude": ["src/**/__tests__/**", "node_modules", "dist"]
+}

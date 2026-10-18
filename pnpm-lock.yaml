@@ -351,6 +351,18 @@ importers:
         specifier: 13.1.3
         version: 13.1.3
 
+  packages/sheet-core:
+    devDependencies:
+      '@tms/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      bun-types:
+        specifier: ^1.4.2
+        version: 1.4.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   packages/tsconfig: {}
 
   packages/ui:
