@@ -1,6 +1,9 @@
 import { type Treaty, treaty } from '@elysiajs/eden'
+import type { DB } from '@tms/db'
 import { createPGliteTestDb } from '@tms/db/testing'
+import type { Kysely } from 'kysely'
 import { type App, createApp } from '../index'
+import type { AppOptions } from '../options'
 
 // Banco do teste atual, destruído por destroyTestDb()
 let testDbCleanup: (() => Promise<void>) | null = null
@@ -15,12 +18,37 @@ let testDbCleanup: (() => Promise<void>) | null = null
  * const app = await createTestApp()
  * const response = await app.handle(new Request('http://localhost/health'))
  */
-export async function createTestApp() {
+export async function createTestApp(overrides: Partial<AppOptions> = {}) {
+  return (await createTestContext(overrides)).app
+}
+
+/** Relógio controlado pelo teste (expiração de token, janelas de rate limit). */
+export function fakeClock(start = new Date('2026-10-18T12:00:00Z')) {
+  let t = start.getTime()
+  return {
+    now: () => new Date(t),
+    advance: (ms: number) => {
+      t += ms
+    },
+  }
+}
+
+export interface TestContext {
+  readonly app: App
+  readonly db: Kysely<DB>
+  readonly clock: ReturnType<typeof fakeClock>
+}
+
+/** App + banco de teste + relógio falso. Destrua com destroyTestDb(). */
+export async function createTestContext(
+  overrides: Partial<AppOptions> = {}
+): Promise<TestContext> {
   // Banco novo a cada teste, com todas as migrations de @tms/db
   const { db, destroy } = await createPGliteTestDb()
   testDbCleanup = destroy
-
-  return createApp(db)
+  const clock = fakeClock()
+  const app = createApp(db, { now: clock.now, ...overrides })
+  return { app, db, clock }
 }
 
 /**

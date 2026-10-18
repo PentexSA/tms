@@ -53,6 +53,18 @@ export interface GameSystems {
   name: string
 }
 
+export interface RefreshTokens {
+  created_at: Generated<Timestamp>
+  expires_at: Timestamp
+  family_expires_at: Timestamp
+  family_id: string
+  id: Generated<string>
+  replaced_by: string | null
+  revoked_at: Timestamp | null
+  token_hash: string
+  user_id: string
+}
+
 export interface TraitTemplates {
   id: Generated<string>
   published_at: Generated<Timestamp>
@@ -75,6 +87,7 @@ export interface DB {
   characters: Characters
   chronicles: Chronicles
   game_systems: GameSystems
+  refresh_tokens: RefreshTokens
   trait_templates: TraitTemplates
   users: Users
 }

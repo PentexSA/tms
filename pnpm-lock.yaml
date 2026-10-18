@@ -154,6 +154,9 @@ importers:
       file-type:
         specifier: 21.3.4
         version: 21.3.4
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
       serialize-error:
         specifier: 12.0.0
         version: 12.0.0
@@ -3756,6 +3759,9 @@ packages:
   jiti@2.0.0-beta.3:
     resolution: {integrity: sha512-pmfRbVRs/7khFrSAYnSiJ8C0D5GvzkE4Ey2pAvUcJsw1ly/p+7ut27jbJrjY79BpAJQJ4gXYFtK6d1Aub+9baQ==}
     hasBin: true
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -9849,6 +9855,8 @@ snapshots:
   jiti@1.21.7: {}
 
   jiti@2.0.0-beta.3: {}
+
+  jose@6.2.12: {}
 
   joycon@3.1.1: {}
 

@@ -27,6 +27,7 @@ describe('migrations', () => {
         'characters',
         'chronicles',
         'game_systems',
+        'refresh_tokens',
         'trait_templates',
         'users',
       ])
