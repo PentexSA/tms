@@ -3,6 +3,11 @@
 // (Expo) usam o mesmo código: no servidor ele é a autoridade; no cliente,
 // conveniência.
 
+export * from './compile'
+export type * from './contract'
 export { DERIVE, isDeriveName } from './derive'
+export { PALETTE } from './palette'
+export * from './parse'
 export * from './registry'
+export * from './resolve'
 export * from './validate'

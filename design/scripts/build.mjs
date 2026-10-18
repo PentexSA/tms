@@ -181,4 +181,20 @@ writeFileSync(
   `// Gerado por design/scripts/build.mjs a partir de scripts/validate.mjs. Não edite à mão.\n;(() => {\n${validatorSource}\nwindow.TMSValidate = { REGISTRY, isSafeText, validateTemplate, validateSheet }\n})()\n`,
 )
 
+// ---------- paleta para o @tms/sheet-core ----------
+// O core não lê arquivo: a paleta validada (accent-N) vira uma constante TS.
+
+writeFileSync(
+  join(root, '../packages/sheet-core/src/palette.ts'),
+  `// Gerado por design/scripts/build.mjs a partir de design/design-system/tokens.json.
+// Não edite à mão: rode \`node design/scripts/build.mjs\`.
+
+// Paleta de accent validada no CI (contraste e daltonismo): o template só pode
+// citar estes nomes, além de accent-neutral.
+export const PALETTE = [
+${palette.map(n => `  '${n}',`).join('\n')}
+] as const
+`,
+)
+
 console.log(`tokens.css gerado; ${Object.keys(templates).length} templates e ${examples.characters.length} personagens válidos; telas/dados.js gerado.`)
