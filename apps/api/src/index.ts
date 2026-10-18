@@ -10,6 +10,7 @@ import { onError } from './http/on-error'
 import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 import { type AppOptions, resolveOptions } from './options'
+import { sheetRoutes } from './sheets/routes'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -54,6 +55,7 @@ export const createApp = (
       .use(authRoutes(db, options, guard))
       .use(meRoutes(db, guard))
       .use(chronicleRoutes(db, options, guard))
+      .use(sheetRoutes(db, guard))
   )
 }
 

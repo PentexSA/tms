@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { SignJWT } from 'jose'
+import { sql } from 'kysely'
 import { createRateLimiter } from '../http/rate-limit'
 import { logger } from '../logger'
 import { defaultLimits } from '../options'
@@ -467,7 +468,8 @@ describe('CORS, cabeçalhos e erros', () => {
   })
 
   it('erro interno sem stack trace nem mensagem', async () => {
-    await ctx.db.destroy()
+    // Falha de banco no meio da rota
+    await sql`drop table users cascade`.execute(ctx.db)
     const res = await post(
       '/auth/login',
       { email: ana.email, password: ana.password },

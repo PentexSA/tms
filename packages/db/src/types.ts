@@ -24,14 +24,35 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>
 
+export interface CharacterBatches {
+  by_role: string
+  character_id: string
+  client_batch_id: string
+  created_at: Generated<Timestamp>
+  created_by: string
+  id: Generated<string>
+  sheet_version: number
+}
+
+export interface CharacterEvents {
+  batch_id: string
+  from_value: Json | null
+  id: Generated<string>
+  path: string
+  seq: number
+  to_value: Json | null
+}
+
 export interface Characters {
   chronicle_id: string
   created_at: Generated<Timestamp | null>
   deleted_at: Timestamp | null
   id: Generated<string>
   name: string
-  sheet_data: Json | null
+  sheet_data: Json
+  sheet_version: Generated<number>
   system_id: string
+  template_version: string
   updated_at: Generated<Timestamp | null>
   user_id: string
 }
@@ -102,6 +123,8 @@ export interface Users {
 }
 
 export interface DB {
+  character_batches: CharacterBatches
+  character_events: CharacterEvents
   characters: Characters
   chronicle_invites: ChronicleInvites
   chronicle_members: ChronicleMembers

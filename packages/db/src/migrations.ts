@@ -9,6 +9,7 @@ import * as m0007 from './migrations/0007_drop_todos'
 import * as m0008 from './migrations/0008_template_versions'
 import * as m0009 from './migrations/0009_auth'
 import * as m0010 from './migrations/0010_chronicle_members'
+import * as m0011 from './migrations/0011_character_sync'
 
 /**
  * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
@@ -26,6 +27,7 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0008_template_versions': m0008,
   '0009_auth': m0009,
   '0010_chronicle_members': m0010,
+  '0011_character_sync': m0011,
 }
 
 export const migrationProvider: MigrationProvider = {

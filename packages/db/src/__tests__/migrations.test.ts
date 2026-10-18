@@ -24,6 +24,8 @@ describe('migrations', () => {
         where table_schema = 'public' and table_name not like 'kysely_%'
         order by table_name`.execute(db)
       expect(rows.map(r => r.table_name)).toEqual([
+        'character_batches',
+        'character_events',
         'characters',
         'chronicle_invites',
         'chronicle_members',

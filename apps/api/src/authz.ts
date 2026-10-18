@@ -32,3 +32,61 @@ export async function chronicleRoles(
   if (row.member) roles.add('player')
   return roles
 }
+
+export interface CharacterAccess {
+  readonly roles: Roles
+  readonly character: {
+    readonly id: string
+    readonly userId: string
+    readonly chronicleId: string
+    readonly systemId: string
+    readonly templateVersion: string
+  }
+}
+
+/**
+ * Papéis na ficha: dono (characters.user_id), narrador da crônica e jogador
+ * (outro membro da crônica). Ficha excluída ou sem vínculo: null (404).
+ */
+export async function characterAccess(
+  db: Kysely<DB>,
+  userId: string,
+  characterId: string
+): Promise<CharacterAccess | null> {
+  const row = await db
+    .selectFrom('characters as ch')
+    .innerJoin('chronicles as c', 'c.id', 'ch.chronicle_id')
+    .leftJoin('chronicle_members as m', join =>
+      join
+        .onRef('m.chronicle_id', '=', 'ch.chronicle_id')
+        .on('m.user_id', '=', userId)
+    )
+    .select([
+      'ch.id',
+      'ch.user_id',
+      'ch.chronicle_id',
+      'ch.system_id',
+      'ch.template_version',
+      'c.storyteller_id',
+      'm.user_id as member',
+    ])
+    .where('ch.id', '=', characterId)
+    .where('ch.deleted_at', 'is', null)
+    .executeTakeFirst()
+  if (!row) return null
+  const roles = new Set<RoleName>()
+  if (row.user_id === userId) roles.add('owner')
+  if (row.storyteller_id === userId) roles.add('storyteller')
+  if (row.member && row.user_id !== userId) roles.add('player')
+  if (roles.size === 0) return null
+  return {
+    roles,
+    character: {
+      id: row.id,
+      userId: row.user_id,
+      chronicleId: row.chronicle_id,
+      systemId: row.system_id,
+      templateVersion: row.template_version,
+    },
+  }
+}

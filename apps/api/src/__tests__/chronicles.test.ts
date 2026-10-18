@@ -7,7 +7,6 @@ import {
 } from '../chronicles/invite-code'
 import { createRateLimiter } from '../http/rate-limit'
 import { defaultLimits } from '../options'
-import { type Actor, MATRIX, NOT_IN_MATRIX } from '../test/authz-matrix'
 import {
   addMember,
   as,
@@ -44,14 +43,6 @@ async function scenario(extra: Parameters<typeof createTestContext>[0] = {}) {
   await createChronicle(ctx, otherStoryteller, 'vtm-v20', 'Outra crônica')
 }
 
-const actors: Record<Actor, () => TestUser | null> = {
-  storyteller: () => storyteller,
-  player: () => player,
-  otherStoryteller: () => otherStoryteller,
-  stranger: () => stranger,
-  anonymous: () => null,
-}
-
 async function newInvite(user: TestUser = storyteller, body?: unknown) {
   const res = await as(
     ctx,
@@ -73,38 +64,6 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   await destroyTestDb()
-})
-
-describe('matriz de AuthZ', () => {
-  for (const row of MATRIX)
-    for (const [actor, status] of Object.entries(row.expect) as [
-      Actor,
-      number,
-    ][])
-      it(`${row.method} ${row.route} como ${actor} → ${status}`, async () => {
-        const invite = row.route.includes(':inviteId')
-          ? await newInvite()
-          : null
-        const path = row.route
-          .replace(':id', chronicleId)
-          .replace(':inviteId', invite?.id ?? '')
-        const res = await as(ctx, actors[actor](), row.method, path)
-        expect(res.status).toBe(status)
-      })
-
-  it('toda rota protegida tem linha na matriz ou está na lista de exceções', () => {
-    const inMatrix = new Set(MATRIX.map(r => `${r.method} ${r.route}`))
-    const missing = ctx.app.routes
-      .filter(r => r.method !== 'OPTIONS' && !r.path.startsWith('/swagger'))
-      .map(r => `${r.method} ${r.path}`)
-      .filter(k => !inMatrix.has(k) && !NOT_IN_MATRIX.has(k))
-    expect(missing).toEqual([])
-  })
-
-  it('id malformado é recusado antes do banco', async () => {
-    const res = await as(ctx, storyteller, 'GET', '/chronicles/1 or 1=1')
-    expect(res.status).toBe(400)
-  })
 })
 
 describe('GET /systems', () => {

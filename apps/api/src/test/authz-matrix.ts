@@ -5,7 +5,9 @@
 export type Actor =
   // narrador da crônica do cenário
   | 'storyteller'
-  // jogador da crônica (membro)
+  // jogador da crônica, dono da ficha do cenário
+  | 'owner'
+  // outro jogador da mesma crônica
   | 'player'
   // narrador de outra crônica
   | 'otherStoryteller'
@@ -15,9 +17,10 @@ export type Actor =
 
 export interface MatrixRow {
   readonly method: string
-  // Caminho do Elysia, com :id e afins
+  // Caminho do Elysia, com :id e afins (:id é a crônica ou a ficha)
   readonly route: string
   readonly expect: Readonly<Record<Actor, number>>
+  readonly body?: unknown
 }
 
 const denied = { otherStoryteller: 404, stranger: 404, anonymous: 401 } as const
@@ -26,22 +29,43 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'GET',
     route: '/chronicles/:id',
-    expect: { storyteller: 200, player: 200, ...denied },
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
   },
   {
     method: 'POST',
     route: '/chronicles/:id/invites',
-    expect: { storyteller: 201, player: 403, ...denied },
+    expect: { storyteller: 201, owner: 403, player: 403, ...denied },
   },
   {
     method: 'GET',
     route: '/chronicles/:id/invites',
-    expect: { storyteller: 200, player: 403, ...denied },
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
   },
   {
     method: 'DELETE',
     route: '/chronicles/:id/invites/:inviteId',
-    expect: { storyteller: 204, player: 403, ...denied },
+    expect: { storyteller: 204, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/characters',
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/characters',
+    body: { values: { name: 'Nova' } },
+    expect: { storyteller: 201, owner: 201, player: 201, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/characters/:id',
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+  },
+  {
+    method: 'DELETE',
+    route: '/characters/:id',
+    expect: { storyteller: 204, owner: 204, player: 403, ...denied },
   },
 ]
 
@@ -55,6 +79,7 @@ export const NOT_IN_MATRIX = new Set([
   'POST /auth/logout',
   'GET /me',
   'GET /systems',
+  'GET /systems/:code/template',
   'POST /chronicles',
   'GET /chronicles',
   'POST /invites/accept',

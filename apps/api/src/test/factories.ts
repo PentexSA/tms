@@ -86,3 +86,37 @@ export const as = (
   path: string,
   body?: unknown
 ) => makeRequest(ctx.app, method, path, body, user?.headers ?? {})
+
+/** Ficha direto no banco, já com a versão publicada do template. */
+export async function createCharacter(
+  ctx: TestContext,
+  owner: TestUser,
+  chronicleId: string,
+  values: Record<string, unknown> = { name: 'Helena Varga' },
+  specialties: Record<string, string> = {}
+): Promise<string> {
+  const chronicle = await ctx.db
+    .selectFrom('chronicles')
+    .select('system_id')
+    .where('id', '=', chronicleId)
+    .executeTakeFirstOrThrow()
+  const template = await ctx.db
+    .selectFrom('trait_templates')
+    .select('version')
+    .where('system_id', '=', chronicle.system_id)
+    .orderBy('published_at', 'desc')
+    .executeTakeFirstOrThrow()
+  const row = await ctx.db
+    .insertInto('characters')
+    .values({
+      user_id: owner.id,
+      chronicle_id: chronicleId,
+      system_id: chronicle.system_id,
+      name: String(values.name ?? 'Sem nome'),
+      sheet_data: JSON.stringify({ values, specialties }),
+      template_version: template.version,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow()
+  return row.id
+}
