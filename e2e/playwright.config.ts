@@ -39,7 +39,7 @@ export default defineConfig({
       },
     },
     {
-      command: `bun serve-web.ts ../apps/frontend/dist ${WEB_PORT} ${API_URL}`,
+      command: `bun serve-web.ts ../apps/frontend/dist ${WEB_PORT}`,
       url: WEB_URL,
       reuseExistingServer: !CI,
     },
