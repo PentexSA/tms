@@ -10,6 +10,7 @@ import { onError } from './http/on-error'
 import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 import { type AppOptions, resolveOptions } from './options'
+import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
 
 /**
@@ -56,6 +57,7 @@ export const createApp = (
       .use(meRoutes(db, guard))
       .use(chronicleRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
+      .use(eventRoutes(db, options, guard))
   )
 }
 

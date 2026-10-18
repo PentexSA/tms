@@ -628,7 +628,7 @@ G · depende de: 4, 12
 - o mesmo `clientBatchId` enviado duas vezes é aplicado uma vez só;
 - um lote com um evento inválido não grava nada;
 - o 409 não vaza Notas do Narrador para o jogador;
-- 51 eventos → 422; corpo de 65 KB → 413; 429;
+- 51 eventos → 400 (o limite está no schema da rota, é forma); corpo de 65 KB → 413; 429;
 - o histórico não tem conteúdo de texto, e o jogador não vê caminhos restritos;
 - um spy no logger mostra que um texto "segredo" nas notas nunca aparece em log;
 - no job `postgres` do CI, dois lotes concorrentes com o mesmo `from` resultam em exatamente um 200 e um 409. O PGLite tem uma conexão só e não prova a trava.

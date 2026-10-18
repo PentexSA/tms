@@ -16,6 +16,8 @@ export interface Limits {
   readonly loginFailures: RateLimiter
   // Por usuário e por IP: aceitar convite (força bruta no código).
   readonly invites: RateLimiter
+  // Lotes de eventos: por usuário e por ficha.
+  readonly events: RateLimiter
 }
 
 export interface AppOptions {
@@ -52,6 +54,7 @@ export function defaultLimits(now: () => Date): Limits {
       windowMs: 15 * MINUTE,
       now: clock,
     }),
+    events: createRateLimiter({ limit: 120, windowMs: MINUTE, now: clock }),
   }
 }
 
