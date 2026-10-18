@@ -20,6 +20,8 @@ import { layoutFor, layouts } from '../layouts'
 import { ListLayout } from '../layouts/ListLayout'
 import { SheetView } from '../SheetView'
 import { resolveView } from '../views'
+import { FieldDetail } from '../views/FieldDetail'
+import { GenericChip } from '../views/GenericChip'
 import { GenericFact, GenericRow } from '../views/GenericRow'
 
 // Etapa 13: qualquer ficha aparece inteira em Leitura, com o GenericRow, e o
@@ -165,9 +167,16 @@ describe('registry de views e de layouts', () => {
     }
     expect(resolveView('wod', 'rating', 'cell', views, skins)).toBe(Skin)
     expect(resolveView('dnd', 'rating', 'cell', views, skins)).toBe(Cell)
-    expect(resolveView('dnd', 'rating', 'chip', views, skins)).toBe(Row)
-    expect(resolveView('dnd', 'number', 'chip', views, skins)).toBe(GenericRow)
+    expect(resolveView('dnd', 'rating', 'editor', views, skins)).toBe(Row)
+    expect(resolveView('dnd', 'number', 'editor', views, skins)).toBe(
+      GenericRow
+    )
     expect(resolveView('dnd', 'number', 'fact', views, skins)).toBe(GenericFact)
+    // Chip do dock e sheet não caem numa linha: têm genéricos próprios
+    expect(resolveView('dnd', 'rating', 'chip', views, skins)).toBe(GenericChip)
+    expect(resolveView('dnd', 'number', 'sheet', views, skins)).toBe(
+      FieldDetail
+    )
     expect(
       resolveView('dnd', 'constructor' as never, 'row', views, skins)
     ).toBe(GenericRow)

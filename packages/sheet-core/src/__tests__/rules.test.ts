@@ -8,7 +8,12 @@ import type {
   TemplateAction,
   TrackField,
 } from '../contract'
-import { planAction, planDamage, planDefaultAction } from '../effects'
+import {
+  IMPLEMENTED_EFFECTS,
+  planAction,
+  planDamage,
+  planDefaultAction,
+} from '../effects'
 import { applyBatch } from '../events'
 import { type ResolvedResource, resolve } from '../resolve'
 import { gain, setCurrent, spend, takeDamage } from '../rules/resource'
@@ -392,5 +397,24 @@ describe('planDamage (sheet da Vitalidade)', () => {
   it('campo que não é trilha wod-stacking', () => {
     expect(planDamage(model, helena(), 'blood', 'lethal', 1).ok).toBe(false)
     expect(planDamage(model, helena(), 'health', 'lethal', 0).ok).toBe(false)
+  })
+})
+
+describe('IMPLEMENTED_EFFECTS', () => {
+  it('lista o que o planAction aplica; o resto a UI esconde', () => {
+    expect([...IMPLEMENTED_EFFECTS].sort()).toEqual([
+      'health.heal',
+      'resource.gain',
+      'resource.spend',
+    ])
+    // Os descansos do D&D ainda não têm efeito nesta versão
+    const actions = dndModel.template.actions ?? []
+    expect(actions.length).toBeGreaterThan(0)
+    for (const action of actions) {
+      expect(IMPLEMENTED_EFFECTS.has(action.effect)).toBe(false)
+      expect(planAction(dndModel, { values: {} } as SheetData, action)).toEqual(
+        { ok: false, reason: 'Ainda não disponível nesta versão' }
+      )
+    }
   })
 })

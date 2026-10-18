@@ -10,6 +10,7 @@ import { jsonEqual } from './equal'
 import type { SheetEvent } from './events'
 import { resource as resourceType } from './fields/resource'
 import { type ChangeLabel, describeEvent } from './labels'
+import type { EffectName } from './registry'
 import {
   type ResolvedResource,
   type ResolvedStacking,
@@ -34,6 +35,14 @@ export type ActionPlan =
   | { readonly ok: false; readonly reason: string }
 
 const unavailable = (reason: string): ActionPlan => ({ ok: false, reason })
+
+/**
+ * Efeitos que o planAction sabe aplicar nesta versão. A UI esconde as ações
+ * com outro efeito, em vez de mostrar um botão que nunca funciona.
+ */
+export const IMPLEMENTED_EFFECTS: ReadonlySet<EffectName> = new Set<EffectName>(
+  ['resource.spend', 'resource.gain', 'health.heal']
+)
 
 const stored = (sheet: SheetData, id: FieldId): unknown =>
   Object.hasOwn(sheet.values, id) ? sheet.values[id] : null

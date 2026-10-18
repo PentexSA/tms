@@ -1,5 +1,13 @@
 import type { FieldTypeName, SkinName } from '@tms/sheet-core'
+import { FieldDetail } from './FieldDetail'
+import { GenericChip } from './GenericChip'
 import { GenericFact, GenericRow } from './GenericRow'
+import { ResourceChip } from './resource/ResourceChip'
+import { ResourceRow } from './resource/ResourceRow'
+import { ResourceSheet } from './resource/ResourceSheet'
+import { TrackChip } from './track/TrackChip'
+import { TrackRow } from './track/TrackRow'
+import { TrackSheet } from './track/TrackSheet'
 import type { FieldView, FieldViewComponent, Variant } from './types'
 
 export type { FieldView, FieldViewProps, Variant } from './types'
@@ -10,8 +18,9 @@ export const baseViews = {
   rating: {},
   number: {},
   percent: {},
-  resource: {},
-  track: {},
+  // Modo Jogo (Etapa 17): linha, chip do dock e sheet
+  resource: { row: ResourceRow, chip: ResourceChip, sheet: ResourceSheet },
+  track: { row: TrackRow, chip: TrackChip, sheet: TrackSheet },
   slots: {},
   clock: {},
   state: {},
@@ -29,8 +38,12 @@ export const skinViews: Readonly<
   Record<SkinName, Partial<Record<FieldTypeName, FieldView>>>
 > = { wod: {}, dnd: {}, coc: {}, fate: {} }
 
+// Variantes que não podem cair numa linha: o chip do dock é pequeno e o sheet
+// é o detalhe (com o porquê de não dar para mexer).
 const FALLBACK: Readonly<Partial<Record<Variant, FieldViewComponent>>> = {
   fact: GenericFact,
+  chip: GenericChip,
+  sheet: FieldDetail,
 }
 
 /** Ordem fixa: override da skin → variante do tipo → linha do tipo → genérica. */

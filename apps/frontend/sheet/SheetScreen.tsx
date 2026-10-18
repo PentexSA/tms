@@ -1,3 +1,4 @@
+import type { RoleName, SheetMode } from '@tms/sheet-core'
 import { AppBar, Button, EmptyState, Screen, Skeleton } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -74,6 +75,13 @@ export function SheetScreen({ id }: { readonly id: string }) {
   )
 }
 
+/**
+ * O dono abre a própria ficha em Jogo; os demais (narrador, outros jogadores),
+ * em Leitura. É UX: quem decide se a escrita vale é o servidor.
+ */
+export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
+  roles.includes('owner') ? 'play' : 'read'
+
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
 function LiveSheet({
   state,
@@ -89,6 +97,7 @@ function LiveSheet({
       sheet: state.sheet,
       sheetVersion,
       roles: state.roles,
+      mode: defaultMode(state.roles),
       sync,
     })
   )
