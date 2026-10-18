@@ -35,8 +35,9 @@ jest.mock('@react-native-community/netinfo', () =>
   require('@react-native-community/netinfo/jest/netinfo-mock.js')
 )
 
-// kv-store do expo-sqlite em memória (o SQLite nativo não existe no Jest)
-jest.mock('expo-sqlite/kv-store', () => require('./__mocks__/kvStore'))
+// expo-sqlite em memória, com SQLCipher simulado (o SQLite nativo não existe
+// no Jest)
+jest.mock('expo-sqlite', () => require('./__mocks__/expoSqlite'))
 
 // Mock do Expo Status Bar
 jest.mock('expo-status-bar', () => ({

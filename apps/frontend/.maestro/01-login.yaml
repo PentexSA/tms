@@ -1,0 +1,7 @@
+# Login: o app abre (banco SQLCipher criado, chave no Keychain/Keystore) e
+# entra com a conta de teste
+appId: com.tms.app
+name: Login
+---
+- runFlow: subflows/login.yaml
+- assertVisible: "Suas crônicas"

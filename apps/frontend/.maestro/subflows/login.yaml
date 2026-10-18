@@ -1,0 +1,20 @@
+# Entra com a conta de teste (EMAIL e PASSWORD vêm de -e; nunca no repositório)
+appId: com.tms.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: "Entrar"
+- extendedWaitUntil:
+    visible: "Suas crônicas"
+    timeout: 20000

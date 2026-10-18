@@ -839,6 +839,30 @@ M · depende de: todas
   - exclusão de conta, por ser um direito do titular (LGPD, art. 18).
 - O §8.3 da arquitetura passa a incluir as tabelas que o plano criou: membros, convites, refresh tokens e rolagens.
 
+**Feito (armazenamento nativo e smoke).**
+
+- **SQLCipher** (`sheet/sync/encryptedStorage.ts`, ligado em `storage.native.ts`):
+  - banco `tms-offline.db` cifrado, com chave de 32 bytes do `expo-crypto` guardada só no SecureStore (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`);
+  - `PRAGMA key` antes de qualquer instrução;
+  - fail secure, detalhado no §7.2 da arquitetura: sem chave ou com a chave errada, apaga e recomeça; com o SecureStore falhando ou sem SQLCipher no binário, fica em memória;
+  - o banco sem cifra da Etapa 20 é apagado na primeira abertura;
+  - plugin `["expo-sqlite", { "useSQLCipher": true }]` e identificadores `com.tms.app` no `app.json`. O `expo prebuild` grava `expo.sqlite.useSQLCipher=true` no `gradle.properties`.
+- **Testes:**
+  - `encryptedStorage.test.ts` com um `expo-sqlite` falso que simula a cifra (`test/__mocks__/expoSqlite.ts`). Cobre a primeira abertura, a reutilização da chave, a chave ausente, errada e adulterada, a falha do SecureStore, o binário sem SQLCipher, a ordem do PRAGMA, o prefixo sem curinga e a chave fora dos logs;
+  - `storage.native.test.ts`: as opções do SecureStore e os 32 bytes;
+  - `nativeConfig.test.ts`: o `app.json` mantém o SQLCipher e `allowBackup: false` e não abre cleartext nem ATS.
+- **Maestro** (`apps/frontend/.maestro/`):
+  - quatro fluxos: login, abrir a ficha, gastar Sangue e Desfazer, e modo avião com reinício offline (Android);
+  - o `README.md` explica como rodar num dev build com conta de homologação.
+- **Roteiro manual no aparelho** (iOS e Android, antes de cada release), no mesmo README:
+  1. Ligar o modo avião.
+  2. Gastar Sangue e levar dano: o indicador mostra "Offline · 2 pendentes".
+  3. Fechar o app à força e reabrir sem rede: a ficha abre do aparelho, com os valores e os pendentes.
+  4. Desligar o modo avião: "Salvo", e o mesmo valor no web.
+  5. Sair da conta: sem rede, o app pede login.
+  6. Copiar o `tms-offline.db` de um Android de desenvolvimento: ele não abre no `sqlite3` comum e não contém o texto da ficha.
+- **O que só um dev build prova:** que o binário tem o SQLCipher (`PRAGMA cipher_version`) e que o arquivo no disco está cifrado. O Jest prova a lógica e a ordem das instruções; o Maestro e o roteiro manual provam o aparelho.
+
 ---
 
 ## 6. Riscos

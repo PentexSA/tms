@@ -1,0 +1,19 @@
+# Gastar Sangue pelo dock: toque longo aplica a ação padrão ("Gastar 1
+# Sangue"), o aviso tem Desfazer, e a fila confirma ("Salvo")
+appId: com.tms.app
+name: Gastar Sangue e desfazer
+---
+- runFlow: subflows/open-sheet.yaml
+- longPressOn:
+    id: "dock-blood"
+- assertVisible:
+    text: "Sangue .* → .*"
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Salvo"
+    timeout: 15000
+- tapOn: "Desfazer"
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Salvo"
+    timeout: 15000

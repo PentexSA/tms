@@ -1,11 +1,12 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+import { createFakeSqlite } from '../../../test/__mocks__/expoSqlite'
+import { createEncryptedStorage } from '../encryptedStorage'
 import {
   createMemoryStorage,
   type KeyValueStorage,
   scopeStorage,
   userPrefix,
 } from '../kv'
-import { deviceStorage as native } from '../storage.native'
 import { createIndexedDbStorage } from '../storage.web'
 
 // O jest-expo resolve `../storage` para o .native: o fallback vai explícito
@@ -22,7 +23,24 @@ describe('o mesmo contrato nas três implementações', () => {
   it.each([
     ['memória', () => createMemoryStorage()],
     ['fallback (sem plataforma)', () => fallback],
-    ['nativo (kv-store do expo-sqlite)', () => native],
+    [
+      'nativo (SQLCipher)',
+      () => {
+        const sqlite = createFakeSqlite()
+        const secrets = new Map<string, string>()
+        return createEncryptedStorage({
+          openDatabase: name => sqlite.openDatabaseAsync(name),
+          deleteDatabase: name => sqlite.deleteDatabaseAsync(name),
+          secrets: {
+            get: async k => secrets.get(k) ?? null,
+            set: async (k, v) => {
+              secrets.set(k, v)
+            },
+          },
+          randomBytes: n => new Uint8Array(n).fill(7),
+        })
+      },
+    ],
     [
       'web (IndexedDB)',
       () =>

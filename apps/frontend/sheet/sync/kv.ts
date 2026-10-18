@@ -1,7 +1,7 @@
 // O storage do aparelho (doc/arquitetura §7.1 e §7.2): chave e valor, só
 // texto. O cache e o outbox gravam aqui; tokens nunca (ficam no secure store
-// ou no cookie HttpOnly). A troca por SQLCipher (Etapa 22) é outra
-// implementação desta interface.
+// ou no cookie HttpOnly). No nativo, a implementação é o banco SQLCipher de
+// encryptedStorage.ts; no web, o IndexedDB.
 
 export interface KeyValueStorage {
   getItem(key: string): Promise<string | null>

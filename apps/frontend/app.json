@@ -13,9 +13,11 @@
       "backgroundColor": "#120e10"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tms.app"
     },
     "android": {
+      "package": "com.tms.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -28,7 +30,11 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-sqlite", { "useSQLCipher": true }]
+    ],
     "scheme": "tms"
   }
 }

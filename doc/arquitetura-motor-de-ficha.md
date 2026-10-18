@@ -353,8 +353,18 @@ Quando algo dá errado:
 - **Seções restritas nunca chegam** ao aparelho de quem não pode lê-las, porque o servidor as remove antes de responder (contrato §11).
 - **Tudo é separado por usuário.** A chave do storage leva o id do usuário, e o logout apaga o cache e o outbox.
 - **O que vem do disco é input hostil.** Ao reidratar, o template passa por `compileTemplate` e a ficha por `validateSheet`. Se falhar, o dado é descartado e rebuscado.
-- **Criptografia em repouso entra antes do lançamento público.** No nativo, o adapter passa a usar uma tabela num banco SQLCipher (`useSQLCipher` no plugin `expo-sqlite`), com chave aleatória gerada no primeiro uso e guardada no `expo-secure-store`. A interface do storage não muda. Isso exige dev build (não roda no Expo Go). No web não há equivalente; a mitigação é apagar tudo no logout.
-- **Android** com `allowBackup: false`.
+- **Criptografia em repouso no nativo** (Etapa 22, `apps/frontend/sheet/sync/encryptedStorage.ts`):
+  - **Banco:** o storage é uma tabela num banco SQLCipher próprio (`tms-offline.db`, plugin `expo-sqlite` com `useSQLCipher` no `app.json`). A interface `KeyValueStorage` não mudou. Exige dev build.
+  - **Chave:** 32 bytes aleatórios do `expo-crypto`, gerados no primeiro uso. Ficam só no `expo-secure-store` (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`, como o refresh token) e entram como raw key no `PRAGMA key`, a primeira instrução de cada conexão. Nunca aparecem em log, no banco nem em outro storage.
+  - **Fail secure:**
+    - sem chave (reinstalação, backup restaurado, o banco sem cifra da Etapa 20), o banco é apagado e recomeça vazio. O servidor é a fonte da verdade;
+    - chave que não abre o banco: apaga e recomeça;
+    - SecureStore com falha: nada é aberto sem chave; o storage fica em memória naquela sessão e o banco fica intacto;
+    - binário sem SQLCipher (Expo Go): em produção, memória; só em desenvolvimento abre sem cifra.
+  - **Log:** leva só o tipo do problema (`secure-store`, `wrong-key`, `no-sqlcipher`, `sqlite`).
+  - **Web:** não há equivalente; a mitigação é apagar tudo no logout.
+- **Android** com `allowBackup: false`, sem `usesCleartextTraffic` no manifest de release (cleartext só nos de debug, para o Metro), e o ATS do iOS ligado. `sheet/sync/__tests__/nativeConfig.test.ts` quebra se alguém mudar isso.
+- **Como verificar no aparelho:** o roteiro manual em modo avião e a conferência do arquivo cifrado ficam em `apps/frontend/.maestro/README.md`.
 
 ### 7.3 O outbox
 

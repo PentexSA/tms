@@ -1,0 +1,32 @@
+# Modo avião (só Android: o Maestro não liga o modo avião no simulador do
+# iOS; lá o roteiro é manual, no README). Gastar offline fica no aparelho
+# (outbox no banco SQLCipher), sobrevive a reiniciar o app e sobe quando a
+# rede volta. Cada rodada gasta 1 Sangue da ficha de teste.
+appId: com.tms.app
+name: Modo avião
+tags:
+  - android
+---
+- runFlow: subflows/open-sheet.yaml
+- setAirplaneMode: enabled
+- extendedWaitUntil:
+    visible: "Sem conexão"
+    timeout: 15000
+- longPressOn:
+    id: "dock-blood"
+- assertVisible:
+    text: "Sincronização: Offline · 1 pendente"
+# Reiniciar sem rede: a lista de crônicas não fica no disco, então a ficha
+# abre direto pelo link; ela e o pendente vêm do banco cifrado
+- stopApp
+- launchApp
+- openLink: "tms://characters/${CHARACTER_ID}"
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Offline · 1 pendente"
+    timeout: 20000
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Salvo"
+    timeout: 30000

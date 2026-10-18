@@ -1,0 +1,13 @@
+# Abrir a ficha: identidade, dock (Vitalidade, Sangue, FdV) e "Salvo"
+appId: com.tms.app
+name: Abrir a ficha
+---
+- runFlow: subflows/open-sheet.yaml
+- assertVisible:
+    text: "${CHARACTER}"
+- assertVisible:
+    id: "dock-health"
+- assertVisible:
+    id: "dock-willpower"
+- assertVisible:
+    text: "Sincronização: Salvo"
