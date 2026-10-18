@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!design/**"]
+    "includes": ["**", "!design/**", "!packages/ui/src/tokens.ts"]
   },
   "formatter": {
     "enabled": true,

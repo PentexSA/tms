@@ -1,40 +1,41 @@
 import type { ReactNode } from 'react'
-import {
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  View,
-  ViewStyle,
-} from 'react-native'
+import { StyleSheet, View, type ViewStyle } from 'react-native'
+import { useInsets } from './insets'
+import { useTheme } from './theme'
+import { tokens } from './tokens'
 
 export interface ScreenProps {
-  children: ReactNode
-  style?: ViewStyle
-  safe?: boolean
-  testID?: string
+  readonly children: ReactNode
+  readonly style?: ViewStyle
+  // Respeita a safe area de cima e de baixo (react-native-safe-area-context).
+  readonly safe?: boolean
+  readonly testID?: string
 }
 
 export function Screen({ children, style, safe = true, testID }: ScreenProps) {
-  const Container = safe ? SafeAreaView : View
-
+  const { colors } = useTheme()
+  const insets = useInsets()
   return (
-    <Container
+    <View
       testID={testID}
-      style={[styles.container, Platform.OS === 'web' && styles.web, style]}
+      style={[
+        styles.screen,
+        { backgroundColor: colors.bg },
+        safe && { paddingTop: insets.top, paddingBottom: insets.bottom },
+        style,
+      ]}
     >
-      {children}
-    </Container>
+      <View style={styles.content}>{children}</View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: { flex: 1 },
+  content: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  web: {
-    maxWidth: 1200,
-    marginHorizontal: 'auto',
     width: '100%',
+    maxWidth: tokens.layout.contentMaxExpanded,
+    alignSelf: 'center',
   },
 })
