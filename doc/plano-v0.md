@@ -36,6 +36,39 @@ O que fica fora está no §8.
 
 ---
 
+## Estado da v0 (18/10/2026)
+
+As 22 etapas estão implementadas, em branches empilhadas (`v0/NN-nome`, cada uma sobre a anterior). A jornada do §1 roda inteira no `e2e/tests/journey.spec.ts`, no Chromium e no WebKit, sob a CSP de produção.
+
+| Etapas | Branch (topo) |
+|---|---|
+| 15 Eventos e histórico | `v0/15-events-api` |
+| 16 Store, fila e Desfazer | `v0/16-sheet-store` |
+| 17 Modo Jogo | `v0/17-play-mode` |
+| 18 Modo Evoluir | `v0/18-evolve-mode` |
+| 19 Mesa e histórico | `v0/19-storyteller-table` |
+| 20 Offline persistente | `v0/20-offline` |
+| 21 Parada de dados | `v0/21-dice` |
+| 22 Fechamento | `v0/22-closing` |
+
+As Etapas 17 a 22 foram feitas em paralelo, em worktrees, e integradas na ordem. A integração e os E2E acharam defeitos que os testes de unidade não pegavam, todos corrigidos com teste:
+
+- **"De" efetivo.** Um recurso no padrão aparecia como "Sangue — → 9" no aviso, na prévia e no histórico. Agora é o `withEffectiveFrom` do core.
+- **Rede no Eden.** O Eden devolve status 503 em erro de rede, e cair a rede parecia erro do servidor. Agora é o `isNetworkError`.
+- **NetInfo no web.** No Chromium ele não percebe a queda da rede; no web vale o `onlineManager` do TanStack.
+- **Cache persistido.** Um refetch que falhava offline apagava a ficha do disco. Agora vai o último dado bom, a ficha restaurada fica marcada como velha, e um erro com dados não troca a tela.
+- **Sessão offline.** Abria sem prazo; agora vale o mesmo prazo do cache (fail secure).
+- **Cache do turbo.** Os inputs ignoravam `lib/` e `sheet/` do app; agora é `$TURBO_DEFAULT$`.
+- **`?mode=evolve`.** Valia de novo a cada recarga; agora só na chegada.
+
+Fora do código, ainda falta:
+
+- o que só um dev build prova (SQLCipher ativo, fluxos do Maestro);
+- o identificador definitivo do app (hoje `com.tms.app`);
+- a declaração de criptografia da App Store.
+
+O checklist de segurança, item por item, está em [`checklist-seguranca-v0.md`](checklist-seguranca-v0.md).
+
 ## 2. Ponto de partida
 
 | Área | Hoje, na `main` | O que falta para a v0 |
