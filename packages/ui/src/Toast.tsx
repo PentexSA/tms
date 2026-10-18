@@ -113,8 +113,9 @@ function ToastView({
             accessibilityRole="button"
             accessibilityLabel={toast.action.label}
             onPress={() => {
-              toast.action?.onPress()
+              // Fecha antes: a ação pode mostrar outro aviso, que fica
               onDone()
+              toast.action?.onPress()
             }}
             style={styles.action}
           >

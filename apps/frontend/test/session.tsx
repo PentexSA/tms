@@ -5,6 +5,9 @@ import type { ReactElement } from 'react'
 import { SessionProvider } from '../lib/session/SessionProvider'
 import { Session } from '../lib/session/session'
 import type { TokenStore } from '../lib/session/tokenStore'
+import type { Outbox, QueuedBatch } from '../sheet/sync/outbox'
+import { SyncProvider } from '../sheet/sync/SyncProvider'
+import type { PostOutcome } from '../sheet/sync/sender'
 
 export const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -46,8 +49,17 @@ export function testSession(
   return { session, fetch, store }
 }
 
-/** Renderiza com QueryClient, sessão e toast de teste. */
-export function renderWithSession(ui: ReactElement, session: Session) {
+export interface SyncOptions {
+  readonly outbox?: Outbox
+  readonly post?: (id: string, batch: QueuedBatch) => Promise<PostOutcome>
+}
+
+/** Renderiza com QueryClient, sessão, toast e fila de sincronização. */
+export function renderWithSession(
+  ui: ReactElement,
+  session: Session,
+  sync: SyncOptions = {}
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: Number.POSITIVE_INFINITY },
@@ -59,7 +71,11 @@ export function renderWithSession(ui: ReactElement, session: Session) {
     ...render(
       <QueryClientProvider client={queryClient}>
         <SessionProvider session={session}>
-          <ToastProvider>{ui}</ToastProvider>
+          <ToastProvider>
+            <SyncProvider outbox={sync.outbox} post={sync.post}>
+              {ui}
+            </SyncProvider>
+          </ToastProvider>
         </SessionProvider>
       </QueryClientProvider>
     ),

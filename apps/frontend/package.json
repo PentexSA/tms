@@ -20,6 +20,7 @@
     "@tms/ui": "workspace:*",
     "expo": "54.0.37",
     "expo-clipboard": "8.0.8",
+    "expo-crypto": "15.0.9",
     "expo-linking": "~8.0.12",
     "expo-router": "6.0.24",
     "expo-secure-store": "15.0.8",
@@ -31,7 +32,8 @@
     "react-native-reanimated": "~4.1.7",
     "react-native-safe-area-context": "5.6.2",
     "react-native-svg": "15.12.1",
-    "react-native-web": "catalog:"
+    "react-native-web": "catalog:",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "@rnx-kit/metro-resolver-symlinks": "0.2.11",

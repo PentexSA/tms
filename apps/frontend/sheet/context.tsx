@@ -1,56 +1,78 @@
-import {
-  type FieldId,
-  type ResolvedField,
-  type ResolvedSheet,
-  type RoleName,
-  resolve,
-  type SheetData,
-  type SheetMode,
-  type SheetModel,
+import type {
+  FieldId,
+  ResolvedField,
+  ResolvedSheet,
+  RoleName,
+  SheetMode,
+  SheetModel,
 } from '@tms/sheet-core'
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
+import { useStore } from 'zustand'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
+import type {
+  FieldEntry,
+  SheetActions,
+  SheetState,
+  SheetStore,
+} from './store/sheetStore'
 
-// O que toda a árvore da ficha lê: modelo compilado, valores resolvidos,
-// papéis (do servidor) e modo. Os componentes usam só os hooks abaixo, para a
-// Etapa 16 trocar a fonte (store com assinatura por campo) sem mexer neles.
+// O que toda a árvore da ficha lê. O modelo e os papéis não mudam durante a
+// vida do store; os valores vêm do store com assinatura por campo
+// (doc/arquitetura §6.5): gastar Sangue re-renderiza só quem assina o Sangue.
 
 interface SheetContextValue {
+  readonly store: SheetStore
   readonly model: SheetModel
-  readonly resolved: ResolvedSheet
   readonly roles: ReadonlySet<RoleName>
-  readonly mode: SheetMode
 }
 
 const SheetContext = createContext<SheetContextValue | null>(null)
 
 export function SheetProvider({
-  model,
-  sheet,
-  roles,
-  mode = 'read',
+  store,
   children,
 }: {
-  readonly model: SheetModel
-  readonly sheet: SheetData
-  readonly roles: readonly RoleName[]
-  readonly mode?: SheetMode
+  readonly store: SheetStore
   readonly children: ReactNode
 }) {
-  const resolved = useMemo(() => resolve(model, sheet), [model, sheet])
-  const roleSet = useMemo(() => new Set(roles), [roles])
-  const value = useMemo(
-    () => ({ model, resolved, roles: roleSet, mode }),
-    [model, resolved, roleSet, mode]
-  )
+  const value = useMemo(() => {
+    const { model, roles } = store.getState()
+    return { store, model, roles: new Set(roles) }
+  }, [store])
   return <SheetContext.Provider value={value}>{children}</SheetContext.Provider>
 }
 
-export function useSheet(): SheetContextValue {
+function useSheetContext(): SheetContextValue {
   const value = useContext(SheetContext)
   if (!value) throw new Error('useSheet precisa de um SheetProvider')
   return value
 }
 
-export function useResolvedField(id: FieldId): ResolvedField | undefined {
-  return useSheet().resolved.get(id)
+/** Modelo, papéis, store e modo (trocar de modo re-renderiza a ficha toda). */
+export function useSheet(): SheetContextValue & { readonly mode: SheetMode } {
+  const context = useSheetContext()
+  const mode = useStore(context.store, s => s.mode)
+  return { ...context, mode }
 }
+
+/** Um pedaço do estado; re-renderiza só quando `equal` diz que mudou. */
+export function useSheetSelector<T>(
+  selector: (state: SheetState & SheetActions) => T,
+  equal: (a: T, b: T) => boolean = Object.is
+): T {
+  return useStoreWithEqualityFn(useSheetContext().store, selector, equal)
+}
+
+/** A entrada do campo: a mesma referência enquanto o campo não muda. */
+export const useFieldEntry = (id: FieldId): FieldEntry | undefined =>
+  useSheetSelector(s => s.entries.get(id))
+
+export const useResolvedField = (id: FieldId): ResolvedField | undefined =>
+  useFieldEntry(id)?.resolved
+
+/** A ficha resolvida inteira: re-renderiza a cada mudança. Prefira os acima. */
+export const useResolvedSheet = (): ResolvedSheet =>
+  useSheetSelector(s => s.resolved)
+
+/** O store da ficha, para ações (commit, desfazer) sem assinar nada. */
+export const useSheetStore = (): SheetStore => useSheetContext().store

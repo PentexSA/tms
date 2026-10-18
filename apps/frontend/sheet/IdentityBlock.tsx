@@ -1,15 +1,16 @@
-import { identityOf } from '@tms/sheet-core'
+import { identityOf, jsonEqual } from '@tms/sheet-core'
 import { Avatar, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
-import { useSheet } from './context'
+import { useSheet, useSheetSelector } from './context'
 import { SectionView } from './SectionView'
 
 // Nome, selo e resumo, e as seções da zona `identity` (DS: IdentityBlock).
 // Esses campos nunca são de seção restrita: o validador do template garante.
+// Assina só a identidade: gastar Sangue não re-renderiza o cabeçalho.
 export function IdentityBlock() {
-  const { model, resolved } = useSheet()
+  const { model } = useSheet()
   const { accent } = useTheme()
-  const id = identityOf(resolved)
+  const id = useSheetSelector(s => identityOf(s.resolved), jsonEqual)
   const sections = model.zones.find(z => z.id === 'identity')?.sections ?? []
   return (
     <View style={styles.block}>

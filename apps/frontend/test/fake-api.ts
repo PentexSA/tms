@@ -19,6 +19,8 @@ export function createFakeApi() {
   }
   const calls = {
     characterGet: jest.fn(),
+    eventsPost: jest.fn(),
+    historyGet: jest.fn(),
     templateGet: jest.fn(),
     systemsGet: jest.fn(),
     chroniclesGet: jest.fn(),
@@ -38,6 +40,8 @@ export function createFakeApi() {
     ),
     characters: ({ id }: { id: string }) => ({
       get: (...a: unknown[]) => calls.characterGet(id, ...a),
+      events: { post: (...a: unknown[]) => calls.eventsPost(id, ...a) },
+      history: { get: (...a: unknown[]) => calls.historyGet(id, ...a) },
     }),
     chronicles: Object.assign(
       ({ id }: { id: string }) => {

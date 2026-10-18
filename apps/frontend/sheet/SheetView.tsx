@@ -2,8 +2,8 @@ import {
   type CompiledZone,
   canReadSection,
   identityOf,
+  jsonEqual,
   type RoleName,
-  resolve,
   type SheetData,
   type SheetMode,
   type SheetModel,
@@ -11,20 +11,28 @@ import {
 import { SectionHeader, Tabs, ThemeProvider, tokens } from '@tms/ui'
 import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
 import { IdentityBlock } from './IdentityBlock'
 import { SectionView } from './SectionView'
+import { createSheetStore, type SheetStore } from './store/sheetStore'
 
 // A ficha montada pelo template (doc/arquitetura §6.1): identidade, "Em jogo"
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
 // template). Aba sem seção legível some.
+//
+// Com `store`, é a ficha viva (otimista, fila, Desfazer). Com `sheet`, uma
+// ficha só de leitura (prévias e testes).
 
-export interface SheetViewProps {
-  readonly model: SheetModel
-  readonly sheet: SheetData
-  readonly roles: readonly RoleName[]
-  readonly mode?: SheetMode
-}
+export type SheetViewProps =
+  | { readonly store: SheetStore }
+  | {
+      readonly model: SheetModel
+      readonly sheet: SheetData
+      readonly roles: readonly RoleName[]
+      readonly mode?: SheetMode
+    }
 
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
 
@@ -38,26 +46,50 @@ function readableZones(model: SheetModel, roles: readonly RoleName[]) {
   )
 }
 
-export function SheetView({
-  model,
-  sheet,
-  roles,
-  mode = 'read',
-}: SheetViewProps) {
+export function SheetView(props: SheetViewProps) {
+  const fixed = 'store' in props ? null : props
+  const store = useMemo(
+    () =>
+      'store' in props
+        ? props.store
+        : createSheetStore({
+            characterId: '',
+            model: props.model,
+            sheet: props.sheet,
+            sheetVersion: 0,
+            roles: props.roles,
+            mode: props.mode,
+          }),
+    // Só leitura: uma ficha nova é um store novo
+    [
+      'store' in props ? props.store : null,
+      fixed?.model,
+      fixed?.sheet,
+      fixed?.roles,
+      fixed?.mode,
+    ]
+  )
+  return <SheetBody store={store} />
+}
+
+function SheetBody({ store }: { readonly store: SheetStore }) {
+  const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
   const [tab, setTab] = useState(zones[0]?.id ?? 'build')
   const active: CompiledZone | undefined =
     zones.find(z => z.id === tab) ?? zones[0]
   const play = model.zones.find(z => z.id === 'play')?.sections ?? []
-  const accent = useMemo(
-    () => identityOf(resolve(model, sheet)).accent,
-    [model, sheet]
+  const accent = useStoreWithEqualityFn(
+    store,
+    s => identityOf(s.resolved).accent,
+    jsonEqual
   )
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider model={model} sheet={sheet} roles={roles} mode={mode}>
+      <SheetProvider store={store}>
         <ScrollView contentContainerStyle={styles.content}>
+          <ConflictBanner />
           <IdentityBlock />
           {play.length ? (
             <View>

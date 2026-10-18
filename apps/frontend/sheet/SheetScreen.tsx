@@ -1,9 +1,12 @@
 import { AppBar, Button, EmptyState, Screen, Skeleton } from '@tms/ui'
 import { useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 
 import { messageOf, statusOf } from '../lib/errors'
-import { useSheetData } from './data'
+import { type SheetState, useSheetData } from './data'
 import { SheetView } from './SheetView'
+import { createSheetStore } from './store/sheetStore'
+import { useSync } from './sync/SyncProvider'
 
 export function SheetScreen({ id }: { readonly id: string }) {
   const router = useRouter()
@@ -54,11 +57,11 @@ export function SheetScreen({ id }: { readonly id: string }) {
         )
       break
     case 'ready':
+      // Outra versão do template ou outros papéis: outro store
       body = (
-        <SheetView
-          model={state.model}
-          sheet={state.sheet}
-          roles={state.roles}
+        <LiveSheet
+          key={`${state.character.templateVersion}:${state.roles.join(',')}`}
+          state={state}
         />
       )
   }
@@ -69,4 +72,30 @@ export function SheetScreen({ id }: { readonly id: string }) {
       {body}
     </Screen>
   )
+}
+
+/** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
+function LiveSheet({
+  state,
+}: {
+  readonly state: Extract<SheetState, { status: 'ready' }>
+}) {
+  const sync = useSync()
+  const { id, sheet, sheetVersion } = state.character
+  const [store] = useState(() =>
+    createSheetStore({
+      characterId: id,
+      model: state.model,
+      sheet: state.sheet,
+      sheetVersion,
+      roles: state.roles,
+      sync,
+    })
+  )
+  useEffect(() => sync.register(id, store), [sync, id, store])
+  // Rebuscada (foco, conflito): o store confere a versão e valida
+  useEffect(() => {
+    store.getState().received(sheet, sheetVersion)
+  }, [store, sheet, sheetVersion])
+  return <SheetView store={store} />
 }
