@@ -23,8 +23,16 @@ export interface SenderEvents {
     status: number,
     body: unknown
   ): void
-  /** Vai tentar de novo em `delayMs` (indicador de sincronização). */
-  retrying?(characterId: string, attempt: number, delayMs: number): void
+  /**
+   * Vai tentar de novo em `delayMs` (indicador de sincronização). `status` é
+   * o da resposta que falhou; 0 quando não houve resposta (rede).
+   */
+  retrying?(
+    characterId: string,
+    attempt: number,
+    delayMs: number,
+    status: number
+  ): void
 }
 
 export interface SenderDeps {
@@ -77,11 +85,15 @@ export function createSender(deps: SenderDeps): Sender {
     return Math.max(Math.round(d / 2 + random() * (d / 2)), retryAfterMs)
   }
 
-  const retryLater = (characterId: string, retryAfterMs?: number) => {
+  const retryLater = (
+    characterId: string,
+    status: number,
+    retryAfterMs?: number
+  ) => {
     const attempt = attempts.get(characterId) ?? 0
     attempts.set(characterId, attempt + 1)
     const ms = delayFor(attempt, retryAfterMs)
-    deps.events.retrying?.(characterId, attempt + 1, ms)
+    deps.events.retrying?.(characterId, attempt + 1, ms, status)
     timers.set(
       characterId,
       setTimeout(() => {
@@ -109,7 +121,7 @@ export function createSender(deps: SenderDeps): Sender {
         continue
       }
       if (isRetryable(res.status)) {
-        retryLater(characterId, res.retryAfterMs)
+        retryLater(characterId, res.status, res.retryAfterMs)
         return
       }
       attempts.delete(characterId)
@@ -132,7 +144,7 @@ export function createSender(deps: SenderDeps): Sender {
     const run = drain(characterId, mine)
       .catch(() => {
         // Falha do storage do outbox: tenta de novo com backoff
-        if (mine === epoch) retryLater(characterId)
+        if (mine === epoch) retryLater(characterId, 0)
       })
       .finally(() => {
         if (running.get(characterId) === run) running.delete(characterId)

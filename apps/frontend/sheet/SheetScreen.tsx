@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { RoleName, SheetMode } from '@tms/sheet-core'
-import { AppBar, Button, EmptyState, Screen, Skeleton } from '@tms/ui'
+import { AppBar, Button, EmptyState, Screen, Skeleton, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
 
 import { messageOf, statusOf } from '../lib/errors'
 import { useRefetchOnFocus } from '../lib/queries/focus'
@@ -14,6 +15,7 @@ import { HistorySheet } from './history/HistorySheet'
 import { SheetView } from './SheetView'
 import { createSheetStore } from './store/sheetStore'
 import { StorytellerBar } from './storyteller/StorytellerBar'
+import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
 
 export function SheetScreen({
@@ -97,16 +99,20 @@ export function SheetScreen({
         title={title}
         back={back}
         actions={
-          state.status === 'ready' ? (
-            <Button
-              title="Histórico"
-              variant="ghost"
-              accessibilityHint="Abre o histórico de alterações da ficha"
-              onPress={() => setHistory(true)}
-            />
-          ) : undefined
+          <View style={styles.actions}>
+            <SyncIndicator />
+            {state.status === 'ready' ? (
+              <Button
+                title="Histórico"
+                variant="ghost"
+                accessibilityHint="Abre o histórico de alterações da ficha"
+                onPress={() => setHistory(true)}
+              />
+            ) : null}
+          </View>
         }
       />
+      <OfflineBanner />
       {body}
       {state.status === 'ready' ? (
         <HistorySheet
@@ -173,3 +179,7 @@ function LiveSheet({
     </>
   )
 }
+
+const styles = StyleSheet.create({
+  actions: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+})

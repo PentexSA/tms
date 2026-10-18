@@ -27,10 +27,21 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * O último usuário que entrou (id e nome, nunca token): sem rede ao abrir o
+ * app, a sessão entra com ele para a ficha abrir do cache do aparelho.
+ */
+export interface LastUserStore {
+  read(): Promise<SessionUser | null>
+  write(user: SessionUser): Promise<void>
+  clear(): Promise<void>
+}
+
 export interface SessionDeps {
   readonly apiUrl: string
   readonly store: TokenStore
   readonly fetch: (input: string, init: RequestInit) => Promise<Response>
+  readonly lastUser?: LastUserStore
 }
 
 interface TokenResponse {
@@ -45,6 +56,8 @@ export class Session {
   #state: SessionState = { status: 'loading', user: null }
   #accessToken: string | null = null
   #refreshing: Promise<boolean> | null = null
+  // O último refresh falhou por falta de rede (não por sessão inválida)
+  #unreachable = false
   // Sobe a cada saída: resposta de refresh ou login iniciado antes dela é
   // descartada (sair é definitivo, mesmo com uma renovação em voo)
   #epoch = 0
@@ -88,13 +101,24 @@ export class Session {
     return this.#deps.store.refreshInBody ? 'omit' : 'include'
   }
 
-  /** Ao abrir o app: tenta recuperar a sessão. */
+  /**
+   * Ao abrir o app: tenta recuperar a sessão. Sem rede, entra com o último
+   * usuário (sem token de acesso): a ficha abre do aparelho, e a primeira
+   * chamada com rede renova a sessão ou, se o servidor recusar, sai.
+   */
   async restore(): Promise<void> {
     if (this.#deps.store.refreshInBody && !(await this.#deps.store.read())) {
       this.#set({ status: 'signedOut', user: null })
       return
     }
-    if (!(await this.refresh())) this.#set({ status: 'signedOut', user: null })
+    const epoch = this.#epoch
+    if (await this.refresh()) return
+    const last = this.#unreachable
+      ? await this.#deps.lastUser?.read().catch(() => null)
+      : null
+    if (epoch !== this.#epoch) return
+    if (last) this.#set({ status: 'signedIn', user: last })
+    else this.#set({ status: 'signedOut', user: null })
   }
 
   login(email: string, password: string): Promise<SessionUser> {
@@ -134,6 +158,7 @@ export class Session {
     this.#epoch++
     this.#accessToken = null
     await this.#deps.store.clear()
+    await this.#deps.lastUser?.clear().catch(() => undefined)
     this.#set({ status: 'signedOut', user: null })
     for (const l of this.#signOutListeners) l()
   }
@@ -152,8 +177,10 @@ export class Session {
       )
     } catch {
       // Sem rede não é sessão inválida: mantém o estado e tenta depois
+      this.#unreachable = true
       return false
     }
+    this.#unreachable = false
     if (epoch !== this.#epoch) return false
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) await this.signOut()
@@ -188,6 +215,7 @@ export class Session {
     this.#accessToken = data.accessToken
     if (this.#deps.store.refreshInBody && data.refreshToken)
       await this.#deps.store.write(data.refreshToken)
+    await this.#deps.lastUser?.write(data.user).catch(() => undefined)
     this.#set({ status: 'signedIn', user: data.user })
   }
 

@@ -23,6 +23,21 @@ export interface SyncDeps {
   readonly baseDelayMs?: number
 }
 
+/**
+ * O que o indicador de sincronização mostra. `failure`: por que o último
+ * envio não foi (sem resposta ou erro do servidor); limpa quando o servidor
+ * responde ou a fila esvazia.
+ */
+export interface SyncStatus {
+  readonly pending: number
+  readonly failure: 'network' | 'server' | null
+}
+
+export interface SyncStatusStore {
+  getSnapshot(): SyncStatus
+  subscribe(listener: () => void): () => void
+}
+
 export interface Sync extends SheetSync {
   /** A ficha aberta passa a receber as respostas; devolve o "desligar". */
   register(characterId: string, store: SheetStore): () => void
@@ -30,6 +45,9 @@ export interface Sync extends SheetSync {
   flush(): Promise<void>
   /** Logout: para o envio e apaga a fila (nada fica para o próximo usuário). */
   reset(): Promise<void>
+  /** Abriu o app: conta o que ficou na fila e retoma o envio. */
+  start(): Promise<void>
+  readonly status: SyncStatusStore
   readonly sender: Sender
 }
 
@@ -80,13 +98,45 @@ export function createSync(deps: SyncDeps): Sync {
       queryKey: sheetKeys.character(characterId),
     })
 
+  let status: SyncStatus = { pending: 0, failure: null }
+  const listeners = new Set<() => void>()
+  const setStatus = (next: SyncStatus) => {
+    if (next.pending === status.pending && next.failure === status.failure)
+      return
+    status = next
+    for (const l of listeners) l()
+  }
+  // Conta direto do outbox (a verdade, também depois de reiniciar o app).
+  // Só a contagem mais recente vale.
+  let counting = 0
+  const recount = async () => {
+    const mine = ++counting
+    let pending = 0
+    try {
+      for (const id of await outbox.characters())
+        pending += (await outbox.pending(id)).length
+    } catch {
+      return
+    }
+    if (mine !== counting) return
+    setStatus({ pending, failure: pending ? status.failure : null })
+  }
+  const answered = () => {
+    setStatus({ ...status, failure: null })
+    void recount()
+  }
+
   const sender = createSender({
     outbox,
     post: deps.post,
     random: deps.random,
     baseDelayMs: deps.baseDelayMs,
     events: {
+      retrying(_characterId, _attempt, _delayMs, code) {
+        setStatus({ ...status, failure: code === 0 ? 'network' : 'server' })
+      },
       confirmed(characterId, batch, body) {
+        answered()
         const store = stores.get(characterId)
         store?.getState().confirmed(batch.clientBatchId, body)
         const res = body as Partial<CharacterCache> | null
@@ -108,10 +158,12 @@ export function createSync(deps: SyncDeps): Sync {
         }
       },
       conflicted(characterId, batch) {
+        answered()
         stores.get(characterId)?.getState().conflicted(batch.clientBatchId)
         void refetch(characterId)
       },
       rejected(characterId, batch, status, body) {
+        answered()
         stores
           .get(characterId)
           ?.getState()
@@ -127,9 +179,19 @@ export function createSync(deps: SyncDeps): Sync {
 
   return {
     sender,
+    status: {
+      getSnapshot: () => status,
+      subscribe(listener) {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+    },
     enqueue(characterId, batch) {
       outbox.enqueue(characterId, batch).then(
-        () => sender.kick(characterId),
+        () => {
+          void recount()
+          return sender.kick(characterId)
+        },
         () => {
           stores.get(characterId)?.getState().rejected(batch.clientBatchId)
           notify(`Não foi possível guardar “${batch.label}” no aparelho.`)
@@ -149,10 +211,16 @@ export function createSync(deps: SyncDeps): Sync {
       }
     },
     flush: () => sender.flush(),
+    async start() {
+      await recount()
+      await sender.flush()
+    },
     async reset() {
       sender.reset()
       stores.clear()
-      await outbox.clear()
+      counting++
+      setStatus({ pending: 0, failure: null })
+      await outbox.clear().catch(() => undefined)
     },
   }
 }

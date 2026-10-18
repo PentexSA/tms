@@ -1,5 +1,7 @@
+import { deviceStorage } from '../../sheet/sync/storage'
 import { API_URL } from '../env'
 import { fetchWithTimeout } from '../http'
+import { createLastUserStore } from './lastUser'
 import { Session } from './session'
 import { tokenStore } from './tokenStore'
 
@@ -10,4 +12,5 @@ export const session = new Session({
   apiUrl: API_URL,
   store: tokenStore,
   fetch: fetchWithTimeout,
+  lastUser: createLastUserStore(deviceStorage),
 })

@@ -129,7 +129,13 @@ describe('tabela de respostas', () => {
       await flushPromises()
       await answer(outcome instanceof Error ? outcome : { ...outcome })
       expect(await outbox.pending('a')).toHaveLength(1)
-      expect(events.retrying).toHaveBeenCalledWith('a', 1, 500)
+      // O status vai junto (0: sem resposta) para o indicador
+      expect(events.retrying).toHaveBeenCalledWith(
+        'a',
+        1,
+        500,
+        outcome instanceof Error ? 0 : outcome.status
+      )
       // kick durante o backoff não fura a espera
       void sender.kick('a')
       await flushPromises()
@@ -281,7 +287,7 @@ describe('reconexão e logout', () => {
     const { sender, post, events } = setup(outbox)
     await real.enqueue('a', batch(1))
     await sender.kick('a')
-    expect(events.retrying).toHaveBeenCalledWith('a', 1, 500)
+    expect(events.retrying).toHaveBeenCalledWith('a', 1, 500, 0)
     broken = false
     jest.advanceTimersByTime(500)
     await flushPromises()

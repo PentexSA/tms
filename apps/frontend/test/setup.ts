@@ -30,6 +30,14 @@ jest.mock(
   () => require('react-native-safe-area-context/jest/mock').default
 )
 
+// NetInfo sem módulo nativo (o mock oficial do pacote)
+jest.mock('@react-native-community/netinfo', () =>
+  require('@react-native-community/netinfo/jest/netinfo-mock.js')
+)
+
+// kv-store do expo-sqlite em memória (o SQLite nativo não existe no Jest)
+jest.mock('expo-sqlite/kv-store', () => require('./__mocks__/kvStore'))
+
 // Mock do Expo Status Bar
 jest.mock('expo-status-bar', () => ({
   StatusBar: 'StatusBar',
