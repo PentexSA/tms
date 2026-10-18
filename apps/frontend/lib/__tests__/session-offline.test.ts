@@ -1,6 +1,7 @@
 import { createMemoryStorage } from '../../sheet/sync/kv'
 import { json, memoryStore } from '../../test/session'
-import { createLastUserStore } from '../session/lastUser'
+import { CACHE_MAX_AGE_MS } from '../persist'
+import { createLastUserStore, LAST_USER_MAX_AGE_MS } from '../session/lastUser'
 import { Session } from '../session/session'
 
 // Etapa 20: sem rede ao abrir o app, a sessão entra com o último usuário
@@ -32,11 +33,14 @@ const offline = () => {
   throw new Error('Network request failed')
 }
 
-it('entrar grava o último usuário (só id e nome)', async () => {
+it('entrar grava o último usuário (só id, nome e quando)', async () => {
   const { session, storage } = setup(tokens)
   await session.restore()
   expect(session.getState()).toEqual({ status: 'signedIn', user: USER })
-  expect(JSON.parse(storage.data.get(KEY) ?? '{}')).toEqual(USER)
+  expect(JSON.parse(storage.data.get(KEY) ?? '{}')).toEqual({
+    ...USER,
+    savedAt: expect.any(Number),
+  })
   expect(storage.data.get(KEY)).not.toContain('r2')
 })
 
@@ -120,8 +124,29 @@ describe('último usuário no disco é conferido', () => {
 
   it('campos a mais não passam', async () => {
     const storage = createMemoryStorage()
-    await storage.setItem(KEY, JSON.stringify({ ...USER, token: 'x' }))
+    await storage.setItem(
+      KEY,
+      JSON.stringify({ ...USER, token: 'x', savedAt: Date.now() })
+    )
     expect(await createLastUserStore(storage).read()).toEqual(USER)
+  })
+
+  it('vale pelo mesmo prazo do cache; depois, ou sem data, pede login', async () => {
+    expect(LAST_USER_MAX_AGE_MS).toBe(CACHE_MAX_AGE_MS)
+    const storage = createMemoryStorage()
+    let t = 1_000_000_000_000
+    const store = createLastUserStore(storage, () => t)
+    await store.write(USER)
+    t += LAST_USER_MAX_AGE_MS
+    expect(await store.read()).toEqual(USER)
+    t += 1
+    expect(await store.read()).toBeNull()
+    expect(storage.data.has(KEY)).toBe(false)
+    // Sem savedAt (formato antigo) ou no futuro: descartado
+    for (const savedAt of [undefined, t + 60_000]) {
+      await storage.setItem(KEY, JSON.stringify({ ...USER, savedAt }))
+      expect(await store.read()).toBeNull()
+    }
   })
 
   it('falha do storage não impede entrar nem sair', async () => {
