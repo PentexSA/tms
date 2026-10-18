@@ -89,9 +89,10 @@ describe('resolve: as fichas de Vampiro', () => {
     expect(r.number('strength')).toBe(1) // atributos começam em 1 (min)
     expect(r.number('athletics')).toBe(0)
     const blood = r.get('blood') as ResolvedResource
-    // Geração sem default no template ainda: vale o min (4ª). A Etapa 6 põe 13.
-    expect(blood.max).toBe(50)
-    expect(blood.current).toBe(50) // recurso começa cheio
+    // Ficha nova nasce na 13ª geração (default do template): 10 de Sangue.
+    expect(r.number('generation')).toBe(13)
+    expect(blood.max).toBe(10)
+    expect(blood.current).toBe(10) // recurso começa cheio
     const fdv = r.get('willpower') as ResolvedResource
     expect(fdv).toMatchObject({ current: 1, permanent: 1 })
     expect((r.get('health') as ResolvedStacking).filled).toBe(0)

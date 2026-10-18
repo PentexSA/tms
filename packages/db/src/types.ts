@@ -55,8 +55,10 @@ export interface GameSystems {
 
 export interface TraitTemplates {
   id: Generated<string>
+  published_at: Generated<Timestamp>
   system_id: string
-  template_data: Json | null
+  template_data: Json
+  version: string
 }
 
 export interface Users {

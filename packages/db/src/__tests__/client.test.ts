@@ -61,6 +61,23 @@ describe('@tms/db - Database Client', () => {
       expect(found).toBeUndefined()
     })
 
+    it('should reject the same template version twice', async () => {
+      const system = await testDb
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'Vampiro', family: 'wod' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const row = {
+        system_id: system.id,
+        version: '1.0.0',
+        template_data: JSON.stringify({ schema: 1 }),
+      }
+      await testDb.insertInto('trait_templates').values(row).execute()
+      await expect(
+        testDb.insertInto('trait_templates').values(row).execute()
+      ).rejects.toThrow()
+    })
+
     it('should reject duplicate email (unique constraint)', async () => {
       await testDb.insertInto('users').values(newUser(1)).execute()
       await expect(
@@ -81,6 +98,7 @@ describe('@tms/db - Database Client', () => {
         .insertInto('trait_templates')
         .values({
           system_id: system.id,
+          version: '1.0.0',
           template_data: JSON.stringify({ schema: 1, fields: { a: 1 } }),
         })
         .returning('template_data')

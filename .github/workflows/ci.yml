@@ -99,3 +99,6 @@ jobs:
         run: |
           pnpm db:codegen
           git diff --exit-code packages/db/src/types.ts
+      # O template da v0 publica num Postgres real (schema.json + contrato)
+      - run: pnpm -C packages/sheet-core build
+      - run: pnpm templates:publish design/templates/vtm-v20.json

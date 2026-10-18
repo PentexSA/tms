@@ -14,6 +14,7 @@
     "db:down": "docker compose down -v",
     "db:migrate": "pnpm -C packages/db migrate:up",
     "db:codegen": "pnpm -C packages/db codegen",
+    "templates:publish": "pnpm -C apps/api templates:publish",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch --parallel",
     "test:coverage": "turbo run test:coverage",

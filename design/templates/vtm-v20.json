@@ -61,6 +61,7 @@
       "label": "Geração",
       "min": 4,
       "max": 15,
+      "default": 13,
       "suffix": "ª geração"
     },
     "sire": { "type": "text", "label": "Senhor", "maxLength": 80 },
