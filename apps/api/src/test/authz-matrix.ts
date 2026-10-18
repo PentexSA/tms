@@ -87,6 +87,21 @@ export const MATRIX: readonly MatrixRow[] = [
     route: '/characters/:id/history',
     expect: { storyteller: 200, owner: 200, player: 200, ...denied },
   },
+  {
+    method: 'POST',
+    route: '/characters/:id/rolls',
+    body: {
+      clientRollId: '00000000-0000-4000-8000-0000000000d1',
+      slots: { attribute: 'dexterity' },
+      difficulty: 6,
+    },
+    expect: { storyteller: 201, owner: 201, player: 403, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/characters/:id/rolls',
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+  },
 ]
 
 // Rotas fora da matriz: públicas, ou só do próprio usuário (sem recurso de

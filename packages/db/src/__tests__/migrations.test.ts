@@ -26,6 +26,7 @@ describe('migrations', () => {
       expect(rows.map(r => r.table_name)).toEqual([
         'character_batches',
         'character_events',
+        'character_rolls',
         'characters',
         'chronicle_invites',
         'chronicle_members',
@@ -35,6 +36,72 @@ describe('migrations', () => {
         'trait_templates',
         'users',
       ])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0012: o mesmo client_roll_id não rola duas vezes; o lote some, a rolagem fica', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'u', email: 'u@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: user.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const batch = await db
+        .insertInto('character_batches')
+        .values({
+          character_id: character.id,
+          client_batch_id: crypto.randomUUID(),
+          created_by: user.id,
+          by_role: 'owner',
+          sheet_version: 1,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const roll = {
+        character_id: character.id,
+        client_roll_id: crypto.randomUUID(),
+        created_by: user.id,
+        by_role: 'owner',
+        label: 'Destreza',
+        request: JSON.stringify({}),
+        result: JSON.stringify({ total: 1 }),
+        batch_id: batch.id,
+      }
+      await db.insertInto('character_rolls').values(roll).execute()
+      await expect(
+        db.insertInto('character_rolls').values(roll).execute()
+      ).rejects.toThrow()
+      await db.deleteFrom('character_batches').execute()
+      const kept = await db
+        .selectFrom('character_rolls')
+        .select(['batch_id', 'manual'])
+        .executeTakeFirstOrThrow()
+      expect(kept).toEqual({ batch_id: null, manual: false })
     } finally {
       await destroy()
     }

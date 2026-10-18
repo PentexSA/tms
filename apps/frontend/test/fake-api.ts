@@ -22,6 +22,8 @@ export function createFakeApi() {
     characterGet: jest.fn(),
     eventsPost: jest.fn(),
     historyGet: jest.fn(),
+    rollsPost: jest.fn(),
+    rollsGet: jest.fn(),
     templateGet: jest.fn(),
     systemsGet: jest.fn(),
     chroniclesGet: jest.fn(),
@@ -43,6 +45,10 @@ export function createFakeApi() {
       get: (...a: unknown[]) => calls.characterGet(id, ...a),
       events: { post: (...a: unknown[]) => calls.eventsPost(id, ...a) },
       history: { get: (...a: unknown[]) => calls.historyGet(id, ...a) },
+      rolls: {
+        post: (...a: unknown[]) => calls.rollsPost(id, ...a),
+        get: (...a: unknown[]) => calls.rollsGet(id, ...a),
+      },
     }),
     chronicles: Object.assign(
       ({ id }: { id: string }) => {

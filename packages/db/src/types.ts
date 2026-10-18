@@ -43,6 +43,20 @@ export interface CharacterEvents {
   to_value: Json | null
 }
 
+export interface CharacterRolls {
+  batch_id: string | null
+  by_role: string
+  character_id: string
+  client_roll_id: string
+  created_at: Generated<Timestamp>
+  created_by: string
+  id: Generated<string>
+  label: string
+  manual: Generated<boolean>
+  request: Json
+  result: Json
+}
+
 export interface Characters {
   chronicle_id: string
   created_at: Generated<Timestamp | null>
@@ -125,6 +139,7 @@ export interface Users {
 export interface DB {
   character_batches: CharacterBatches
   character_events: CharacterEvents
+  character_rolls: CharacterRolls
   characters: Characters
   chronicle_invites: ChronicleInvites
   chronicle_members: ChronicleMembers

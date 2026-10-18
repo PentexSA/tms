@@ -1,4 +1,5 @@
 import { config } from '@tms/config/env'
+import { cryptoRandom, type RandomSource } from '@tms/sheet-core'
 import type { SessionConfig } from './auth/sessions'
 import type { TokenConfig } from './auth/tokens'
 import { createRateLimiter, type RateLimiter } from './http/rate-limit'
@@ -18,6 +19,8 @@ export interface Limits {
   readonly invites: RateLimiter
   // Lotes de eventos: por usuário e por ficha.
   readonly events: RateLimiter
+  // Rolagens de dados: por usuário e por ficha.
+  readonly rolls: RateLimiter
 }
 
 export interface AppOptions {
@@ -29,6 +32,9 @@ export interface AppOptions {
   readonly swagger: boolean
   readonly secureCookies: boolean
   readonly limits: Limits
+  // Fonte dos dados rolados no servidor: CSPRNG (Web Crypto). Os testes
+  // trocam por uma sequência fixa.
+  readonly random: RandomSource
 }
 
 const MINUTE = 60_000
@@ -55,6 +61,7 @@ export function defaultLimits(now: () => Date): Limits {
       now: clock,
     }),
     events: createRateLimiter({ limit: 120, windowMs: MINUTE, now: clock }),
+    rolls: createRateLimiter({ limit: 30, windowMs: MINUTE, now: clock }),
   }
 }
 
@@ -95,5 +102,7 @@ export function resolveOptions(
     swagger: overrides.swagger ?? !production,
     secureCookies: overrides.secureCookies ?? production,
     limits: overrides.limits ?? defaultLimits(now),
+    random:
+      overrides.random ?? cryptoRandom(array => crypto.getRandomValues(array)),
   }
 }

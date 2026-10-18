@@ -11,6 +11,7 @@ import { onError } from './http/on-error'
 import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 import { type AppOptions, resolveOptions } from './options'
+import { rollRoutes } from './rolls/routes'
 import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
 
@@ -60,6 +61,7 @@ export const createApp = (
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
       .use(tableRoutes(db, guard))
+      .use(rollRoutes(db, options, guard))
   )
 }
 
