@@ -29,7 +29,7 @@ export interface CharacterBatches {
   character_id: string
   client_batch_id: string
   created_at: Generated<Timestamp>
-  created_by: string
+  created_by: string | null
   id: Generated<string>
   sheet_version: number
 }
@@ -49,7 +49,7 @@ export interface CharacterRolls {
   character_id: string
   client_roll_id: string
   created_at: Generated<Timestamp>
-  created_by: string
+  created_by: string | null
   id: Generated<string>
   label: string
   manual: Generated<boolean>

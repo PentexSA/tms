@@ -222,7 +222,8 @@ export function eventRoutes(
         const limit = query.limit ?? 20
         let q = db
           .selectFrom('character_batches as b')
-          .innerJoin('users as u', 'u.id', 'b.created_by')
+          // Left: lote de conta excluída fica no histórico, sem autor
+          .leftJoin('users as u', 'u.id', 'b.created_by')
           .select([
             'b.id',
             'b.created_at',
@@ -281,7 +282,8 @@ export function eventRoutes(
             return {
               id: b.id,
               at: b.created_at,
-              by: { username: b.username },
+              // Null: "Conta excluída" (migration 0013)
+              by: b.username === null ? null : { username: b.username },
               byRole: b.by_role,
               sheetVersion: b.sheet_version,
               changes,

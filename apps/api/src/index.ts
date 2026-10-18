@@ -3,6 +3,7 @@ import { swagger } from '@elysiajs/swagger'
 import { type DB, db as defaultDb } from '@tms/db'
 import { Elysia } from 'elysia'
 import type { Kysely } from 'kysely'
+import { accountRoutes } from './account/routes'
 import { authGuard } from './auth/guard'
 import { authRoutes, meRoutes } from './auth/routes'
 import { chronicleRoutes } from './chronicles/routes'
@@ -57,6 +58,7 @@ export const createApp = (
       .get('/health', () => ({ ok: true }))
       .use(authRoutes(db, options, guard))
       .use(meRoutes(db, guard))
+      .use(accountRoutes(db, options, guard))
       .use(chronicleRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))

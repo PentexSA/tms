@@ -41,7 +41,8 @@ type Row = {
   label: string
   request: unknown
   result: unknown
-  username: string
+  // Null: a conta de quem rolou foi excluída (migration 0013)
+  username: string | null
 }
 
 interface StoredRequest {
@@ -65,7 +66,7 @@ const rollOut = (row: Row) => {
   return {
     id: row.id,
     at: row.created_at,
-    by: { username: row.username },
+    by: row.username === null ? null : { username: row.username },
     byRole: row.by_role,
     label: row.label,
     manual: row.manual,
@@ -148,7 +149,8 @@ export function rollRoutes(
   const selectRoll = (q: Kysely<DB> | Transaction<DB>) =>
     q
       .selectFrom('character_rolls as r')
-      .innerJoin('users as u', 'u.id', 'r.created_by')
+      // Left: rolagem de conta excluída continua na lista, sem autor
+      .leftJoin('users as u', 'u.id', 'r.created_by')
       .select([
         'r.id',
         'r.created_at',

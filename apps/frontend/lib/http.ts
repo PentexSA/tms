@@ -26,14 +26,28 @@ export interface AuthFetchSession {
   refresh(): Promise<boolean>
 }
 
-const isAuthPath = (input: RequestInfo | URL) => {
+const pathOf = (input: RequestInfo | URL) => {
   const url = typeof input === 'string' ? input : input.toString()
-  return /\/auth\//.test(new URL(url, 'http://x').pathname)
+  return new URL(url, 'http://x').pathname
+}
+
+/**
+ * Onde o 401 não é sessão vencida: as rotas /auth/* e a exclusão de conta,
+ * em que o 401 é a resposta à senha. Renovar e repetir mandaria a senha de
+ * novo e gastaria duas tentativas do limite (quem chama renova antes).
+ */
+const noRenew = (input: RequestInfo | URL, init: RequestInit) => {
+  const path = pathOf(input)
+  return (
+    /\/auth\//.test(path) ||
+    (path.endsWith('/me') && init.method?.toUpperCase() === 'DELETE')
+  )
 }
 
 /**
  * fetch com a sessão: põe o token de acesso e, num 401, renova a sessão uma
- * vez (single-flight) e repete a requisição. As rotas /auth/* não repetem.
+ * vez (single-flight) e repete a requisição. As rotas /auth/* (e a exclusão
+ * de conta) não repetem.
  */
 export function createAuthFetch(
   session: AuthFetchSession,
@@ -46,7 +60,7 @@ export function createAuthFetch(
   }
   return async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const first = await base(input, withSession(init))
-    if (first.status !== 401 || isAuthPath(input)) return first
+    if (first.status !== 401 || noRenew(input, init)) return first
     if (!(await session.refresh())) return first
     return base(input, withSession(init))
   }

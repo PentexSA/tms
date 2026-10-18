@@ -1,5 +1,5 @@
 import { Banner, Button, Screen, Text, TextField, tokens } from '@tms/ui'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
   KeyboardAvoidingView,
@@ -14,6 +14,8 @@ import { useSession } from '../../lib/session/SessionProvider'
 export default function LoginScreen() {
   const { session } = useSession()
   const router = useRouter()
+  // Veio da exclusão de conta (app/(app)/account.tsx)
+  const { deleted } = useLocalSearchParams<{ deleted?: string }>()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +52,13 @@ export default function LoginScreen() {
             TMS
           </Text>
           <Text color="inkMuted">Entre para ver suas crônicas e fichas.</Text>
+          {deleted === '1' ? (
+            <Banner
+              tone="success"
+              title="Conta excluída"
+              message="Seus dados foram apagados, inclusive os deste aparelho."
+            />
+          ) : null}
           {error ? <Banner tone="danger" message={error} /> : null}
           <TextField
             label="E-mail"

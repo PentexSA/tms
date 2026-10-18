@@ -18,6 +18,8 @@ const DAY = 24 * 60 * 60 * 1000
 const notFound = () => new ApiError(404, 'não encontrado')
 const storytellerOnly = () => new ApiError(403, 'só o narrador pode fazer isso')
 const INVALID_INVITE = 'convite inválido ou expirado'
+export const CONFIRM_DELETE =
+  'a crônica tem fichas de outros jogadores: confirme com o nome da crônica'
 
 // Nome exibido a outras pessoas: texto seguro de uma linha (sem HTML, controle
 // nem bidi, que permitiria falsificar o texto).
@@ -176,6 +178,52 @@ export function chronicleRoutes(
         }
       },
       { params: idParams }
+    )
+    .delete(
+      '/chronicles/:id',
+      async ({ params, body, userId, set }) => {
+        const me = requireUser(userId)
+        await requireStoryteller(me, params.id)
+        await db.transaction().execute(async trx => {
+          const chronicle = await trx
+            .selectFrom('chronicles')
+            .select('name')
+            .where('id', '=', params.id)
+            .forUpdate()
+            .executeTakeFirst()
+          if (!chronicle) throw notFound()
+          // Fichas de outras pessoas só saem com confirmação explícita: o
+          // nome da crônica digitado (não é um toque por engano). Membros sem
+          // ficha perdem só o vínculo
+          const { n } = await trx
+            .selectFrom('characters')
+            .select(eb => eb.fn.countAll<string>().as('n'))
+            .where('chronicle_id', '=', params.id)
+            .where('user_id', '!=', me)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirstOrThrow()
+          const others = Number(n)
+          if (others > 0 && body?.confirm?.trim() !== chronicle.name)
+            throw new ApiError(409, CONFIRM_DELETE, { otherCharacters: others })
+          await trx
+            .deleteFrom('characters')
+            .where('chronicle_id', '=', params.id)
+            .execute()
+          // Vínculos e convites vão por cascata
+          await trx
+            .deleteFrom('chronicles')
+            .where('id', '=', params.id)
+            .execute()
+        })
+        set.status = 204
+        return null
+      },
+      {
+        params: idParams,
+        body: t.Optional(
+          t.Object({ confirm: t.Optional(t.String({ maxLength: 80 })) })
+        ),
+      }
     )
     .post(
       '/chronicles/:id/invites',

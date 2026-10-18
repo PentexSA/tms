@@ -220,6 +220,29 @@ describe('Histórico de alterações', () => {
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).toBeNull()
   })
 
+  it('quem excluiu a conta aparece como "Conta excluída"', async () => {
+    calls.historyGet.mockResolvedValue(
+      ok({
+        items: [
+          {
+            ...item('b3', 'storyteller', [
+              { label: 'Vitalidade', change: '+1 letal' },
+            ]),
+            by: null,
+          },
+        ],
+        next: null,
+      })
+    )
+    await open(['owner'])
+    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    expect(
+      await screen.findByLabelText(
+        /^Vitalidade: \+1 letal\. às \d\d:\d\d · Conta excluída \(narrador\)$/
+      )
+    ).toBeTruthy()
+  })
+
   it('"Carregar mais" segue o cursor até o fim', async () => {
     calls.historyGet.mockImplementation(
       async (_id: string, opts: { query: { before?: string } }) =>

@@ -297,6 +297,23 @@ describe('createAuthFetch', () => {
     expect(s.refresh).not.toHaveBeenCalled()
   })
 
+  it('DELETE /me não renova: o 401 ali é a resposta à senha', async () => {
+    const s = fakeSession()
+    const base = jest
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 401 }))
+    const res = await createAuthFetch(s, base)('http://api.test/me', {
+      method: 'delete',
+      body: JSON.stringify({ password: 'x' }),
+    })
+    expect(res.status).toBe(401)
+    expect(base).toHaveBeenCalledTimes(1)
+    expect(s.refresh).not.toHaveBeenCalled()
+    // GET /me continua renovando
+    await createAuthFetch(s, base)('http://api.test/me', { method: 'GET' })
+    expect(s.refresh).toHaveBeenCalledTimes(1)
+  })
+
   it('outros status passam direto', async () => {
     const s = fakeSession()
     const base = jest

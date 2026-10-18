@@ -888,6 +888,7 @@ M · depende de: todas
 | 5 | Política de conflito | 409 com "Reaplicar", como na arquitetura. O contrato (§10) diz "o último a escrever vence"; ele precisa ser alinhado | 16 |
 | 6 | Recuperação de senha | Exige um provedor de e-mail. Sem ele, quem esquece a senha perde o acesso. Proposta: decidir o provedor junto com a hospedagem | 22 |
 | 7 | Onde a v0 roda | API, banco e web, mais o gerenciador de segredos (Azure Key Vault ou Google Secret Manager). Este plano não cobre o deploy | 22 |
+| 8 | O que a exclusão de conta apaga (LGPD art. 18, VI) | **Decidido na Etapa 22.** A linha do usuário sai de verdade (e-mail, nome e hash), sem "soft delete". O que é só dele vai junto: fichas (com histórico e rolagens), vínculos, convites e sessões. O que ele fez em fichas de outras pessoas fica no histórico, anônimo ("Conta excluída"). Dado de outra pessoa nunca é apagado em silêncio: se ele narra uma crônica com outros membros ou fichas, `DELETE /me` responde 409 com a lista, e ele precisa excluir a crônica antes (`DELETE /chronicles/:id`, que pede o nome da crônica digitado quando há fichas de outros jogadores). Passar a narração para outro membro fica para depois da v0. Risco residual: o token de acesso já emitido vale até expirar (15 min), mas não alcança mais nada (os vínculos saíram) | 22 |
 
 ---
 

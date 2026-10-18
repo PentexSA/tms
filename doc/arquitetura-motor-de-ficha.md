@@ -464,6 +464,7 @@ Table character_events {
 
 - `template_version` só registra a versão. Migrar fichas entre versões fica para depois (§11).
 - `text` e `longText` entram no histórico **sem conteúdo** ("Notas atualizadas"). O valor fica só na ficha (contrato §10).
+- **Exclusão de conta** (migration `0013_account_deletion`, plano §7 decisão 8): `characters.user_id` é `on delete cascade` (as fichas do usuário saem com ele); `character_batches.created_by` e `character_rolls.created_by` passam a aceitar null, com `on delete set null` (o que ele fez em fichas de outras pessoas fica, anônimo: "Conta excluída"). `chronicles.storyteller_id` continua sem cascata: a API apaga a crônica explicitamente ou recusa a exclusão (409), e o banco recusa se algo escapar.
 
 ### 8.4 O que corrigir na API atual antes de produção
 
@@ -505,6 +506,7 @@ Resumo. Os detalhes do contrato estão em [`design/templates/README.md`](../desi
 | Abuso do endpoint de eventos | Rate limit por usuário e por ficha; limite de corpo e de eventos por lote. |
 | Dado adulterado no aparelho | A reidratação passa por `compileTemplate` e `validateSheet`. |
 | Vazamento por log | Log com ids e números, nunca conteúdo de texto, tokens ou dados pessoais. |
+| Titular quer os dados apagados (LGPD art. 18, VI) | `DELETE /me` com a senha de novo (reautenticação, rate limit por usuário e IP): apaga a conta e o que é só dela numa transação, anonimiza o que ela fez em fichas alheias e recusa (409) se apagaria dado de outra pessoa sem confirmação. O app apaga cache, fila e último usuário do aparelho. |
 | Dependência vulnerável | `pnpm audit` no CI. |
 
 ---

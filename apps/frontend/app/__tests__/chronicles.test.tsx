@@ -110,6 +110,13 @@ describe('Crônicas (lista)', () => {
     ).toBeTruthy()
   })
 
+  it('"Conta" abre a tela da conta', async () => {
+    calls.chroniclesGet.mockResolvedValue(ok([]))
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    fireEvent.press(screen.getByRole('button', { name: 'Conta' }))
+    expect(router.push).toHaveBeenCalledWith('/account')
+  })
+
   it('sair encerra a sessão', async () => {
     calls.chroniclesGet.mockResolvedValue(ok([]))
     const session = await signedIn()
@@ -240,6 +247,63 @@ describe('Crônica (detalhe)', () => {
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Convidar' })).toBeNull()
     expect(calls.chronicleIds).toContain(CHRONICLE_ID)
+  })
+
+  it('jogador não vê "Excluir crônica"', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('player'))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    await screen.findByText('Narrador: ana')
+    expect(screen.queryByRole('button', { name: 'Excluir crônica' })).toBeNull()
+  })
+
+  it('narrador exclui a crônica digitando o nome', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+    calls.chronicle.delete.mockResolvedValue(ok(null))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Excluir crônica' })
+    )
+    const confirm = () =>
+      screen.getAllByRole('button', { name: 'Excluir crônica' }).at(-1)
+    // Sem o nome certo, o botão do sheet fica desabilitado
+    expect(confirm()).toBeDisabled()
+    const field = screen.getByLabelText(
+      'Digite o nome da crônica para confirmar'
+    )
+    fireEvent.changeText(field, 'crônica da liberdade')
+    expect(confirm()).toBeDisabled()
+    fireEvent.changeText(field, ' Crônica da Liberdade ')
+    expect(confirm()).toBeEnabled()
+    await act(async () => {
+      fireEvent.press(confirm() as never)
+    })
+    expect(calls.chronicle.delete).toHaveBeenCalledWith(CHRONICLE_ID, {
+      confirm: 'Crônica da Liberdade',
+    })
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('erro ao excluir aparece no sheet', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+    calls.chronicle.delete.mockResolvedValue(fail(500, 'erro interno'))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Excluir crônica' })
+    )
+    fireEvent.changeText(
+      screen.getByLabelText('Digite o nome da crônica para confirmar'),
+      'Crônica da Liberdade'
+    )
+    await act(async () => {
+      fireEvent.press(
+        screen
+          .getAllByRole('button', { name: 'Excluir crônica' })
+          .at(-1) as never
+      )
+    })
+    expect(await screen.findByText('erro interno')).toBeTruthy()
+    expect(router.replace).not.toHaveBeenCalledWith('/')
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
   })
 
   it('crônica alheia: não encontrada', async () => {

@@ -16,6 +16,7 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
+import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
 import { TableView } from '../../../../components/chronicles/TableView'
 import { messageOf, statusOf } from '../../../../lib/errors'
@@ -26,6 +27,7 @@ export default function ChronicleScreen() {
   const router = useRouter()
   const chronicle = useChronicle(id)
   const [inviting, setInviting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [view, setView] = useState<'sheets' | 'table'>('sheets')
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
@@ -100,14 +102,32 @@ export default function ChronicleScreen() {
             onInvite={() => setInviting(true)}
           />
         )}
+        {narrating ? (
+          <View style={styles.danger}>
+            <Button
+              title="Excluir crônica"
+              variant="danger"
+              accessibilityHint="Pede o nome da crônica para confirmar"
+              onPress={() => setDeleting(true)}
+            />
+          </View>
+        ) : null}
       </ScrollView>
       {narrating ? (
-        <InviteSheet
-          chronicleId={c.id}
-          chronicleName={c.name}
-          visible={inviting}
-          onClose={() => setInviting(false)}
-        />
+        <>
+          <InviteSheet
+            chronicleId={c.id}
+            chronicleName={c.name}
+            visible={inviting}
+            onClose={() => setInviting(false)}
+          />
+          <DeleteChronicleSheet
+            chronicleId={c.id}
+            chronicleName={c.name}
+            visible={deleting}
+            onClose={() => setDeleting(false)}
+          />
+        </>
       ) : null}
     </Screen>
   )
@@ -174,4 +194,9 @@ const styles = StyleSheet.create({
   content: { gap: tokens.space[2], paddingBottom: tokens.space[12] },
   info: { gap: tokens.space[1], padding: tokens.layout.gutter },
   empty: { paddingHorizontal: tokens.layout.gutter },
+  danger: {
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[8],
+    alignItems: 'flex-start',
+  },
 })

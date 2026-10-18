@@ -21,6 +21,8 @@ export interface Limits {
   readonly events: RateLimiter
   // Rolagens de dados: por usuário e por ficha.
   readonly rolls: RateLimiter
+  // Excluir a conta: por usuário e por IP (força bruta na senha).
+  readonly accountDeletion: RateLimiter
 }
 
 export interface AppOptions {
@@ -62,6 +64,11 @@ export function defaultLimits(now: () => Date): Limits {
     }),
     events: createRateLimiter({ limit: 120, windowMs: MINUTE, now: clock }),
     rolls: createRateLimiter({ limit: 30, windowMs: MINUTE, now: clock }),
+    accountDeletion: createRateLimiter({
+      limit: 5,
+      windowMs: 15 * MINUTE,
+      now: clock,
+    }),
   }
 }
 

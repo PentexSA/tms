@@ -21,7 +21,8 @@ import { useCharacterHistory } from '../../lib/queries/history'
 export interface HistoryItem {
   readonly id: string
   readonly at: string | Date
-  readonly by: { readonly username: string }
+  // Null: a conta de quem alterou foi excluída (o histórico fica, anônimo)
+  readonly by: { readonly username: string } | null
   readonly byRole: string
   readonly changes: readonly {
     readonly label: string
@@ -29,8 +30,12 @@ export interface HistoryItem {
   }[]
 }
 
+export const DELETED_ACCOUNT = 'Conta excluída'
+
 export const whoLabel = (item: Pick<HistoryItem, 'by' | 'byRole'>) =>
-  `${item.by.username}${item.byRole === 'storyteller' ? ' (narrador)' : ''}`
+  `${item.by?.username ?? DELETED_ACCOUNT}${
+    item.byRole === 'storyteller' ? ' (narrador)' : ''
+  }`
 
 function HistoryRow({ item }: { readonly item: HistoryItem }) {
   const { colors } = useTheme()

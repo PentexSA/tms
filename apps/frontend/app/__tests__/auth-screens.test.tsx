@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { Redirect, useRouter } from 'expo-router'
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import {
   json,
@@ -16,6 +16,7 @@ import RegisterScreen from '../(auth)/register'
 const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
 beforeEach(() => {
   jest.mocked(useRouter).mockReturnValue(router as never)
+  jest.mocked(useLocalSearchParams).mockReturnValue({})
 })
 
 describe('LoginScreen', () => {
@@ -74,6 +75,20 @@ describe('LoginScreen', () => {
     renderWithSession(<LoginScreen />, session)
     fireEvent.press(screen.getByRole('button', { name: 'Criar conta' }))
     expect(router.replace).toHaveBeenCalledWith('/register')
+  })
+
+  it('vindo da exclusão de conta, avisa que os dados foram apagados', () => {
+    jest.mocked(useLocalSearchParams).mockReturnValueOnce({ deleted: '1' })
+    const { session } = testSession(() => json(200, tokens()))
+    renderWithSession(<LoginScreen />, session)
+    expect(screen.getByText('Conta excluída')).toBeTruthy()
+    expect(screen.getByText(/inclusive os deste aparelho/)).toBeTruthy()
+  })
+
+  it('sem o aviso no login normal', () => {
+    const { session } = testSession(() => json(200, tokens()))
+    renderWithSession(<LoginScreen />, session)
+    expect(screen.queryByText('Conta excluída')).toBeNull()
   })
 })
 

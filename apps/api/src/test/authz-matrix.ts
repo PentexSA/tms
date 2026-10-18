@@ -32,6 +32,13 @@ export const MATRIX: readonly MatrixRow[] = [
     expect: { storyteller: 200, owner: 200, player: 200, ...denied },
   },
   {
+    // O cenário tem a ficha da dona: só sai com o nome da crônica digitado
+    method: 'DELETE',
+    route: '/chronicles/:id',
+    body: { confirm: 'Crônica da Liberdade' },
+    expect: { storyteller: 204, owner: 403, player: 403, ...denied },
+  },
+  {
     method: 'POST',
     route: '/chronicles/:id/invites',
     expect: { storyteller: 201, owner: 403, player: 403, ...denied },
@@ -113,6 +120,8 @@ export const NOT_IN_MATRIX = new Set([
   'POST /auth/refresh',
   'POST /auth/logout',
   'GET /me',
+  // Exclusão da própria conta, com a senha (__tests__/account.test.ts)
+  'DELETE /me',
   'GET /systems',
   'GET /systems/:code/template',
   'POST /chronicles',

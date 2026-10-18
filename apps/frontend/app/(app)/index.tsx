@@ -90,11 +90,18 @@ export default function ChroniclesScreen() {
       <AppBar
         title="Crônicas"
         actions={
-          <Button
-            title="Sair"
-            variant="ghost"
-            onPress={() => session.logout()}
-          />
+          <View style={styles.bar}>
+            <Button
+              title="Conta"
+              variant="ghost"
+              onPress={() => router.push('/account')}
+            />
+            <Button
+              title="Sair"
+              variant="ghost"
+              onPress={() => session.logout()}
+            />
+          </View>
         }
       />
       {body}
@@ -108,6 +115,7 @@ const styles = StyleSheet.create({
     paddingTop: tokens.space[4],
   },
   footer: { padding: tokens.layout.gutter },
+  bar: { flexDirection: 'row', gap: tokens.space[1] },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

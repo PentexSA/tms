@@ -74,6 +74,19 @@ export const useRevokeInvite = (id: string) => {
   })
 }
 
+/** Só o narrador. Com fichas de outros jogadores, a API exige o nome digitado. */
+export const useDeleteChronicle = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (confirm: string) =>
+      unwrap(await api.chronicles({ id }).delete({ confirm })),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: chronicleKeys.one(id) })
+      return queryClient.invalidateQueries({ queryKey: chronicleKeys.all })
+    },
+  })
+}
+
 export const useAcceptInvite = () => {
   const queryClient = useQueryClient()
   return useMutation({
