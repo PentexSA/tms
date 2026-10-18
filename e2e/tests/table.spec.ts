@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { apiAs, signUp } from '../support/users'
 
@@ -64,7 +63,9 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
     page.getByText('As alterações ficam assinadas no histórico.')
   ).toBeVisible()
   await page.getByRole('button', { name: 'Editar Notas do Narrador' }).click()
-  await page.getByLabel('Notas do Narrador').fill('O Regente vai cobrar.')
+  await page
+    .getByRole('textbox', { name: 'Notas do Narrador', exact: true })
+    .fill('O Regente vai cobrar.')
   await page.getByRole('button', { name: 'Salvar' }).click()
   await expect(page.getByRole('button', { name: 'Desfazer' })).toBeVisible()
   // O lote sai em segundo plano: espera o servidor confirmar
@@ -82,24 +83,19 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
     )
     .toBe(1)
 
-  // O dano entra pelo endpoint de eventos, como narrador. Quando as views de
-  // Jogo (Etapa 17) estiverem na branch, este passo vira o toque no dock.
-  await apiAs(
-    context,
-    storyteller,
-    'POST',
-    `/characters/${character.id}/events`,
-    {
-      clientBatchId: randomUUID(),
-      events: [
-        {
-          path: 'values.health',
-          from: null,
-          to: { aggravated: 0, lethal: 1, bashing: 0 },
-        },
-      ],
-    }
+  // O dano entra pelo sheet da Vitalidade, em Jogo, como narrador
+  const hurt = page.waitForResponse(
+    r =>
+      r.url().endsWith(`/characters/${character.id}/events`) &&
+      r.request().method() === 'POST' &&
+      r.status() === 200
   )
+  await page
+    .getByRole('button', { name: 'Vitalidade: Sem ferimentos; sem dano' })
+    .click()
+  await page.getByRole('button', { name: 'Aumentar Dano letal' }).click()
+  await hurt
+  await page.getByRole('button', { name: 'Fechar' }).last().click()
 
   // O histórico mostra quem alterou e com que papel
   await page.getByRole('button', { name: 'Histórico' }).click()
