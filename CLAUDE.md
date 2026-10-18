@@ -211,7 +211,7 @@ npx pnpm codegen                   # Generate types
 - **Monorepo Tool**: Turborepo v2.5+
 - **Runtime**: Bun (API only), Node.js (other packages)
 - **API Framework**: Elysia v1.2+ with @elysiajs/cors and @elysiajs/swagger
-- **Frontend**: Expo ~54.0 + Expo Router ~6.0 + React 19
+- **Frontend**: Expo ~57.0 + Expo Router ~57.0 + React 19.2 (React Native 0.86)
 - **Database**: PostgreSQL 16 via Docker
 - **Query Builder**: Kysely v0.28 with kysely-codegen
 - **TypeScript**: v5.7+ across all packages

@@ -25,7 +25,7 @@ describe('tema', () => {
     expect(renderHook(() => useTheme()).result.current.name).toBe('pergaminho')
     scheme.mockReturnValue('dark')
     expect(renderHook(() => useTheme()).result.current.name).toBe('noite')
-    scheme.mockReturnValue(null)
+    scheme.mockReturnValue('unspecified')
     expect(renderHook(() => useTheme()).result.current.name).toBe('noite')
   })
 
