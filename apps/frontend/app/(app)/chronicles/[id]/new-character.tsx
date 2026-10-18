@@ -72,7 +72,9 @@ export default function NewCharacterScreen() {
           serverIssues={issuesOf(create.error)}
           onSubmit={values =>
             create.mutate(values, {
-              onSuccess: c => router.replace(`/characters/${c.id}`),
+              // A ficha nova abre em Evoluir: atributos, habilidades e
+              // poderes se montam ali
+              onSuccess: c => router.replace(`/characters/${c.id}?mode=evolve`),
             })
           }
         />

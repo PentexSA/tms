@@ -66,7 +66,8 @@ describe('Nova ficha', () => {
     expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
       values: { name: 'Helena Varga', clan: 'tremere' },
     })
-    expect(router.replace).toHaveBeenCalledWith('/characters/ch1')
+    // A ficha nova abre em Evoluir (Etapa 18)
+    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=evolve')
     // O template mais recente do sistema da crônica
     expect(calls.templateGet).toHaveBeenCalledWith(
       'vtm-v20',

@@ -350,6 +350,52 @@ describe('Stepper', () => {
     }
   })
 
+  it('tocar no valor: ação "activate" no app e botão "Digitar" no web', () => {
+    const onValuePress = jest.fn()
+    const { el } = renderStepper({ onValuePress })
+    expect(el.props.accessibilityActions).toEqual([
+      { name: 'increment' },
+      { name: 'decrement' },
+      { name: 'activate', label: 'Digitar o valor' },
+    ])
+    fireEvent(el, 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    })
+    fireEvent.press(
+      screen.getByTestId('stepper-value', { includeHiddenElements: true })
+    )
+    expect(onValuePress).toHaveBeenCalledTimes(2)
+
+    const os = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      const onWeb = jest.fn()
+      render(
+        <Stepper
+          label="Força"
+          value={2}
+          min={1}
+          max={5}
+          onChange={jest.fn()}
+          onValuePress={onWeb}
+        />
+      )
+      fireEvent.press(screen.getByRole('button', { name: 'Digitar Força' }))
+      expect(onWeb).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
+  })
+
+  it('desabilitado, o valor não abre o teclado', () => {
+    const onValuePress = jest.fn()
+    const { el } = renderStepper({ onValuePress, disabled: true })
+    expect(el.props.accessibilityActions).toHaveLength(2)
+    expect(
+      screen.queryByTestId('stepper-value', { includeHiddenElements: true })
+    ).toBeNull()
+  })
+
   it('no sheet, botões de 56', () => {
     renderStepper({ size: 'sheet' })
     expect(

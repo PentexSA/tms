@@ -4,7 +4,7 @@ import { sheetKeys } from '../../data'
 import { createSheetStore } from '../../store/sheetStore'
 import { createMemoryOutbox, type Outbox, type QueuedBatch } from '../outbox'
 import type { PostOutcome } from '../sender'
-import { createSync, rejectionMessage } from '../sync'
+import { createSync, issuesOf, rejectionMessage } from '../sync'
 
 // Etapa 16: fila + envio + store + cache, sem tela.
 
@@ -256,4 +256,48 @@ it('flush: reconectou, tenta já', async () => {
   void sync.flush()
   await flush()
   expect(post).toHaveBeenCalledTimes(2)
+})
+
+describe('422 (Etapa 18)', () => {
+  it('as issues chegam ao store e o Salvar de Evoluir volta como rascunho', async () => {
+    const { store, notify } = setup(() => ({
+      status: 422,
+      body: {
+        issues: [
+          { path: 'values.strength', message: 'acima do permitido' },
+          { path: 42, message: 'ignorada' },
+          { path: 'values.x', message: 'y'.repeat(500) },
+        ],
+      },
+    }))
+    await flush()
+    store.getState().setMode('evolve')
+    store.getState().startDraft()
+    store.getState().setDraftValue('values.strength', 3)
+    store.getState().saveDraft('1 alteração')
+    await flush()
+    expect(store.getState().fieldIssues.get('strength')).toBe(
+      'acima do permitido'
+    )
+    expect(store.getState().draftEvents()).toHaveLength(1)
+    expect(notify).toHaveBeenCalledWith(
+      'O servidor recusou “1 alteração”. Confira os campos marcados em Evoluir.'
+    )
+  })
+
+  it('issuesOf descarta o que não tem forma de issue', () => {
+    expect(issuesOf(null)).toEqual([])
+    expect(issuesOf({ issues: 'x' })).toEqual([])
+    expect(
+      issuesOf({
+        issues: Array.from({ length: 60 }, (_, i) => ({
+          path: `values.a${i}`,
+          message: 'm',
+        })),
+      })
+    ).toHaveLength(50)
+    expect(
+      issuesOf({ issues: [{ path: 'values.a', message: 'm', extra: 1 }] })
+    ).toEqual([{ path: 'values.a', message: 'm' }])
+  })
 })

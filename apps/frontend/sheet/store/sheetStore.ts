@@ -93,6 +93,8 @@ export interface SheetState {
   readonly draft: Draft | null
   readonly undoStack: readonly QueuedBatch[]
   readonly conflict: SheetConflict | null
+  // O que o servidor recusou (422), por campo: o editor mostra a mensagem.
+  readonly fieldIssues: ReadonlyMap<FieldId, string>
 }
 
 export interface SheetActions {
@@ -100,14 +102,20 @@ export interface SheetActions {
   commit(
     events: readonly SheetEvent[],
     label: string,
-    options?: { readonly undoable?: boolean }
+    options?: { readonly undoable?: boolean; readonly draft?: boolean }
   ): CommitResult
   /** Desfaz um lote (o último, sem id): é só mais um lote, o inverso. */
   undo(clientBatchId?: string): CommitResult | null
   /** O servidor confirmou: a resposta dele vira o snapshot. */
   confirmed(clientBatchId: string, body: unknown): void
-  /** 400, 403, 404, 422: sai da fila e o otimista volta atrás. */
-  rejected(clientBatchId: string): QueuedBatch | undefined
+  /**
+   * 400, 403, 404, 422: sai da fila e o otimista volta atrás. Com as issues
+   * do 422, marca os campos; em Evoluir, o rascunho volta para corrigir.
+   */
+  rejected(
+    clientBatchId: string,
+    issues?: readonly Issue[]
+  ): QueuedBatch | undefined
   /** 409: sai da fila e fica guardado para "Reaplicar". */
   conflicted(clientBatchId: string): void
   /** A ficha rebuscada do servidor (foco, reconexão, depois de um 409). */
@@ -121,6 +129,8 @@ export interface SheetActions {
   startDraft(): void
   /** Altera o rascunho de Evoluir (validado como um lote). */
   editDraft(events: readonly SheetEvent[]): CommitResult | null
+  /** Um caminho do rascunho; o `from` é o valor que a tela mostra agora. */
+  setDraftValue(path: string, to: unknown): CommitResult | null
   /** O lote que o rascunho viraria (o resumo de "Concluir"). */
   draftEvents(): SheetEvent[]
   saveDraft(label: string): CommitResult | null
@@ -169,6 +179,27 @@ function share(
   }
   return next
 }
+
+/** O campo de um caminho de issue ("values.strength", "/values/x/0/value"). */
+export function fieldOfIssuePath(path: string): FieldId | null {
+  const dotted = path.replace(/^\//, '').replace(/\//g, '.')
+  const m = /^(?:values|specialties)\.([^.]+)/.exec(dotted)
+  return m?.[1] ? (m[1] as FieldId) : null
+}
+
+function issuesByField(
+  model: SheetModel,
+  issues: readonly Issue[]
+): ReadonlyMap<FieldId, string> {
+  const out = new Map<FieldId, string>()
+  for (const issue of issues) {
+    const id = fieldOfIssuePath(issue.path)
+    if (id && model.fields.has(id) && !out.has(id)) out.set(id, issue.message)
+  }
+  return out
+}
+
+const NO_ISSUES: ReadonlyMap<FieldId, string> = new Map()
 
 const valueAt = (sheet: SheetData, path: string): unknown => {
   const p = parsePath(path)
@@ -245,6 +276,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         clientBatchId: uuid(),
         events: events.map(e => ({ path: e.path, from: e.from, to: e.to })),
         label,
+        ...(options?.draft ? { draft: true } : {}),
       }
       try {
         checkLimits(batch, s.pending.length)
@@ -260,6 +292,37 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       set({ pending, undoStack, ...derive({ ...s, pending }, r.sheet) })
       sync.enqueue(characterId, batch)
       return { ok: true, batch }
+    }
+
+    const editDraft: SheetActions['editDraft'] = events => {
+      const s = get()
+      if (!s.draft) return null
+      const r = applyBatch(model, shown(s.values, s.draft), { events }, roles)
+      if (!r.ok) return { ok: false, kind: r.kind, issues: r.issues }
+      const draft = new Map(s.draft)
+      for (const e of events) {
+        // `from: null` (campo sem valor guardado) também é o de antes
+        const before = draft.get(e.path)
+        const from = before ? before.from : e.from
+        // Voltou ao valor de antes: a alteração some do rascunho
+        if (jsonEqual(from, e.to)) draft.delete(e.path)
+        else draft.set(e.path, { from, to: e.to })
+      }
+      // Mexeu no campo: a recusa anterior do servidor deixa de valer
+      let fieldIssues = s.fieldIssues
+      for (const e of events) {
+        const id = fieldOfIssuePath(e.path)
+        if (id && fieldIssues.has(id)) {
+          const next = new Map(fieldIssues)
+          next.delete(id)
+          fieldIssues = next
+        }
+      }
+      set({ draft, fieldIssues, ...derive({ ...s, draft }, s.values) })
+      return {
+        ok: true,
+        batch: { clientBatchId: '', events: [...events], label: '' },
+      }
     }
 
     const received: SheetActions['received'] = (sheet, sheetVersion) => {
@@ -291,9 +354,18 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       draft: null,
       undoStack: [],
       conflict: null,
+      fieldIssues: NO_ISSUES,
 
       commit,
       received,
+      editDraft,
+
+      setDraftValue(path, to) {
+        const s = get()
+        if (!s.draft) return null
+        const from = valueAt(shown(s.values, s.draft), path)
+        return editDraft([{ path, from, to }])
+      },
 
       hydrate(batches) {
         const s = get()
@@ -336,10 +408,30 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           received(res.sheet, res.sheetVersion)
       },
 
-      rejected(clientBatchId) {
+      rejected(clientBatchId, issues) {
         const { batch, pending, undoStack } = without(clientBatchId)
         const s = get()
-        set({ pending, undoStack, ...derive({ ...s, pending }) })
+        const marked = issues?.length ? issuesByField(model, issues) : null
+        // O "Salvar" de Evoluir recusado (422): as alterações voltam ao
+        // rascunho, com os campos marcados, em vez de sumirem. Recusa de um
+        // lote do Jogo só desfaz o otimista.
+        const back = Boolean(marked?.size && batch?.draft && !s.draft)
+        const draft = back
+          ? new Map(
+              (batch?.events ?? []).map(e => [
+                e.path,
+                { from: e.from, to: e.to },
+              ])
+            )
+          : s.draft
+        set({
+          pending,
+          undoStack,
+          draft,
+          mode: back ? 'evolve' : s.mode,
+          fieldIssues: marked?.size ? marked : s.fieldIssues,
+          ...derive({ ...s, pending, draft }),
+        })
         return batch
       },
 
@@ -389,25 +481,6 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         set({ draft: new Map() })
       },
 
-      editDraft(events) {
-        const s = get()
-        if (!s.draft) return null
-        const r = applyBatch(model, shown(s.values, s.draft), { events }, roles)
-        if (!r.ok) return { ok: false, kind: r.kind, issues: r.issues }
-        const draft = new Map(s.draft)
-        for (const e of events) {
-          const from = draft.get(e.path)?.from ?? e.from
-          // Voltou ao valor de antes: a alteração some do rascunho
-          if (jsonEqual(from, e.to)) draft.delete(e.path)
-          else draft.set(e.path, { from, to: e.to })
-        }
-        set({ draft, ...derive({ ...s, draft }, s.values) })
-        return {
-          ok: true,
-          batch: { clientBatchId: '', events: [...events], label: '' },
-        }
-      },
-
       draftEvents() {
         const { draft } = get()
         return draft ? draftToEvents(draft) : []
@@ -422,11 +495,12 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           return null
         }
         // Salvar é um lote só; com conflito, o rascunho fica para decidir
-        const result = commit(events, label)
+        const result = commit(events, label, { draft: true })
         if (result.ok) {
           const after = get()
           set({
             draft: null,
+            fieldIssues: NO_ISSUES,
             ...derive({ ...after, draft: null }, after.values),
           })
         }
@@ -435,7 +509,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
 
       discardDraft() {
         const s = get()
-        set({ draft: null, ...derive({ ...s, draft: null }, s.values) })
+        set({
+          draft: null,
+          fieldIssues: NO_ISSUES,
+          ...derive({ ...s, draft: null }, s.values),
+        })
       },
     }
   })

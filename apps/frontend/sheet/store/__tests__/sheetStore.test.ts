@@ -1,7 +1,7 @@
 import type { RoleName, SheetData } from '@tms/sheet-core'
 import { clone, example, modelOf, sheetFor } from '../../../test/fixtures'
 import { MAX_PENDING_PER_CHARACTER } from '../../sync/outbox'
-import { createSheetStore, MAX_UNDO } from '../sheetStore'
+import { createSheetStore, fieldOfIssuePath, MAX_UNDO } from '../sheetStore'
 
 // Etapa 16: o SheetStore (doc/arquitetura §6.5): otimista, confirmação,
 // rejeição, conflito, Desfazer e o rascunho de Evoluir.
@@ -432,5 +432,90 @@ describe('assinatura por campo', () => {
       uuid: () => '00000000-0000-4000-8000-000000000001',
     })
     expect(store.getState().entries.size).toBe(other.fields.size)
+  })
+})
+
+describe('Evoluir (Etapa 18): setDraftValue e o 422', () => {
+  it('campo sem valor guardado editado duas vezes mantém o from null', () => {
+    const { s } = setup(['owner'], {
+      values: { name: 'Nova' },
+      specialties: {},
+    })
+    s().startDraft()
+    expect(s().setDraftValue('values.strength', 2)).toMatchObject({ ok: true })
+    expect(s().setDraftValue('values.strength', 3)).toMatchObject({ ok: true })
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.strength', from: null, to: 3 },
+    ])
+    expect(s().saveDraft('Força')).toMatchObject({ ok: true })
+  })
+
+  it('setDraftValue sem rascunho não faz nada', () => {
+    const { s } = setup()
+    expect(s().setDraftValue('values.strength', 3)).toBeNull()
+  })
+
+  it('422 do Salvar: o rascunho volta, em Evoluir, com o campo marcado', () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    const saved = s().saveDraft('Evolução')
+    if (!saved?.ok) throw new Error('save')
+    expect(saved.batch.draft).toBe(true)
+    // A tela já saiu de Evoluir quando a resposta chega
+    s().setMode('read')
+    s().rejected(saved.batch.clientBatchId, [
+      { path: 'values.strength', message: 'acima do permitido' },
+      { path: 'values.strength', message: 'segunda mensagem' },
+      { path: 'values.naoExiste', message: 'ignorada' },
+    ])
+    expect(s().mode).toBe('evolve')
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.strength', from: 2, to: 3 },
+    ])
+    expect([...s().fieldIssues]).toEqual([['strength', 'acima do permitido']])
+    // Mexer no campo apaga a marca
+    s().setDraftValue('values.strength', 4)
+    expect(s().fieldIssues.size).toBe(0)
+  })
+
+  it('422 de um lote do Jogo só desfaz (não abre Evoluir)', () => {
+    const { s } = setup()
+    s().setMode('play')
+    const r = s().commit([blood(9, 8)], 'Sangue −1')
+    if (!r.ok) throw new Error('commit')
+    s().rejected(r.batch.clientBatchId, [
+      { path: 'values.blood', message: 'não' },
+    ])
+    expect(s().mode).toBe('play')
+    expect(s().draft).toBeNull()
+    expect(s().fieldIssues.get('blood')).toBe('não')
+  })
+
+  it('descartar limpa as marcas', () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    const saved = s().saveDraft('x')
+    if (!saved?.ok) throw new Error('save')
+    s().rejected(saved.batch.clientBatchId, [
+      { path: 'values.dexterity', message: 'm' },
+    ])
+    expect(s().fieldIssues.size).toBe(1)
+    s().discardDraft()
+    expect(s().fieldIssues.size).toBe(0)
+  })
+
+  it.each([
+    ['values.strength', 'strength'],
+    ['/values/strength', 'strength'],
+    ['values.disciplines.0.value', 'disciplines'],
+    ['specialties.occult', 'occult'],
+    ['', null],
+    ['events.0.path', null],
+  ])('o caminho %s marca %s', (path, field) => {
+    expect(fieldOfIssuePath(path)).toBe(field)
   })
 })

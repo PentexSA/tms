@@ -29,6 +29,9 @@ export interface StepperProps {
   readonly disabled?: boolean
   readonly size?: 'inline' | 'sheet'
   readonly testID?: string
+  // Tocar no valor (digitar o número). No web é um botão; no app, a ação
+  // "activate" do controle ajustável (toque duplo do leitor de tela).
+  readonly onValuePress?: () => void
 }
 
 const HOLD_DELAY_MS = 400
@@ -44,6 +47,7 @@ export function Stepper({
   disabled = false,
   size = 'inline',
   testID,
+  onValuePress,
 }: StepperProps) {
   const { colors } = useTheme()
   const [display, setDisplay] = useState(value)
@@ -92,7 +96,9 @@ export function Stepper({
   const onAction = (e: AccessibilityActionEvent) => {
     if (e.nativeEvent.actionName === 'increment') commit(value + 1)
     if (e.nativeEvent.actionName === 'decrement') commit(value - 1)
+    if (e.nativeEvent.actionName === 'activate') onValuePress?.()
   }
+  const typeable = Boolean(onValuePress) && !disabled
 
   const big = size === 'sheet'
   const web = Platform.OS === 'web'
@@ -137,25 +143,49 @@ export function Stepper({
         'aria-valuenow': display,
         'aria-valuetext': valueText ? valueText(display) : undefined,
         'aria-disabled': disabled,
-        accessibilityActions: [{ name: 'increment' }, { name: 'decrement' }],
+        accessibilityActions: [
+          { name: 'increment' },
+          { name: 'decrement' },
+          ...(typeable ? [{ name: 'activate', label: 'Digitar o valor' }] : []),
+        ],
         onAccessibilityAction: disabled ? undefined : onAction,
       }
+
+  const shownValue = (
+    <Text
+      variant={big ? 'numberLg' : 'number'}
+      style={[styles.value, big && styles.valueBig]}
+      {...(web
+        ? {
+            accessibilityLabel: `${label}, ${spoken}`,
+            'aria-live': 'polite' as const,
+          }
+        : {})}
+    >
+      {String(display)}
+    </Text>
+  )
 
   return (
     <View testID={testID} {...container} style={styles.row}>
       {button(-1)}
-      <Text
-        variant={big ? 'numberLg' : 'number'}
-        style={[styles.value, big && styles.valueBig]}
-        {...(web
-          ? {
-              accessibilityLabel: `${label}, ${spoken}`,
-              'aria-live': 'polite' as const,
-            }
-          : {})}
-      >
-        {String(display)}
-      </Text>
+      {typeable ? (
+        <Pressable
+          testID={testID ? `${testID}-value` : undefined}
+          {...(web
+            ? {
+                accessibilityRole: 'button' as const,
+                accessibilityLabel: `Digitar ${label}`,
+              }
+            : { accessible: false, 'aria-hidden': true })}
+          onPress={onValuePress}
+          style={styles.valueTarget}
+        >
+          {shownValue}
+        </Pressable>
+      ) : (
+        shownValue
+      )}
       {button(1)}
     </View>
   )
@@ -171,5 +201,6 @@ const styles = StyleSheet.create({
   },
   big: { width: tokens.size.stepperSize, height: tokens.size.stepperSize },
   value: { minWidth: 32, textAlign: 'center' },
+  valueTarget: { alignItems: 'center', justifyContent: 'center' },
   valueBig: { minWidth: 56 },
 })

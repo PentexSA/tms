@@ -20,6 +20,9 @@ const examples: { id: string; system: string; sheet: SheetData }[] =
 
 export const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
 
+/** Os ids de todas as fichas de exemplo (todos os sistemas). */
+export const exampleIds = (): string[] => examples.map(c => c.id)
+
 export const templateJson = (system: string): Json =>
   clone(templates[system] as Json)
 

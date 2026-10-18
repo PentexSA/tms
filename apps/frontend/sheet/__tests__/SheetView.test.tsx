@@ -31,7 +31,10 @@ function renderSheet(model: SheetModel, sheet: SheetData, roles: RoleName[]) {
   return render(<SheetView model={model} sheet={sheet} roles={roles} />)
 }
 
-/** Percorre as abas e confere que todo campo legível foi desenhado. */
+/**
+ * Percorre as abas e confere que todo campo legível foi desenhado. Seção com
+ * filtro ligado por padrão ("Só com pontos") mostra tudo com "Mostrar todos".
+ */
 function expectEveryField(
   model: SheetModel,
   sheet: SheetData,
@@ -40,6 +43,10 @@ function expectEveryField(
   const resolved = resolve(model, sheet)
   const seen = new Set<string>()
   const check = (zoneId: string) => {
+    for (const all of screen.queryAllByRole('button', {
+      name: 'Mostrar todos',
+    }))
+      fireEvent.press(all)
     const zone = model.zones.find(z => z.id === zoneId)
     for (const s of zone?.sections ?? [])
       for (const id of s.fieldIds) {

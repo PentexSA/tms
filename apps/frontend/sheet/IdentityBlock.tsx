@@ -2,16 +2,25 @@ import { identityOf, jsonEqual } from '@tms/sheet-core'
 import { Avatar, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from './context'
+import { FieldSlot } from './FieldSlot'
 import { SectionView } from './SectionView'
 
 // Nome, selo e resumo, e as seções da zona `identity` (DS: IdentityBlock).
 // Esses campos nunca são de seção restrita: o validador do template garante.
 // Assina só a identidade: gastar Sangue não re-renderiza o cabeçalho.
 export function IdentityBlock() {
-  const { model } = useSheet()
+  const { model, mode } = useSheet()
   const { accent } = useTheme()
   const id = useSheetSelector(s => identityOf(s.resolved), jsonEqual)
   const sections = model.zones.find(z => z.id === 'identity')?.sections ?? []
+  // Em Evoluir, o nome, o selo e o resumo que não estão em seção nenhuma
+  // (Nome, Clã e Geração no Vampiro; Classe e Nível no D&D) ganham editor
+  const loose =
+    mode === 'evolve'
+      ? model.identityFields.filter(
+          f => model.fields.get(f)?.sectionIds.length === 0
+        )
+      : []
   return (
     <View style={styles.block}>
       <View style={styles.head}>
@@ -38,6 +47,13 @@ export function IdentityBlock() {
           ) : null}
         </View>
       </View>
+      {loose.length ? (
+        <View testID="identity-editors">
+          {loose.map(f => (
+            <FieldSlot key={f} id={f} variant="row" />
+          ))}
+        </View>
+      ) : null}
       {sections.map(s => (
         <SectionView key={s.id} section={s} hideTitle />
       ))}

@@ -1,10 +1,18 @@
 import type { FieldTypeName, SkinName } from '@tms/sheet-core'
+import { ChoiceEditorRow } from '../evolve/ChoiceEditorRow'
+import { ListEditor } from '../evolve/ListEditor'
+import { NumberEditorRow } from '../evolve/NumberEditorRow'
+import { ResourceEditorRow } from '../evolve/ResourceEditorRow'
+import { TextEditorRow } from '../evolve/TextEditorRow'
 import { FieldDetail } from './FieldDetail'
 import { GenericChip } from './GenericChip'
 import { GenericFact, GenericRow } from './GenericRow'
+import { ListRow } from './ListView'
+import { RatingCell, RatingRow } from './RatingViews'
 import { ResourceChip } from './resource/ResourceChip'
 import { ResourceRow } from './resource/ResourceRow'
 import { ResourceSheet } from './resource/ResourceSheet'
+import { wodViews } from './skins/wod'
 import { TrackChip } from './track/TrackChip'
 import { TrackRow } from './track/TrackRow'
 import { TrackSheet } from './track/TrackSheet'
@@ -13,30 +21,36 @@ import type { FieldView, FieldViewComponent, Variant } from './types'
 export type { FieldView, FieldViewProps, Variant } from './types'
 
 // Uma entrada por tipo da lista fechada: o build quebra se faltar um. Tipo
-// sem view própria cai no GenericRow; as views ricas entram nas Etapas 17 e 18.
+// sem view própria cai no GenericRow. A variante `editor` é a de Evoluir
+// (Etapa 18); as views de Jogo (resource, track) são da Etapa 17.
 export const baseViews = {
-  rating: {},
-  number: {},
-  percent: {},
-  // Modo Jogo (Etapa 17): linha, chip do dock e sheet
-  resource: { row: ResourceRow, chip: ResourceChip, sheet: ResourceSheet },
+  rating: { row: RatingRow, cell: RatingCell, editor: NumberEditorRow },
+  number: { editor: NumberEditorRow },
+  percent: { editor: NumberEditorRow },
+  // Jogo (Etapa 17): linha, chip do dock e sheet; Evoluir (18): o editor
+  resource: {
+    row: ResourceRow,
+    chip: ResourceChip,
+    sheet: ResourceSheet,
+    editor: ResourceEditorRow,
+  },
   track: { row: TrackRow, chip: TrackChip, sheet: TrackSheet },
   slots: {},
   clock: {},
-  state: {},
+  state: { editor: ChoiceEditorRow },
   mark: {},
-  text: {},
-  longText: {},
-  choice: {},
+  text: { editor: TextEditorRow },
+  longText: { editor: TextEditorRow },
+  choice: { editor: ChoiceEditorRow },
   tags: {},
-  list: {},
+  list: { row: ListRow, editor: ListEditor },
 } satisfies Record<FieldTypeName, FieldView>
 
 // Overrides por skin (doc/arquitetura §6.4): mesmas props, mesma
 // acessibilidade, só o visual muda.
 export const skinViews: Readonly<
   Record<SkinName, Partial<Record<FieldTypeName, FieldView>>>
-> = { wod: {}, dnd: {}, coc: {}, fate: {} }
+> = { wod: wodViews, dnd: {}, coc: {}, fate: {} }
 
 // Variantes que não podem cair numa linha: o chip do dock é pequeno e o sheet
 // é o detalhe (com o porquê de não dar para mexer).
@@ -63,4 +77,17 @@ export function resolveView(
   return (
     override ?? base?.[variant] ?? FALLBACK[variant] ?? base?.row ?? GenericRow
   )
+}
+
+/** O tipo tem view própria nesta variante (na skin ou na base)? */
+export function hasView(
+  skin: SkinName,
+  type: FieldTypeName,
+  variant: Variant,
+  views: Readonly<Record<FieldTypeName, FieldView>> = baseViews,
+  skins = skinViews
+): boolean {
+  const skinned = Object.hasOwn(skins, skin) ? skins[skin][type] : undefined
+  const base = Object.hasOwn(views, type) ? views[type] : undefined
+  return Boolean(skinned?.[variant] ?? base?.[variant])
 }

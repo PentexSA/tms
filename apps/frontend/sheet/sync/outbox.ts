@@ -7,6 +7,9 @@ import { type EventBatch, MAX_EVENTS_PER_BATCH } from '@tms/sheet-core'
 /** Um lote na fila: o EventBatch do core e o rótulo do aviso ("Sangue −1"). */
 export interface QueuedBatch extends EventBatch {
   readonly label: string
+  // Veio do "Salvar" de Evoluir: recusado (422), volta como rascunho. Fica
+  // no aparelho; a API recebe só clientBatchId e events.
+  readonly draft?: boolean
 }
 
 export interface Outbox {

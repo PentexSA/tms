@@ -15,6 +15,8 @@ import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
+import { canEditSomething } from './evolve/hooks'
+import { ModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
 import { ActionsButton } from './play/ActionsMenu'
 import { CombatDock, dockFields } from './play/CombatDock'
@@ -31,10 +33,11 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // system: CombatDock). O menu ⋯ tem as ações do template.
 //
 // Com `store`, é a ficha viva (otimista, fila, Desfazer). Com `sheet`, uma
-// ficha só de leitura (prévias e testes).
+// ficha só de leitura (prévias e testes). `editable` mostra os modos
+// (Leitura · Jogo · Evoluir) para quem escreve algum campo.
 
 export type SheetViewProps =
-  | { readonly store: SheetStore }
+  | { readonly store: SheetStore; readonly editable?: boolean }
   | {
       readonly model: SheetModel
       readonly sheet: SheetData
@@ -77,12 +80,23 @@ export function SheetView(props: SheetViewProps) {
       fixed?.mode,
     ]
   )
-  return <SheetBody store={store} />
+  const editable = 'store' in props && props.editable === true
+  return <SheetBody store={store} editable={editable} />
 }
 
-function SheetBody({ store }: { readonly store: SheetStore }) {
+function SheetBody({
+  store,
+  editable,
+}: {
+  readonly store: SheetStore
+  readonly editable: boolean
+}) {
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
+  const writer = useMemo(
+    () => editable && canEditSomething(model, new Set(roles)),
+    [editable, model, roles]
+  )
   const [tab, setTab] = useState(zones[0]?.id ?? 'build')
   const active: CompiledZone | undefined =
     zones.find(z => z.id === tab) ?? zones[0]
@@ -104,7 +118,11 @@ function SheetBody({ store }: { readonly store: SheetStore }) {
       <SheetProvider store={store}>
         <FieldSheetProvider>
           <View style={styles.screen}>
-            <ScrollView contentContainerStyle={styles.content}>
+            {writer ? <ModeBar /> : null}
+            <ScrollView
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+            >
               <ConflictBanner />
               {mode === 'play' ? (
                 <View style={styles.toolbar}>

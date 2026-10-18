@@ -1,11 +1,14 @@
 import type { FieldId } from '@tms/sheet-core'
 import { memo } from 'react'
 import { useFieldEntry, useSheet } from './context'
-import { resolveView, type Variant } from './views'
+import { canEditIn } from './evolve/hooks'
+import { hasView, resolveView, type Variant } from './views'
 
 /**
  * Um campo na variante pedida pelo layout; o registry escolhe o componente.
- * Assina só o próprio campo: re-renderiza quando ele muda, não a ficha.
+ * Assina só o próprio campo: re-renderiza quando ele muda, não a ficha. Em
+ * Evoluir, o campo que o papel escreve pede a variante `editor`; tipo sem
+ * editor fica na variante do layout.
  */
 export const FieldSlot = memo(function FieldSlot({
   id,
@@ -14,9 +17,14 @@ export const FieldSlot = memo(function FieldSlot({
   readonly id: FieldId
   readonly variant: Variant
 }) {
-  const { model } = useSheet()
+  const { model, roles, mode } = useSheet()
   const entry = useFieldEntry(id)
   if (!entry) return null
-  const View = resolveView(model.skin, entry.resolved.type, variant)
+  const { type } = entry.resolved
+  const editing =
+    mode === 'evolve' &&
+    canEditIn(model, roles, id, mode) &&
+    hasView(model.skin, type, 'editor')
+  const View = resolveView(model.skin, type, editing ? 'editor' : variant)
   return <View resolved={entry.resolved} sheet={entry.sheet} />
 })

@@ -5,11 +5,20 @@ import { useEffect, useState } from 'react'
 
 import { messageOf, statusOf } from '../lib/errors'
 import { type SheetState, useSheetData } from './data'
+import { canEditSomething } from './evolve/hooks'
+import { LeaveGuard } from './evolve/LeaveGuard'
 import { SheetView } from './SheetView'
 import { createSheetStore } from './store/sheetStore'
 import { useSync } from './sync/SyncProvider'
 
-export function SheetScreen({ id }: { readonly id: string }) {
+export function SheetScreen({
+  id,
+  initialMode,
+}: {
+  readonly id: string
+  // A ficha recém-criada abre em Evoluir (Etapa 18)
+  readonly initialMode?: SheetMode
+}) {
   const router = useRouter()
   const state = useSheetData(id)
   const chronicle = state.status === 'ready' ? state.character.chronicle : null
@@ -63,6 +72,7 @@ export function SheetScreen({ id }: { readonly id: string }) {
         <LiveSheet
           key={`${state.character.templateVersion}:${state.roles.join(',')}`}
           state={state}
+          initialMode={initialMode}
         />
       )
   }
@@ -85,26 +95,44 @@ export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
 function LiveSheet({
   state,
+  initialMode,
 }: {
   readonly state: Extract<SheetState, { status: 'ready' }>
+  readonly initialMode?: SheetMode
 }) {
   const sync = useSync()
   const { id, sheet, sheetVersion } = state.character
-  const [store] = useState(() =>
-    createSheetStore({
+  const [store] = useState(() => {
+    // Só quem escreve algum campo começa em Evoluir (ficha recém-criada); sem
+    // pedido, o modo padrão do papel
+    const writer = canEditSomething(state.model, new Set(state.roles))
+    const mode: SheetMode =
+      initialMode === 'evolve'
+        ? writer
+          ? 'evolve'
+          : defaultMode(state.roles)
+        : (initialMode ?? defaultMode(state.roles))
+    const created = createSheetStore({
       characterId: id,
       model: state.model,
       sheet: state.sheet,
       sheetVersion,
       roles: state.roles,
-      mode: defaultMode(state.roles),
+      mode,
       sync,
     })
-  )
+    if (mode === 'evolve') created.getState().startDraft()
+    return created
+  })
   useEffect(() => sync.register(id, store), [sync, id, store])
   // Rebuscada (foco, conflito): o store confere a versão e valida
   useEffect(() => {
     store.getState().received(sheet, sheetVersion)
   }, [store, sheet, sheetVersion])
-  return <SheetView store={store} />
+  return (
+    <>
+      <SheetView store={store} editable />
+      <LeaveGuard store={store} />
+    </>
+  )
 }
