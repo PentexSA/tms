@@ -110,8 +110,14 @@ describe('Mesa do narrador', () => {
     const lia = dockPhrases('lia', 'dnd5e-2014')
     expect(helena).toHaveLength(3)
     expect(lia).toHaveLength(3)
+    // Cada chip é visual; o nome da linha (um alvo só) leva a frase de cada
+    // um, para o leitor de tela não repetir
+    await screen.findByRole('button', { name: /^Helena Varga, Tremere\./ })
+    const lines = screen
+      .getAllByRole('button')
+      .map(b => String(b.props.accessibilityLabel ?? ''))
     for (const phrase of [...helena, ...lia])
-      expect(await screen.findByLabelText(phrase)).toBeTruthy()
+      expect(lines.some(l => l.includes(phrase))).toBe(true)
     // Os templates vêm pela versão de cada ficha
     expect(calls.templateGet).toHaveBeenCalledWith(
       'dnd5e-2014',
