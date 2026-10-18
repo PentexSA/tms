@@ -130,7 +130,10 @@ export function sanitizeClient(raw: unknown): PersistedClient {
     if (!isObject(q) || !Array.isArray(q.queryKey) || !isObject(q.state))
       continue
     const what = persistable(q.queryKey)
-    if (!what || q.state.status !== 'success') continue
+    // O último dado bom vale, mesmo que o refetch seguinte tenha falhado
+    // (offline, a ficha em "error" ainda tem os dados)
+    const ok = q.state.status === 'success' || q.state.status === 'error'
+    if (!what || !ok || q.state.data === undefined) continue
     const at = q.state.dataUpdatedAt
     entries.push({
       key: q.queryKey,
@@ -187,7 +190,10 @@ export function createCachePersister(storage: KeyValueStorage) {
   return createAsyncStoragePersister({
     storage,
     key: CACHE_KEY,
-    throttleTime: 1000,
+    // Rápido: quem abre a ficha e perde a rede logo em seguida precisa dela no
+    // disco (o outbox já é gravado na hora). O cache é pequeno (templates e
+    // fichas) e só é regravado quando muda
+    throttleTime: 200,
     deserialize: text => {
       try {
         return sanitizeClient(JSON.parse(text))
@@ -199,10 +205,12 @@ export function createCachePersister(storage: KeyValueStorage) {
 }
 
 export const dehydrateOptions = {
+  // Com dados, mesmo que o último refetch tenha falhado: sem rede, um refetch
+  // que falha não pode apagar a ficha do disco (o cache é regravado inteiro)
   shouldDehydrateQuery: (q: {
     queryKey: QueryKey
-    state: { status: string }
-  }) => q.state.status === 'success' && persistable(q.queryKey) !== null,
+    state: { status: string; data?: unknown }
+  }) => q.state.data !== undefined && persistable(q.queryKey) !== null,
   // Mutação nunca vai para o disco: o que precisa sobreviver está no outbox
   shouldDehydrateMutation: () => false,
 }
@@ -253,6 +261,14 @@ export function OfflineProvider({
       .catch(() => undefined)
       .finally(() => {
         if (!alive) return
+        // O disco pode estar atrás do servidor (a última confirmação ainda
+        // não tinha sido gravada, outra pessoa mexeu): a ficha restaurada
+        // abre na hora, mas como velha, e é rebuscada ao montar com rede.
+        // O template é imutável por versão e não precisa
+        void queryClient.invalidateQueries({
+          queryKey: ['characters'],
+          refetchType: 'none',
+        })
         unsubscribe = persistQueryClientSubscribe(options)
         setRestored(userStorage)
       })

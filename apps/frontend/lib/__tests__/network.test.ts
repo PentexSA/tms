@@ -43,6 +43,13 @@ it('sem checagem de "internet alcançável" (chamaria um servidor de terceiros)'
   expect(config.reachabilityShouldRun()).toBe(false)
 })
 
+it('no web fica o padrão do TanStack (eventos online/offline da janela)', () => {
+  const netinfo = fakeNetInfo()
+  connectNetwork(netinfo, 'web')
+  expect(netinfo.configure).not.toHaveBeenCalled()
+  expect(netinfo.addEventListener).not.toHaveBeenCalled()
+})
+
 it('isOnline', () => {
   expect(isOnline({ isConnected: true })).toBe(true)
   expect(isOnline({ isConnected: false })).toBe(false)

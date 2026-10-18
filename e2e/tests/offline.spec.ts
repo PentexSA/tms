@@ -8,17 +8,20 @@ import { apiAs, signUp } from '../support/users'
 // recarrega. Para "recarregar sem rede", a página carrega e só a API fica
 // inalcançável (route.abort), que é o que o app vê num túnel ou Wi-Fi ruim.
 
-// As interações do Modo Jogo (Etapa 17). Ficam aqui para ajustar num lugar só.
+// As interações do Modo Jogo (Etapa 17), no computador (a partir de 600 não
+// há dock: a seção "Em jogo" abre os mesmos sheets). Iguais ao play.spec.
 async function spendBlood(page: Page) {
-  await page.getByRole('button', { name: /^Sangue/ }).click()
-  await page.getByRole('button', { name: 'Gastar 1' }).click()
-  await page.getByRole('button', { name: 'Fechar' }).first().click()
+  await page
+    .getByRole('button', { name: /^Pontos de Sangue, \d+ de \d+$/ })
+    .click()
+  await page.getByRole('button', { name: 'Gastar 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Fechar' }).last().click()
 }
 
 async function takeLethal(page: Page) {
-  await page.getByRole('button', { name: /^Vitalidade/ }).click()
-  await page.getByRole('button', { name: 'Aumentar Letal' }).click()
-  await page.getByRole('button', { name: 'Fechar' }).first().click()
+  await page.getByRole('button', { name: /^Vitalidade: / }).click()
+  await page.getByRole('button', { name: 'Aumentar Dano letal' }).click()
+  await page.getByRole('button', { name: 'Fechar' }).last().click()
 }
 
 const indicator = (page: Page) => page.getByLabel(/^Sincronização: /)

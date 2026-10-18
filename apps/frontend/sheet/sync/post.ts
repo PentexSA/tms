@@ -1,4 +1,5 @@
 import { api } from '../../lib/api'
+import { isNetworkError } from '../../lib/errors'
 import type { QueuedBatch } from './outbox'
 import type { PostOutcome } from './sender'
 
@@ -12,6 +13,10 @@ export async function postEvents(
     clientBatchId: batch.clientBatchId,
     events: batch.events.map(e => ({ path: e.path, from: e.from, to: e.to })),
   })
+  // Sem resposta HTTP, o Eden devolve 503 (lib/errors.ts): para a fila e o
+  // indicador, isso é rede (status 0), não erro do servidor
+  if (!res.response || isNetworkError(res.error))
+    return { status: 0, body: null }
   const seconds = Number(new Headers(res.headers).get('retry-after') ?? '')
   return {
     status: res.status,

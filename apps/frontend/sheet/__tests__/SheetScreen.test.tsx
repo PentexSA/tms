@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { useRouter } from 'expo-router'
 
 import * as apiModule from '../../lib/api'
@@ -106,6 +106,32 @@ describe('SheetScreen', () => {
       })
     ).toBeTruthy()
     expect(screen.queryByLabelText(/Força/)).toBeNull()
+  })
+
+  it('refetch que falha (sem rede) não tira a ficha da tela', async () => {
+    calls.characterGet.mockResolvedValueOnce(character())
+    calls.characterGet.mockResolvedValue({
+      data: null,
+      error: { status: 503, value: new TypeError('Failed to fetch') },
+    })
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    await act(() => queryClient.invalidateQueries())
+    await waitFor(() =>
+      expect(queryClient.getQueryState(['characters', ID])?.status).toBe(
+        'error'
+      )
+    )
+    // Deixa a tela reagir ao erro antes de conferir
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    expect(screen.queryByText('Não foi possível carregar a ficha')).toBeNull()
+    expect(screen.getByLabelText('Destreza, 2 de 5')).toBeTruthy()
   })
 
   it.each(['ficha', 'template'])(

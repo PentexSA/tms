@@ -75,14 +75,19 @@ describe('o que vai para o disco', () => {
     expect(persistable(['chronicles'])).toBeNull()
     expect(persistable(['chronicles', 'c1', 'invites'])).toBeNull()
     const should = dehydrateOptions.shouldDehydrateQuery
+    const data = character()
     expect(
-      should({ queryKey: CHARACTER_KEY, state: { status: 'success' } })
+      should({ queryKey: CHARACTER_KEY, state: { status: 'success', data } })
+    ).toBe(true)
+    // Refetch que falhou sem rede: os dados de antes continuam indo
+    expect(
+      should({ queryKey: CHARACTER_KEY, state: { status: 'error', data } })
     ).toBe(true)
     expect(
       should({ queryKey: CHARACTER_KEY, state: { status: 'error' } })
     ).toBe(false)
     expect(
-      should({ queryKey: ['chronicles'], state: { status: 'success' } })
+      should({ queryKey: ['chronicles'], state: { status: 'success', data } })
     ).toBe(false)
     expect(dehydrateOptions.shouldDehydrateMutation()).toBe(false)
   })
@@ -137,6 +142,22 @@ describe('o que volta do disco é input hostil', () => {
       ])
     )
     expect(keysOf(restored)).toEqual([TEMPLATE_KEY])
+  })
+
+  it('ficha cujo último refetch falhou volta com os dados, como sucesso', () => {
+    const failed = query(CHARACTER_KEY, character())
+    const restored = sanitizeClient(
+      client([
+        query(TEMPLATE_KEY, templateJson('vtm-v20')),
+        { ...failed, state: { ...failed.state, status: 'error', error: {} } },
+      ])
+    )
+    expect(keysOf(restored)).toEqual([TEMPLATE_KEY, CHARACTER_KEY])
+    expect(restored.clientState.queries[1]?.state).toMatchObject({
+      status: 'success',
+      error: null,
+      data: character(),
+    })
   })
 
   it('hash adulterado é recalculado; estado de erro não volta', () => {
@@ -247,6 +268,17 @@ describe('OfflineProvider', () => {
       )
     )
     expect(second.queryClient.getQueryData(['chronicles'])).toBeUndefined()
+    // A ficha do disco abre na hora, mas como velha: com rede, é rebuscada
+    // ao montar (a última confirmação pode não ter chegado ao disco). O
+    // template é imutável por versão e fica fresco
+    await waitFor(() =>
+      expect(
+        second.queryClient.getQueryState(CHARACTER_KEY)?.isInvalidated
+      ).toBe(true)
+    )
+    expect(second.queryClient.getQueryState(TEMPLATE_KEY)?.isInvalidated).toBe(
+      false
+    )
     second.view.unmount()
   })
 

@@ -105,13 +105,15 @@ export function useSheetData(id: string): SheetState {
     [compiled, character.data]
   )
 
-  if (character.isError)
+  // Com a ficha em mãos (cache, disco), um refetch que falha não tira a
+  // ficha da tela: offline, ela continua jogável; a fila sincroniza depois
+  if (character.isError && !character.data)
     return {
       status: 'error',
       error: character.error,
       retry: () => character.refetch(),
     }
-  if (template.isError)
+  if (template.isError && template.data === undefined)
     return {
       status: 'error',
       error: template.error,
