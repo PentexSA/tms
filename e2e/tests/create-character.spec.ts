@@ -29,14 +29,18 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   await page.getByRole('button', { name: 'Diminuir Geração' }).click()
   await page.getByRole('button', { name: 'Criar ficha' }).click()
 
-  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}$/)
+  // A ficha nova abre em Evoluir (Etapa 18)
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}\?mode=evolve$/)
   await expect(
     page.getByRole('heading', { name: 'Helena Varga' })
   ).toBeVisible()
-  await expect(page.getByText('Tremere', { exact: true })).toBeVisible()
-  // A geração escolhida (11ª) aparece no Sangue derivado: 12 pontos. (O
-  // resumo também está na lista da crônica, atrás na pilha do web.)
-  await expect(page.getByLabel('Pontos de Sangue, 12 de 12')).toBeVisible()
+  // Em Evoluir, o Clã aparece no editor, com "Trocar"
+  await expect(page.getByRole('button', { name: 'Clã: Tremere' })).toBeVisible()
+  // A geração escolhida (11ª) aparece no Sangue derivado: 12 pontos, no
+  // editor do atual em Evoluir
+  await expect(
+    page.getByRole('group', { name: 'Pontos de Sangue atual' })
+  ).toContainText('12')
 
   await page
     .getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
