@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 
+import { CharacterList } from '../../../../components/chronicles/CharacterList'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { useChronicle } from '../../../../lib/queries/chronicles'
@@ -72,6 +73,8 @@ export default function ChronicleScreen() {
               : `Narrador: ${c.storyteller.username}`}
           </Text>
         </View>
+
+        <CharacterList chronicleId={c.id} systemCode={c.system.code} />
 
         <SectionHeader
           title="Mesa"

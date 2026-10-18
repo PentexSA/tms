@@ -43,6 +43,34 @@ export const useTemplate = (code?: string, version?: string) =>
       ) as unknown,
   })
 
+/** O template publicado mais recente do sistema (criação de ficha). */
+export const useLatestTemplate = (code?: string) =>
+  useQuery({
+    queryKey: ['templates', code ?? '', 'latest'] as const,
+    enabled: Boolean(code),
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.systems({ code: code ?? '' }).template.get({
+          query: {},
+          fetch: { signal },
+        })
+      ) as unknown,
+  })
+
+/** Compila sem lançar: null quando esta versão do app não entende o template. */
+export function useCompiled(json: unknown): SheetModel | null | undefined {
+  return useMemo(() => {
+    if (json === undefined) return undefined
+    try {
+      return compileTemplate(json)
+    } catch (e) {
+      if (e instanceof UnsupportedTemplateError) return null
+      throw e
+    }
+  }, [json])
+}
+
 export type CharacterData = NonNullable<ReturnType<typeof useCharacter>['data']>
 
 export type SheetState =
@@ -68,15 +96,7 @@ export function useSheetData(id: string): SheetState {
     character.data?.systemCode,
     character.data?.templateVersion
   )
-  const compiled = useMemo(() => {
-    if (template.data === undefined) return undefined
-    try {
-      return compileTemplate(template.data)
-    } catch (e) {
-      if (e instanceof UnsupportedTemplateError) return null
-      throw e
-    }
-  }, [template.data])
+  const compiled = useCompiled(template.data)
   const parsed = useMemo(
     () =>
       compiled && character.data

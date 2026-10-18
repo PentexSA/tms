@@ -48,11 +48,13 @@ export function Stepper({
   const { colors } = useTheme()
   const [display, setDisplay] = useState(value)
   const shown = useRef(value)
+  // Segurar: o onLongPress liga a repetição (só visual); soltar grava uma vez.
+  // O toque simples é o onPress, que também atende Enter e Espaço no web e a
+  // ativação pelo leitor de tela.
   const hold = useRef<{
-    delay?: ReturnType<typeof setTimeout>
     repeat?: ReturnType<typeof setInterval>
-    repeated: boolean
-  }>({ repeated: false })
+    repeating: boolean
+  }>({ repeating: false })
 
   useEffect(() => {
     setDisplay(value)
@@ -70,22 +72,22 @@ export function Stepper({
     if (next !== value) onChange(next)
   }
   function stop() {
-    clearTimeout(hold.current.delay)
     clearInterval(hold.current.repeat)
+    hold.current.repeat = undefined
   }
-  const pressIn = (delta: number) => {
-    hold.current.repeated = false
-    hold.current.delay = setTimeout(() => {
-      hold.current.repeat = setInterval(() => {
-        hold.current.repeated = true
-        show(clamp(shown.current + delta))
-      }, REPEAT_MS)
-    }, HOLD_DELAY_MS)
+  const longPress = (delta: number) => {
+    hold.current.repeating = true
+    show(clamp(shown.current + delta))
+    hold.current.repeat = setInterval(
+      () => show(clamp(shown.current + delta)),
+      REPEAT_MS
+    )
   }
-  const pressOut = (delta: number) => {
+  const pressOut = () => {
+    if (!hold.current.repeating) return
+    hold.current.repeating = false
     stop()
-    if (hold.current.repeated) commit(shown.current)
-    else commit(value + delta)
+    commit(shown.current)
   }
   const onAction = (e: AccessibilityActionEvent) => {
     if (e.nativeEvent.actionName === 'increment') commit(value + 1)
@@ -107,8 +109,10 @@ export function Stepper({
             }
           : { accessible: false, 'aria-hidden': true })}
         disabled={off}
-        onPressIn={() => pressIn(delta)}
-        onPressOut={() => pressOut(delta)}
+        onPress={() => commit(value + delta)}
+        onLongPress={() => longPress(delta)}
+        delayLongPress={HOLD_DELAY_MS}
+        onPressOut={pressOut}
         style={[
           styles.button,
           big && styles.big,

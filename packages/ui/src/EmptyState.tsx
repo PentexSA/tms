@@ -18,7 +18,12 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <View testID={testID} style={styles.root}>
-      <Text variant="title" accessibilityRole="header" style={styles.center}>
+      <Text
+        variant="title"
+        accessibilityRole="header"
+        aria-level={2}
+        style={styles.center}
+      >
         {title}
       </Text>
       {message ? (

@@ -62,6 +62,7 @@ export function BottomSheet({
             <Text
               variant="title"
               accessibilityRole="header"
+              aria-level={2}
               style={styles.title}
             >
               {title}

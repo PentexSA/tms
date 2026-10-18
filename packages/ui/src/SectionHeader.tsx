@@ -23,6 +23,7 @@ export function SectionHeader({
         <Text
           variant={level === 'section' ? 'displayLg' : 'title'}
           accessibilityRole="header"
+          aria-level={level === 'section' ? 2 : 3}
         >
           {title}
         </Text>

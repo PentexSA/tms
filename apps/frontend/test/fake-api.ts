@@ -11,6 +11,8 @@ export const fail = (status: number, error = 'erro') => ({
 export function createFakeApi() {
   const chronicle = {
     get: jest.fn(),
+    charactersGet: jest.fn(),
+    charactersPost: jest.fn(),
     invitesGet: jest.fn(),
     invitesPost: jest.fn(),
     invitesDelete: jest.fn(),
@@ -42,6 +44,10 @@ export function createFakeApi() {
         calls.chronicleIds.push(id)
         return {
           get: (...a: unknown[]) => chronicle.get(...a),
+          characters: {
+            get: (...a: unknown[]) => chronicle.charactersGet(...a),
+            post: (...a: unknown[]) => chronicle.charactersPost(...a),
+          },
           invites: Object.assign(
             ({ inviteId }: { inviteId: string }) => ({
               delete: () => chronicle.invitesDelete(inviteId),

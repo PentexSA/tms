@@ -287,8 +287,9 @@ describe('Stepper', () => {
     const dec = screen.getByTestId('stepper-dec', {
       includeHiddenElements: true,
     })
-    fireEvent(dec, 'pressIn')
+    fireEvent.press(dec)
     fireEvent(dec, 'pressOut')
+    expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith(8)
   })
 
@@ -297,9 +298,9 @@ describe('Stepper', () => {
     const inc = screen.getByTestId('stepper-inc', {
       includeHiddenElements: true,
     })
-    fireEvent(inc, 'pressIn')
+    fireEvent(inc, 'longPress')
     act(() => {
-      jest.advanceTimersByTime(400 + 5 * 100)
+      jest.advanceTimersByTime(4 * 100)
     })
     expect(onChange).not.toHaveBeenCalled()
     expect(screen.getByText('7')).toBeTruthy()
@@ -337,8 +338,7 @@ describe('Stepper', () => {
         />
       )
       const more = screen.getByRole('button', { name: 'Aumentar Sangue' })
-      fireEvent(more, 'pressIn')
-      fireEvent(more, 'pressOut')
+      fireEvent.press(more)
       expect(onChange).toHaveBeenCalledWith(10)
       expect(
         screen.getByRole('button', { name: 'Diminuir Sangue' })

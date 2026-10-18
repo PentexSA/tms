@@ -59,6 +59,7 @@ export function AppBar({ title, back, actions }: AppBarProps) {
       <Text
         variant="displaySm"
         accessibilityRole="header"
+        aria-level={1}
         numberOfLines={1}
         style={styles.title}
       >

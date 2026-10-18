@@ -10,6 +10,7 @@ export const chronicleKeys = {
   all: ['chronicles'] as const,
   one: (id: string) => ['chronicles', id] as const,
   invites: (id: string) => ['chronicles', id, 'invites'] as const,
+  characters: (id: string) => ['chronicles', id, 'characters'] as const,
 }
 
 export const useSystems = () =>
@@ -85,3 +86,27 @@ export const useAcceptInvite = () => {
 /** "ABCD EFGH ..." para ler e ditar; a API aceita com ou sem espaços. */
 export const formatInviteCode = (code: string) =>
   code.replace(/(.{4})(?=.)/g, '$1 ')
+
+export const useChronicleCharacters = (id: string) =>
+  useQuery({
+    queryKey: chronicleKeys.characters(id),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.chronicles({ id }).characters.get({ fetch: { signal } })
+      ),
+  })
+
+export const useCreateCharacter = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (values: Record<string, unknown>) =>
+      unwrap(await api.chronicles({ id }).characters.post({ values })),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.characters(id),
+        }),
+        queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
+      ]),
+  })
+}
