@@ -1,18 +1,12 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import type { Todo } from '@tms/db'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { sleep } from 'bun'
+import type { App } from '../index'
+import { logger } from '../logger'
 import { createTestApp, destroyTestDb, makeRequest } from '../test/helpers'
 
-/**
- * Testes completos da API TMS
- *
- * Estrutura:
- * - Health Endpoint
- * - Todos Endpoints (Integration Tests)
- * - E2E Flows
- */
 describe('TMS API Tests', () => {
-  let app: any
+  let app: App
 
   beforeEach(async () => {
     app = await createTestApp()
@@ -22,404 +16,58 @@ describe('TMS API Tests', () => {
     await destroyTestDb()
   })
 
-  // ============================================================================
-  // HEALTH ENDPOINT
-  // ============================================================================
   describe('GET /health', () => {
     it('should return ok: true', async () => {
-      // Act
       const response = await makeRequest(app, 'GET', '/health')
-      const data = await response.json()
 
-      // Assert
       expect(response.status).toBe(200)
-      expect(data).toEqual({ ok: true })
+      expect(await response.json()).toEqual({ ok: true })
     })
 
     it('should have correct content-type', async () => {
-      // Act
       const response = await makeRequest(app, 'GET', '/health')
 
-      // Assert
       expect(response.headers.get('content-type')).toContain('application/json')
     })
 
-    it('should respond quickly (performance check)', async () => {
-      // Arrange
-      const startTime = Date.now()
+    it('should return a request id', async () => {
+      const response = await makeRequest(app, 'GET', '/health')
 
-      // Act
-      await makeRequest(app, 'GET', '/health')
-      const endTime = Date.now()
-
-      // Assert
-      const responseTime = endTime - startTime
-      expect(responseTime).toBeLessThan(100) // Deve responder em menos de 100ms
+      expect(response.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
     })
   })
 
-  // ============================================================================
-  // TODOS ENDPOINTS - INTEGRATION TESTS
-  // ============================================================================
-  describe('Todos API - Integration Tests', () => {
-    // --------------------------------------------------------------------------
-    // GET /todos
-    // --------------------------------------------------------------------------
-    describe('GET /todos', () => {
-      it('should return an array of todos', async () => {
-        // Arrange
+  describe('unknown routes', () => {
+    it('should return 404', async () => {
+      const response = await makeRequest(app, 'GET', '/todos')
 
-        // Act
-        const response = await makeRequest(app, 'GET', '/todos')
-        const data = await response.json()
-
-        // Assert
-        expect(response.status).toBe(200)
-        expect(Array.isArray(data)).toBe(true)
-      })
-
-      it('should return todos ordered by created_at desc', async () => {
-        // Arrange
-
-        // Criar alguns todos para testar ordenação
-        await makeRequest(app, 'POST', '/todos', { title: 'First Todo' })
-        await makeRequest(app, 'POST', '/todos', { title: 'Second Todo' })
-        await makeRequest(app, 'POST', '/todos', { title: 'Third Todo' })
-
-        // Act
-        const response = await makeRequest(app, 'GET', '/todos')
-        const todos = await response.json()
-
-        // Assert - verify all todos are returned
-        expect(todos.length).toBeGreaterThanOrEqual(3)
-        const titles = todos.map((t: Todo) => t.title)
-        expect(titles).toContain('First Todo')
-        expect(titles).toContain('Second Todo')
-        expect(titles).toContain('Third Todo')
-      })
-
-      it('should return 200 even when no todos exist', async () => {
-        // Arrange
-
-        // Act
-        const response = await makeRequest(app, 'GET', '/todos')
-
-        // Assert
-        expect(response.status).toBe(200)
-      })
-    })
-
-    // --------------------------------------------------------------------------
-    // POST /todos
-    // --------------------------------------------------------------------------
-    describe('POST /todos', () => {
-      it('should create a new todo', async () => {
-        // Arrange
-        const newTodo = { title: 'Test Todo' }
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', newTodo)
-        const data = await response.json()
-
-        // Assert
-        expect(response.status).toBe(200)
-        expect(data).toHaveProperty('id')
-        expect(data).toHaveProperty('title', 'Test Todo')
-        expect(data).toHaveProperty('created_at')
-        expect(data).toHaveProperty('done')
-      })
-
-      it('should return the created todo with all fields', async () => {
-        // Arrange
-        const newTodo = { title: 'Buy groceries' }
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', newTodo)
-        const data = await response.json()
-
-        // Assert
-        expect(data.id).toBeDefined()
-        expect(data.title).toBe('Buy groceries')
-        expect(data.done).toBe(false) // Default value
-        expect(data.created_at).toBeDefined()
-      })
-
-      it('should return 400 when title is missing', async () => {
-        // Arrange
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', {})
-
-        // Assert
-        expect(response.status).toBe(422)
-      })
-
-      it('should return 400 when title is not a string', async () => {
-        // Arrange
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', {
-          title: 123,
-        })
-
-        // Assert
-        expect(response.status).toBe(422)
-      })
-
-      it('should accept empty string title', async () => {
-        // Arrange
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', { title: '' })
-        const data = await response.json()
-
-        // Assert
-        expect(response.status).toBe(200)
-        expect(data.title).toBe('')
-      })
-
-      it('should create multiple todos independently', async () => {
-        // Arrange
-
-        // Act
-        const response1 = await makeRequest(app, 'POST', '/todos', {
-          title: 'Todo 1',
-        })
-        const response2 = await makeRequest(app, 'POST', '/todos', {
-          title: 'Todo 2',
-        })
-
-        const todo1 = await response1.json()
-        const todo2 = await response2.json()
-
-        // Assert
-        expect(todo1.id).not.toBe(todo2.id)
-        expect(todo1.title).toBe('Todo 1')
-        expect(todo2.title).toBe('Todo 2')
-      })
-
-      it('should handle special characters in title', async () => {
-        // Arrange
-        const specialTitle = 'Todo with special chars: @#$%^&*()'
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', {
-          title: specialTitle,
-        })
-        const data = await response.json()
-
-        // Assert
-        expect(response.status).toBe(200)
-        expect(data.title).toBe(specialTitle)
-      })
-
-      it('should handle unicode characters in title', async () => {
-        // Arrange
-        const unicodeTitle = 'Comprar café ☕ e pão 🥖'
-
-        // Act
-        const response = await makeRequest(app, 'POST', '/todos', {
-          title: unicodeTitle,
-        })
-        const data = await response.json()
-
-        // Assert
-        expect(response.status).toBe(200)
-        expect(data.title).toBe(unicodeTitle)
-      })
+      expect(response.status).toBe(404)
     })
   })
 
-  // ============================================================================
-  // E2E FLOWS
-  // ============================================================================
-  describe('E2E Flows', () => {
-    describe('Todo CRUD', () => {
-      it('should complete full CRUD flow for a todo', async () => {
-        // Arrange
-
-        // Act 1: Create todo
-        const createResponse = await makeRequest(app, 'POST', '/todos', {
-          title: 'Buy groceries',
-        })
-        const createdTodo = await createResponse.json()
-
-        // Assert 1: Todo created
-        expect(createResponse.status).toBe(200)
-        expect(createdTodo).toHaveProperty('id')
-        expect(createdTodo.title).toBe('Buy groceries')
-        expect(createdTodo.done).toBe(false)
-
-        // Act 2: List todos
-        const listResponse = await makeRequest(app, 'GET', '/todos')
-        const todos = await listResponse.json()
-
-        // Assert 2: Todo appears in list
-        expect(listResponse.status).toBe(200)
-        expect(todos).toContainEqual(
-          expect.objectContaining({ title: 'Buy groceries' })
+  describe('access log', () => {
+    it('never logs headers, request body or response body', async () => {
+      const info = spyOn(logger, 'info')
+      try {
+        await makeRequest(
+          app,
+          'POST',
+          '/health',
+          { password: 'senha-secreta' },
+          { Authorization: 'Bearer token-secreto', Cookie: 'refresh=cookie' }
         )
-      })
+        await makeRequest(app, 'GET', '/health')
+        // onAfterResponse roda depois da resposta
+        await sleep(10)
 
-      it('should handle multiple todos in sequence', async () => {
-        // Arrange
-        const todoTitles = [
-          'Wake up',
-          'Brush teeth',
-          'Have breakfast',
-          'Go to work',
-          'Come back home',
-        ]
-
-        // Act: Create multiple todos
-        const createdTodos = []
-        for (const title of todoTitles) {
-          const response = await makeRequest(app, 'POST', '/todos', { title })
-          const todo = await response.json()
-          createdTodos.push(todo)
-          // Add small delay to ensure different timestamps
-          await new Promise(resolve => setTimeout(resolve, 10))
-        }
-
-        // Assert: All todos created
-        expect(createdTodos).toHaveLength(5)
-        createdTodos.forEach((todo, index) => {
-          expect(todo.title).toBe(todoTitles[index])
-          expect(todo.id).toBeDefined()
-        })
-
-        // Act: List all todos
-        const listResponse = await makeRequest(app, 'GET', '/todos')
-        const allTodos = await listResponse.json()
-
-        // Assert: All created todos appear in list
-        const createdIds = createdTodos.map(t => t.id)
-        const retrievedCreatedTodos = allTodos.filter((t: Todo) =>
-          createdIds.includes(t.id)
-        )
-        expect(retrievedCreatedTodos).toHaveLength(5)
-
-        // Verify all titles are present (order may vary with PGLite)
-        const retrievedTitles = retrievedCreatedTodos.map((t: Todo) => t.title)
-        todoTitles.forEach(title => {
-          expect(retrievedTitles).toContain(title)
-        })
-      })
-
-      it('should maintain data consistency across operations', async () => {
-        // Arrange
-
-        // Act 1: Get initial count
-        const initialResponse = await makeRequest(app, 'GET', '/todos')
-        const initialTodos = await initialResponse.json()
-        const initialCount = initialTodos.length
-
-        // Act 2: Create 3 new todos
-        await makeRequest(app, 'POST', '/todos', { title: 'Todo 1' })
-        await makeRequest(app, 'POST', '/todos', { title: 'Todo 2' })
-        await makeRequest(app, 'POST', '/todos', { title: 'Todo 3' })
-
-        // Act 3: Get updated count
-        const updatedResponse = await makeRequest(app, 'GET', '/todos')
-        const updatedTodos = await updatedResponse.json()
-        const updatedCount = updatedTodos.length
-
-        // Assert: Count increased by 3
-        expect(updatedCount).toBe(initialCount + 3)
-      })
-
-      it('should handle concurrent requests', async () => {
-        // Arrange
-
-        // Act: Create todos concurrently
-        const promises = [
-          makeRequest(app, 'POST', '/todos', { title: 'Concurrent 1' }),
-          makeRequest(app, 'POST', '/todos', { title: 'Concurrent 2' }),
-          makeRequest(app, 'POST', '/todos', { title: 'Concurrent 3' }),
-          makeRequest(app, 'POST', '/todos', { title: 'Concurrent 4' }),
-          makeRequest(app, 'POST', '/todos', { title: 'Concurrent 5' }),
-        ]
-
-        const responses = await Promise.all(promises)
-
-        // Assert: All requests successful
-        for (const response of responses) {
-          expect(response.status).toBe(200)
-          const todo = await response.json()
-          expect(todo.id).toBeDefined()
-          expect(todo.title).toContain('Concurrent')
-        }
-
-        // Act: Verify all todos were created
-        const listResponse = await makeRequest(app, 'GET', '/todos')
-        const todos = await listResponse.json()
-
-        // Assert: All 5 concurrent todos exist
-        const concurrentTodos = todos.filter((t: Todo) =>
-          t.title.startsWith('Concurrent')
-        )
-        expect(concurrentTodos.length).toBeGreaterThanOrEqual(5)
-      })
-    })
-
-    describe('Business Rules & Validation', () => {
-      it('should validate business rules end-to-end', async () => {
-        // Arrange
-
-        // Act & Assert: Cannot create todo without title
-        const noTitleResponse = await makeRequest(app, 'POST', '/todos', {})
-        expect(noTitleResponse.status).toBe(422)
-
-        // Act & Assert: Can create todo with empty title
-        const emptyTitleResponse = await makeRequest(app, 'POST', '/todos', {
-          title: '',
-        })
-        expect(emptyTitleResponse.status).toBe(200)
-
-        // Act & Assert: Can create todo with valid title
-        const validResponse = await makeRequest(app, 'POST', '/todos', {
-          title: 'Valid Todo',
-        })
-        expect(validResponse.status).toBe(200)
-
-        const validTodo = await validResponse.json()
-        expect(validTodo.title).toBe('Valid Todo')
-      })
-
-      it('should handle edge cases gracefully', async () => {
-        // Arrange
-
-        // Test 1: Very long title
-        const longTitle = 'a'.repeat(500)
-        const longTitleResponse = await makeRequest(app, 'POST', '/todos', {
-          title: longTitle,
-        })
-        expect(longTitleResponse.status).toBe(200)
-
-        // Test 2: Title with only whitespace
-        const whitespaceResponse = await makeRequest(app, 'POST', '/todos', {
-          title: '   ',
-        })
-        expect(whitespaceResponse.status).toBe(200)
-
-        // Test 3: Title with newlines
-        const newlineTitle = 'Line 1\nLine 2\nLine 3'
-        const newlineResponse = await makeRequest(app, 'POST', '/todos', {
-          title: newlineTitle,
-        })
-        expect(newlineResponse.status).toBe(200)
-
-        // Test 4: Title with SQL-like content (injection test)
-        const sqlTitle = "'; DROP TABLE todos; --"
-        const sqlResponse = await makeRequest(app, 'POST', '/todos', {
-          title: sqlTitle,
-        })
-        expect(sqlResponse.status).toBe(200)
-
-        // Verify todos table still exists by listing
-        const listResponse = await makeRequest(app, 'GET', '/todos')
-        expect(listResponse.status).toBe(200)
-      })
+        const logged = JSON.stringify(info.mock.calls)
+        expect(info).toHaveBeenCalled()
+        for (const secret of ['senha-secreta', 'token-secreto', 'cookie'])
+          expect(logged).not.toContain(secret)
+        expect(logged).not.toContain('"ok":true')
+      } finally {
+        info.mockRestore()
+      }
     })
   })
 })

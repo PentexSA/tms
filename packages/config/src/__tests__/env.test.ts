@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 
 describe('@tms/config - Environment Configuration', () => {
   const originalEnv = process.env
@@ -160,6 +160,46 @@ describe('@tms/config - Environment Configuration', () => {
       const { config } = await import('../env')
 
       expect(config.API_PORT).toBe(9000)
+    })
+  })
+
+  describe('Invalid environment', () => {
+    it('should report invalid variables without exiting in tests', async () => {
+      process.env.NODE_ENV = 'test'
+      process.env.DATABASE_URL = 'not-a-url'
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+
+        // Sem config válida, ler qualquer chave falha (nunca um valor errado)
+        expect(() => config.DATABASE_URL).toThrow()
+        expect(error).toHaveBeenCalled()
+        expect(exit).not.toHaveBeenCalled()
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
+    })
+
+    it('should exit outside tests (fail fast on boot)', async () => {
+      process.env.NODE_ENV = 'production'
+      process.env.API_PORT = 'not-a-port'
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+
+        expect(() => config.API_PORT).toThrow('exit')
+        expect(exit).toHaveBeenCalledWith(1)
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
     })
   })
 })

@@ -1,110 +1,40 @@
-import type { ScreenProps } from './Screen'
+import { render, screen } from '@testing-library/react-native'
+import { Platform, Text } from 'react-native'
+import { Screen } from './Screen'
 
-describe('@tms/ui - Screen Component', () => {
-  describe('Type Safety', () => {
-    it('should have correct prop types', () => {
-      const props: ScreenProps = {
-        children: null,
-      }
+describe('@tms/ui - Screen', () => {
+  it('renders its children', () => {
+    render(
+      <Screen>
+        <Text>Conteúdo</Text>
+      </Screen>
+    )
 
-      expect(props.children).toBe(null)
-    })
-
-    it('should accept style prop', () => {
-      const props: ScreenProps = {
-        children: null,
-        style: { backgroundColor: 'blue' },
-      }
-
-      expect(props.style).toEqual({ backgroundColor: 'blue' })
-    })
-
-    it('should accept safe prop', () => {
-      const props: ScreenProps = {
-        children: null,
-        safe: true,
-      }
-
-      expect(props.safe).toBe(true)
-    })
-
-    it('should have safe prop default behavior', () => {
-      const props: ScreenProps = {
-        children: null,
-      }
-
-      expect(props.safe).toBeUndefined()
-    })
+    expect(screen.getByText('Conteúdo')).toBeTruthy()
   })
 
-  describe('Safe Prop', () => {
-    it('should accept safe as true', () => {
-      const safe: ScreenProps['safe'] = true
-      expect(safe).toBe(true)
-    })
+  it('renders without the safe area and with custom style', () => {
+    render(
+      <Screen safe={false} style={{ padding: 8 }} testID="screen">
+        <Text>Conteúdo</Text>
+      </Screen>
+    )
 
-    it('should accept safe as false', () => {
-      const safe: ScreenProps['safe'] = false
-      expect(safe).toBe(false)
-    })
-
-    it('should accept safe as undefined', () => {
-      const safe: ScreenProps['safe'] = undefined
-      expect(safe).toBeUndefined()
-    })
+    expect(screen.getByTestId('screen')).toHaveStyle({ padding: 8 })
   })
 
-  describe('Children', () => {
-    it('should accept ReactNode as children', () => {
-      const props: ScreenProps = {
-        children: 'Text content',
-      }
-
-      expect(props.children).toBe('Text content')
-    })
-
-    it('should accept null as children', () => {
-      const props: ScreenProps = {
-        children: null,
-      }
-
-      expect(props.children).toBe(null)
-    })
-
-    it('should accept undefined as children', () => {
-      const props: ScreenProps = {
-        children: undefined,
-      }
-
-      expect(props.children).toBeUndefined()
-    })
-  })
-
-  describe('Style', () => {
-    it('should accept ViewStyle object', () => {
-      const props: ScreenProps = {
-        children: null,
-        style: {
-          flex: 1,
-          backgroundColor: 'white',
-          padding: 16,
-        },
-      }
-
-      expect(props.style).toEqual({
-        flex: 1,
-        backgroundColor: 'white',
-        padding: 16,
-      })
-    })
-
-    it('should accept empty style object', () => {
-      const props: ScreenProps = {
-        children: null,
-        style: {},
-      }
-
-      expect(props.style).toEqual({})
-    })
+  it('limits the width on the web', () => {
+    const os = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      render(
+        <Screen testID="screen">
+          <Text>Conteúdo</Text>
+        </Screen>
+      )
+      expect(screen.getByTestId('screen')).toHaveStyle({ maxWidth: 1200 })
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
   })
 })

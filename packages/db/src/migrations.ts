@@ -1,30 +1,27 @@
-/**
- * Re-export all migrations for use in different contexts
- * This ensures migrations can be imported and used from anywhere in the monorepo
- * without duplicating migration code
- */
+import type { Migration, MigrationProvider } from 'kysely'
+import * as m0001 from './migrations/0001_init'
+import * as m0002 from './migrations/0002_users'
+import * as m0003 from './migrations/0003_game_systems'
+import * as m0004 from './migrations/0004_chronicles'
+import * as m0005 from './migrations/0005_characters'
+import * as m0006 from './migrations/0006_trait_templates'
+import * as m0007 from './migrations/0007_drop_todos'
 
-export {
-  down as migration_0001_init_down,
-  up as migration_0001_init_up,
-} from './migrations/0001_init'
-export {
-  down as migration_0002_users_down,
-  up as migration_0002_users_up,
-} from './migrations/0002_users'
-export {
-  down as migration_0003_game_systems_down,
-  up as migration_0003_game_systems_up,
-} from './migrations/0003_game_systems'
-export {
-  down as migration_0004_chronicles_down,
-  up as migration_0004_chronicles_up,
-} from './migrations/0004_chronicles'
-export {
-  down as migration_0005_characters_down,
-  up as migration_0005_characters_up,
-} from './migrations/0005_characters'
-export {
-  down as migration_0006_trait_templates_down,
-  up as migration_0006_trait_templates_up,
-} from './migrations/0006_trait_templates'
+/**
+ * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
+ * dos testes usam esta lista; um teste confere que todo arquivo de
+ * `migrations/` está aqui.
+ */
+export const migrations: Readonly<Record<string, Migration>> = {
+  '0001_init': m0001,
+  '0002_users': m0002,
+  '0003_game_systems': m0003,
+  '0004_chronicles': m0004,
+  '0005_characters': m0005,
+  '0006_trait_templates': m0006,
+  '0007_drop_todos': m0007,
+}
+
+export const migrationProvider: MigrationProvider = {
+  getMigrations: async () => ({ ...migrations }),
+}

@@ -1,21 +1,20 @@
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
-import { config } from '@tms/config/env'
-import { db as defaultDb } from '@tms/db'
-import { Elysia, t } from 'elysia'
-import { logger } from './logger'
+import { type DB, db as defaultDb } from '@tms/db'
+import { Elysia } from 'elysia'
+import type { Kysely } from 'kysely'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
  * Exportado para ser usado em testes
  *
- * @param database - Opcional. Use para injetar um banco mock nos testes
+ * @param database - Opcional. Use para injetar o banco de teste (PGLite)
  */
-// biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Kysely injection
-export const createApp = (database?: any) => {
-  const db = database || defaultDb
+export const createApp = (database: Kysely<DB> = defaultDb) => {
+  const db = database
   return new Elysia()
+    .decorate('db', db)
     .use(loggerMiddleware)
     .use(cors())
     .use(
@@ -29,45 +28,7 @@ export const createApp = (database?: any) => {
       })
     )
     .get('/health', () => ({ ok: true }))
-    .get('/todos', async () => {
-      const todos = await db
-        .selectFrom('todos')
-        .selectAll()
-        .orderBy('created_at', 'desc')
-        .execute()
-      return todos
-    })
-    .post(
-      '/todos',
-      async ({ body }) => {
-        const { title } = body as { title: string }
-
-        const [todo] = await db
-          .insertInto('todos')
-          .values({ title })
-          .returningAll()
-          .execute()
-
-        return todo
-      },
-      {
-        body: t.Object({
-          title: t.String(),
-        }),
-      }
-    )
 }
 
 // Exporta o tipo da app para Eden Treaty
 export type App = ReturnType<typeof createApp>
-
-// Inicia o servidor apenas quando executado diretamente
-// (não em testes)
-// Verifica se não estamos em ambiente de teste (Jest)
-if (process.env.NODE_ENV !== 'test') {
-  const app = createApp().listen(config.API_PORT)
-
-  logger.info(
-    `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-  )
-}

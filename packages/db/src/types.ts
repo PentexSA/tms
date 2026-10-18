@@ -53,13 +53,6 @@ export interface GameSystems {
   name: string
 }
 
-export interface Todos {
-  created_at: Generated<Timestamp | null>
-  done: Generated<boolean>
-  id: Generated<number>
-  title: string
-}
-
 export interface TraitTemplates {
   id: Generated<string>
   system_id: string
@@ -80,7 +73,6 @@ export interface DB {
   characters: Characters
   chronicles: Chronicles
   game_systems: GameSystems
-  todos: Todos
   trait_templates: TraitTemplates
   users: Users
 }

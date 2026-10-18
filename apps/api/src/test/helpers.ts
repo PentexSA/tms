@@ -1,10 +1,8 @@
 import { type Treaty, treaty } from '@elysiajs/eden'
-import { clearPGliteTodos, createPGliteTestDb } from '@tms/db'
-import { Elysia } from 'elysia'
+import { createPGliteTestDb } from '@tms/db/testing'
 import { type App, createApp } from '../index'
 
-// Global test state for managing DB lifecycle
-let testDbInstance: any = null
+// Banco do teste atual, destruído por destroyTestDb()
 let testDbCleanup: (() => Promise<void>) | null = null
 
 /**
@@ -14,14 +12,12 @@ let testDbCleanup: (() => Promise<void>) | null = null
  * Usa um banco de dados em memória (PGLite) isolado para testes
  *
  * @example
- * const app = createTestApp()
+ * const app = await createTestApp()
  * const response = await app.handle(new Request('http://localhost/health'))
  */
 export async function createTestApp() {
-  // Create new test DB for each test to ensure isolation
-  // Uses PGLite from @tms/db for centralized test database configuration
+  // Banco novo a cada teste, com todas as migrations de @tms/db
   const { db, destroy } = await createPGliteTestDb()
-  testDbInstance = db
   testDbCleanup = destroy
 
   return createApp(db)
@@ -33,24 +29,18 @@ export async function createTestApp() {
  * @example
  * const response = await makeRequest(app, 'GET', '/health')
  * expect(response.status).toBe(200)
- *
- * Note: Uses 'any' for app parameter to avoid complex Elysia type issues with plugins
  */
 export async function makeRequest(
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper needs flexibility for Elysia with various plugins
-  app: any,
+  app: App,
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  headers: Record<string, string> = {}
 ) {
-  const url = `http://localhost${path}`
-
-  const request = new Request(url, {
+  const request = new Request(`http://localhost${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
 
   return app.handle(request)
@@ -63,17 +53,8 @@ export async function makeRequest(
  * const api = createTestClient(app)
  * const { data } = await api.health.get()
  */
-export function createTestClient(app: Elysia): Treaty.Create<App> {
-  return treaty<App>(app as unknown as App)
-}
-
-/**
- * Limpa todos os dados do banco de testes
- */
-export async function clearDatabase() {
-  if (testDbInstance) {
-    await clearPGliteTodos(testDbInstance)
-  }
+export function createTestClient(app: App): Treaty.Create<App> {
+  return treaty<App>(app)
 }
 
 /**
@@ -83,7 +64,6 @@ export async function clearDatabase() {
 export async function destroyTestDb() {
   if (testDbCleanup) {
     await testDbCleanup()
-    testDbInstance = null
     testDbCleanup = null
   }
 }

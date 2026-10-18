@@ -1,15 +1,7 @@
-const base = require('@tms/jest-config/base')
+const reactNative = require('@tms/jest-config/react-native')
 
 module.exports = {
-  ...base,
+  ...reactNative,
   displayName: '@tms/ui',
   rootDir: '.',
-
-  // Override for React Native type tests (no actual rendering)
-  testMatch: [
-    '<rootDir>/src/**/*.test.ts',
-    '<rootDir>/src/**/*.test.tsx',
-    '<rootDir>/src/**/*.spec.ts',
-    '<rootDir>/src/**/*.spec.tsx',
-  ],
 }

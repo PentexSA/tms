@@ -14,7 +14,7 @@ Domain model (see `doc/database.dbml`):
 - `characters`: a user's character in a chronicle; sheet values stored in `sheet_data` (jsonb)
 - `trait_templates`: per-system sheet structure in `template_data` (jsonb)
 
-Keep the data model system-agnostic: sheet structure comes from `trait_templates`, not hardcoded WoD columns. Adding a new system should not require a migration. The `todos` table and routes are leftover template boilerplate.
+Keep the data model system-agnostic: sheet structure comes from `trait_templates`, not hardcoded WoD columns. Adding a new system should not require a migration.
 
 ## Architecture Overview
 
@@ -47,7 +47,7 @@ packages/
 
 **Environment Variables**: Centralized in `@tms/config` package (`packages/config/src/env.ts`). Provides defaults for DATABASE_URL, API_PORT, and EXPO_PUBLIC_API_URL.
 
-**API Routes**: Defined in `apps/api/src/index.ts` using Elysia with Swagger docs at `/swagger`.
+**API Routes**: Defined in `apps/api/src/index.ts` (`createApp`, no `.listen`) using Elysia with Swagger docs at `/swagger`. `apps/api/src/server.ts` is the server entry point.
 
 **Frontend Navigation**: Uses Expo Router (file-based routing) in `apps/frontend/app/`.
 
@@ -127,7 +127,7 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 #### Test Infrastructure
 
 - **Bun Test Runner**: Backend packages use native Bun for ~70% faster execution
-- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker)
+- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry)
 - **Jest**: Frontend packages use Jest for React Native/Expo compatibility
 - **@tms/bun-test-config**: Shared Bun test utilities and helpers
 

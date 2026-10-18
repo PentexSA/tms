@@ -1,80 +1,38 @@
-import type { ButtonProps } from './Button'
+import { fireEvent, render, screen } from '@testing-library/react-native'
+import { Button } from './Button'
 
-describe('@tms/ui - Button Component', () => {
-  describe('Type Safety', () => {
-    it('should have correct prop types', () => {
-      const props: ButtonProps = {
-        title: 'Test',
-        onPress: () => undefined,
-      }
+describe('@tms/ui - Button', () => {
+  it('renders the title and calls onPress', () => {
+    const onPress = jest.fn()
+    render(<Button title="Salvar" onPress={onPress} />)
 
-      expect(props.title).toBe('Test')
-      expect(typeof props.onPress).toBe('function')
-    })
+    fireEvent.press(screen.getByText('Salvar'))
 
-    it('should accept variant prop', () => {
-      const props: ButtonProps = {
-        title: 'Test',
-        onPress: () => undefined,
-        variant: 'primary',
-      }
-
-      expect(props.variant).toBe('primary')
-    })
-
-    it('should accept disabled prop', () => {
-      const props: ButtonProps = {
-        title: 'Test',
-        onPress: () => undefined,
-        disabled: true,
-      }
-
-      expect(props.disabled).toBe(true)
-    })
-
-    it('should accept style prop', () => {
-      const props: ButtonProps = {
-        title: 'Test',
-        onPress: () => undefined,
-        style: { backgroundColor: 'red' },
-      }
-
-      expect(props.style).toEqual({ backgroundColor: 'red' })
-    })
-
-    it('should accept textStyle prop', () => {
-      const props: ButtonProps = {
-        title: 'Test',
-        onPress: () => undefined,
-        textStyle: { fontSize: 20 },
-      }
-
-      expect(props.textStyle).toEqual({ fontSize: 20 })
-    })
+    expect(onPress).toHaveBeenCalledTimes(1)
   })
 
-  describe('Variants', () => {
-    it('should accept primary variant', () => {
-      const variant: ButtonProps['variant'] = 'primary'
-      expect(variant).toBe('primary')
-    })
+  it('does not call onPress when disabled', () => {
+    const onPress = jest.fn()
+    render(<Button title="Salvar" onPress={onPress} disabled />)
 
-    it('should accept secondary variant', () => {
-      const variant: ButtonProps['variant'] = 'secondary'
-      expect(variant).toBe('secondary')
-    })
+    fireEvent.press(screen.getByText('Salvar'))
+
+    expect(onPress).not.toHaveBeenCalled()
   })
 
-  describe('Callbacks', () => {
-    it('should execute onPress callback', () => {
-      let called = false
-      const onPress = () => {
-        called = true
-      }
+  it('applies the secondary variant and custom styles', () => {
+    render(
+      <Button
+        title="Descartar"
+        onPress={() => undefined}
+        variant="secondary"
+        textStyle={{ letterSpacing: 1 }}
+      />
+    )
 
-      onPress()
-
-      expect(called).toBe(true)
+    expect(screen.getByText('Descartar')).toHaveStyle({
+      color: '#000000',
+      letterSpacing: 1,
     })
   })
 })

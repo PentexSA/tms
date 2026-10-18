@@ -4,6 +4,12 @@ import type { Kysely } from 'kysely'
 import { createPGliteTestDb } from '../test/pglite'
 import type { DB } from '../types'
 
+const newUser = (n: number) => ({
+  email: `user${n}@example.test`,
+  username: `user${n}`,
+  hashed_password: 'x',
+})
+
 describe('@tms/db - Database Client', () => {
   let testDb: Kysely<DB>
   let destroy: () => Promise<void>
@@ -18,193 +24,93 @@ describe('@tms/db - Database Client', () => {
     await destroy()
   })
 
-  describe('Connection', () => {
-    it('should have PGLite database instance', async () => {
-      expect(testDb).toBeDefined()
-      expect(testDb).toHaveProperty('selectFrom')
-    })
-
-    it('should have query builder methods defined', () => {
-      expect(testDb).toHaveProperty('selectFrom')
-      expect(testDb).toHaveProperty('insertInto')
-      expect(testDb).toHaveProperty('updateTable')
-      expect(testDb).toHaveProperty('deleteFrom')
-    })
-  })
-
   describe('Query Builder', () => {
-    it('should execute SELECT query', async () => {
-      const result = await testDb.selectFrom('todos').selectAll().execute()
-
-      expect(Array.isArray(result)).toBe(true)
-    })
-
-    it('should execute INSERT query', async () => {
-      const result = await testDb
-        .insertInto('todos')
-        .values({ title: 'Test Todo' })
+    it('should execute INSERT with generated id and timestamps', async () => {
+      const user = await testDb
+        .insertInto('users')
+        .values(newUser(1))
         .returningAll()
         .executeTakeFirstOrThrow()
 
-      expect(result).toHaveProperty('id')
-      expect(result.title).toBe('Test Todo')
-      expect(result.done).toBe(false)
-      expect(result.created_at).toBeInstanceOf(Date)
+      expect(user.id).toMatch(/^[0-9a-f-]{36}$/)
+      expect(user.created_at).toBeInstanceOf(Date)
+      expect(user.deleted_at).toBeNull()
     })
 
-    it('should execute UPDATE query', async () => {
-      const inserted = await testDb
-        .insertInto('todos')
-        .values({ title: 'Update Test' })
-        .returningAll()
+    it('should execute UPDATE and DELETE', async () => {
+      const { id } = await testDb
+        .insertInto('users')
+        .values(newUser(1))
+        .returning('id')
         .executeTakeFirstOrThrow()
 
       const updated = await testDb
-        .updateTable('todos')
-        .set({ done: true })
-        .where('id', '=', inserted.id)
-        .returningAll()
+        .updateTable('users')
+        .set({ username: 'renamed' })
+        .where('id', '=', id)
+        .returning('username')
         .executeTakeFirstOrThrow()
+      expect(updated.username).toBe('renamed')
 
-      expect(updated.done).toBe(true)
-      expect(updated.id).toBe(inserted.id)
-    })
-
-    it('should execute DELETE query', async () => {
-      const inserted = await testDb
-        .insertInto('todos')
-        .values({ title: 'Delete Test' })
-        .returningAll()
-        .executeTakeFirstOrThrow()
-
-      await testDb.deleteFrom('todos').where('id', '=', inserted.id).execute()
-
+      await testDb.deleteFrom('users').where('id', '=', id).execute()
       const found = await testDb
-        .selectFrom('todos')
-        .selectAll()
-        .where('id', '=', inserted.id)
+        .selectFrom('users')
+        .select('id')
+        .where('id', '=', id)
         .executeTakeFirst()
-
       expect(found).toBeUndefined()
     })
-  })
 
-  describe('Type Safety', () => {
-    it('should have typed query results', async () => {
-      const result = await testDb
-        .selectFrom('todos')
-        .select(['id', 'title', 'done', 'created_at'])
-        .limit(1)
-        .execute()
-
-      if (result.length > 0) {
-        const todo = result[0]
-        expect(todo).toBeDefined()
-        expect(typeof todo?.id).toBe('number')
-        expect(typeof todo?.title).toBe('string')
-        expect(typeof todo?.done).toBe('boolean')
-        expect(todo?.created_at).toBeInstanceOf(Date)
-      }
+    it('should reject duplicate email (unique constraint)', async () => {
+      await testDb.insertInto('users').values(newUser(1)).execute()
+      await expect(
+        testDb
+          .insertInto('users')
+          .values({ ...newUser(2), email: newUser(1).email })
+          .execute()
+      ).rejects.toThrow()
     })
 
-    it('should enforce column names at compile time', async () => {
-      const result = await testDb
-        .selectFrom('todos')
-        .select('title')
-        .limit(1)
-        .execute()
+    it('should store jsonb as structured data', async () => {
+      const system = await testDb
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'Vampiro', family: 'wod' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const template = await testDb
+        .insertInto('trait_templates')
+        .values({
+          system_id: system.id,
+          template_data: JSON.stringify({ schema: 1, fields: { a: 1 } }),
+        })
+        .returning('template_data')
+        .executeTakeFirstOrThrow()
 
-      expect(Array.isArray(result)).toBe(true)
+      expect(template.template_data).toEqual({ schema: 1, fields: { a: 1 } })
     })
   })
 
   describe('Transactions', () => {
-    it('should support transactions', async () => {
-      await testDb.transaction().execute(async trx => {
-        const inserted = await trx
-          .insertInto('todos')
-          .values({ title: 'Transaction Test' })
-          .returningAll()
-          .executeTakeFirstOrThrow()
-
-        expect(inserted.title).toBe('Transaction Test')
-      })
-    })
-
     it('should rollback on error', async () => {
-      const initialCount = await testDb
-        .selectFrom('todos')
-        .select(testDb.fn.count('id').as('count'))
-        .executeTakeFirstOrThrow()
-
-      try {
-        await testDb.transaction().execute(async trx => {
-          await trx
-            .insertInto('todos')
-            .values({ title: 'Rollback Test' })
-            .execute()
-
+      await expect(
+        testDb.transaction().execute(async trx => {
+          await trx.insertInto('users').values(newUser(1)).execute()
           throw new Error('Test rollback')
         })
-        // Se chegou aqui, o teste falhou
-        expect(true).toBe(false)
-      } catch (error) {
-        // Verifica que o erro foi lançado corretamente
-        expect(error).toBeInstanceOf(Error)
-        expect((error as Error).message).toBe('Test rollback')
-      }
+      ).rejects.toThrow('Test rollback')
 
-      const finalCount = await testDb
-        .selectFrom('todos')
-        .select(testDb.fn.count('id').as('count'))
+      const { count } = await testDb
+        .selectFrom('users')
+        .select(testDb.fn.countAll().as('count'))
         .executeTakeFirstOrThrow()
-
-      expect(finalCount.count).toBe(initialCount.count)
+      expect(Number(count)).toBe(0)
     })
   })
 
-  describe('Schema', () => {
-    it('should have todos table with correct columns', async () => {
-      const todo = await testDb
-        .insertInto('todos')
-        .values({ title: 'Schema Test' })
-        .returningAll()
-        .executeTakeFirstOrThrow()
-
-      expect(todo).toHaveProperty('id')
-      expect(todo).toHaveProperty('title')
-      expect(todo).toHaveProperty('done')
-      expect(todo).toHaveProperty('created_at')
-    })
-
-    it('should set default value for done column', async () => {
-      const todo = await testDb
-        .insertInto('todos')
-        .values({ title: 'Default Test' })
-        .returningAll()
-        .executeTakeFirstOrThrow()
-
-      expect(todo.done).toBe(false)
-    })
-
-    it('should set default value for created_at column', async () => {
-      const beforeInsert = new Date()
-
-      const todo = await testDb
-        .insertInto('todos')
-        .values({ title: 'Timestamp Test' })
-        .returningAll()
-        .executeTakeFirstOrThrow()
-
-      const afterInsert = new Date()
-
-      expect(todo.created_at).toBeDefined()
-      expect(todo.created_at?.getTime()).toBeGreaterThanOrEqual(
-        beforeInsert.getTime()
-      )
-      expect(todo.created_at?.getTime()).toBeLessThanOrEqual(
-        afterInsert.getTime()
-      )
+  describe('Isolation', () => {
+    it('each test database starts empty', async () => {
+      const users = await testDb.selectFrom('users').select('id').execute()
+      expect(users).toEqual([])
     })
   })
 })

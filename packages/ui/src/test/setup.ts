@@ -1,17 +1,3 @@
-import '@testing-library/jest-dom'
-
-// Mock React Native components and APIs
-jest.mock('react-native', () => {
-  const RN = jest.requireActual('react-native-web')
-
-  return {
-    ...RN,
-    Platform: {
-      OS: 'web',
-      select: <T>(obj: Record<string, T>) => obj.web || obj.default,
-    },
-    StyleSheet: {
-      create: <T>(styles: T) => styles,
-    },
-  }
-})
+// Setup dos testes do @tms/ui (preset jest-expo: componentes renderizam de
+// verdade no react-native de teste, sem mock manual de react-native).
+export {}

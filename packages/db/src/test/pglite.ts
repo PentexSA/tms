@@ -1,82 +1,43 @@
-import { Kysely } from 'kysely'
+import { Kysely, type MigrationProvider, Migrator } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
-import { up as migration_0001_init_up } from '../migrations/0001_init'
-import { up as migration_0002_users_up } from '../migrations/0002_users'
-import { up as migration_0003_game_systems_up } from '../migrations/0003_game_systems'
-import { up as migration_0004_chronicles_up } from '../migrations/0004_chronicles'
-import { up as migration_0005_characters_up } from '../migrations/0005_characters'
-import { up as migration_0006_trait_templates_up } from '../migrations/0006_trait_templates'
+import { migrationProvider } from '../migrations'
 import type { DB } from '../types'
 
 /**
- * Apply all migrations from @tms/db to the test database
- * These migrations are imported from packages/db/src/migrations/
- * and reused to keep a single source of truth
- */
-async function applyMigrations(db: Kysely<DB>) {
-  const migrations = [
-    { name: '0001_init', up: migration_0001_init_up },
-    { name: '0002_users', up: migration_0002_users_up },
-    { name: '0003_game_systems', up: migration_0003_game_systems_up },
-    { name: '0004_chronicles', up: migration_0004_chronicles_up },
-    { name: '0005_characters', up: migration_0005_characters_up },
-    { name: '0006_trait_templates', up: migration_0006_trait_templates_up },
-  ]
-
-  for (const migration of migrations) {
-    try {
-      // biome-ignore lint/suspicious/noExplicitAny: Migration functions accept unknown
-      await migration.up(db as any)
-    } catch (error) {
-      // Skip if table already exists or migration fails
-      // This is expected for optional tables that may not be supported in PGLite
-      console.debug(`Migration ${migration.name} skipped or failed:`, error)
-    }
-  }
-}
-
-/**
- * Creates an in-memory PGLite test database with all migrations applied
+ * Cria um Postgres em memória (PGLite) com todas as migrations aplicadas.
  *
- * PGLite is an in-process PostgreSQL database that runs in memory.
- * This is perfect for isolated, fast tests that don't require external dependencies.
+ * Usa o mesmo `Migrator` do Kysely que o `migrate.ts` e falha se uma
+ * migration falhar: teste com schema incompleto não passa.
  *
  * @example
  * const { db, destroy } = await createPGliteTestDb()
- * const todos = await db.selectFrom('todos').selectAll().execute()
+ * const users = await db.selectFrom('users').selectAll().execute()
  * await destroy()
- *
- * @returns Object with Kysely DB instance and destroy function
  */
-export async function createPGliteTestDb() {
-  // In-memory Postgres for each test file/suite
-  const pgliteDb = new KyselyPGlite('memory://')
-  const db = new Kysely<DB>({
-    dialect: pgliteDb.dialect,
-  })
-
-  // Apply all migrations from @tms/db
-  await applyMigrations(db)
+export async function createPGliteTestDb(
+  provider: MigrationProvider = migrationProvider
+) {
+  const pglite = new KyselyPGlite() // sem dataDir: em memória
+  const db = new Kysely<DB>({ dialect: pglite.dialect })
 
   const destroy = async () => {
     try {
       await db.destroy()
     } catch {
-      // Ignore destroy errors
+      // já destruído
     }
     try {
-      await pgliteDb.client.close()
+      await pglite.client.close()
     } catch {
-      // Already closed, ignore
+      // já fechado
     }
   }
 
-  return { db, destroy }
-}
+  const { error } = await new Migrator({ db, provider }).migrateToLatest()
+  if (error) {
+    await destroy()
+    throw error instanceof Error ? error : new Error(String(error))
+  }
 
-/**
- * Clears all data from the todos table
- */
-export async function clearPGliteTodos(db: Kysely<DB>) {
-  await db.deleteFrom('todos').execute()
+  return { db, destroy }
 }

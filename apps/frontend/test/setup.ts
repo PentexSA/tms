@@ -26,30 +26,9 @@ jest.mock('@tms/config/env', () => ({
   },
 }))
 
-// Mock completo do módulo @elysiajs/eden com implementação funcional
+// Eden sem rede: cada teste mocka as rotas que usa (ver app/__tests__)
 jest.mock('@elysiajs/eden', () => ({
-  treaty: jest.fn(() => ({
-    todos: {
-      get: jest.fn().mockResolvedValue({
-        data: [
-          {
-            id: 1,
-            title: 'Test Todo',
-            done: false,
-            created_at: new Date().toISOString(),
-          },
-        ],
-      }),
-      post: jest.fn().mockResolvedValue({
-        data: {
-          id: 2,
-          title: 'New Todo',
-          done: false,
-          created_at: new Date().toISOString(),
-        },
-      }),
-    },
-  })),
+  treaty: jest.fn(() => ({})),
 }))
 
 // O resetMocks zera o mock do AppState (react-native/jest) antes de cada teste;

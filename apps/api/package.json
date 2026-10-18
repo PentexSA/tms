@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=../../.env run --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir dist",
-    "start": "bun run dist/index.js",
+    "dev": "bun --env-file=../../.env run --hot src/server.ts",
+    "build": "bun build src/server.ts --outdir dist --target bun",
+    "start": "bun run dist/server.js",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",

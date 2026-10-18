@@ -11,13 +11,15 @@ export interface ScreenProps {
   children: ReactNode
   style?: ViewStyle
   safe?: boolean
+  testID?: string
 }
 
-export function Screen({ children, style, safe = true }: ScreenProps) {
+export function Screen({ children, style, safe = true, testID }: ScreenProps) {
   const Container = safe ? SafeAreaView : View
 
   return (
     <Container
+      testID={testID}
       style={[styles.container, Platform.OS === 'web' && styles.web, style]}
     >
       {children}
