@@ -15,6 +15,7 @@ import {
   planDefaultAction,
 } from '../effects'
 import { applyBatch } from '../events'
+import { withEffectiveFrom } from '../labels'
 import { type ResolvedResource, resolve } from '../resolve'
 import { gain, setCurrent, spend, takeDamage } from '../rules/resource'
 import { damage, heal } from '../rules/wod-stacking'
@@ -316,6 +317,44 @@ describe('ação padrão do dock (toque longo)', () => {
     expect(
       planDefaultAction(model, withValues({ blood: { current: 0 } }), 'blood')
     ).toEqual({ ok: false, reason: 'Sem Sangue para gastar' })
+  })
+
+  it('Sangue no padrão: o from cru é null, a prévia mostra o efetivo', () => {
+    // 13ª geração e nada guardado: 10 de 10
+    const fresh = { values: { name: 'Nova' }, specialties: {} } as SheetData
+    const plan = planDefaultAction(model, fresh, 'blood')
+    expect(plan).toMatchObject({
+      ok: true,
+      events: [{ path: 'values.blood', from: null, to: { current: 9 } }],
+      preview: [{ label: 'Sangue', change: '10 → 9' }],
+    })
+  })
+
+  it('withEffectiveFrom: só preenche o que não tem valor guardado', () => {
+    const sheet = {
+      values: { name: 'Nova', strength: 3 },
+      specialties: {},
+    } as SheetData
+    expect(
+      withEffectiveFrom(model, sheet, [
+        { path: 'values.blood', from: null, to: { current: 9 } },
+        { path: 'values.strength', from: 3, to: 4 },
+        { path: 'values.dexterity', from: null, to: 2 },
+        // Texto nunca ganha conteúdo; especialização e caminho ruim ficam
+        { path: 'values.notes', from: null, to: 'x' },
+        { path: 'specialties.occult', from: null, to: 'x' },
+        { path: 'values.naoExiste', from: null, to: 1 },
+        { path: 'lixo', from: null, to: 1 },
+      ])
+    ).toEqual([
+      { path: 'values.blood', from: { current: 10 }, to: { current: 9 } },
+      { path: 'values.strength', from: 3, to: 4 },
+      { path: 'values.dexterity', from: 1, to: 2 },
+      { path: 'values.notes', from: null, to: 'x' },
+      { path: 'specialties.occult', from: null, to: 'x' },
+      { path: 'values.naoExiste', from: null, to: 1 },
+      { path: 'lixo', from: null, to: 1 },
+    ])
   })
 
   it('sem ação padrão (Vitalidade abre o sheet)', () => {

@@ -397,6 +397,28 @@ describe('GET /characters/:id/history', () => {
     expect(forStoryteller.items).toHaveLength(2)
   })
 
+  it('Sangue ainda no padrão: o histórico mostra o efetivo (10 → 9)', async () => {
+    const fresh = await createCharacter(ctx, owner, chronicleId, {
+      name: 'Nova',
+    })
+    const res = await as(ctx, owner, 'POST', `/characters/${fresh}/events`, {
+      clientBatchId: batchId(),
+      events: [{ path: 'values.blood', from: null, to: { current: 9 } }],
+    })
+    expect(res.status).toBe(200)
+    const event = await ctx.db
+      .selectFrom('character_events')
+      .select('from_value')
+      .executeTakeFirstOrThrow()
+    expect(event.from_value).toEqual({ current: 10 })
+    const body = (await (
+      await as(ctx, owner, 'GET', `/characters/${fresh}/history`)
+    ).json()) as { items: { changes: unknown[] }[] }
+    expect(body.items[0]?.changes).toEqual([
+      { label: 'Sangue', change: '10 → 9' },
+    ])
+  })
+
   it('texto aparece como "atualizado", sem conteúdo', async () => {
     await send(owner, [
       { path: 'values.notes', from: helena.notes, to: 'novo segredo' },

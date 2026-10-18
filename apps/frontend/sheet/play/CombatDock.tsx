@@ -94,7 +94,7 @@ const DockChip = memo(function DockChip({ id }: { readonly id: FieldId }) {
       toast.show({ message: next.reason })
       return
     }
-    if (commit(next.events, planLabel(model, next)).ok) haptics.impact()
+    if (commit(next.events, planLabel(next)).ok) haptics.impact()
   }
   const onAction = (e: AccessibilityActionEvent) => {
     if (e.nativeEvent.actionName === 'longpress') runDefault()

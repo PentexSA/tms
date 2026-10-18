@@ -9,7 +9,7 @@ import type {
 import { jsonEqual } from './equal'
 import type { SheetEvent } from './events'
 import { resource as resourceType } from './fields/resource'
-import { type ChangeLabel, describeEvent } from './labels'
+import { type ChangeLabel, describeEvent, withEffectiveFrom } from './labels'
 import type { EffectName } from './registry'
 import {
   type ResolvedResource,
@@ -55,13 +55,17 @@ const event = (sheet: SheetData, id: FieldId, to: unknown): SheetEvent => ({
 
 function plan(
   model: SheetModel,
+  sheet: SheetData,
   events: SheetEvent[],
   label: string
 ): ActionPlan {
+  // A prévia mostra o valor efetivo de antes ("Sangue 10 → 9" com o Sangue
+  // ainda no padrão), não o `from` guardado
+  const shown = withEffectiveFrom(model, sheet, events)
   return {
     ok: true,
     events,
-    preview: events.map(e => describeEvent(model, e)),
+    preview: shown.map(e => describeEvent(model, e)),
     label,
   }
 }
@@ -90,7 +94,12 @@ export function planAction(
       if (!r) return unavailable('Recurso inexistente')
       if (r.current === 0)
         return unavailable(`Sem ${r.field.def.label.toLowerCase()} para gastar`)
-      return plan(model, [event(sheet, r.id, spend(r, amount))], action.label)
+      return plan(
+        model,
+        sheet,
+        [event(sheet, r.id, spend(r, amount))],
+        action.label
+      )
     }
     case 'resource.gain': {
       const r = resourceOf(action.params?.field)
@@ -98,7 +107,7 @@ export function planAction(
       const to = gain(r, amount)
       if (to.current === r.current)
         return unavailable(`${r.field.def.label} já está no máximo`)
-      return plan(model, [event(sheet, r.id, to)], action.label)
+      return plan(model, sheet, [event(sheet, r.id, to)], action.label)
     }
     case 'health.heal': {
       const trackId = action.params?.field
@@ -129,7 +138,7 @@ export function planAction(
         cost > 0 && pay
           ? ` (${cost} ${pay.field.def.shortLabel ?? pay.field.def.label})`
           : ''
-      return plan(model, events, `${change.note}${by}`)
+      return plan(model, sheet, events, `${change.note}${by}`)
     }
     default:
       return unavailable('Ainda não disponível nesta versão')
@@ -155,6 +164,7 @@ export function planDefaultAction(
         if (r.current === 0) return unavailable(`Sem ${label} para gastar`)
         return plan(
           model,
+          sheet,
           [event(sheet, r.id, spend(r, 1))],
           `${r.field.def.spendLabel ?? 'Gastar 1'} ${label}`
         )
@@ -164,6 +174,7 @@ export function planDefaultAction(
           return unavailable(`${label} já está no máximo`)
         return plan(
           model,
+          sheet,
           [event(sheet, r.id, to)],
           `${r.field.def.gainLabel ?? 'Recuperar 1'} ${label}`
         )
@@ -172,7 +183,12 @@ export function planDefaultAction(
         const to = takeDamage(r, 1)
         if (jsonEqual(to, resourceType.stored(r)))
           return unavailable(`${label} já está em 0`)
-        return plan(model, [event(sheet, r.id, to)], `1 de dano em ${label}`)
+        return plan(
+          model,
+          sheet,
+          [event(sheet, r.id, to)],
+          `1 de dano em ${label}`
+        )
       }
       default:
         return unavailable('Sem ação padrão')
@@ -189,6 +205,7 @@ export function planDefaultAction(
     )
     return plan(
       model,
+      sheet,
       [event(sheet, r.id, to)],
       `Usou 1 espaço de ${level.label} nível`
     )
@@ -213,5 +230,5 @@ export function planDamage(
       ? damage(def, value ?? undefined, type, delta)
       : heal(def, value ?? undefined, type, -delta)
   if (!change.changed) return unavailable(change.note)
-  return plan(model, [event(sheet, fieldId, change.counts)], change.note)
+  return plan(model, sheet, [event(sheet, fieldId, change.counts)], change.note)
 }

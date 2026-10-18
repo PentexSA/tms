@@ -14,13 +14,14 @@ async function newCharacter(page: Page) {
     '/chronicles',
     { name: 'Crônica da Liberdade', systemCode: 'vtm-v20' }
   )
-  // 13ª geração (padrão): Sangue cheio, 10 de 10
+  // 13ª geração (padrão) e Sangue sem valor guardado: cheio, 10 de 10. A
+  // criação só aceita os campos da identidade
   return apiAs<{ id: string }>(
     context,
     user,
     'POST',
     `/chronicles/${chronicle.id}/characters`,
-    { values: { name: 'Helena Varga', blood: { current: 10 } } }
+    { values: { name: 'Helena Varga' } }
   )
 }
 

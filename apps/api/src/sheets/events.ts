@@ -9,6 +9,7 @@ import {
   type SheetData,
   type SheetEvent,
   stripRestricted,
+  withEffectiveFrom,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
@@ -166,7 +167,9 @@ export function eventRoutes(
           await trx
             .insertInto('character_events')
             .values(
-              body.events.map((e, seq) => {
+              // O histórico guarda o "de" efetivo (o padrão, quando não havia
+              // valor): "Sangue 10 → 9". O conflito já foi conferido com o cru
+              withEffectiveFrom(model, current, body.events).map((e, seq) => {
                 const p = parsePath(e.path)
                 const type = p
                   ? model.fields.get(p.fieldId)?.def.type

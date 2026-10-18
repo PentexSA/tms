@@ -1,12 +1,10 @@
 import {
   type ActionPlan,
   canWrite,
-  describeEvent,
   type FieldId,
   isEditableIn,
   type SheetData,
   type SheetEvent,
-  type SheetModel,
 } from '@tms/sheet-core'
 import { useSheet } from '../context'
 
@@ -54,12 +52,11 @@ export function eventTo(
  * vários (Curar mexe na Vitalidade e no Sangue) ou num tipo sem "de → para"
  * (espaços de magia), o rótulo da ação ("Usou 1 espaço de 1º nível").
  */
-export function planLabel(
-  model: SheetModel,
-  plan: Extract<ActionPlan, { ok: true }>
-): string {
-  const [only] = plan.events
+export function planLabel(plan: Extract<ActionPlan, { ok: true }>): string {
+  // A prévia do core já tem o "de" efetivo (Sangue cheio no padrão: 10 → 9)
+  const [only] = plan.preview
   if (plan.events.length !== 1 || !only) return plan.label
-  const { label, change } = describeEvent(model, only)
-  return change === 'alterado' ? plan.label : `${label} ${change}`
+  return only.change === 'alterado'
+    ? plan.label
+    : `${only.label} ${only.change}`
 }

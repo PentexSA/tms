@@ -1,6 +1,8 @@
 import type { SheetModel } from './compile'
-import type { FieldDef } from './contract'
+import type { FieldDef, SheetData } from './contract'
 import { parsePath, type SheetEvent } from './events'
+import { stored } from './fields'
+import { resolve } from './resolve'
 import { plural } from './text'
 import { asArray, get, rec } from './validate/util'
 
@@ -101,6 +103,37 @@ export function describeEvent(
       ? (def.shortLabel ?? def.label)
       : def.label
   return { label: short, change: text }
+}
+
+const NO_EFFECTIVE = new Set(['text', 'longText'])
+
+/**
+ * Os eventos com o `from` que a pessoa via: sem valor guardado, o valor
+ * efetivo da ficha de antes (o padrão, um máximo derivado). Assim o aviso e o
+ * histórico dizem "Sangue 10 → 9", não "— → 9". Só para mostrar: o conflito
+ * compara o `from` cru, que continua null.
+ */
+export function withEffectiveFrom(
+  model: SheetModel,
+  before: SheetData,
+  events: readonly SheetEvent[]
+): SheetEvent[] {
+  let resolved: ReturnType<typeof resolve> | undefined
+  return events.map(e => {
+    if (e.from !== null && e.from !== undefined) return e
+    const p = parsePath(e.path)
+    const field = p ? model.fields.get(p.fieldId) : undefined
+    if (
+      !p ||
+      p.scope !== 'values' ||
+      !field ||
+      NO_EFFECTIVE.has(field.def.type)
+    )
+      return e
+    resolved ??= resolve(model, before)
+    const r = resolved.get(p.fieldId)
+    return r ? { ...e, from: stored(r, resolved) } : e
+  })
 }
 
 /** Uma linha para o toast e o histórico: o evento único ou "N alterações". */
