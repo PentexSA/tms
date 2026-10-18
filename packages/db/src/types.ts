@@ -36,6 +36,24 @@ export interface Characters {
   user_id: string
 }
 
+export interface ChronicleInvites {
+  chronicle_id: string
+  code_hash: string
+  created_at: Generated<Timestamp>
+  created_by: string
+  expires_at: Timestamp
+  id: Generated<string>
+  max_uses: number
+  revoked_at: Timestamp | null
+  uses: Generated<number>
+}
+
+export interface ChronicleMembers {
+  chronicle_id: string
+  joined_at: Generated<Timestamp>
+  user_id: string
+}
+
 export interface Chronicles {
   created_at: Generated<Timestamp | null>
   id: Generated<string>
@@ -85,6 +103,8 @@ export interface Users {
 
 export interface DB {
   characters: Characters
+  chronicle_invites: ChronicleInvites
+  chronicle_members: ChronicleMembers
   chronicles: Chronicles
   game_systems: GameSystems
   refresh_tokens: RefreshTokens

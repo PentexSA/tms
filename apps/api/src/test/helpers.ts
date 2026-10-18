@@ -2,6 +2,7 @@ import { type Treaty, treaty } from '@elysiajs/eden'
 import type { DB } from '@tms/db'
 import { createPGliteTestDb } from '@tms/db/testing'
 import type { Kysely } from 'kysely'
+import type { TokenConfig } from '../auth/tokens'
 import { type App, createApp } from '../index'
 import type { AppOptions } from '../options'
 
@@ -37,6 +38,8 @@ export interface TestContext {
   readonly app: App
   readonly db: Kysely<DB>
   readonly clock: ReturnType<typeof fakeClock>
+  // Os mesmos da app: as factories assinam tokens válidos com eles
+  readonly tokens: TokenConfig
 }
 
 /** App + banco de teste + relógio falso. Destrua com destroyTestDb(). */
@@ -47,8 +50,17 @@ export async function createTestContext(
   const { db, destroy } = await createPGliteTestDb()
   testDbCleanup = destroy
   const clock = fakeClock()
-  const app = createApp(db, { now: clock.now, ...overrides })
-  return { app, db, clock }
+  const secret = new Uint8Array(32)
+  crypto.getRandomValues(secret)
+  const tokens: TokenConfig = overrides.tokens ?? {
+    secret,
+    issuer: 'tms-api',
+    audience: 'tms-app',
+    ttlSeconds: 15 * 60,
+    now: clock.now,
+  }
+  const app = createApp(db, { now: clock.now, ...overrides, tokens })
+  return { app, db, clock, tokens }
 }
 
 /**

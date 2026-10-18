@@ -14,6 +14,8 @@ export interface Limits {
   readonly refresh: RateLimiter
   // Por e-mail: só as tentativas que falham contam.
   readonly loginFailures: RateLimiter
+  // Por usuário e por IP: aceitar convite (força bruta no código).
+  readonly invites: RateLimiter
 }
 
 export interface AppOptions {
@@ -41,6 +43,11 @@ export function defaultLimits(now: () => Date): Limits {
     }),
     refresh: createRateLimiter({ limit: 60, windowMs: MINUTE, now: clock }),
     loginFailures: createRateLimiter({
+      limit: 10,
+      windowMs: 15 * MINUTE,
+      now: clock,
+    }),
+    invites: createRateLimiter({
       limit: 10,
       windowMs: 15 * MINUTE,
       now: clock,

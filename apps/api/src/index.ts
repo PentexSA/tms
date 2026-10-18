@@ -5,6 +5,7 @@ import { Elysia } from 'elysia'
 import type { Kysely } from 'kysely'
 import { authGuard } from './auth/guard'
 import { authRoutes, meRoutes } from './auth/routes'
+import { chronicleRoutes } from './chronicles/routes'
 import { onError } from './http/on-error'
 import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
@@ -52,6 +53,7 @@ export const createApp = (
       .get('/health', () => ({ ok: true }))
       .use(authRoutes(db, options, guard))
       .use(meRoutes(db, guard))
+      .use(chronicleRoutes(db, options, guard))
   )
 }
 

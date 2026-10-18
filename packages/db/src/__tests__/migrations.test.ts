@@ -25,6 +25,8 @@ describe('migrations', () => {
         order by table_name`.execute(db)
       expect(rows.map(r => r.table_name)).toEqual([
         'characters',
+        'chronicle_invites',
+        'chronicle_members',
         'chronicles',
         'game_systems',
         'refresh_tokens',
