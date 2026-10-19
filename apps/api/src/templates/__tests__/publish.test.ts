@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DB } from '@tms/db'
 import { createPGliteTestDb } from '@tms/db/testing'
+import { compileTemplate } from '@tms/sheet-core'
 import type { Kysely } from 'kysely'
 import { main } from '../../scripts/publish-template'
 import {
@@ -13,6 +14,7 @@ import {
   publishTemplate,
   schemaIssues,
 } from '../publish'
+import { PUBLISHED_SYSTEMS, publishedFiles } from '../published'
 
 const DESIGN = join(import.meta.dir, '../../../../../design')
 const SYSTEMS = [
@@ -252,8 +254,44 @@ describe('pnpm templates:publish (CLI)', () => {
 
   it('sem arquivo, mostra o uso', async () => {
     expect(await run([])).toBe(1)
-    expect(err).toEqual(['Uso: pnpm templates:publish <template.json> [...]'])
+    expect(err).toEqual([
+      'Uso: pnpm templates:publish <template.json> [...] | --published',
+    ])
   })
+
+  it('--published grava os templates do produto, na ordem', async () => {
+    expect(await run(['--published'])).toBe(0)
+    expect(out.map(l => l.split(' (')[0])).toEqual([
+      'publicado: vtm-v20@1.1.0',
+      'publicado: mta-m20@1.0.0',
+    ])
+  })
+})
+
+describe('os templates do produto (plano-v1, Etapa 7)', () => {
+  const examples = (
+    JSON.parse(
+      readFileSync(join(DESIGN, 'templates/exemplos/personagens.json'), 'utf8')
+    ) as { characters: { system: string }[] }
+  ).characters
+
+  it('a lista é Vampiro e Mago, e cada arquivo existe', () => {
+    expect([...PUBLISHED_SYSTEMS]).toEqual(['vtm-v20', 'mta-m20'])
+    expect(publishedFiles().map(f => f.split('/').at(-1))).toEqual([
+      'vtm-v20.json',
+      'mta-m20.json',
+    ])
+  })
+
+  it.each([...PUBLISHED_SYSTEMS])(
+    '%s passa no Ajv, compila e tem ficha de exemplo',
+    system => {
+      const t = template(system)
+      expect(schemaIssues(t)).toEqual([])
+      expect(compileTemplate(t).system).toBe(system)
+      expect(examples.some(c => c.system === system)).toBe(true)
+    }
+  )
 })
 
 describe('o Ajv fica fora do app e do core', () => {

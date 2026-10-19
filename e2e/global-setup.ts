@@ -38,7 +38,8 @@ export default async function globalSetup() {
     'bun',
     [
       'apps/api/src/scripts/publish-template.cli.ts',
-      join(ROOT, 'design/templates/vtm-v20.json'),
+      // Os templates do produto (Vampiro e Mago), a mesma lista do deploy
+      '--published',
     ],
     { cwd: ROOT, env, stdio: 'inherit' }
   )

@@ -38,9 +38,10 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await st.goto('/')
   await st.getByRole('button', { name: 'Criar crônica' }).click()
   await st.getByLabel('Nome da crônica').fill('Crônica da Liberdade')
-  await expect(
-    st.getByRole('radio', { name: /Vampiro: A Máscara/ })
-  ).toBeChecked()
+  // Com Vampiro e Mago publicados, o sistema é escolhido (v1)
+  const vampire = st.getByRole('radio', { name: /Vampiro: A Máscara/ })
+  await vampire.click()
+  await expect(vampire).toBeChecked()
   await st.getByRole('button', { name: 'Criar crônica' }).click()
   await expect(
     st.getByRole('heading', { name: 'Crônica da Liberdade' })

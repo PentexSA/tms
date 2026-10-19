@@ -3,8 +3,10 @@ import { resolve } from 'node:path'
 import type { DB } from '@tms/db'
 import type { Kysely } from 'kysely'
 import { PublishError, publishTemplate } from '../templates/publish'
+import { publishedFiles } from '../templates/published'
 
 // pnpm templates:publish design/templates/vtm-v20.json [outros.json]
+// pnpm templates:publish --published   (os templates do produto)
 //
 // Grava o template no banco de DATABASE_URL. Sai com código 1 se algum for
 // recusado. O log diz sistema, versão e hash, nunca o conteúdo.
@@ -17,11 +19,14 @@ export interface PublishCliDeps {
 }
 
 export async function main(
-  files: readonly string[],
+  args: readonly string[],
   deps: PublishCliDeps
 ): Promise<number> {
+  const files = args.flatMap(a =>
+    a === '--published' ? publishedFiles() : [a]
+  )
   if (!files.length) {
-    deps.err('Uso: pnpm templates:publish <template.json> [...]')
+    deps.err('Uso: pnpm templates:publish <template.json> [...] | --published')
     return 1
   }
   let failed = false

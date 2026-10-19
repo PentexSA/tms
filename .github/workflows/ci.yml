@@ -38,6 +38,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec biome ci .
       - run: pnpm typecheck
+      # O código conhece tipos; o template conhece o sistema (plano-v1 §4)
+      - run: node scripts/check-system-names.mjs
       # Testes com as metas de cobertura de cada pacote (bunfig.toml e jest.config.js)
       - run: pnpm test:coverage
       - run: pnpm audit --audit-level high
@@ -106,7 +108,7 @@ jobs:
       # Os pacotes de que a API depende (config, db, sheet-core, logger)
       - run: pnpm turbo run build --filter='@tms/api^...'
       # O template da v0 publica num Postgres real (schema.json + contrato)
-      - run: pnpm templates:publish design/templates/vtm-v20.json
+      - run: pnpm templates:publish --published
       # O PGLite serializa tudo; o FOR UPDATE dos eventos só se prova aqui
       - name: eventos concorrentes (lock da ficha)
         env:
