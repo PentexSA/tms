@@ -7,7 +7,7 @@ import {
   UnsupportedTemplateError,
 } from '../compile'
 import { REGISTRY } from '../registry'
-import { clone, dnd, type Json, templates, vtm } from './fixtures'
+import { clone, dnd, type Json, mta, templates, vtm } from './fixtures'
 
 type Fields = Record<string, Json>
 const fieldsOf = (t: Json) => t.fields as Fields
@@ -113,6 +113,36 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   it('dock e rolagem vêm do template', () => {
     expect(model.dock).toEqual(['health', 'blood', 'willpower'])
     expect(model.roll.model).toBe('pool-success')
+  })
+})
+
+describe('compileTemplate: o Mago (M20, v1)', () => {
+  const model = compileTemplate(mta())
+
+  it('identityFields seguem as colunas da ficha impressa', () => {
+    expect(model.identityFields).toEqual([
+      'name',
+      'nature',
+      'demeanor',
+      'concept',
+      'tradition',
+      'essence',
+      'house',
+    ])
+  })
+
+  it('Atributos e Habilidades viram abas no celular, como no Vampiro', () => {
+    expect(model.sections.get('attributes')?.def.groupTabs).toBe(true)
+    expect(model.sections.get('abilities')?.def.groupTabs).toBe(true)
+  })
+
+  it('as rotinas são uma lista em Vantagens', () => {
+    expect(model.fields.get('rotes')?.def.type).toBe('list')
+    expect(model.fields.get('rotes')?.zone).toBe('powers')
+  })
+
+  it('dock com a roda entre a Vitalidade e a FdV', () => {
+    expect(model.dock).toEqual(['health', 'wheel', 'willpower'])
   })
 })
 

@@ -341,6 +341,91 @@
       }
     },
     {
+      "id": "nadia",
+      "chronicleId": "torre-marfim",
+      "system": "mta-m20",
+      "ownerId": "u-bruno",
+      "updatedAt": "2026-10-03T22:10:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Nádia Coutinho",
+          "concept": "Parteira do interior",
+          "tradition": "verbena",
+          "essence": "primordial",
+          "nature": "Cuidadora",
+          "demeanor": "Tradicionalista"
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "otto",
+      "chronicleId": "torre-marfim",
+      "system": "mta-m20",
+      "ownerId": "u-carla",
+      "updatedAt": "2026-10-03T23:40:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Otto Brandt",
+          "concept": "Engenheiro de rádio",
+          "tradition": "filhos-do-eter",
+          "essence": "questionadora",
+          "house": "Sociedade dos Engenheiros Etéricos",
+          "nature": "Inovador",
+          "demeanor": "Excêntrico",
+          "quote": "Se a teoria não explica a faísca, troque a teoria.",
+          "strength": 2,
+          "dexterity": 3,
+          "stamina": 2,
+          "charisma": 2,
+          "manipulation": 1,
+          "appearance": 2,
+          "perception": 3,
+          "intelligence": 4,
+          "wits": 3,
+          "alertness": 2,
+          "athletics": 1,
+          "crafts": 3,
+          "technology": 4,
+          "research": 2,
+          "science": 4,
+          "computer": 2,
+          "enigmas": 3,
+          "cosmology": 1,
+          "arete": 2,
+          "affinity": "forces",
+          "forces": 3,
+          "matter": 2,
+          "prime": 1,
+          "backgrounds": [
+            { "id": "b1", "name": "Avatar", "value": 2 },
+            { "id": "b2", "name": "Recursos", "value": 2 }
+          ],
+          "rotes": [
+            {
+              "id": "r1",
+              "name": "Bobina de Tesla de bolso",
+              "notes": "Forças 2 + Primórdio 1. Descarga elétrica pelo transmissor de pulso."
+            },
+            {
+              "id": "r2",
+              "name": "Leitura de frequência",
+              "notes": "Forças 1. Sente campos eletromagnéticos com o fone de ouvido."
+            }
+          ],
+          "willpower": { "current": 3, "permanent": 5 },
+          "wheel": { "quintessence": 5, "paradox": 15 },
+          "health": { "bashing": 0, "lethal": 2, "aggravated": 0 },
+          "paradigm": "O universo é uma máquina etérica, e toda máquina pode ser melhorada.",
+          "practice": "Ciência Estranha",
+          "instruments": "Aparelhos de válvula, éter destilado, cálculos em lousa.",
+          "notes": "Fez um experimento vulgar diante de testemunhas no último capítulo.",
+          "storytellerNotes": "A roda cheia de Paradoxo: um Sinal está para aparecer."
+        },
+        "specialties": { "technology": "Rádio", "science": "Física etérica" }
+      }
+    },
+    {
       "id": "iara",
       "chronicleId": "serra-do-mar",
       "system": "wta-w20",

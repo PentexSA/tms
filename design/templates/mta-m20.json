@@ -12,7 +12,12 @@
     "name": "name",
     "chip": "tradition",
     "summary": ["concept", "essence"],
-    "voice": "quote"
+    "voice": "quote",
+    "columns": [
+      ["name"],
+      ["nature", "demeanor", "concept"],
+      ["tradition", "essence", "house"]
+    ]
   },
   "accent": {
     "from": "tradition",
@@ -434,6 +439,14 @@
       ]
     },
 
+    "rotes": {
+      "type": "list",
+      "label": "Rotinas",
+      "itemLabel": "Rotina",
+      "item": { "notes": true },
+      "help": "Efeitos que o mago já domina. Anote as Esferas e o que a rotina faz nas notas de cada uma."
+    },
+
     "willpower": {
       "type": "resource",
       "label": "Força de Vontade",
@@ -522,6 +535,7 @@
       "zone": "build",
       "title": "Atributos",
       "layout": "grid",
+      "groupTabs": true,
       "groups": [
         {
           "id": "physical",
@@ -545,6 +559,7 @@
       "zone": "build",
       "title": "Habilidades",
       "layout": "groups",
+      "groupTabs": true,
       "filter": {
         "rule": "invested",
         "label": "Só com pontos",
@@ -642,6 +657,13 @@
           "fields": ["backgrounds"]
         }
       ]
+    },
+    {
+      "id": "rotes",
+      "zone": "powers",
+      "title": "Rotinas",
+      "layout": "groups",
+      "groups": [{ "id": "rotes", "title": "Rotinas", "fields": ["rotes"] }]
     },
     {
       "id": "focus",

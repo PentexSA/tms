@@ -54,8 +54,10 @@ export function must<T>(v: T | undefined, what: string): T {
   return v
 }
 
-// Template v0 (produto) e fixture de outra família (só teste).
+// Templates do produto (Vampiro na v0, Mago na v1) e fixture de outra
+// família (só teste).
 export const vtm = () => clone(must(templates['vtm-v20'], 'vtm-v20'))
+export const mta = () => clone(must(templates['mta-m20'], 'mta-m20'))
 export const dnd = () => clone(must(templates['dnd5e-2014'], 'dnd5e-2014'))
 export const character = (id: string) =>
   clone(
