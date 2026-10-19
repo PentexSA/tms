@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { compileTemplate } from '../compile'
 import type { ClockField, SheetData } from '../contract'
+import { planClock } from '../effects'
 import { applyBatch, invert, type SheetEvent } from '../events'
 import { describeEvent, withEffectiveFrom } from '../labels'
 import { REGISTRY } from '../registry'
@@ -224,5 +225,44 @@ describe('rótulos da roda (toast, resumo e histórico)', () => {
       label: 'Quintessência',
       change: '0 → 1',
     })
+  })
+})
+
+describe('planClock (sheet da roda)', () => {
+  it('Paradoxo +1 com a roda cheia: um evento com a roda inteira e a prévia', () => {
+    const sheet = otto()
+    expect(planClock(model, sheet, 'wheel', 'paradox', 1)).toEqual({
+      ok: true,
+      events: [{ path: 'values.wheel', from: w(5, 15), to: w(4, 16) }],
+      preview: [
+        {
+          label: 'Quintessência e Paradoxo',
+          change: 'Quintessência 5 → 4, Paradoxo 15 → 16',
+        },
+      ],
+      label: 'Sem casa livre: 1 Quintessência virou Paradoxo',
+    })
+  })
+
+  it('−1 Quintessência', () => {
+    expect(planClock(model, otto(), 'wheel', 'quintessence', -1)).toMatchObject(
+      {
+        ok: true,
+        label: '−1 Quintessência',
+        events: [{ to: w(4, 15) }],
+      }
+    )
+  })
+
+  it('bloqueio da regra não vira evento vazio', () => {
+    expect(planClock(model, otto(), 'wheel', 'quintessence', 1)).toEqual({
+      ok: false,
+      reason: 'Sem casa livre: Quintessência não entra',
+    })
+  })
+
+  it('campo que não é roda, ou passo zero', () => {
+    expect(planClock(model, otto(), 'health', 'paradox', 1).ok).toBe(false)
+    expect(planClock(model, otto(), 'wheel', 'paradox', 0).ok).toBe(false)
   })
 })

@@ -337,7 +337,7 @@ N casas com até dois preenchimentos opostos.
   }
   ```
 - **Estados:** vazio, parcial, cheio, bloqueado pela regra.
-- **A11y:** imagem com rótulo "Quintessência 6, Paradoxo 2, de 20 casas"; edição só pelos Steppers. Os números ficam fora do miolo e nunca na fonte display.
+- **A11y:** imagem com rótulo que começa pelo nome do campo, como os outros tipos ("Quintessência e Paradoxo: Quintessência 6, Paradoxo 2, de 20 casas"); edição só pelos Steppers. No app: `Clock` em `@tms/ui` e as views `row`, `chip` e `sheet` de `clock`. Os números ficam fora do miolo e nunca na fonte display.
 - **Multi-sistema:** roda de Quintessência e Paradoxo (Mago, no dock); relógios de progresso de PbtA e Blades (4, 6 ou 8 casas, um preenchimento); contadores de cena do narrador.
 - **Resolve:** C-13, C-17, DS-14.
 

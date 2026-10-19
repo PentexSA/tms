@@ -4,6 +4,7 @@ import { ListEditor } from '../evolve/ListEditor'
 import { NumberEditorRow } from '../evolve/NumberEditorRow'
 import { ResourceEditorRow } from '../evolve/ResourceEditorRow'
 import { TextEditorRow } from '../evolve/TextEditorRow'
+import { ClockChip, ClockRow, ClockSheet } from './clock/ClockViews'
 import { FieldDetail } from './FieldDetail'
 import { GenericChip } from './GenericChip'
 import { GenericFact, GenericRow } from './GenericRow'
@@ -36,7 +37,8 @@ export const baseViews = {
   },
   track: { row: TrackRow, chip: TrackChip, sheet: TrackSheet },
   slots: {},
-  clock: {},
+  // Jogo (v1, Etapa 4): a roda; muda só em Jogo, sem editor de Editar
+  clock: { row: ClockRow, chip: ClockChip, sheet: ClockSheet },
   state: { editor: ChoiceEditorRow },
   mark: {},
   text: { editor: TextEditorRow },

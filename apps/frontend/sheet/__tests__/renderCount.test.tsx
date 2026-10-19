@@ -46,3 +46,32 @@ it('gastar Sangue re-renderiza só o Sangue', () => {
   expect([...renders.keys()]).toEqual(['blood'])
   expect(renders.get('blood')).toBe(2)
 })
+
+it('mexer na roda do Mago re-renderiza só a roda (v1)', () => {
+  const { model, sheet } = sheetFor('tomas', ['owner'])
+  const store = createSheetStore({
+    characterId: 'c2',
+    model,
+    sheet,
+    sheetVersion: 1,
+    roles: ['owner'],
+    sync: { enqueue: jest.fn() },
+    uuid: () => '00000000-0000-4000-8000-000000000002',
+  })
+  render(<SheetView store={store} />)
+  renders.clear()
+
+  act(() => {
+    store.getState().commit(
+      [
+        {
+          path: 'values.wheel',
+          from: { quintessence: 6, paradox: 2 },
+          to: { quintessence: 6, paradox: 3 },
+        },
+      ],
+      'Paradoxo 2 → 3'
+    )
+  })
+  expect([...renders.keys()]).toEqual(['wheel'])
+})

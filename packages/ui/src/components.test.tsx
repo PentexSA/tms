@@ -22,6 +22,8 @@ import {
   Button,
   Chip,
   Choice,
+  Clock,
+  clockSegmentsOf,
   EmptyState,
   IconButton,
   initials,
@@ -224,6 +226,85 @@ describe('RatingDots e BoxTrack (só visual)', () => {
         screen.getByTestId(id, { includeHiddenElements: true })
       ).toBeTruthy()
   })
+})
+
+describe('Clock (roda)', () => {
+  const wheel = [
+    { id: 'quintessence', n: 6, from: 'start', tone: 'accent' },
+    { id: 'paradox', n: 2, from: 'end', tone: 'alt-cool' },
+  ] as const
+
+  it('início no sentido horário, fim no anti-horário, o resto livre', () => {
+    const s = clockSegmentsOf({ segments: 10, fills: wheel })
+    expect(s.map(x => x.fill)).toEqual([
+      'quintessence',
+      'quintessence',
+      'quintessence',
+      'quintessence',
+      'quintessence',
+      'quintessence',
+      null,
+      null,
+      'paradox',
+      'paradox',
+    ])
+  })
+
+  it('nunca passa das casas, e casas fora da faixa são limitadas', () => {
+    const full = clockSegmentsOf({
+      segments: 4,
+      fills: [
+        { id: 'a', n: 3, from: 'start', tone: 'accent' },
+        { id: 'b', n: 9, from: 'end', tone: 'alt-cool' },
+      ],
+    })
+    expect(full.map(x => x.fill)).toEqual(['a', 'a', 'a', 'b'])
+    expect(clockSegmentsOf({ segments: 99, fills: [] })).toHaveLength(24)
+    expect(clockSegmentsOf({ segments: 0, fills: [] })).toHaveLength(2)
+    expect(
+      clockSegmentsOf({
+        segments: 3,
+        fills: [{ id: 'a', n: -2, from: 'start', tone: 'accent' }],
+      }).every(x => x.fill === null)
+    ).toBe(true)
+  })
+
+  it('com rótulo é uma imagem acessível; sem, fica fora da árvore', () => {
+    render(
+      <Clock
+        segments={20}
+        fills={wheel}
+        accessibilityLabel="Quintessência 6, Paradoxo 2, de 20 casas"
+      />
+    )
+    expect(
+      screen.getByRole('image', {
+        name: 'Quintessência 6, Paradoxo 2, de 20 casas',
+      })
+    ).toBeTruthy()
+    screen.unmount()
+    render(<Clock segments={20} fills={wheel} testID="clock" size={40} />)
+    expect(screen.queryByTestId('clock')).toBeNull()
+    expect(
+      screen.getAllByTestId('clock-free', { includeHiddenElements: true })
+    ).toHaveLength(12)
+  })
+
+  it.each(['alt-cool', 'alt-warm', 'neutral'] as const)(
+    'tom %s desenha a casa',
+    tone => {
+      render(
+        <Clock
+          segments={4}
+          fills={[{ id: 'x', n: 2, from: 'start', tone }]}
+          testID="clock"
+        />
+      )
+      expect(
+        screen.getAllByTestId('clock-x', { includeHiddenElements: true })
+      ).toHaveLength(2)
+    }
+  )
 })
 
 describe('Stepper', () => {
