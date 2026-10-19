@@ -1,5 +1,5 @@
 import type { SheetModel } from './compile'
-import type { FieldDef, SheetData } from './contract'
+import type { ClockField, FieldDef, SheetData } from './contract'
 import { parsePath, type SheetEvent } from './events'
 import { stored } from './fields'
 import { resolve } from './resolve'
@@ -27,6 +27,21 @@ const optionLabel = (options: unknown, id: unknown) =>
   (asArray(options)
     .map(rec)
     .find(o => o?.id === id)?.label as string) ?? DASH
+
+// Os preenchimentos que mudaram, na ordem do template.
+function clockChanges(def: ClockField, from: unknown, to: unknown) {
+  const count = (v: unknown, id: string) => {
+    const x = get(v, id)
+    return typeof x === 'number' ? x : 0
+  }
+  return def.fills
+    .map(f => ({
+      label: f.label,
+      from: count(from, f.id),
+      to: count(to, f.id),
+    }))
+    .filter(c => c.from !== c.to)
+}
 
 function change(def: FieldDef, from: unknown, to: unknown, model: SheetModel) {
   switch (def.type) {
@@ -81,6 +96,12 @@ function change(def: FieldDef, from: unknown, to: unknown, model: SheetModel) {
       return `${asArray(from).length} ${ARROW} ${plural(asArray(to).length, 'marcada', 'marcadas')}`
     case 'list':
       return `${asArray(from).length} ${ARROW} ${plural(asArray(to).length, 'item', 'itens')}`
+    case 'clock':
+      return (
+        clockChanges(def, from, to)
+          .map(c => `${c.label} ${c.from} ${ARROW} ${c.to}`)
+          .join(', ') || 'sem mudança'
+      )
     default:
       return 'alterado'
   }
@@ -95,6 +116,13 @@ export function describeEvent(
   if (!path || !def) return { label: 'Campo', change: 'alterado' }
   if (path.scope === 'specialties')
     return { label: `${def.label} · especialização`, change: 'atualizada' }
+  // Na roda, um preenchimento só leva o nome dele ("Paradoxo 2 → 3")
+  if (def.type === 'clock') {
+    const changes = clockChanges(def, event.from, event.to)
+    const [only] = changes
+    if (only && changes.length === 1)
+      return { label: only.label, change: `${only.from} ${ARROW} ${only.to}` }
+  }
   const text = change(def, event.from, event.to, model)
   // Como no protótipo: recursos usam o rótulo curto ("Sangue 10 → 9"), menos
   // na mudança do permanente, que é rara e merece o nome por extenso.
