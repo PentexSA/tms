@@ -14,6 +14,7 @@ import {
   type PoolPlan,
   planPool,
   poolOptions,
+  poolPresets,
   poolRollOf,
   rollPool,
   scorePool,
@@ -543,6 +544,97 @@ describe('"Rolei na mão" e a frase acessível', () => {
     ).toBe('1 sucesso. Dados: 10, 7, 1.')
     expect(describePool(manualResult(2) as never)).toBe('2 sucessos.')
     expect(outcomeText('botch', 0)).toBe('Falha crítica')
+  })
+})
+
+describe('atalhos (roll.presets)', () => {
+  const mta = compileTemplate(templates['mta-m20'])
+  // Otto: Arete 2 e Forças 3 (1 inativo), Vitalidade com 2 letais (−1)
+  const otto = (values: Record<string, unknown> = {}): SheetData => {
+    const s = character('otto').sheet as unknown as SheetData
+    return { ...s, values: { ...s.values, ...values, ...unhurt } } as SheetData
+  }
+
+  it('Conjurar efeito: parada de Arete, com a Habilidade vazia', () => {
+    const plan = planPool(
+      mta,
+      otto(),
+      { slots: {}, preset: 'magick', difficulty: 7 },
+      ['owner']
+    )
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.label).toBe('Conjurar efeito: Arete')
+    expect(plan.preset).toBe('magick')
+    expect(plan.dice).toBe(2)
+    expect(plan.chosen.map(c => c.slot)).toEqual(['attribute'])
+  })
+
+  it('o atalho fixa o slot dele: o pedido não o sobrepõe', () => {
+    const plan = planPool(
+      mta,
+      otto(),
+      {
+        slots: { attribute: 'forces', ability: 'technology' },
+        preset: 'magick',
+        difficulty: 6,
+      },
+      ['owner']
+    )
+    if (!plan.ok) throw new Error(plan.reason)
+    expect(plan.label).toBe('Conjurar efeito: Arete + Tecnologia')
+    expect(plan.dice).toBe(2 + 4)
+  })
+
+  it('Esfera inativa entra pelo valor efetivo (o teto)', () => {
+    const forces = poolOptions(
+      mta,
+      resolve(mta, otto()),
+      poolRollOf(mta)?.slots[0] as never,
+      ['owner']
+    ).find(o => o.key === 'forces')
+    expect(forces?.value).toBe(2)
+  })
+
+  it('atalho desconhecido ou num sistema sem atalhos → inválido', () => {
+    for (const [model, sheet] of [
+      [mta, otto()],
+      [vtm, helena(unhurt)],
+    ] as const)
+      for (const preset of ['inexistente', '__proto__', 7])
+        expect(
+          planPool(model, sheet, { slots: {}, preset, difficulty: 6 }, [
+            'owner',
+          ])
+        ).toEqual({ ok: false, kind: 'invalid', reason: 'atalho desconhecido' })
+  })
+
+  it('poolPresets: os atalhos com a opção já resolvida', () => {
+    expect(poolPresets(mta, resolve(mta, otto()), ['owner'])).toEqual([
+      expect.objectContaining({
+        id: 'magick',
+        label: 'Conjurar efeito',
+        available: true,
+        slots: {
+          attribute: expect.objectContaining({ key: 'arete', value: 2 }),
+        },
+      }),
+    ])
+    expect(poolPresets(vtm, resolve(vtm, helena()), ['owner'])).toEqual([])
+  })
+
+  it('poolPresets: campo de seção sem leitura deixa o atalho indisponível', () => {
+    const t = JSON.parse(JSON.stringify(templates['mta-m20']))
+    for (const s of t.sections)
+      if (s.id === 'spheres')
+        s.permissions = { read: ['storyteller'], write: ['storyteller'] }
+    const m = compileTemplate(t)
+    const [preset] = poolPresets(m, resolve(m, otto()), ['owner'])
+    expect(preset?.available).toBe(false)
+    expect(
+      planPool(m, otto(), { slots: {}, preset: 'magick', difficulty: 6 }, [
+        'owner',
+      ]).ok
+    ).toBe(false)
   })
 })
 

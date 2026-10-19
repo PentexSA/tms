@@ -478,3 +478,70 @@ describe('GET /characters/:id/rolls', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('atalhos do template (Mago, plano-v1 Etapa 3)', () => {
+  let mageId: string
+
+  beforeEach(async () => {
+    await publish(ctx, 'mta-m20')
+    const mage = await createChronicle(ctx, storyteller, 'mta-m20', 'Torre')
+    await addMember(ctx, mage, owner)
+    mageId = await createCharacter(ctx, owner, mage, {
+      name: 'Otto Brandt',
+      arete: 3,
+      forces: 4,
+      technology: 2,
+    })
+  })
+
+  const rollMage = (body: Record<string, unknown>) =>
+    as(ctx, owner, 'POST', `/characters/${mageId}/rolls`, {
+      clientRollId: crypto.randomUUID(),
+      ...body,
+    })
+
+  it('Conjurar efeito: o servidor monta a parada de Arete', async () => {
+    queue = [9, 4, 7]
+    const res = await rollMage({
+      slots: {},
+      preset: 'magick',
+      difficulty: 7,
+    })
+    expect(res.status).toBe(201)
+    const body = (await res.json()) as RollResponse
+    expect(body.roll).toMatchObject({
+      label: 'Conjurar efeito: Arete',
+      dice: 3,
+      difficulty: 7,
+      total: 2,
+    })
+    const row = await ctx.db
+      .selectFrom('character_rolls')
+      .select('request')
+      .where('character_id', '=', mageId)
+      .executeTakeFirstOrThrow()
+    expect(row.request).toMatchObject({ preset: 'magick', slots: {} })
+  })
+
+  it('o slot fixado pelo atalho não é sobreposto pelo pedido', async () => {
+    queue = [9, 4, 7, 2, 2]
+    const res = await rollMage({
+      slots: { attribute: 'forces', ability: 'technology' },
+      preset: 'magick',
+      difficulty: 6,
+    })
+    expect(res.status).toBe(201)
+    const body = (await res.json()) as RollResponse
+    expect(body.roll.label).toBe('Conjurar efeito: Arete + Tecnologia')
+    expect(body.roll.dice).toBe(5)
+  })
+
+  it('atalho que o template não tem: 422', async () => {
+    const res = await rollMage({ slots: {}, preset: 'banir', difficulty: 6 })
+    expect(res.status).toBe(422)
+    expect(await res.json()).toMatchObject({ kind: 'invalid' })
+    // O Vampiro não tem atalhos
+    const vtm = await roll(owner, { ...dexAthletics, preset: 'magick' })
+    expect(vtm.status).toBe(422)
+  })
+})

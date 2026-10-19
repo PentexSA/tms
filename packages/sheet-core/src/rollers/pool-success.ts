@@ -3,6 +3,7 @@ import type {
   FieldId,
   PoolSuccessRoll,
   RollBoost,
+  RollPreset,
   RollSlot,
   SheetData,
 } from '../contract'
@@ -54,6 +55,19 @@ export interface PoolRequest {
   readonly difficulty: number
   readonly specialty?: boolean
   readonly boosts?: readonly string[]
+  // Atalho do template (roll.presets): fixa os slots que ele declara.
+  readonly preset?: string
+}
+
+/** Um atalho do template, com as opções que ele fixa já resolvidas. */
+export interface PoolPreset {
+  readonly id: string
+  readonly label: string
+  readonly help: string | null
+  // slot → opção fixada pelo atalho.
+  readonly slots: Readonly<Record<string, PoolOption>>
+  // false: algum campo do atalho não entra para este papel (seção sem leitura).
+  readonly available: boolean
 }
 
 export interface PoolModifier {
@@ -71,8 +85,9 @@ export type PoolFailure =
 export type PoolPlan =
   | {
       readonly ok: true
-      // "Destreza + Esportes"
+      // "Destreza + Esportes"; com atalho, "Conjurar efeito: Arete"
       readonly label: string
+      readonly preset: string | null
       readonly chosen: readonly {
         readonly slot: string
         readonly option: PoolOption
@@ -187,6 +202,39 @@ export function poolOptions(
   return out
 }
 
+const presetOf = (roll: PoolSuccessRoll, id: unknown): RollPreset | null =>
+  (typeof id === 'string' && roll.presets?.find(p => p.id === id)) || null
+
+/** Os atalhos do template, na ordem dele, com as opções que cada um fixa. */
+export function poolPresets(
+  model: SheetModel,
+  resolved: ResolvedSheet,
+  roles: Roles
+): PoolPreset[] {
+  const roll = poolRollOf(model)
+  if (!roll) return []
+  return (roll.presets ?? []).map(preset => {
+    const slots: Record<string, PoolOption> = {}
+    let available = true
+    for (const slot of roll.slots) {
+      if (!Object.hasOwn(preset.slots, slot.id)) continue
+      const key = preset.slots[slot.id]
+      const option = poolOptions(model, resolved, slot, roles).find(
+        o => o.key === key
+      )
+      if (option) slots[slot.id] = option
+      else available = false
+    }
+    return {
+      id: preset.id,
+      label: preset.label,
+      help: preset.help ?? null,
+      slots,
+      available,
+    }
+  })
+}
+
 /**
  * Planeja a rolagem a partir da ficha: a parada, os modificadores e o custo.
  * O pedido é input hostil (vem da rede ou do disco): só ids de slot,
@@ -202,10 +250,18 @@ export function planPool(
   if (!roll) return fail('unsupported', 'este sistema não usa parada de dados')
   if (!isObj(request) || !isObj(request.slots))
     return fail('invalid', 'pedido de rolagem malformado')
-  const slotsIn = request.slots as Record<string, unknown>
   const known = new Set(roll.slots.map(s => s.id))
-  if (Object.keys(slotsIn).some(k => !known.has(k)))
+  if (Object.keys(request.slots).some(k => !known.has(k)))
     return fail('invalid', 'slot desconhecido')
+  // O atalho fixa os slots que declara; o que vier no pedido para eles é
+  // ignorado, e os demais continuam escolhíveis
+  const hasPreset = request.preset !== undefined && request.preset !== null
+  const preset = hasPreset ? presetOf(roll, request.preset) : null
+  if (hasPreset && !preset) return fail('invalid', 'atalho desconhecido')
+  const slotsIn: Record<string, unknown> = {
+    ...(request.slots as Record<string, unknown>),
+    ...preset?.slots,
+  }
 
   const die = roll.die ?? 10
   const difficulty = request.difficulty
@@ -313,9 +369,11 @@ export function planPool(
 
   const base = chosen.reduce((s, c) => s + c.option.value, 0)
   const dice = Math.min(MAX_POOL_DICE, Math.max(0, base + penalty))
+  const pool = chosen.map(c => c.option.label).join(' + ')
   return {
     ok: true,
-    label: chosen.map(c => c.option.label).join(' + '),
+    label: preset ? `${preset.label}: ${pool}` : pool,
+    preset: preset?.id ?? null,
     chosen,
     dice,
     die,

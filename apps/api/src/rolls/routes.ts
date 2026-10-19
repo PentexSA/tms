@@ -24,7 +24,7 @@ import type { AppOptions } from '../options'
 import { modelFor } from '../sheets/models'
 
 // Rolagem de dados no servidor (doc/plano-v0.md, Etapa 21). O cliente manda só
-// o pedido (slots, dificuldade, especialização, boosts); o servidor monta a
+// o pedido (slots, atalho, dificuldade, especialização, boosts); o servidor monta a
 // parada da ficha gravada, rola com CSPRNG e grava. Resultado de dado vindo do
 // cliente nunca é aceito: o corpo não tem onde pô-lo, e o parser descarta o
 // que sobra. "Rolei na mão" é a única entrada de resultado, e fica marcada
@@ -50,6 +50,8 @@ interface StoredRequest {
   readonly difficulty: number
   readonly specialty: boolean
   readonly boosts: readonly string[]
+  // Atalho do template (roll.presets); o servidor o resolve do seu modelo
+  readonly preset?: string
 }
 
 interface StoredResult extends PoolResult {
@@ -223,6 +225,7 @@ export function rollRoutes(
             difficulty: body.difficulty,
             specialty: body.specialty ?? false,
             boosts: body.boosts ?? [],
+            ...(body.preset ? { preset: body.preset } : {}),
           }
           const plan = planPool(model, current, request, roles)
           if (!plan.ok) throw planFailure(plan)
@@ -318,6 +321,8 @@ export function rollRoutes(
               maxItems: 4,
             })
           ),
+          // Atalho do template ("Conjurar efeito"): fixa os slots dele
+          preset: t.Optional(t.String({ minLength: 1, maxLength: 40 })),
           // "Rolei na mão": os sucessos dos dados, informados pela pessoa
           manual: t.Optional(
             t.Object({
