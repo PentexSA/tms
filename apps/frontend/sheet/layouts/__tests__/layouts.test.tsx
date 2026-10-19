@@ -101,7 +101,7 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(section.getByLabelText(startsWith(accented))).toBeTruthy()
   })
 
-  it('no celular, fora do Editar: todos os grupos, e o filtro vira chips', () => {
+  it('no celular, fora do Editar: filtro ligado vira chips; desligado, abas', () => {
     dims(390)
     renderSheet(model, sheet)
     const section = within(screen.getByTestId('groups-abilities'))
@@ -115,11 +115,27 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(
       section.queryAllByTestId('pip-on', { includeHiddenElements: true })
     ).toHaveLength(0)
-    // Sem o filtro, as linhas com pips voltam
+    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
+    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
     expect(
       section.getAllByTestId('pip-on', { includeHiddenElements: true }).length
     ).toBeGreaterThan(0)
+    expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
+    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    // A busca procura em todas as abas
+    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.changeText(
+      section.getByLabelText('Buscar em Habilidades'),
+      'ocultismo'
+    )
+    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    // Religar o filtro tira as abas: chips de todos os grupos
+    fireEvent.changeText(section.getByLabelText('Buscar em Habilidades'), '')
+    fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
+    expect(section.queryByRole('tab')).toBeNull()
   })
 
   it('no Editar do celular, abas por grupo; a busca procura em todos', async () => {

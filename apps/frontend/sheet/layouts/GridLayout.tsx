@@ -18,7 +18,8 @@ export function GridLayout({ section }: LayoutProps) {
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
-  const tabs = useGroupTabs(section, groups)
+  // Abas só no Editar: em Jogo e Leitura a grade cabe inteira
+  const tabs = useGroupTabs(section, groups, { enabled: mode === 'evolve' })
   const columns =
     !tabs.bar && !stacked && !(mode === 'evolve' && breakpoint === 'compact')
 

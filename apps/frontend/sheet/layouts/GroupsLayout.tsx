@@ -22,8 +22,9 @@ import type { LayoutProps } from './types'
 // (`searchable`). O filtro some em Evoluir: é ali que se compra o primeiro
 // ponto. A lista visível é um seletor comparado por valor: gastar Sangue
 // não re-renderiza as Habilidades. Com `groupTabs`, no celular cada grupo é
-// uma aba (só no Editar); com busca, o resultado vem de todos os grupos. Com
-// o filtro ligado, fora do Editar, os traços viram chips "Nome N" (ChipFlow). Com `badge`
+// uma aba (no Editar, ou com o filtro desligado); com busca, o resultado vem
+// de todos os grupos. Com o filtro ligado, fora do Editar, os traços viram
+// chips "Nome N" (ChipFlow), todos os grupos à vista. Com `badge`
 // (contrato §6), a linha cujo id é o valor do `choice` citado ganha o selo
 // (a Esfera de afinidade do Mago).
 
@@ -51,7 +52,12 @@ export function GroupsLayout({ section }: LayoutProps) {
   const total = section.fieldIds.length
   const showFilter = Boolean(filter) && mode !== 'evolve'
   const searching = search.trim() !== ''
-  const tabs = useGroupTabs(section, groups, searching)
+  // Abas no Editar e, fora dele, quando a seção mostra tudo em linhas
+  // (filtro desligado); com o filtro ligado, os chips cabem inteiros
+  const tabs = useGroupTabs(section, groups, {
+    enabled: mode === 'evolve' || !filtered,
+    all: searching,
+  })
   // O título do grupo some quando a aba já diz qual é
   const titled = !tabs.bar || searching
 
