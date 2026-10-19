@@ -29,6 +29,7 @@ export const REGISTRY = {
     'dnd5eCheckBonus',
     'vtmBloodPool',
     'vtmBloodPerTurn',
+    'vtmGeneration',
     'cocHitPoints',
     'cocMagicPoints',
     'cocSanityMax',

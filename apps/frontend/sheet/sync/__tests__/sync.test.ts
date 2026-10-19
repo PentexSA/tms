@@ -259,7 +259,7 @@ it('flush: reconectou, tenta já', async () => {
 })
 
 describe('422 (Etapa 18)', () => {
-  it('as issues chegam ao store e o Salvar de Evoluir volta como rascunho', async () => {
+  it('as issues chegam ao store e o Salvar da edição volta como rascunho', async () => {
     const { store, notify } = setup(() => ({
       status: 422,
       body: {
@@ -281,7 +281,7 @@ describe('422 (Etapa 18)', () => {
     )
     expect(store.getState().draftEvents()).toHaveLength(1)
     expect(notify).toHaveBeenCalledWith(
-      'O servidor recusou “1 alteração”. Confira os campos marcados em Evoluir.'
+      'O servidor recusou “1 alteração”. Confira os campos marcados em Editar.'
     )
   })
 

@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native'
 
 import { modelOf } from '../../test/fixtures'
 import { CharacterForm } from '../CharacterForm'
@@ -23,36 +29,39 @@ describe('CharacterForm (Vampiro)', () => {
     const ids = screen
       .getAllByTestId(/^editor-/)
       .map(e => (e.props.testID as string).replace('editor-', ''))
+    // O nome, os textos curtos em pares (na ordem da ficha impressa) e o Clã
     expect(ids).toEqual([
       'name',
-      'clan',
-      'concept',
-      'generation',
-      'sire',
       'nature',
       'demeanor',
+      'concept',
+      'sire',
+      'clan',
     ])
     expect(screen.getByRole('radio', { name: 'Tremere' })).toBeTruthy()
-    // Geração começa no padrão do template (13ª)
-    expect(
-      screen.getByRole('adjustable', { name: 'Geração' })
-    ).toHaveAccessibilityValue({
-      now: 13,
-      text: '13ª geração',
-    })
+    // A Geração sai do antecedente: não se escolhe na criação
+    expect(screen.queryByRole('adjustable', { name: 'Geração' })).toBeNull()
+  })
+
+  it('Natureza | Comportamento e Conceito | Senhor dividem a linha', () => {
+    setup()
+    // Sobe do campo `a` até a primeira View que também contém `b`: a linha
+    const rowWith = (a: string, b: string) => {
+      let x = screen.getByTestId(`editor-${a}`).parent
+      while (x && !within(x).queryByTestId(`editor-${b}`)) x = x.parent
+      if (!x) throw new Error(`${a} e ${b} não têm linha em comum`)
+      return x
+    }
+    const first = rowWith('nature', 'demeanor')
+    expect(within(first).queryByTestId('editor-concept')).toBeNull()
+    const second = rowWith('concept', 'sire')
+    expect(within(second).queryByTestId('editor-nature')).toBeNull()
   })
 
   it('cria só com o que foi preenchido, aparado', async () => {
     const onSubmit = setup()
     fireEvent.changeText(screen.getByTestId('editor-name'), '  Helena Varga ')
     fireEvent.press(screen.getByRole('radio', { name: 'Tremere' }))
-    fireEvent(
-      screen.getByRole('adjustable', { name: 'Geração' }),
-      'accessibilityAction',
-      {
-        nativeEvent: { actionName: 'decrement' },
-      }
-    )
     fireEvent.changeText(screen.getByTestId('editor-concept'), '   ')
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
@@ -60,7 +69,6 @@ describe('CharacterForm (Vampiro)', () => {
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Helena Varga',
       clan: 'tremere',
-      generation: 12,
     })
   })
 

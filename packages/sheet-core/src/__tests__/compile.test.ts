@@ -36,8 +36,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.0.0')
-    expect(model.version).toBe('1.0.0')
+    expect(model.key).toBe('vtm-v20@1.1.0')
+    expect(model.version).toBe('1.1.0')
     expect(model.skin).toBe('wod')
   })
 
@@ -98,14 +98,15 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   })
 
   it('identityFields são os campos da criação de ficha', () => {
+    // Na ordem das colunas da ficha impressa; a Geração é derivada do
+    // antecedente e não entra na criação
     expect(model.identityFields).toEqual([
       'name',
-      'clan',
-      'concept',
-      'generation',
-      'sire',
       'nature',
       'demeanor',
+      'concept',
+      'clan',
+      'sire',
     ])
   })
 

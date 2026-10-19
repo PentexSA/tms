@@ -631,6 +631,22 @@ describe('TextField, TextArea e Choice', () => {
     fireEvent.press(brujah)
     expect(onChange).toHaveBeenCalledWith('brujah')
     expect(styleOf(brujah).minHeight).toBeGreaterThanOrEqual(HIT)
+    // Poucas opções: uma coluna
+    expect(styleOf(screen.getByLabelText('Clã')).flexWrap).toBeUndefined()
+  })
+
+  it('a partir de 8 opções, duas colunas', () => {
+    const options = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i}`,
+      label: `Clã ${i}`,
+    }))
+    render(
+      <Choice label="Clã" value={null} onChange={jest.fn()} options={options} />
+    )
+    expect(styleOf(screen.getByLabelText('Clã')).flexWrap).toBe('wrap')
+    expect(styleOf(screen.getByRole('radio', { name: 'Clã 0' })).width).toBe(
+      '50%'
+    )
   })
 })
 

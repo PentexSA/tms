@@ -16,7 +16,7 @@ jest.mock('../../sheet/SheetScreen', () => ({
 
 const ID = '00000000-0000-4000-8000-00000000c001'
 
-it('entra em Evoluir e tira o parâmetro da URL', () => {
+it('entra em Editar e tira o parâmetro da URL', () => {
   const setParams = jest.fn()
   jest.mocked(useRouter).mockReturnValue({ setParams } as never)
   jest.mocked(useLocalSearchParams).mockReturnValue({ id: ID, mode: 'evolve' })

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, eighthGeneration, signUp } from '../support/users'
 
 // Etapa 19: a Mesa do narrador. O narrador vê o dock de cada personagem,
 // abre a ficha em Leitura, edita como narrador (assinado no histórico) e a
@@ -36,9 +36,10 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
     'POST',
     `/chronicles/${chronicle.id}/characters`,
     {
-      values: { name: 'Helena Varga', clan: 'tremere', generation: 8 },
+      values: { name: 'Helena Varga', clan: 'tremere' },
     }
   )
+  await eighthGeneration(playerContext, player, character.id)
 
   // A jogadora está com a ficha aberta, sem ferimentos
   const sheet = await playerContext.newPage()

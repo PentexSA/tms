@@ -154,7 +154,7 @@ export function ResourceSheet({ resolved, sheet }: FieldViewProps) {
       ) : null}
       {r.permanent !== null ? (
         <Text color="inkMuted">
-          {`Permanente ${r.permanent} · muda só em Evoluir`}
+          {`Permanente ${r.permanent} · muda só em Editar`}
         </Text>
       ) : null}
       {def.help ? <Text color="inkMuted">{def.help}</Text> : null}

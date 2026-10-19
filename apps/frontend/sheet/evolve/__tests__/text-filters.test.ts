@@ -65,7 +65,7 @@ describe('regras de filtro (contrato: filterRules)', () => {
     expect(percents.every(r => passesRule('naoExiste', r))).toBe(true)
   })
 
-  it('o filtro some em Evoluir', () => {
+  it('o filtro some em Editar', () => {
     const abilities = vtm.zones
       .flatMap(z => z.sections)
       .find(s => s.id === 'abilities')

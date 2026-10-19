@@ -35,6 +35,8 @@ export const DERIVE: Readonly<
     abilityModifier(score) + prof * multiplier,
   vtmBloodPool: generation => blood(generation)[0],
   vtmBloodPerTurn: generation => blood(generation)[1],
+  // Antecedente Geração da V20: cada ponto desce uma geração a partir da 13ª
+  vtmGeneration: dots => 13 - Math.min(5, Math.max(0, dots)),
   cocHitPoints: (con, siz) => Math.floor((con + siz) / 10),
   cocMagicPoints: pow => Math.floor(pow / 5),
   cocSanityMax: mythos => 99 - mythos,

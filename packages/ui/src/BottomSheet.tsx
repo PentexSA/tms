@@ -1,5 +1,12 @@
 import type { ReactNode } from 'react'
-import { Modal, ScrollView, StyleSheet, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { IconButton } from './IconButton'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
@@ -9,7 +16,8 @@ import { tokens } from './tokens'
 
 // Sheet modal (design system §9.5): o voltar do Android fecha, o fundo fica
 // inerte para o leitor de tela (aria-modal) e o título é heading.
-// Com "reduzir movimento", aparece sem animar.
+// Com "reduzir movimento", aparece sem animar. A raiz evita o teclado: no
+// iOS a folha inteira (campo e rodapé) sobe acima dele.
 
 export interface BottomSheetProps {
   readonly visible: boolean
@@ -38,7 +46,10 @@ export function BottomSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Fechar"
@@ -74,7 +85,7 @@ export function BottomSheet({
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

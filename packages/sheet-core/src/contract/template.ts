@@ -40,6 +40,8 @@ export interface Section {
     readonly default?: boolean
   }
   readonly searchable?: boolean
+  /** No celular, os grupos viram abas (Físicos, Sociais, Mentais). */
+  readonly groupTabs?: boolean
   readonly badge?: { readonly field: FieldId; readonly label: string }
   readonly permissions?: SectionPermissions
   readonly pinTop?: boolean
@@ -55,6 +57,8 @@ export interface Identity {
   readonly summary?: readonly FieldId[]
   readonly voice?: FieldId
   readonly subtitle?: FieldId
+  /** Colunas do cabeçalho, como na ficha impressa (Editar e criação). */
+  readonly columns?: readonly (readonly FieldId[])[]
 }
 
 export type AccentRef = string

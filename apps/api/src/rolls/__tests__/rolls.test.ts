@@ -41,7 +41,7 @@ const rng: RandomSource = {
 const helena = {
   name: 'Helena Varga',
   clan: 'tremere',
-  generation: 8,
+  backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
   dexterity: 3,
   athletics: 2,
   willpower: { current: 5, permanent: 7 },

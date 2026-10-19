@@ -7,6 +7,7 @@ import {
   flat1,
   isId,
   isIntIn,
+  isListItemRef,
   isObj,
   NUM_LIMIT,
   numOr,
@@ -118,6 +119,7 @@ const KEYS = {
     'fields',
     'filter',
     'searchable',
+    'groupTabs',
     'badge',
     'permissions',
     'pinTop',
@@ -278,6 +280,22 @@ function check(
   const has = (id: unknown) => own(fields, id)
   const field = (id: unknown): Obj | undefined =>
     has(id) ? rec(fields[id as string]) : undefined
+  // Entradas de uma derivação: campos ou um item (pelo nome) de uma lista
+  const sources = (path: string, from: unknown) => {
+    for (const src of flat1(from).filter(Boolean)) {
+      if (!isListItemRef(src)) {
+        if (!has(src)) err(path, `campo '${src}' não existe`)
+        continue
+      }
+      const l = field(src.list)
+      if (l?.type !== 'list') err(path, `campo '${src.list}' não é uma lista`)
+      else if (
+        Array.isArray(l.catalog) &&
+        !(l.catalog as unknown[]).includes(src.item)
+      )
+        err(path, `'${src.item}' não está no catálogo de '${src.list}'`)
+    }
+  }
   const accentOk = (v: unknown) =>
     v === 'accent-neutral' || (typeof v === 'string' && palette.includes(v))
 
@@ -340,8 +358,7 @@ function check(
         'defaultAction'
       )
     if (f.derive) oneOf(`${p}.derive`, f.derive, REGISTRY.derive, 'derive')
-    for (const src of flat1(f.from).filter(Boolean))
-      if (!has(src)) err(`${p}.from`, `campo '${src}' não existe`)
+    sources(`${p}.from`, f.from)
     const badge = rec(f.badge)
     if (f.badge && !has(badge?.field))
       err(`${p}.badge.field`, `campo '${badge?.field}' não existe`)
@@ -398,8 +415,7 @@ function check(
       else if (isObj(max)) {
         if (max.derive)
           oneOf(`${p}.max.derive`, max.derive, REGISTRY.derive, 'derive')
-        for (const src of flat1(max.from).filter(Boolean))
-          if (!has(src)) err(`${p}.max.from`, `campo '${src}' não existe`)
+        sources(`${p}.max.from`, max.from)
         if (max.field && !has(max.field))
           err(`${p}.max.field`, `campo '${max.field}' não existe`)
         if (max.stored) {
@@ -609,6 +625,12 @@ function check(
     if (restricted.has(k))
       err('identity.summary', `campo '${k}' é de seção com leitura restrita`)
   }
+  for (const [i, col] of list('identity.columns', identity.columns).entries())
+    for (const k of list(`identity.columns.${i}`, col)) {
+      if (!has(k)) err('identity.columns', `campo '${k}' não existe`)
+      if (restricted.has(k))
+        err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
+    }
   if (identity.chipFormat) {
     text('identity.chipFormat', identity.chipFormat, 60)
     if (typeof identity.chipFormat === 'string')

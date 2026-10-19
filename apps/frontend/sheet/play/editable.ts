@@ -17,7 +17,7 @@ export interface Editability {
   readonly reason: string | null
 }
 
-export const PERMANENT_NOTE = 'Traço permanente: muda só em Evoluir.'
+export const PERMANENT_NOTE = 'Traço permanente: muda só em Editar.'
 
 export function useEditable(id: FieldId): Editability {
   const { model, roles, mode } = useSheet()

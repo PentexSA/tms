@@ -2,6 +2,7 @@ import { identityOf, jsonEqual } from '@tms/sheet-core'
 import { Avatar, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from './context'
+import { CompactEditors } from './evolve/compact'
 import { FieldSlot } from './FieldSlot'
 import { SectionView } from './SectionView'
 
@@ -21,6 +22,17 @@ export function IdentityBlock() {
           f => model.fields.get(f)?.sectionIds.length === 0
         )
       : []
+  // Com colunas no template, o Editar mostra o cabeçalho como na ficha
+  // impressa (Nome | Natureza, Comportamento, Conceito | Clã, Geração,
+  // Senhor); tocar numa célula abre o mesmo editor da linha
+  const columns =
+    mode === 'evolve' ? (model.template.identity.columns ?? null) : null
+  const inColumns = new Set(columns?.flat())
+  const rest = columns
+    ? [...loose, ...sections.flatMap(s => s.fieldIds)].filter(
+        f => !inColumns.has(f)
+      )
+    : loose
   return (
     <View style={styles.block}>
       <View style={styles.head}>
@@ -47,16 +59,29 @@ export function IdentityBlock() {
           ) : null}
         </View>
       </View>
-      {loose.length ? (
+      {columns ? (
+        <CompactEditors value>
+          <View testID="identity-columns" style={styles.columns}>
+            {columns.map(col => (
+              <View key={col.join(':')} style={styles.column}>
+                {col.map(f => (
+                  <FieldSlot key={f} id={f} variant="fact" />
+                ))}
+              </View>
+            ))}
+          </View>
+        </CompactEditors>
+      ) : null}
+      {rest.length ? (
         <View testID="identity-editors">
-          {loose.map(f => (
+          {rest.map(f => (
             <FieldSlot key={f} id={f} variant="row" />
           ))}
         </View>
       ) : null}
-      {sections.map(s => (
-        <SectionView key={s.id} section={s} hideTitle />
-      ))}
+      {columns
+        ? null
+        : sections.map(s => <SectionView key={s.id} section={s} hideTitle />)}
     </View>
   )
 }
@@ -70,6 +95,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   names: { flex: 1, gap: tokens.space[1] },
+  columns: {
+    flexDirection: 'row',
+    gap: tokens.space[3],
+    paddingHorizontal: tokens.layout.gutter,
+  },
+  // minWidth 0: o valor longo quebra dentro da coluna
+  column: { flex: 1, minWidth: 0, gap: tokens.space[1] },
   chip: {
     alignSelf: 'flex-start',
     borderWidth: tokens.borderWidth.control,

@@ -16,7 +16,12 @@ export interface ChoiceProps {
   readonly value: string | null
   readonly onChange: (id: string) => void
   readonly testID?: string
+  /** Colunas; por padrão, 2 a partir de 8 opções (os 14 clãs). */
+  readonly columns?: 1 | 2
 }
+
+// A partir daqui a lista vira grade, para não rolar uma coluna longa
+const GRID_FROM = 8
 
 /** Escolha única: radiogroup com um radio marcado (Clã, Natureza...). */
 export function Choice({
@@ -25,14 +30,16 @@ export function Choice({
   value,
   onChange,
   testID,
+  columns = options.length >= GRID_FROM ? 2 : 1,
 }: ChoiceProps) {
   const { colors } = useTheme()
+  const grid = columns === 2
   return (
     <View
       testID={testID}
       accessibilityRole="radiogroup"
       accessibilityLabel={label}
-      style={styles.group}
+      style={[styles.group, grid && styles.grid]}
     >
       {options.map(o => {
         const checked = o.id === value
@@ -43,7 +50,7 @@ export function Choice({
             accessibilityLabel={o.meta ? `${o.label}, ${o.meta}` : o.label}
             aria-checked={checked}
             onPress={() => onChange(o.id)}
-            style={styles.row}
+            style={[styles.row, grid && styles.cell]}
           >
             <View
               style={[
@@ -74,6 +81,9 @@ export function Choice({
 
 const styles = StyleSheet.create({
   group: { gap: tokens.space[1] },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 0 },
+  // 50% menos o respiro, para o rótulo não colar na coluna ao lado
+  cell: { width: '50%', paddingRight: tokens.space[2] },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

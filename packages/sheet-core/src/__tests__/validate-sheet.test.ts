@@ -88,7 +88,8 @@ describe('validateSheet: fail secure', () => {
 describe('validateSheet: regras do Vampiro (v0)', () => {
   it('Sangue respeita o máximo derivado da Geração (vtmBloodPool)', () => {
     const c = helena()
-    c.sheet.values.generation = 13
+    // Sem o antecedente Geração, a 13ª
+    c.sheet.values.backgrounds = []
     c.sheet.values.blood = { current: 11 }
     expect(validateSheet(vtmTemplate(), c.sheet)).toContainEqual({
       path: 'values.blood.current',
@@ -96,6 +97,15 @@ describe('validateSheet: regras do Vampiro (v0)', () => {
     })
     c.sheet.values.blood = { current: 10 }
     expect(validateSheet(vtmTemplate(), c.sheet)).toEqual([])
+  })
+
+  it('Geração é derivada: gravar o valor é recusado', () => {
+    const c = helena()
+    c.sheet.values.generation = 8
+    expect(validateSheet(vtmTemplate(), c.sheet)).toContainEqual({
+      path: 'values.generation',
+      message: 'campo derivado: o servidor calcula, o cliente não grava',
+    })
   })
 
   it('Vitalidade aceita dano até o número de níveis', () => {

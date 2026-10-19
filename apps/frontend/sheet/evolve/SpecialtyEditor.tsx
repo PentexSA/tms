@@ -1,6 +1,6 @@
 import { BottomSheet, Button, Pressable, Text, TextField } from '@tms/ui'
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
+import { StyleSheet } from 'react-native'
 import { useSetDraft } from './hooks'
 
 // Especialização de um campo com `specialty: true` (contrato §3): texto curto
@@ -69,18 +69,14 @@ export function SpecialtyEditor({
           </>
         }
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <TextField
-            label="Especialização"
-            value={text}
-            onChangeText={setText}
-            maxLength={SPECIALTY_MAX}
-            error={error}
-            autoFocus
-          />
-        </KeyboardAvoidingView>
+        <TextField
+          label="Especialização"
+          value={text}
+          onChangeText={setText}
+          maxLength={SPECIALTY_MAX}
+          error={error}
+          autoFocus
+        />
       </BottomSheet>
     </>
   )

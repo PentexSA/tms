@@ -26,20 +26,24 @@ import { useDraftCount } from './hooks'
 export const MODE_LABELS: Readonly<Record<SheetMode, string>> = {
   read: 'Leitura',
   play: 'Jogo',
-  evolve: 'Evoluir',
+  evolve: 'Editar',
 }
 
-const MODES: readonly SheetMode[] = ['read', 'play', 'evolve']
+// O dono não tem Leitura: Jogo já mostra a ficha inteira. Quem escreve sem
+// ser dono (o narrador) começa em Leitura e precisa do botão para voltar
+const OWNER_MODES: readonly SheetMode[] = ['play', 'evolve']
+const OTHER_MODES: readonly SheetMode[] = ['read', 'play', 'evolve']
 
 export const changesLabel = (n: number): string =>
   n === 1 ? '1 alteração' : `${n} alterações`
 
 export function ModeBar({
-  modes = MODES,
+  modes: only,
 }: {
   readonly modes?: readonly SheetMode[]
 }) {
-  const { model, mode } = useSheet()
+  const { model, mode, roles } = useSheet()
+  const modes = only ?? (roles.has('owner') ? OWNER_MODES : OTHER_MODES)
   const store = useSheetStore()
   const toast = useToast()
   const count = useDraftCount()
@@ -48,12 +52,15 @@ export function ModeBar({
     readonly events: readonly SheetEvent[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const returnTo = useRef<SheetMode>(mode === 'evolve' ? 'read' : mode)
+  // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
+  const back = (m: SheetMode): SheetMode =>
+    m !== 'evolve' && modes.includes(m) ? m : (modes[0] ?? 'read')
+  const returnTo = useRef<SheetMode>(back(mode))
 
   const switchTo = (next: SheetMode) => {
     const s = store.getState()
     if (next === 'evolve') {
-      returnTo.current = s.mode === 'evolve' ? returnTo.current : s.mode
+      returnTo.current = s.mode === 'evolve' ? returnTo.current : back(s.mode)
       s.startDraft()
     } else if (s.mode === 'evolve') s.discardDraft()
     s.setMode(next)
@@ -79,7 +86,7 @@ export function ModeBar({
     if (result && !result.ok) {
       setError(
         result.kind === 'conflict'
-          ? 'Alguém mudou um destes campos enquanto você evoluía. Confira os valores e salve de novo.'
+          ? 'Alguém mudou um destes campos enquanto você editava. Confira os valores e salve de novo.'
           : (result.issues[0]?.message ?? 'Não foi possível salvar.')
       )
       return
@@ -179,7 +186,7 @@ function EvolveBar({
   const { colors } = useTheme()
   return (
     <View
-      accessibilityLabel="Modo Evoluir"
+      accessibilityLabel="Modo Editar"
       style={[
         styles.bar,
         {
@@ -189,7 +196,7 @@ function EvolveBar({
       ]}
     >
       <Text variant="caption" aria-live="polite" style={styles.flex}>
-        {`Evoluindo · ${changesLabel(count)}`}
+        {`Editando · ${changesLabel(count)}`}
       </Text>
       <Button title="Concluir" variant="secondary" onPress={onFinish} />
     </View>

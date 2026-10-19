@@ -144,7 +144,7 @@ describe('Fichas na crônica', () => {
             name: 'Helena Varga',
             clan: 'tremere',
             concept: 'Arquivista',
-            generation: 8,
+            backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
           },
         },
         {

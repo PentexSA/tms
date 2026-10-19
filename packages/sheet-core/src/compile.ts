@@ -1,6 +1,8 @@
 import type {
   FieldDef,
   FieldId,
+  FromRef,
+  FromSource,
   Roll,
   Section,
   SectionGroup,
@@ -222,7 +224,11 @@ const isTabZone = (zone: ZoneName): zone is TabZone =>
 
 // Campos de que o valor numérico de um campo depende (ver resolve.ts).
 export function numericDeps(def: FieldDef): FieldId[] {
-  const refs = (from: unknown) => (Array.isArray(from) ? from : [from])
+  // De um item de lista, a dependência é a própria lista
+  const refs = (from: FromRef): FieldId[] =>
+    (Array.isArray(from) ? from : [from]).map((x: FromSource) =>
+      typeof x === 'string' ? x : x.list
+    )
   switch (def.type) {
     case 'rating':
       return def.cap ? [def.cap.field] : []
@@ -236,6 +242,39 @@ export function numericDeps(def: FieldDef): FieldId[] {
     default:
       return []
   }
+}
+
+// Os campos e tudo de que os valores calculados deles dependem (o máximo do
+// Sangue lê a Geração, que lê os Antecedentes). Serve a quem manda só parte da
+// ficha (lista da crônica): sem as dependências, o derivado sairia errado.
+export function withValueDeps(
+  template: Template,
+  ids: Iterable<FieldId>
+): Set<FieldId> {
+  const out = new Set<FieldId>()
+  const refs = (from: FromRef): FieldId[] =>
+    (Array.isArray(from) ? from : [from]).map((x: FromSource) =>
+      typeof x === 'string' ? x : x.list
+    )
+  const visit = (id: FieldId) => {
+    if (out.has(id)) return
+    out.add(id)
+    const def = Object.hasOwn(template.fields, id)
+      ? template.fields[id]
+      : undefined
+    if (!def) return
+    const deps = numericDeps(def)
+    if (def.type === 'resource') {
+      const max = def.max
+      if (max && typeof max === 'object' && 'field' in max) deps.push(max.field)
+      else if (max && typeof max === 'object' && 'derive' in max)
+        deps.push(...refs(max.from))
+      if (def.perTurn) deps.push(...refs(def.perTurn.from))
+    }
+    for (const d of deps) visit(d)
+  }
+  for (const id of ids) visit(id)
+  return out
 }
 
 // Ordem topológica do grafo de dependências numéricas. Ciclo é erro: o
@@ -270,8 +309,10 @@ function identityFields(
   sections: ReadonlyMap<string, CompiledSection>
 ): FieldId[] {
   const { identity } = template
+  // Com colunas, a ordem é a da ficha impressa (coluna a coluna)
   const ids = [
     identity.name,
+    ...(identity.columns ?? []).flat(),
     identity.chip,
     identity.subtitle,
     ...(identity.summary ?? []),

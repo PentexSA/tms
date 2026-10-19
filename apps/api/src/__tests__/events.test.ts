@@ -32,7 +32,7 @@ let characterId: string
 const helena = {
   name: 'Helena Varga',
   clan: 'tremere',
-  generation: 8,
+  backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
   blood: { current: 9 },
   willpower: { current: 5, permanent: 7 },
   health: { aggravated: 0, lethal: 1, bashing: 1 },

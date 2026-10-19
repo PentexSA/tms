@@ -4,7 +4,9 @@ import {
   asArray,
   flat1,
   get,
+  isListItemRef,
   isObj,
+  listItemValue,
   NUM_LIMIT,
   numOr,
   type Obj,
@@ -326,7 +328,11 @@ function numberOf(fields: Obj, values: Obj, id: unknown, depth = 0): number {
   if (!f || depth > 4) return 0
   if (f.readOnly && f.derive && isDeriveName(f.derive))
     return DERIVE[f.derive](
-      ...flat1(f.from).map(x => numberOf(fields, values, x, depth + 1))
+      ...flat1(f.from).map(x =>
+        isListItemRef(x)
+          ? listItemValue(get(values, x.list), x.item)
+          : numberOf(fields, values, x, depth + 1)
+      )
     )
   const v = get(values, id)
   if (typeof v === 'number' && Number.isInteger(v)) return v
@@ -348,7 +354,11 @@ function resourceCap(fields: Obj, values: Obj, f: Obj, v: Obj): number | null {
   if (max?.field) return numberOf(fields, values, max.field)
   if (max?.derive && isDeriveName(max.derive))
     return DERIVE[max.derive](
-      ...flat1(max.from).map(x => numberOf(fields, values, x))
+      ...flat1(max.from).map(x =>
+        isListItemRef(x)
+          ? listItemValue(get(values, x.list), x.item)
+          : numberOf(fields, values, x)
+      )
     )
   return null
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, eighthGeneration, signUp } from '../support/users'
 
 // Etapa 13: uma ficha criada pela API abre no navegador em Leitura, com a
 // identidade, "Em jogo" e as 3 abas do Vampiro.
@@ -42,10 +42,10 @@ test('a ficha abre em Leitura com as 3 abas; só o narrador vê as notas dele', 
         name: 'Helena Varga',
         concept: 'Arquivista da Capela',
         clan: 'tremere',
-        generation: 8,
       },
     }
   )
+  await eighthGeneration(playerContext, player, character.id)
 
   // A jogadora abre a própria ficha
   const sheet = await playerContext.newPage()

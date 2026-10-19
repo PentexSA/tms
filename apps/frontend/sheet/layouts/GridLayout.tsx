@@ -3,13 +3,14 @@ import { SectionHeader, Text, tokens, useLayout } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
 import { FieldSlot } from '../FieldSlot'
+import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
 // Grade primária (DS: Grid / Cell): com grupos, cada grupo é uma coluna lida
 // de cima para baixo (Atributos do WoD em 3×3, os 6 do D&D, as 8
 // características do CoC). Com fonte grande ou tela estreita a grade vira
 // lista (DS §10); em Evoluir no celular também, porque o Stepper não cabe
-// numa coluna de 1/3.
+// numa coluna de 1/3. Com `groupTabs`, no celular cada grupo é uma aba.
 
 export function GridLayout({ section }: LayoutProps) {
   const { mode } = useSheet()
@@ -17,14 +18,18 @@ export function GridLayout({ section }: LayoutProps) {
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
-  const columns = !stacked && !(mode === 'evolve' && breakpoint === 'compact')
+  const tabs = useGroupTabs(section, groups)
+  const columns =
+    !tabs.bar && !stacked && !(mode === 'evolve' && breakpoint === 'compact')
 
   if (!columns)
     return (
       <View testID={`grid-${section.id}`}>
-        {groups.map(g => (
+        {tabs.bar}
+        {tabs.groups.map(g => (
           <View key={g.id}>
-            {g.title ? (
+            {/* Com abas, o título do grupo é a própria aba */}
+            {g.title && !tabs.bar ? (
               <View style={styles.title}>
                 <SectionHeader title={g.title} level="group" />
               </View>
