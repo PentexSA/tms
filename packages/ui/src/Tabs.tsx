@@ -14,19 +14,24 @@ export interface TabsProps {
   readonly selected: string
   readonly onSelect: (id: string) => void
   readonly accessibilityLabel: string
+  /** `sm`: abas de segundo nível (grupos dentro de uma seção), mais discretas. */
+  readonly size?: 'md' | 'sm'
 }
 
 /**
  * Abas fixas que dividem a largura (as 3 zonas da ficha). Com fonte grande o
- * rótulo quebra em duas linhas; a faixa nunca rola de lado.
+ * rótulo quebra em duas linhas; a faixa nunca rola de lado. As `sm` ficam
+ * dentro de uma seção, abaixo das da ficha: rótulo menor e traço mais fino.
  */
 export function Tabs({
   items,
   selected,
   onSelect,
   accessibilityLabel,
+  size = 'md',
 }: TabsProps) {
   const { colors } = useTheme()
+  const sm = size === 'sm'
   return (
     <View
       accessibilityRole="tablist"
@@ -42,10 +47,14 @@ export function Tabs({
             accessibilityLabel={item.label}
             aria-selected={active}
             onPress={() => onSelect(item.id)}
-            style={[styles.tab, active && { borderBottomColor: colors.action }]}
+            style={[
+              styles.tab,
+              sm && styles.tabSm,
+              active && { borderBottomColor: colors.action },
+            ]}
           >
             <Text
-              variant="fieldLabel"
+              variant={sm ? 'caption' : 'fieldLabel'}
               color={active ? 'ink' : 'inkMuted'}
               style={styles.label}
             >
@@ -68,5 +77,6 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
     paddingHorizontal: tokens.space[1],
   },
+  tabSm: { borderBottomWidth: 2 },
   label: { textAlign: 'center' },
 })

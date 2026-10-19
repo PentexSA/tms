@@ -30,7 +30,6 @@ const helena = {
   name: 'Helena Varga',
   concept: 'Arquivista da Capela',
   clan: 'tremere',
-  generation: 8,
   sire: 'Regente Aurélio Costa',
   nature: 'Arquiteta',
   demeanor: 'Pedante',
@@ -82,7 +81,7 @@ describe('POST /chronicles/:id/characters', () => {
       user_id: owner.id,
       chronicle_id: chronicleId,
       name: 'Helena Varga',
-      template_version: '1.0.0',
+      template_version: '1.1.0',
       sheet_version: 0,
     })
     expect(row.sheet_data).toEqual({
@@ -93,7 +92,7 @@ describe('POST /chronicles/:id/characters', () => {
 
   it('o sistema e a versão vêm da crônica, nunca do cliente', async () => {
     const t = template('vtm-v20')
-    t.templateVersion = '1.1.0'
+    t.templateVersion = '1.2.0'
     await publishTemplate(ctx.db, t)
     const res = await create({ name: 'Nova', systemCode: 'dnd5e-2014' })
     expect(res.status).toBe(422)
@@ -104,7 +103,7 @@ describe('POST /chronicles/:id/characters', () => {
       .select('template_version')
       .where('id', '=', id)
       .executeTakeFirstOrThrow()
-    expect(row.template_version).toBe('1.1.0')
+    expect(row.template_version).toBe('1.2.0')
   })
 
   it.each([
@@ -122,8 +121,8 @@ describe('POST /chronicles/:id/characters', () => {
     ['nome só com espaços', { name: '   ' }, '/values/name'],
     ['clã inexistente', { name: 'X', clan: 'admin' }, '/values/clan'],
     [
-      'geração fora da faixa',
-      { name: 'X', generation: 2 },
+      'geração gravada (é derivada do antecedente)',
+      { name: 'X', generation: 8 },
       '/values/generation',
     ],
     ['nome longo demais', { name: 'x'.repeat(81) }, '/values/name'],
@@ -195,7 +194,7 @@ describe('GET /characters/:id', () => {
     expect(body).toMatchObject({
       name: 'Helena Varga',
       systemCode: 'vtm-v20',
-      templateVersion: '1.0.0',
+      templateVersion: '1.1.0',
       sheetVersion: 0,
       chronicle: { id: chronicleId, name: 'Crônica da Liberdade' },
       owner: { id: owner.id, username: 'dona' },
@@ -234,6 +233,7 @@ describe('GET /chronicles/:id/characters', () => {
   it('lista só a prévia (identidade e dock), sem campo restrito', async () => {
     await createCharacter(ctx, owner, chronicleId, {
       ...helena,
+      backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
       blood: { current: 9 },
       strength: 3,
       notes: 'nota da jogadora',
@@ -260,7 +260,8 @@ describe('GET /chronicles/:id/characters', () => {
       ['Caio', true, 'outro'],
     ])
     expect(Object.keys(list[0]?.values ?? {}).sort()).toEqual(
-      ['blood', 'clan', 'concept', 'generation', 'name'].sort()
+      // Os Antecedentes vão junto: a Geração (no resumo) deriva deles
+      ['backgrounds', 'blood', 'clan', 'concept', 'name'].sort()
     )
   })
 
@@ -290,7 +291,7 @@ describe('GET /systems/:code/template', () => {
   it('a versão mais recente, com ETag e revalidação', async () => {
     const res = await as(ctx, player, 'GET', '/systems/vtm-v20/template')
     expect(res.status).toBe(200)
-    expect(res.headers.get('etag')).toBe('"vtm-v20@1.0.0"')
+    expect(res.headers.get('etag')).toBe('"vtm-v20@1.1.0"')
     expect(res.headers.get('cache-control')).toBe('private, no-cache')
     expect(((await res.json()) as { system: string }).system).toBe('vtm-v20')
   })
@@ -300,12 +301,12 @@ describe('GET /systems/:code/template', () => {
       ctx,
       player,
       'GET',
-      '/systems/vtm-v20/template?version=1.0.0'
+      '/systems/vtm-v20/template?version=1.1.0'
     )
     expect(res.headers.get('cache-control')).toContain('immutable')
     const again = await ctx.app.handle(
-      new Request('http://localhost/systems/vtm-v20/template?version=1.0.0', {
-        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.0.0"' },
+      new Request('http://localhost/systems/vtm-v20/template?version=1.1.0', {
+        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.1.0"' },
       })
     )
     expect(again.status).toBe(304)

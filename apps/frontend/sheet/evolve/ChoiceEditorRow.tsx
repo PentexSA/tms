@@ -2,6 +2,7 @@ import { BottomSheet, Choice, Pressable, Text, tokens, useTheme } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
+import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
 
 // choice e state em Evoluir: a linha abre um radiogroup no sheet. Trocar o
@@ -12,6 +13,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
+  const compact = useCompact()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   if (resolved.type !== 'choice' && resolved.type !== 'state') return null
@@ -30,7 +32,11 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
           setError(null)
           setOpen(true)
         }}
-        style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
+        style={[
+          styles.row,
+          compact && styles.compact,
+          { borderBottomColor: colors.borderSubtle },
+        ]}
       >
         <View style={styles.text}>
           <Text variant="fieldLabel">{def.label}</Text>
@@ -41,9 +47,11 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
             </Text>
           ) : null}
         </View>
-        <Text variant="caption" color="action">
-          Trocar
-        </Text>
+        {compact ? null : (
+          <Text variant="caption" color="action">
+            Trocar
+          </Text>
+        )}
       </Pressable>
       <BottomSheet
         visible={open}
@@ -85,5 +93,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
   },
+  compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
 })

@@ -86,7 +86,7 @@ export function rejectionMessage(
     return `A ficha não está mais disponível. “${label}” não foi salva.`
   // O "Salvar" de Evoluir volta como rascunho, com os campos marcados
   if (status === 422 && draft)
-    return `O servidor recusou “${label}”. Confira os campos marcados em Evoluir.`
+    return `O servidor recusou “${label}”. Confira os campos marcados em Editar.`
   return `O servidor recusou “${label}”. A alteração foi desfeita.`
 }
 

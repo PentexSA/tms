@@ -55,15 +55,15 @@ const character = (roles: string[]) =>
     sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
   })
 
-it('o dono abre a ficha nova em Evoluir', async () => {
+it('o dono abre a ficha nova em Editar', async () => {
   calls.characterGet.mockResolvedValue(character(['owner']))
   calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
   renderWithSession(
     <SheetScreen id={ID} initialMode="evolve" />,
     await signedIn()
   )
-  expect(await screen.findByText('Evoluindo · 0 alterações')).toBeTruthy()
-  expect(screen.getByRole('radio', { name: 'Evoluir' })).toBeChecked()
+  expect(await screen.findByText('Editando · 0 alterações')).toBeTruthy()
+  expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
 })
 
 it('quem só lê fica em Leitura mesmo com ?mode=evolve', async () => {
@@ -74,8 +74,8 @@ it('quem só lê fica em Leitura mesmo com ?mode=evolve', async () => {
     await signedIn()
   )
   expect(await screen.findByLabelText(/^Força, /)).toBeTruthy()
-  expect(screen.queryByText(/^Evoluindo/)).toBeNull()
-  expect(screen.queryByRole('radio', { name: 'Evoluir' })).toBeNull()
+  expect(screen.queryByText(/^Editando/)).toBeNull()
+  expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
 })
 
 it('sem parâmetro, o dono abre em Jogo (Etapa 17), com o seletor de modo', async () => {
@@ -88,5 +88,6 @@ it('sem parâmetro, o dono abre em Jogo (Etapa 17), com o seletor de modo', asyn
   calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
   renderWithSession(<SheetScreen id={ID} />, await signedIn())
   expect(await screen.findByRole('radio', { name: 'Jogo' })).toBeChecked()
-  expect(screen.getByRole('radio', { name: 'Leitura' })).not.toBeChecked()
+  // O dono não tem Leitura: Jogo já mostra a ficha inteira
+  expect(screen.queryByRole('radio', { name: 'Leitura' })).toBeNull()
 })

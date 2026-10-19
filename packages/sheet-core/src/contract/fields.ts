@@ -24,7 +24,14 @@ import type {
 export type FieldId = string
 
 // Campo ou lista de campos (até 4), na ordem dos argumentos da derivação.
-export type FromRef = FieldId | readonly FieldId[]
+/** Pontos de um item de lista, pelo nome (o antecedente Geração). */
+export interface ListItemRef {
+  readonly list: FieldId
+  readonly item: string
+}
+
+export type FromSource = FieldId | ListItemRef
+export type FromRef = FromSource | readonly FromSource[]
 
 export interface DeriveRef {
   readonly derive: DeriveName

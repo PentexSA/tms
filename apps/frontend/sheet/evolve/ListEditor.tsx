@@ -11,7 +11,7 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import {
   describeItem,
   ItemLine,
@@ -179,10 +179,7 @@ function AddItemSheet({
         onClose()
       }}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheet}
-      >
+      <View style={styles.sheet}>
         <TextField
           label={def.catalog?.length ? `Buscar ${def.itemLabel}` : 'Nome'}
           value={query}
@@ -217,7 +214,7 @@ function AddItemSheet({
             onPress={() => pick(custom)}
           />
         ) : null}
-      </KeyboardAvoidingView>
+      </View>
     </BottomSheet>
   )
 }
@@ -265,10 +262,7 @@ function ItemSheet({
   )
   return (
     <BottomSheet visible title={title} onClose={onClose} footer={footer}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheet}
-      >
+      <View style={styles.sheet}>
         {confirming ? (
           <Text accessibilityRole="alert">{`Remover ${title}?`}</Text>
         ) : (
@@ -345,7 +339,7 @@ function ItemSheet({
             ) : null}
           </>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </BottomSheet>
   )
 }

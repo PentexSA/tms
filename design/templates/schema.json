@@ -226,6 +226,7 @@
         "dnd5eCheckBonus",
         "vtmBloodPool",
         "vtmBloodPerTurn",
+        "vtmGeneration",
         "cocHitPoints",
         "cocMagicPoints",
         "cocSanityMax",
@@ -332,16 +333,32 @@
     },
 
     "fromRef": {
-      "description": "Campo ou lista de campos (até 4) que alimentam uma derivação, na ordem dos argumentos da função.",
+      "description": "Campo, item de lista ou lista deles (até 4) que alimentam uma derivação, na ordem dos argumentos da função.",
       "oneOf": [
-        { "$ref": "#/$defs/fieldRef" },
+        { "$ref": "#/$defs/fromSource" },
         {
           "type": "array",
-          "items": { "$ref": "#/$defs/fieldRef" },
+          "items": { "$ref": "#/$defs/fromSource" },
           "minItems": 1,
           "maxItems": 4
         }
       ]
+    },
+    "fromSource": {
+      "oneOf": [
+        { "$ref": "#/$defs/fieldRef" },
+        { "$ref": "#/$defs/listItemRef" }
+      ]
+    },
+    "listItemRef": {
+      "description": "Pontos do item de uma lista pelo nome (o antecedente Geração); sem o item na ficha, 0.",
+      "type": "object",
+      "required": ["list", "item"],
+      "properties": {
+        "list": { "$ref": "#/$defs/fieldRef" },
+        "item": { "type": "string", "minLength": 1, "maxLength": 80 }
+      },
+      "additionalProperties": false
     },
     "deriveRef": {
       "description": "Valor calculado por uma derivação da lista fechada a partir de outros campos. Ex.: { derive: vtmBloodPool, from: generation }.",
@@ -1385,6 +1402,10 @@
           "description": "Mostra busca por rótulo na seção.",
           "type": "boolean"
         },
+        "groupTabs": {
+          "description": "No celular, os grupos viram abas (um grupo por vez). Só com groups, em grid ou groups.",
+          "type": "boolean"
+        },
         "badge": {
           "description": "Marca a linha cujo id é o valor de um campo choice (ex.: Esfera de afinidade no Mago).",
           "type": "object",
@@ -1494,6 +1515,13 @@
           "then": { "properties": { "layout": { "const": "grid" } } }
         },
         {
+          "if": { "required": ["groupTabs"] },
+          "then": {
+            "required": ["groups"],
+            "properties": { "layout": { "enum": ["grid", "groups"] } }
+          }
+        },
+        {
           "if": { "required": ["minColWidth"] },
           "then": { "properties": { "layout": { "const": "groups" } } }
         },
@@ -1550,6 +1578,19 @@
         "subtitle": {
           "description": "Campo exibido acima do resumo (ex.: nome de feito do Garou).",
           "$ref": "#/$defs/fieldRef"
+        },
+        "columns": {
+          "description": "Colunas do cabeçalho, como na ficha impressa (até 3, com até 6 campos cada). Dão a ordem da identidade no Editar e na criação.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/fieldRef" },
+            "minItems": 1,
+            "maxItems": 6,
+            "uniqueItems": true
+          },
+          "minItems": 1,
+          "maxItems": 3
         }
       },
       "additionalProperties": false

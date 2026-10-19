@@ -105,6 +105,7 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 - `default`: valor de uma ficha nova, quando difere do mínimo. Os atributos de D&D usam `default: 10`: sem isso, uma ficha nova mostraria −5 em tudo (valor 1).
 - `derive`: com `score+mod`, calcula o modificador a partir do próprio valor (`abilityModifier`).
 - `readOnly: true` + `derive` + `from`: valor só calculado (bônus de proficiência a partir de `level`, iniciativa a partir de `dex`). Nunca é guardado: o servidor rejeita qualquer valor enviado para ele. Não aceita `min`, `max` nem `specialty`.
+- `from` aceita, no lugar de um campo, um item de lista pelo nome: `{ "list": "backgrounds", "item": "Geração" }` lê os pontos desse item (0 se a ficha não tem o item). O item precisa estar no `catalog` da lista. É assim que a Geração da V20 sai do antecedente (`vtmGeneration`: 13 menos os pontos, até a 8ª).
 - `suffix` (" anos", "ª geração"), `badge: { field, label, glyph }` (selo na grade quando o `mark` citado não está no primeiro estado) e `allowInput`.
 
 ### `percent`
@@ -262,6 +263,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   - `aboveBase`: `percent` acima da base.
 - Com `default: true`, a seção abre filtrada e mostra "Mostrando N de M · Mostrar todos". O filtro é desligado em Evoluir: é ali que se compra o primeiro ponto.
 - `searchable: true` mostra busca por rótulo, sem diferenciar acentos, em `groups`, `list` e `pyramid`.
+- `groupTabs: true` (em `grid` e `groups`, com `groups`): no celular, os grupos viram abas e só um aparece por vez (Físicos, Sociais, Mentais). Com busca, o resultado vem de todos os grupos. Em telas largas, a grade continua em colunas.
 
 ### Badge e pinTop
 
@@ -299,6 +301,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 |---|---|
 | `identity.name` | Campo do nome (header, cartões, histórico). |
 | `identity.chip` | Selo de identidade ao lado do nome (Clã, Classe, Ocupação). |
+| `identity.columns` | Colunas do cabeçalho como na ficha impressa (até 3, com até 6 campos). No Editar, o cabeçalho vira essas colunas; na criação, a ordem dos campos segue elas. Os campos não podem ser de seção restrita. |
 | `identity.chipFormat` | Formato do selo com marcadores `{campo}` ("Mago nv 5"). Os marcadores viram texto puro; os campos precisam existir. |
 | `identity.summary` | Até 4 campos no resumo sob o nome. |
 | `identity.voice` | Campo exibido como citação, na fonte de voz da skin. |
@@ -390,7 +393,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `fieldTypes` | `fieldType` | `rating`, `number`, `percent`, `resource`, `track`, `slots`, `clock`, `state`, `mark`, `text`, `longText`, `choice`, `tags`, `list` |
 | `numberDisplays` | `numberDisplay` | `plain`, `score+mod`, `signed`, `ladder` |
 | `percentDisplays` | `percentDisplay` | `percent`, `percent+half+fifth` |
-| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth` |
+| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `vtmGeneration`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth` |
 | `trackRules` | `trackRule` | `wod-stacking`, `boxes` |
 | `resourceRules` | `resourceRule` | `tempFirst` |
 | `clockRules` | `clockRule` | `mage-quint-paradox` |

@@ -56,7 +56,7 @@ describe('GET /chronicles/:id/table', () => {
   it('o narrador recebe todas as fichas inteiras numa resposta só', async () => {
     const helena = await createCharacter(ctx, owner, chronicleId, {
       name: 'Helena Varga',
-      generation: 8,
+      backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
       blood: { current: 9 },
       storytellerNotes: 'O Regente vai cobrar.',
     })
@@ -74,10 +74,10 @@ describe('GET /chronicles/:id/table', () => {
       sheetVersion: 0,
       updatedAt: expect.any(String),
       sheet: {
-        // A Geração entra: o máximo do Sangue no dock depende dela
+        // O antecedente Geração entra: o máximo do Sangue no dock depende dele
         values: {
           name: 'Helena Varga',
-          generation: 8,
+          backgrounds: [{ id: 'b1', name: 'Geração', value: 5 }],
           blood: { current: 9 },
           storytellerNotes: 'O Regente vai cobrar.',
         },

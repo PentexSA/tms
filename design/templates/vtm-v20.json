@@ -4,7 +4,7 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
@@ -12,7 +12,12 @@
     "name": "name",
     "chip": "clan",
     "summary": ["concept", "generation"],
-    "voice": "quote"
+    "voice": "quote",
+    "columns": [
+      ["name"],
+      ["nature", "demeanor", "concept"],
+      ["clan", "generation", "sire"]
+    ]
   },
   "accent": {
     "from": "clan",
@@ -59,9 +64,9 @@
     "generation": {
       "type": "number",
       "label": "Geração",
-      "min": 4,
-      "max": 15,
-      "default": 13,
+      "readOnly": true,
+      "derive": "vtmGeneration",
+      "from": { "list": "backgrounds", "item": "Geração" },
       "suffix": "ª geração"
     },
     "sire": { "type": "text", "label": "Senhor", "maxLength": 80 },
@@ -472,6 +477,7 @@
     {
       "id": "attributes",
       "zone": "build",
+      "groupTabs": true,
       "title": "Atributos",
       "layout": "grid",
       "groups": [
@@ -495,6 +501,7 @@
     {
       "id": "abilities",
       "zone": "build",
+      "groupTabs": true,
       "title": "Habilidades",
       "layout": "groups",
       "filter": {

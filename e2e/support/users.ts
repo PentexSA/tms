@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { BrowserContext } from '@playwright/test'
 import { API_URL, WEB_URL } from '../env'
 
@@ -42,4 +43,25 @@ export async function apiAs<T>(
   if (!res.ok())
     throw new Error(`${method} ${path}: ${res.status()} ${await res.text()}`)
   return (await res.json()) as T
+}
+
+/**
+ * A 8ª geração (Sangue 15): o antecedente Geração com 5 pontos. A criação só
+ * aceita a identidade, então vai por lote, como no Editar do app.
+ */
+export function eighthGeneration(
+  context: BrowserContext,
+  user: { accessToken: string },
+  characterId: string
+) {
+  return apiAs(context, user, 'POST', `/characters/${characterId}/events`, {
+    clientBatchId: randomUUID(),
+    events: [
+      {
+        path: 'values.backgrounds',
+        from: null,
+        to: [{ id: 'b1', name: 'Geração', value: 5 }],
+      },
+    ],
+  })
 }

@@ -96,6 +96,36 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    'derivação de item de lista que não é lista',
+    t => {
+      fieldsOf(t).hack = {
+        type: 'number',
+        label: 'X',
+        readOnly: true,
+        derive: 'half',
+        from: { list: 'name', item: 'X' },
+      }
+    },
+  ],
+  [
+    'derivação de item fora do catálogo da lista',
+    t => {
+      fieldsOf(t).hackList = {
+        type: 'list',
+        label: 'L',
+        item: { value: { type: 'rating', min: 0, max: 5 } },
+        catalog: ['A'],
+      }
+      fieldsOf(t).hack = {
+        type: 'number',
+        label: 'X',
+        readOnly: true,
+        derive: 'half',
+        from: { list: 'hackList', item: 'B' },
+      }
+    },
+  ],
+  [
     'skin fora da lista',
     t => {
       t.skin = 'neon'
@@ -135,6 +165,18 @@ const templateMutations: [string, (t: Json) => void][] = [
     'campo de seção restrita na identidade',
     t => {
       ;(t.identity as Json).summary = [restrictedField(t)]
+    },
+  ],
+  [
+    'coluna do cabeçalho cita campo inexistente',
+    t => {
+      ;(t.identity as Json).columns = [['naoExiste']]
+    },
+  ],
+  [
+    'campo de seção restrita nas colunas do cabeçalho',
+    t => {
+      ;(t.identity as Json).columns = [[restrictedField(t)]]
     },
   ],
   [

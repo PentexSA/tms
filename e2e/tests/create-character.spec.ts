@@ -24,9 +24,8 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   await page.getByLabel('Conceito').fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
   await expect(page.getByRole('radio', { name: 'Tremere' })).toBeChecked()
-  // No web, o Stepper tem botões de verdade
-  await page.getByRole('button', { name: 'Diminuir Geração' }).click()
-  await page.getByRole('button', { name: 'Diminuir Geração' }).click()
+  // A Geração não está no formulário: sai do antecedente, em Editar
+  await expect(page.getByRole('group', { name: /Geração/ })).toHaveCount(0)
   await page.getByRole('button', { name: 'Criar ficha' }).click()
 
   // A ficha nova abre em Evoluir (Etapa 18)
@@ -34,13 +33,13 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Helena Varga' })
   ).toBeVisible()
-  // Em Evoluir, o Clã aparece no editor, com "Trocar"
+  // Em Editar, o Clã fica no cabeçalho em colunas, como na ficha impressa
   await expect(page.getByRole('button', { name: 'Clã: Tremere' })).toBeVisible()
-  // A geração escolhida (11ª) aparece no Sangue derivado: 12 pontos, no
-  // editor do atual em Evoluir
+  // Sem o antecedente Geração, a 13ª: o Sangue derivado tem 10 pontos, no
+  // editor do atual em Editar
   await expect(
     page.getByRole('group', { name: 'Pontos de Sangue atual' })
-  ).toContainText('12')
+  ).toContainText('10')
 
   await page
     .getByRole('button', { name: 'Voltar para Crônica da Liberdade' })

@@ -101,6 +101,28 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(section.getByLabelText(startsWith(accented))).toBeTruthy()
   })
 
+  it('no celular, abas por grupo; a busca procura em todos', () => {
+    dims(390)
+    renderSheet(model, sheet)
+    const section = within(screen.getByTestId('groups-abilities'))
+    fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
+    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
+    expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
+    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+
+    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.changeText(
+      section.getByLabelText('Buscar em Habilidades'),
+      'ocultismo'
+    )
+    // Achou fora da aba aberta, com o título do grupo e sem grupos vazios
+    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
+    expect(section.queryByText('Nada para mostrar em Talentos.')).toBeNull()
+  })
+
   it('seção sem filtro nem busca (Vantagens) não tem barra', () => {
     renderSheet(model, sheet)
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
@@ -156,25 +178,36 @@ describe('grid: Atributos', () => {
     expect(new Set(sizes)).toEqual(new Set(['sm']))
   })
 
-  it.each([
-    ['fonte grande', 800, 1.4],
-    ['tela estreita', 340, 1],
-  ])('%s: a grade vira lista com títulos', (_, width, fontScale) => {
-    dims(width, fontScale)
+  it('fonte grande: a grade vira lista com títulos', () => {
+    dims(800, 1.4)
     renderSheet(model, sheet)
     const grid = within(screen.getByTestId('grid-attributes'))
     expect(grid.getByRole('header', { name: 'Físicos' })).toBeTruthy()
     expect(grid.getByLabelText('Força, 2 de 5')).toBeTruthy()
   })
 
-  it('Evoluir no celular: lista com Stepper; no tablet, colunas', async () => {
+  it('tela estreita: cada grupo é uma aba (groupTabs)', () => {
+    dims(340)
+    renderSheet(model, sheet)
+    const grid = within(screen.getByTestId('grid-attributes'))
+    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
+    expect(grid.getByLabelText('Força, 2 de 5')).toBeTruthy()
+    expect(grid.queryByLabelText(/^Carisma/)).toBeNull()
+    fireEvent.press(grid.getByRole('tab', { name: 'Sociais' }))
+    expect(grid.getByRole('tab', { name: 'Sociais' })).toBeSelected()
+    expect(grid.queryByLabelText(/^Força/)).toBeNull()
+    expect(grid.getByLabelText(/^Carisma/)).toBeTruthy()
+  })
+
+  it('Editar no celular: lista com Stepper; no tablet, colunas', async () => {
     dims(390)
     await renderLive(
       { model, sheet, mode: 'evolve' },
       fakeServer(model, sheet).post
     )
     let grid = within(screen.getByTestId('grid-attributes'))
-    expect(grid.getByRole('header', { name: 'Físicos' })).toBeTruthy()
+    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
     screen.unmount()
 
@@ -185,6 +218,7 @@ describe('grid: Atributos', () => {
     )
     grid = within(screen.getByTestId('grid-attributes'))
     expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
+    expect(grid.queryByRole('tab', { name: 'Físicos' })).toBeNull()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
   })
 
@@ -195,7 +229,7 @@ describe('grid: Atributos', () => {
   })
 })
 
-describe('outros sistemas em Evoluir', () => {
+describe('outros sistemas em Editar', () => {
   it.each(['lia', 'joana', 'dandara', 'tomas', 'iara'])(
     '%s: editores sobem sem erro e o rascunho aceita alterações',
     async id => {

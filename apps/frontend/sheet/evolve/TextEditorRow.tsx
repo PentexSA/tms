@@ -9,9 +9,10 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
 import type { FieldViewProps } from '../views/types'
+import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
 
 // text e longText em Evoluir: a linha mostra o começo do texto e abre um
@@ -23,6 +24,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
   const { model } = useSheet()
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
+  const compact = useCompact()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +58,11 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           setError(null)
           setOpen(true)
         }}
-        style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
+        style={[
+          styles.row,
+          compact && styles.compact,
+          { borderBottomColor: colors.borderSubtle },
+        ]}
       >
         <View style={styles.text}>
           <Text variant="fieldLabel">{def.label}</Text>
@@ -69,9 +75,11 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
             </Text>
           ) : null}
         </View>
-        <Text variant="caption" color="action">
-          Editar
-        </Text>
+        {compact ? null : (
+          <Text variant="caption" color="action">
+            Editar
+          </Text>
+        )}
       </Pressable>
       <BottomSheet
         visible={open}
@@ -88,20 +96,16 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           </>
         }
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <Field
-            label={required ? `${def.label} (obrigatório)` : def.label}
-            value={text}
-            onChangeText={setText}
-            maxLength={max}
-            error={error}
-            hint={def.help}
-            placeholder={def.placeholder}
-            autoFocus
-          />
-        </KeyboardAvoidingView>
+        <Field
+          label={required ? `${def.label} (obrigatório)` : def.label}
+          value={text}
+          onChangeText={setText}
+          maxLength={max}
+          error={error}
+          hint={def.help}
+          placeholder={def.placeholder}
+          autoFocus
+        />
       </BottomSheet>
     </>
   )
@@ -118,5 +122,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
   },
+  compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
 })

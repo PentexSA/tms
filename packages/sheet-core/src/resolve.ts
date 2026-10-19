@@ -16,7 +16,14 @@ import type {
 } from './contract'
 import { DERIVE, isDeriveName } from './derive'
 import type { FieldTypeName, ModifierOp } from './registry'
-import { asArray, get, isObj, rec } from './validate/util'
+import {
+  asArray,
+  get,
+  isListItemRef,
+  isObj,
+  listItemValue,
+  rec,
+} from './validate/util'
 
 // Valor efetivo de cada campo (doc/arquitetura-motor-de-ficha.md §5.2): base
 // ou padrão, modificadores de estado com a origem, tetos e derivados. A view
@@ -236,7 +243,11 @@ export function resolve(
   const derive = (name: unknown, from: unknown): number => {
     if (!isDeriveName(name)) return 0
     const args = (Array.isArray(from) ? from : [from]).map(x =>
-      typeof x === 'string' ? number(x) : 0
+      typeof x === 'string'
+        ? number(x)
+        : isListItemRef(x)
+          ? listItemValue(raw(x.list), x.item)
+          : 0
     )
     return DERIVE[name](...args)
   }

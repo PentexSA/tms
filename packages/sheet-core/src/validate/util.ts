@@ -49,6 +49,21 @@ export const asArray = (v: unknown): readonly unknown[] =>
 export const flat1 = (v: unknown): readonly unknown[] =>
   Array.isArray(v) ? v : [v]
 
+export const isListItemRef = (
+  v: unknown
+): v is { readonly list: string; readonly item: string } =>
+  isObj(v) && typeof v.list === 'string' && typeof v.item === 'string'
+
+// Pontos do item com esse nome numa lista gravada; sem o item, 0.
+export function listItemValue(list: unknown, item: string): number {
+  for (const x of asArray(list)) {
+    const r = rec(x)
+    if (r?.name === item && typeof r.value === 'number')
+      return Number.isInteger(r.value) ? r.value : 0
+  }
+  return 0
+}
+
 export const numOr = (v: unknown, fallback: number): number =>
   typeof v === 'number' ? v : fallback
 

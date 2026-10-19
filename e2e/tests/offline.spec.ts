@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 import { API_URL } from '../env'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, eighthGeneration, signUp } from '../support/users'
 
 // Etapa 20: o jogo continua sem rede e sincroniza ao voltar.
 //
@@ -43,8 +43,9 @@ test('gastar Sangue e levar dano offline, recarregar e sincronizar', async ({
     user,
     'POST',
     `/chronicles/${chronicle.id}/characters`,
-    { values: { name: 'Helena Varga', clan: 'tremere', generation: 8 } }
+    { values: { name: 'Helena Varga', clan: 'tremere' } }
   )
+  await eighthGeneration(context, user, character.id)
 
   await page.goto(`/characters/${character.id}`)
   await expect(page.getByLabel('Pontos de Sangue, 15 de 15')).toBeVisible()

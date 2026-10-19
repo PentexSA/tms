@@ -96,8 +96,8 @@ export function LeaveGuard({ store }: { readonly store: SheetStore }) {
     >
       <Text>
         {pending?.count === 1
-          ? '1 alteração de Evoluir ainda não foi salva e será descartada.'
-          : `${changesLabel(pending?.count ?? 0)} de Evoluir ainda não foram salvas e serão descartadas.`}
+          ? '1 alteração da edição ainda não foi salva e será descartada.'
+          : `${changesLabel(pending?.count ?? 0)} da edição ainda não foram salvas e serão descartadas.`}
       </Text>
     </BottomSheet>
   )

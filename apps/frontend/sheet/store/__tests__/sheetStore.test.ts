@@ -309,7 +309,7 @@ describe('Desfazer', () => {
   })
 })
 
-describe('rascunho de Evoluir', () => {
+describe('rascunho da edição', () => {
   const strength = (from: number, to: number) => ({
     path: 'values.strength',
     from,
@@ -435,7 +435,7 @@ describe('assinatura por campo', () => {
   })
 })
 
-describe('Evoluir (Etapa 18): setDraftValue e o 422', () => {
+describe('Editar (Etapa 18): setDraftValue e o 422', () => {
   it('campo sem valor guardado editado duas vezes mantém o from null', () => {
     const { s } = setup(['owner'], {
       values: { name: 'Nova' },
@@ -455,7 +455,7 @@ describe('Evoluir (Etapa 18): setDraftValue e o 422', () => {
     expect(s().setDraftValue('values.strength', 3)).toBeNull()
   })
 
-  it('422 do Salvar: o rascunho volta, em Evoluir, com o campo marcado', () => {
+  it('422 do Salvar: o rascunho volta, em Editar, com o campo marcado', () => {
     const { s } = setup()
     s().setMode('evolve')
     s().startDraft()
@@ -480,7 +480,7 @@ describe('Evoluir (Etapa 18): setDraftValue e o 422', () => {
     expect(s().fieldIssues.size).toBe(0)
   })
 
-  it('422 de um lote do Jogo só desfaz (não abre Evoluir)', () => {
+  it('422 de um lote do Jogo só desfaz (não abre Editar)', () => {
     const { s } = setup()
     s().setMode('play')
     const r = s().commit([blood(9, 8)], 'Sangue −1')

@@ -79,7 +79,7 @@ describe('ListEditor', () => {
       value: 4,
       specialty: 'Trilha da Chama',
     })
-    expect(screen.getByText('Evoluindo · 1 alteração')).toBeTruthy()
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
   })
 
   it('remover pede confirmação', async () => {

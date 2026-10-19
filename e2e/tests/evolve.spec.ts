@@ -12,7 +12,7 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
     user,
     'POST',
     '/chronicles',
-    { name: 'Crônica de Evoluir', systemCode: 'vtm-v20' }
+    { name: 'Crônica da edição', systemCode: 'vtm-v20' }
   )
 
   await page.goto(`/chronicles/${chronicle.id}/new-character`)
@@ -23,13 +23,13 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
   // A ficha nova abre em Evoluir
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   const id = /characters\/([0-9a-f-]{36})/.exec(page.url())?.[1]
-  await expect(page.getByText('Evoluindo · 0 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 0 alterações')).toBeVisible()
 
   // Ficha nova: Força 1 (o mínimo) → 2
   await page
     .getByRole('button', { name: 'Aumentar Força', exact: true })
     .click()
-  await expect(page.getByText('Evoluindo · 1 alteração')).toBeVisible()
+  await expect(page.getByText('Editando · 1 alteração')).toBeVisible()
   // Em Evoluir o filtro "Só com pontos" some: dá para comprar o 1º ponto
   await expect(page.getByRole('switch', { name: 'Só com pontos' })).toHaveCount(
     0
@@ -37,14 +37,14 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
   await page
     .getByRole('button', { name: 'Aumentar Ocultismo', exact: true })
     .click()
-  await expect(page.getByText('Evoluindo · 2 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 2 alterações')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Vantagens' }).click()
   await expect(page.getByText('Nenhuma Disciplina')).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
   await page.getByLabel('Buscar Disciplina').fill('tauma')
   await page.getByRole('button', { name: 'Taumaturgia', exact: true }).click()
-  await expect(page.getByText('Evoluindo · 3 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 3 alterações')).toBeVisible()
 
   await page.getByRole('button', { name: 'Concluir' }).click()
   await expect(page.getByText('Salvar 3 alterações?')).toBeVisible()
@@ -90,7 +90,7 @@ test('sair com rascunho pede confirmação', async ({ page }) => {
   await page.getByRole('button', { name: 'Voltar para Crônica' }).click()
   await expect(page.getByText('Sair sem salvar?')).toBeVisible()
   await page.getByRole('button', { name: 'Continuar editando' }).click()
-  await expect(page.getByText('Evoluindo · 1 alteração')).toBeVisible()
+  await expect(page.getByText('Editando · 1 alteração')).toBeVisible()
   await page.getByRole('button', { name: 'Voltar para Crônica' }).click()
   await page.getByRole('button', { name: 'Descartar e sair' }).click()
   await expect(page).toHaveURL(new RegExp(`/chronicles/${chronicle.id}$`))

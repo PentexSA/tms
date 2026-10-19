@@ -7,6 +7,8 @@ import { editors } from './editors'
 // Criação de ficha (Etapa 14): o formulário sai do template. São os campos de
 // identidade que o dono pode escrever (model.identityFields); nenhum campo é
 // fixo no código. O resto da ficha nasce vazio e é montado em Evoluir.
+// Ordem: o nome, os textos curtos em pares (Natureza | Comportamento,
+// Conceito | Senhor) e o resto (o Clã, em grade), para rolar menos.
 
 export interface ServerIssue {
   readonly path: string
@@ -20,6 +22,22 @@ export interface CharacterFormProps {
   // Erros do servidor (422), no formato "/values/<campo>"
   readonly serverIssues?: readonly ServerIssue[]
   readonly onSubmit: (values: Record<string, unknown>) => void
+}
+
+// Linhas do formulário: o nome sozinho, textos curtos de dois em dois e os
+// demais campos, cada um na sua linha
+function rowsOf(
+  model: SheetModel,
+  fields: readonly string[],
+  nameField: string
+): string[][] {
+  const short = (id: string) =>
+    id !== nameField && model.fields.get(id)?.def.type === 'text'
+  const texts = fields.filter(short)
+  const rows: string[][] = fields.includes(nameField) ? [[nameField]] : []
+  for (let i = 0; i < texts.length; i += 2) rows.push(texts.slice(i, i + 2))
+  for (const id of fields) if (id !== nameField && !short(id)) rows.push([id])
+  return rows
 }
 
 const fieldOfPath = (path: string) =>
@@ -67,25 +85,30 @@ export function CharacterForm({
   return (
     <View style={styles.form}>
       {error ? <Banner tone="danger" message={error} /> : null}
-      {fields.map(id => {
-        const def = model.fields.get(id)?.def
-        const Editor = def ? editors[def.type] : undefined
-        if (!def || !Editor) return null
-        return (
-          <Editor
-            key={id}
-            id={id}
-            def={def}
-            value={values[id]}
-            required={id === nameField}
-            error={errors[id] ?? fromServer[id]}
-            onChange={next => {
-              setValues(v => ({ ...v, [id]: next }))
-              setErrors(({ [id]: _, ...rest }) => rest)
-            }}
-          />
-        )
-      })}
+      {rowsOf(model, fields, nameField).map(row => (
+        <View key={row.join(':')} style={styles.row}>
+          {row.map(id => {
+            const def = model.fields.get(id)?.def
+            const Editor = def ? editors[def.type] : undefined
+            if (!def || !Editor) return null
+            return (
+              <View key={id} style={styles.cell}>
+                <Editor
+                  id={id}
+                  def={def}
+                  value={values[id]}
+                  required={id === nameField}
+                  error={errors[id] ?? fromServer[id]}
+                  onChange={next => {
+                    setValues(v => ({ ...v, [id]: next }))
+                    setErrors(({ [id]: _, ...rest }) => rest)
+                  }}
+                />
+              </View>
+            )
+          })}
+        </View>
+      ))}
       <Button title="Criar ficha" onPress={submit} busy={busy} />
     </View>
   )
@@ -93,4 +116,7 @@ export function CharacterForm({
 
 const styles = StyleSheet.create({
   form: { gap: tokens.space[5] },
+  row: { flexDirection: 'row', gap: tokens.space[3] },
+  // minWidth 0: o texto longo quebra dentro da coluna, sem empurrar a outra
+  cell: { flex: 1, minWidth: 0 },
 })

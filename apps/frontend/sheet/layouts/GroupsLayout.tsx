@@ -13,13 +13,15 @@ import { StyleSheet, TextInput, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
 // Grupos com título (Habilidades do WoD, perícias do D&D, Vantagens). O
 // template pode pedir filtro (`filter: { rule, label, default }`) e busca
 // (`searchable`). O filtro some em Evoluir: é ali que se compra o primeiro
 // ponto. A lista visível é um seletor comparado por valor: gastar Sangue
-// não re-renderiza as Habilidades.
+// não re-renderiza as Habilidades. Com `groupTabs`, no celular cada grupo é
+// uma aba; com busca, o resultado vem de todos os grupos.
 
 export function GroupsLayout({ section }: LayoutProps) {
   const { mode } = useSheet()
@@ -37,9 +39,14 @@ export function GroupsLayout({ section }: LayoutProps) {
   ]
   const total = section.fieldIds.length
   const showFilter = Boolean(filter) && mode !== 'evolve'
+  const searching = search.trim() !== ''
+  const tabs = useGroupTabs(section, groups, searching)
+  // O título do grupo some quando a aba já diz qual é
+  const titled = !tabs.bar || searching
 
   return (
     <View testID={`groups-${section.id}`}>
+      {tabs.bar}
       {showFilter || section.def.searchable ? (
         <FilterBar
           title={section.def.title}
@@ -65,11 +72,12 @@ export function GroupsLayout({ section }: LayoutProps) {
           />
         </View>
       ) : null}
-      {groups.map(g => {
+      {tabs.groups.map(g => {
         const ids = g.fieldIds.filter(id => shown.has(id))
+        if (searching && tabs.bar && !ids.length) return null
         return (
           <View key={g.id}>
-            {g.title ? (
+            {g.title && titled ? (
               <View style={styles.title}>
                 <SectionHeader title={g.title} level="group" />
               </View>

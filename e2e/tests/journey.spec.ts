@@ -73,8 +73,6 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByLabel('Nome (obrigatório)').fill('Helena Varga')
   await page.getByLabel('Conceito').fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
-  // 13ª (padrão) → 8ª geração: Sangue máximo 15
-  for (let i = 0; i < 5; i++) await stepper(page, 'Diminuir Geração').click()
   await page.getByLabel('Senhor').fill('Ana Bathory')
   await page.getByLabel('Natureza').fill('Arquiteta')
   await page.getByLabel('Comportamento').fill('Conformista')
@@ -86,7 +84,7 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
 
   // 5. Evoluir: atributos, habilidades, especialização, FdV, disciplinas e
   // antecedentes; Salvar grava UM lote
-  await expect(page.getByText('Evoluindo · 0 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 0 alterações')).toBeVisible()
   await stepper(page, 'Aumentar Força').click()
   await stepper(page, 'Aumentar Destreza').click()
   await stepper(page, 'Aumentar Destreza').click()
@@ -106,7 +104,16 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('rebanho')
   await page.getByRole('button', { name: 'Rebanho', exact: true }).click()
-  await expect(page.getByText('Evoluindo · 7 alterações')).toBeVisible()
+  // Geração 5 (da 13ª para a 8ª): Sangue máximo 15. Mesmo caminho
+  // (values.backgrounds) do Rebanho: segue sendo 1 alteração
+  await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
+  await page.getByLabel('Buscar Antecedente').fill('gera')
+  await page.getByRole('button', { name: 'Geração', exact: true }).click()
+  await page.getByRole('button', { name: /^Geração, 1 de 5/ }).click()
+  for (let i = 0; i < 4; i++)
+    await stepper(page, 'Aumentar Geração, valor').click()
+  await page.getByRole('button', { name: 'Aplicar' }).click()
+  await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
   await page.getByRole('button', { name: 'Concluir' }).click()
   await expect(page.getByText('Salvar 7 alterações?')).toBeVisible()
@@ -117,8 +124,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   }
   expect(evolveBatch.events).toHaveLength(7)
 
-  // 6. Leitura (identidade e 3 abas) e Jogo (dock: Vitalidade, Sangue, FdV)
-  await page.getByRole('radio', { name: 'Leitura' }).click()
+  // 6. Jogo (identidade, 3 abas e o dock: Vitalidade, Sangue, FdV). A dona não
+  // tem Leitura: Jogo já mostra a ficha inteira
+  await expect(page.getByRole('radio', { name: 'Leitura' })).toHaveCount(0)
   await expect(
     page.getByRole('tab').filter({ hasText: /Ficha|Vantagens|Sobre/ })
   ).toHaveCount(3)

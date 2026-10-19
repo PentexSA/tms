@@ -352,10 +352,10 @@ describe('sheet do Sangue', () => {
     expect(screen.getByText('Gasto máximo por turno: 3')).toBeTruthy()
   })
 
-  it('FdV: o permanente só muda em Evoluir', () => {
+  it('FdV: o permanente só muda em Editar', () => {
     setup(helena())
     fireEvent.press(screen.getByTestId('dock-willpower'))
-    expect(screen.getByText('Permanente 7 · muda só em Evoluir')).toBeTruthy()
+    expect(screen.getByText('Permanente 7 · muda só em Editar')).toBeTruthy()
   })
 })
 
@@ -405,12 +405,12 @@ describe('menu ⋯: ações do template', () => {
 })
 
 describe('o que muda em Jogo', () => {
-  it('a Força não ganha stepper: o detalhe diz que muda em Evoluir', () => {
+  it('a Força não ganha stepper: o detalhe diz que muda em Editar', () => {
     setup(helena())
     fireEvent.press(screen.getByRole('button', { name: 'Força, 2 de 5' }))
     expect(screen.getByRole('header', { name: 'Força' })).toBeTruthy()
     expect(
-      screen.getByText('Traço permanente: muda só em Evoluir.')
+      screen.getByText('Traço permanente: muda só em Editar.')
     ).toBeTruthy()
     expect(screen.queryByRole('adjustable')).toBeNull()
   })

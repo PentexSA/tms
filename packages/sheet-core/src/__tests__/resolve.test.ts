@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { compileTemplate } from '../compile'
 import {
   type ResolvedField,
+  type ResolvedNumber,
   type ResolvedRating,
   type ResolvedResource,
   type ResolvedStacking,
@@ -33,8 +34,10 @@ describe('resolve: as fichas de Vampiro', () => {
     ['beto', 11, 12, 1],
   ])(
     '%s: Sangue pela Geração %i (máx. %i, %i por turno)',
-    (id, _gen, max, perTurn) => {
+    (id, gen, max, perTurn) => {
       const c = character(id)
+      // A Geração sai do antecedente (13 menos os pontos)
+      expect(field<ResolvedNumber>(c.sheet, 'generation').value).toBe(gen)
       const blood = field<ResolvedResource>(c.sheet, 'blood')
       expect(blood.max).toBe(max)
       expect(blood.cap).toBe(max)
@@ -44,6 +47,16 @@ describe('resolve: as fichas de Vampiro', () => {
       )
     }
   )
+
+  it('Geração: sem o antecedente, 13ª; acima de 5 pontos, para na 8ª', () => {
+    const c = clone(character('caio'))
+    const generation = () => field<ResolvedNumber>(c.sheet, 'generation').value
+    c.sheet.values.backgrounds = []
+    expect(generation()).toBe(13)
+    c.sheet.values.backgrounds = [{ id: 'b1', name: 'Geração', value: 9 }]
+    expect(generation()).toBe(8)
+    expect(field<ResolvedResource>(c.sheet, 'blood').max).toBe(15)
+  })
 
   it('Força de Vontade: o permanente limita o atual', () => {
     const fdv = field<ResolvedResource>(character('helena').sheet, 'willpower')

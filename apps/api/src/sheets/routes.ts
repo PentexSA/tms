@@ -5,6 +5,7 @@ import {
   type SheetData,
   stripRestricted,
   validateSheet,
+  withValueDeps,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
@@ -196,18 +197,22 @@ export function sheetRoutes(
           const mine = new Set(roles)
           if (r.user_id === me) mine.add('owner')
           const { identity, dock } = model.template
-          // Só o que a lista e a mesa mostram: identidade e dock
-          const preview = new Set([
-            identity.name,
-            identity.chip,
-            identity.subtitle,
-            ...(identity.summary ?? []),
-            ...(identity.chipFormat?.match(/\{([a-zA-Z0-9]+)\}/g) ?? []).map(
-              m => m.slice(1, -1)
-            ),
-            model.template.accent.from,
-            ...dock,
-          ])
+          // Só o que a lista e a mesa mostram (identidade e dock), com o que os
+          // derivados deles leem: a Geração vem dos Antecedentes
+          const preview = withValueDeps(
+            model.template,
+            [
+              identity.name,
+              identity.chip,
+              identity.subtitle,
+              ...(identity.summary ?? []),
+              ...(identity.chipFormat?.match(/\{([a-zA-Z0-9]+)\}/g) ?? []).map(
+                m => m.slice(1, -1)
+              ),
+              model.template.accent.from,
+              ...dock,
+            ].filter((x): x is string => typeof x === 'string')
+          )
           const sheet = stripRestricted(
             model,
             r.sheet_data as unknown as SheetData,

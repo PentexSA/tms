@@ -72,7 +72,7 @@ describe('LeaveGuard', () => {
     expect(screen.getByText('Sair sem salvar?')).toBeTruthy()
     expect(
       screen.getByText(
-        '2 alterações de Evoluir ainda não foram salvas e serão descartadas.'
+        '2 alterações da edição ainda não foram salvas e serão descartadas.'
       )
     ).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Continuar editando' }))
@@ -93,7 +93,7 @@ describe('LeaveGuard', () => {
     leave()
     expect(
       screen.getByText(
-        '1 alteração de Evoluir ainda não foi salva e será descartada.'
+        '1 alteração da edição ainda não foi salva e será descartada.'
       )
     ).toBeTruthy()
   })
