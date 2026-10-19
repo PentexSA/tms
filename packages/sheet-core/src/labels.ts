@@ -2,7 +2,8 @@ import type { SheetModel } from './compile'
 import type { ClockField, FieldDef, SheetData } from './contract'
 import { parsePath, type SheetEvent } from './events'
 import { stored } from './fields'
-import { resolve } from './resolve'
+import { inactiveNote } from './fields/rating'
+import { type ResolvedRating, resolve } from './resolve'
 import { plural } from './text'
 import { asArray, get, rec } from './validate/util'
 
@@ -175,4 +176,31 @@ export function describeBatch(
     return `${label} ${change}`
   }
   return plural(events.length, 'alteração', 'alterações')
+}
+
+/**
+ * Os campos com teto não destrutivo (`cap`) cujos pontos inativos mudam de
+ * uma ficha para a outra: o resumo do Concluir avisa "Forças: 1 inativo,
+ * máx. pelo Arete 2" antes de salvar, e "volta a valer" quando o teto sobe.
+ * Nenhum valor muda: o aviso é só sobre o que a parada e a ficha vão usar.
+ */
+export function inactiveChanges(
+  model: SheetModel,
+  before: SheetData,
+  after: SheetData
+): ChangeLabel[] {
+  const a = resolve(model, before)
+  const b = resolve(model, after)
+  const out: ChangeLabel[] = []
+  for (const [id, field] of model.fields) {
+    if (field.def.type !== 'rating' || !field.def.cap) continue
+    const was = a.get(id) as ResolvedRating
+    const now = b.get(id) as ResolvedRating
+    if (was.inactive === now.inactive) continue
+    out.push({
+      label: field.def.label,
+      change: inactiveNote(now) ?? 'volta a valer',
+    })
+  }
+  return out
 }

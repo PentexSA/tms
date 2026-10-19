@@ -21,7 +21,9 @@ import type { LayoutProps } from './types'
 // (`searchable`). O filtro some em Evoluir: é ali que se compra o primeiro
 // ponto. A lista visível é um seletor comparado por valor: gastar Sangue
 // não re-renderiza as Habilidades. Com `groupTabs`, no celular cada grupo é
-// uma aba; com busca, o resultado vem de todos os grupos.
+// uma aba; com busca, o resultado vem de todos os grupos. Com `badge`
+// (contrato §6), a linha cujo id é o valor do `choice` citado ganha o selo
+// (a Esfera de afinidade do Mago).
 
 export function GroupsLayout({ section }: LayoutProps) {
   const { mode } = useSheet()
@@ -34,6 +36,11 @@ export function GroupsLayout({ section }: LayoutProps) {
     jsonEqual
   )
   const shown = new Set(visible)
+  const badge = section.def.badge
+  const badged = useSheetSelector(s => {
+    const r = badge ? s.resolved.get(badge.field) : undefined
+    return r?.type === 'choice' ? r.value : null
+  })
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
@@ -83,7 +90,16 @@ export function GroupsLayout({ section }: LayoutProps) {
               </View>
             ) : null}
             {ids.length ? (
-              ids.map(id => <FieldSlot key={id} id={id} variant="row" />)
+              ids.map(id =>
+                badge && id === badged ? (
+                  <View key={id}>
+                    <FieldSlot id={id} variant="row" />
+                    <RowBadge id={id} label={badge.label} />
+                  </View>
+                ) : (
+                  <FieldSlot key={id} id={id} variant="row" />
+                )
+              )
             ) : (
               <Text color="inkMuted" style={styles.empty}>
                 {g.title
@@ -94,6 +110,26 @@ export function GroupsLayout({ section }: LayoutProps) {
           </View>
         )
       })}
+    </View>
+  )
+}
+
+// O selo da linha marcada: o nome do selo, nunca só a cor
+function RowBadge({
+  id,
+  label,
+}: {
+  readonly id: string
+  readonly label: string
+}) {
+  const { colors } = useTheme()
+  return (
+    <View testID={`badge-${id}`} style={styles.badgeRow}>
+      <View style={[styles.badge, { borderColor: colors.action }]}>
+        <Text variant="caption" color="action">
+          {`◆ ${label}`}
+        </Text>
+      </View>
     </View>
   )
 }
@@ -188,6 +224,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: tokens.layout.gutter,
+    paddingBottom: tokens.space[2],
+  },
+  badge: {
+    borderRadius: tokens.radius.pill,
+    borderWidth: tokens.borderWidth.hair,
+    paddingHorizontal: tokens.space[2],
   },
   empty: {
     paddingHorizontal: tokens.layout.gutter,

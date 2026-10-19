@@ -627,7 +627,11 @@
       "layout": "groups",
       "badge": { "field": "affinity", "label": "Afinidade" },
       "groups": [
-        { "id": "arete", "title": "Arete", "fields": ["arete"] },
+        {
+          "id": "arete",
+          "title": "Arete",
+          "fields": ["arete", "affinity"]
+        },
         {
           "id": "spheres",
           "title": "Esferas",

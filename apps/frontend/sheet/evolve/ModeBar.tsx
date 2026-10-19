@@ -1,6 +1,9 @@
 import {
+  applyBatch,
+  type ChangeLabel,
   describeBatch,
   describeEvent,
+  inactiveChanges,
   type SheetEvent,
   type SheetMode,
 } from '@tms/sheet-core'
@@ -50,6 +53,8 @@ export function ModeBar({
   const [summary, setSummary] = useState<{
     readonly next: SheetMode
     readonly events: readonly SheetEvent[]
+    // Pontos que ficam inativos (ou voltam a valer) com o teto novo
+    readonly inactive: readonly ChangeLabel[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
@@ -73,7 +78,13 @@ export function ModeBar({
     // Sair de Evoluir com alterações passa pelo resumo: salvar ou descartar
     if (s.mode === 'evolve' && s.draft?.size) {
       setError(null)
-      setSummary({ next, events: s.draftEvents() })
+      const events = s.draftEvents()
+      const after = applyBatch(model, s.values, { events }, roles)
+      setSummary({
+        next,
+        events,
+        inactive: after.ok ? inactiveChanges(model, s.values, after.sheet) : [],
+      })
       return
     }
     switchTo(next)
@@ -124,6 +135,7 @@ export function ModeBar({
       <SummarySheet
         visible={summary !== null}
         events={summary?.events ?? []}
+        inactive={summary?.inactive ?? []}
         error={error}
         onSave={save}
         onDiscard={discard}
@@ -206,6 +218,7 @@ function EvolveBar({
 function SummarySheet({
   visible,
   events,
+  inactive,
   error,
   onSave,
   onDiscard,
@@ -213,6 +226,7 @@ function SummarySheet({
 }: {
   readonly visible: boolean
   readonly events: readonly SheetEvent[]
+  readonly inactive: readonly ChangeLabel[]
   readonly error: string | null
   readonly onSave: () => void
   readonly onDiscard: () => void
@@ -251,6 +265,25 @@ function SummarySheet({
             </View>
           )
         })}
+        {inactive.length ? (
+          <View testID="evolve-inactive" style={styles.summary}>
+            <Text variant="caption" color="inkMuted">
+              Nenhum ponto se perde: acima do teto, ficam inativos até ele
+              subir.
+            </Text>
+            {inactive.map(c => (
+              <View
+                key={c.label}
+                accessible
+                accessibilityLabel={`${c.label}, ${c.change}`}
+                style={styles.change}
+              >
+                <Text style={styles.flex}>{c.label}</Text>
+                <Text color="inkMuted">{c.change}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
     </BottomSheet>
   )
