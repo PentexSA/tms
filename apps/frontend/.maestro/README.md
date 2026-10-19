@@ -11,12 +11,15 @@ SQLCipher, dock com toque longo e modo avião.
 | `02-open-sheet` | a ficha abre em Jogo com o dock e "Salvo" |
 | `03-spend-blood` | toque longo no Sangue, aviso com Desfazer, fila confirma |
 | `04-airplane-mode` | gastar offline, reiniciar sem rede (dados do banco cifrado) e sincronizar ao voltar (só Android) |
+| `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
 
 ## Preparar
 
 1. Uma conta de teste **num servidor de homologação**, nunca com dados de
    produção, com uma crônica de Vampiro e uma ficha da própria conta. O Sangue
-   precisa estar acima de 0. Cada rodada do `04` gasta 1.
+   precisa estar acima de 0. Cada rodada do `04` gasta 1. Para o `05`, uma
+   crônica de Mago com uma ficha da conta e menos de 20 de Paradoxo na roda
+   (o Desfazer devolve o que a rodada tirou).
 2. O dev build apontando para esse servidor:
 
    ```bash
@@ -32,7 +35,8 @@ As credenciais vão por `-e` e nunca ficam no repositório:
 maestro test apps/frontend/.maestro \
   -e EMAIL=<conta de teste> -e PASSWORD=<senha> \
   -e CHRONICLE="<nome da crônica>" -e CHARACTER="<nome da ficha>" \
-  -e CHARACTER_ID=<uuid da ficha>
+  -e CHARACTER_ID=<uuid da ficha> \
+  -e MAGE_CHRONICLE="<crônica de Mago>" -e MAGE_CHARACTER="<ficha de Mago>"
 ```
 
 No iOS, exclua o fluxo de modo avião: `--exclude-tags android`.

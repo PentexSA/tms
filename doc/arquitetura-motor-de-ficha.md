@@ -606,6 +606,8 @@ Na v0, um nome da lista fechada que ainda não tem implementação deixa o recur
 ### 10.3 Depois da v0
 
 - **A mesma família primeiro.** Mago (M20) e Lobisomem (W20) reaproveitam a skin `wod` e pedem só `clock` (Quintessência e Paradoxo), `state` (Formas) e `cap` (Esferas ≤ Arete).
+  - **Mago (v1, [`plano-v1.md`](plano-v1.md)):** produto, ao lado do Vampiro. Pediu `clock` com a regra `mage-quint-paradox` (core: `rules/clock.ts` e `planClock`; app: `Clock` em `@tms/ui` e as views `row`, `chip` e `sheet`), o `cap` no Editar (o teto e os pontos inativos, `inactiveChanges` no resumo), o `badge` de seção e os `presets` da rolagem. Nenhuma migration e nenhuma rota nova: o Mago é dado. Os templates publicados ficam em `apps/api/src/templates/published.ts`, e o `scripts/check-system-names.mjs` (CI) impede nome de sistema no app, no `@tms/ui` e na API.
+  - **Lobisomem:** o próximo, com `state` (Formas).
 - **Outras famílias depois.** O D&D 5e passa de fixture a produto com `mark`, `tags`, `slots`, `track` com `boxes`, layout `list`, `sum-vs-target`, descansos e a skin `dnd`. CoC e Fate vêm em seguida, com `percent`, `pyramid`, os seus modelos de rolagem e as suas skins.
 
 ---

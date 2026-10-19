@@ -153,6 +153,7 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 - `segments` (2 a 24) e `fills` (até 2 preenchimentos: `{ id, label, colorRole, from: start | end }`). Cada preenchimento tem amostra própria (cheia ou hachurada): forma e cor, nunca só cor.
 - `rule` é obrigatória. Hoje só existe `mage-quint-paradox`: Quintessência e Paradoxo dividem as casas; ganhar Paradoxo com a roda cheia consome 1 Quintessência; ganhar Quintessência com a roda cheia é bloqueado. Exige um preenchimento `start` e um `end`.
 - Valor: `{ "quintessence": 6, "paradox": 2 }`, com soma até `segments`.
+- No app (v1): a regra roda no cliente, no `planClock` do core; o servidor confere só a forma e a soma, como no `wod-stacking`. Um nome de regra sem implementação deixa a roda sem Stepper ("Esta versão do app não conhece a regra desta roda").
 
 ### `state`
 
@@ -267,7 +268,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 
 ### Badge e pinTop
 
-- `badge: { field, label }` na seção marca a linha cujo id é o valor de um `choice` (Esfera de afinidade do Mago). Só em `groups` e `list`. Não confundir com `badge` de `number` (§3).
+- `badge: { field, label }` na seção marca a linha cujo id é o valor de um `choice` (Esfera de afinidade do Mago). Só em `groups` e `list`. Não confundir com `badge` de `number` (§3). O campo do `choice` precisa estar numa seção para ser editável (no Mago, no grupo do Arete).
 - `pinTop: true` fixa a seção no topo da zona `play` como blocos de texto (aspectos do Fate). Só em `play`.
 - `collapsed: true`: extensão documentada (seção começa recolhida), aceita pelo validador e ainda não consumida pelo protótipo.
 
@@ -351,7 +352,7 @@ A casca é única: seleção por slots, modificadores com origem, total, "Rolar 
 - `penalty: { field }`: trilha `wod-stacking` cuja penalidade reduz a parada; "Incapacitado" bloqueia a rolagem.
 - `specialty: tenCountsDouble`: com especialização, cada 10 vale dois sucessos. Exige d10 (`die` ausente ou 10).
 - `boosts: [{ id, label, resource, cost, effect }]` (`cost` de 0 a 10): gasto opcional que é debitado ao rolar. Só os efeitos que o modelo aplica são aceitos (`autoSuccess` em `pool-success`, `plus2` em `fudge`), para nunca debitar um recurso sem efeito.
-- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito").
+- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito"). O atalho fixa os slots que declara; o pedido de rolagem leva só o id dele, e o servidor monta a parada (v1). O `help` aparece embaixo da dificuldade.
 - `conditions: { field }`: tags com `roll` dão vantagem ou desvantagem automática em `sum-vs-target`.
 - `bonusDice: { min, max }` (−3 a 3): dados de bônus e penalidade do CoC.
 - `ladder`: escada usada no resultado do `fudge`.

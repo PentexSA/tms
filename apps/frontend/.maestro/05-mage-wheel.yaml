@@ -1,0 +1,30 @@
+# A roda do Mago (plano-v1, Etapa 8): o sheet da roda, Paradoxo +1 pela
+# regra do template e Desfazer. Com a roda cheia, o aviso diz que uma
+# Quintessência virou Paradoxo; com casa livre, "Paradoxo N → N+1"
+appId: com.tms.app
+name: Roda do Mago e desfazer
+---
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "${MAGE_CHRONICLE}, .*"
+- extendedWaitUntil:
+    visible:
+      text: "${MAGE_CHARACTER}, .*"
+    timeout: 20000
+- tapOn:
+    text: "${MAGE_CHARACTER}, .*"
+- extendedWaitUntil:
+    visible:
+      id: "dock-wheel"
+    timeout: 20000
+- tapOn:
+    id: "dock-wheel"
+- tapOn:
+    id: "clock-paradox-inc"
+- assertVisible:
+    text: "(Paradoxo .* → .*|Sem casa livre: .* virou Paradoxo)"
+- tapOn: "Desfazer"
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Salvo"
+    timeout: 15000

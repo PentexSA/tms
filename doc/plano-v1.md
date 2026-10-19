@@ -32,6 +32,34 @@ A v1 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 
 O que fica fora está no §8.
 
+## Estado da v1 (19/10/2026)
+
+As 8 etapas estão na branch `feat/v1-ficha-mago`, um commit por etapa, sobre a `main` em `5ab763a`. Nenhuma migration e nenhuma rota nova.
+
+| Etapa | O que entrou |
+|---|---|
+| 1 | `mta-m20` 1.0.0 com colunas no cabeçalho, abas por grupo e rotinas; as fichas de exemplo Nádia e Otto |
+| 2 | `rules/clock.ts` (`mage-quint-paradox`) e o rótulo da roda no histórico |
+| 3 | `roll.presets` no `planPool` e na rota de rolagem |
+| 4 | `Clock` no `@tms/ui` e as views `row`, `chip` e `sheet` de `clock`; `planClock` no core |
+| 5 | o teto no editor de `rating`, os pontos inativos no resumo (`inactiveChanges`), o `badge` de seção e o editor de lista sem valor |
+| 6 | os atalhos no sheet Dados |
+| 7 | `templates:publish --published`, os testes de API do Mago e o `scripts/check-system-names.mjs` no CI |
+| 8 | `journey-mage.spec.ts`, o fluxo `05-mage-wheel` do Maestro e a documentação |
+
+O que mudou em relação ao plano:
+
+- **A afinidade não estava em seção nenhuma.** Sem seção, não havia como editá-la no app. Ela entrou no grupo do Arete (Etapa 5), e o template continua na 1.0.0, porque nunca foi publicado.
+- **O `describe` da roda começa pelo rótulo do campo** ("Quintessência e Paradoxo: Quintessência 6, Paradoxo 2, de 20 casas"), como os outros tipos. A matriz de acessibilidade exige que o nome acessível comece pelo texto visível.
+- **O `journey.spec.ts` mudou numa linha.** Com dois sistemas publicados, a nova crônica não escolhe o sistema sozinha, e a jornada passa a marcar o Vampiro. O mesmo vale para o `chronicles.spec.ts`. É a tela que mudou, não um acoplamento.
+- **O atalho "Anotar Paradoxo" ficou de fora** (Etapa 6). Ele pediria uma chave nova no template, para o sheet Dados não saber da roda.
+
+Ainda falta provar fora desta máquina:
+
+- o E2E (`journey-mage.spec.ts` e as duas jornadas juntas). O Playwright desta versão não roda no Ubuntu 20.04, então ele só roda no CI;
+- o fluxo `05-mage-wheel` do Maestro, num dev build;
+- a publicação no ambiente de verdade, só depois de a versão do app com a roda estar no ar (Etapa 7).
+
 ---
 
 ## 2. Ponto de partida
