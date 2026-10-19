@@ -3,6 +3,7 @@ import {
   Banner,
   BottomSheet,
   Button,
+  Chip,
   ListItem,
   Pressable,
   SectionHeader,
@@ -19,7 +20,8 @@ import { type DiceDeps, type SessionRoll, useDice } from './useDice'
 
 // O sheet "Dados" (doc/plano-v0.md, Etapa 21; protótipo: design/telas). Os
 // slots, a dificuldade, a especialização e os boosts vêm do `roll` do
-// template; nada aqui conhece Vampiro.
+// template; nada aqui conhece Vampiro nem Mago. Os atalhos (`roll.presets`)
+// ficam no topo, e a ajuda do atalho ligado aparece embaixo da dificuldade.
 
 export interface DiceSheetProps extends DiceDeps {
   readonly characterId: string
@@ -92,6 +94,25 @@ export function DiceSheet({
       }
     >
       <View style={styles.body}>
+        {dice.presets.length ? (
+          <View
+            role="group"
+            aria-label="Atalhos"
+            testID="dice-presets"
+            style={styles.presets}
+          >
+            {dice.presets
+              .filter(p => p.available)
+              .map(p => (
+                <Chip
+                  key={p.id}
+                  label={p.label}
+                  selected={dice.preset?.id === p.id}
+                  onPress={() => dice.togglePreset(p.id)}
+                />
+              ))}
+          </View>
+        ) : null}
         {roll.slots.map(slot => (
           <SlotPicker
             key={slot.id}
@@ -110,6 +131,11 @@ export function DiceSheet({
           onChange={dice.setDifficulty}
           size="sheet"
         />
+        {dice.preset?.help ? (
+          <Text variant="caption" color="inkMuted" testID="preset-help">
+            {dice.preset.help}
+          </Text>
+        ) : null}
         {hasSpecialty ? (
           <Toggle
             label="Usar especialização (10 conta 2 sucessos)"
@@ -315,6 +341,7 @@ const styles = StyleSheet.create({
   body: { gap: tokens.space[3], paddingBottom: tokens.space[4] },
   picker: { gap: tokens.space[2], paddingLeft: tokens.space[3] },
   pool: { gap: tokens.space[1] },
+  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
   manual: { gap: tokens.space[2] },
   result: { minHeight: tokens.space[2] },
   resultCard: { gap: tokens.space[1], alignItems: 'flex-start' },

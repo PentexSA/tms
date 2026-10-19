@@ -8,6 +8,7 @@ import type {
   SheetData,
 } from '../contract'
 import type { SheetEvent } from '../events'
+import { inactiveNote } from '../fields/rating'
 import { canReadSection, canWrite, type Roles } from '../permissions'
 import { type RandomSource, randomInt } from '../random'
 import {
@@ -45,7 +46,8 @@ export interface PoolOption {
   readonly specialty: string | null
   // De onde vem: o título da seção ou o rótulo da lista ("Disciplinas").
   readonly group: string
-  // Modificadores de estado com a origem ("Crinos +2").
+  // Modificadores de estado com a origem ("Crinos +2") e o teto não
+  // destrutivo ("1 inativo, máx. pelo Arete 2").
   readonly modifiers: readonly string[]
 }
 
@@ -195,7 +197,14 @@ export function poolOptions(
         value,
         specialty: resolved.specialty(id) || null,
         group: section.def.title,
-        modifiers: r.type === 'rating' ? r.modifiers.map(modifierText) : [],
+        // A Esfera acima do Arete entra pelo teto, e a opção diz por quê
+        modifiers:
+          r.type === 'rating'
+            ? [
+                ...r.modifiers.map(modifierText),
+                ...(r.inactive ? [inactiveNote(r) as string] : []),
+              ]
+            : [],
       })
     }
   }

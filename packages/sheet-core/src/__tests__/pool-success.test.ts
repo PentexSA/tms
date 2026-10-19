@@ -593,6 +593,7 @@ describe('atalhos (roll.presets)', () => {
       ['owner']
     ).find(o => o.key === 'forces')
     expect(forces?.value).toBe(2)
+    expect(forces?.modifiers).toEqual(['1 inativo, máx. pelo Arete 2'])
   })
 
   it('atalho desconhecido ou num sistema sem atalhos → inválido', () => {
