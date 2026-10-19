@@ -13,6 +13,7 @@ import { StyleSheet, TextInput, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { ChipFlow } from './ChipFlow'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -21,12 +22,13 @@ import type { LayoutProps } from './types'
 // (`searchable`). O filtro some em Evoluir: é ali que se compra o primeiro
 // ponto. A lista visível é um seletor comparado por valor: gastar Sangue
 // não re-renderiza as Habilidades. Com `groupTabs`, no celular cada grupo é
-// uma aba; com busca, o resultado vem de todos os grupos. Com `badge`
+// uma aba (só no Editar); com busca, o resultado vem de todos os grupos. Com
+// o filtro ligado, fora do Editar, os traços viram chips "Nome N" (ChipFlow). Com `badge`
 // (contrato §6), a linha cujo id é o valor do `choice` citado ganha o selo
 // (a Esfera de afinidade do Mago).
 
 export function GroupsLayout({ section }: LayoutProps) {
-  const { mode } = useSheet()
+  const { mode, model } = useSheet()
   const filter = section.def.filter
   const [on, setOn] = useState(filter?.default ?? false)
   const [search, setSearch] = useState('')
@@ -36,6 +38,8 @@ export function GroupsLayout({ section }: LayoutProps) {
     jsonEqual
   )
   const shown = new Set(visible)
+  // Item de lista (Disciplinas) tem várias linhas: não vira chip
+  const isList = (id: string) => model.fields.get(id)?.def.type === 'list'
   const badge = section.def.badge
   const badged = useSheetSelector(s => {
     const r = badge ? s.resolved.get(badge.field) : undefined
@@ -89,7 +93,9 @@ export function GroupsLayout({ section }: LayoutProps) {
                 <SectionHeader title={g.title} level="group" />
               </View>
             ) : null}
-            {ids.length ? (
+            {ids.length && filtered && ids.every(id => !isList(id)) ? (
+              <ChipFlow ids={ids} />
+            ) : ids.length ? (
               ids.map(id =>
                 badge && id === badged ? (
                   <View key={id}>

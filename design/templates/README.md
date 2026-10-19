@@ -264,7 +264,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   - `aboveBase`: `percent` acima da base.
 - Com `default: true`, a seção abre filtrada e mostra "Mostrando N de M · Mostrar todos". O filtro é desligado em Evoluir: é ali que se compra o primeiro ponto.
 - `searchable: true` mostra busca por rótulo, sem diferenciar acentos, em `groups`, `list` e `pyramid`.
-- `groupTabs: true` (em `grid` e `groups`, com `groups`): no celular, os grupos viram abas e só um aparece por vez (Físicos, Sociais, Mentais). Com busca, o resultado vem de todos os grupos. Em telas largas, a grade continua em colunas.
+- `groupTabs: true` (em `grid` e `groups`, com `groups`): no Editar do celular, os grupos viram abas e só um aparece por vez (Físicos, Sociais, Mentais), porque a linha com Stepper não cabe numa coluna. Em Jogo e Leitura, a grade 3×3 aparece inteira e, com o filtro ligado, os traços viram chips "Nome N". Com busca, o resultado vem de todos os grupos. Em telas largas, a grade continua em colunas.
 
 ### Badge e pinTop
 
