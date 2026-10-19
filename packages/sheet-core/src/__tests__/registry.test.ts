@@ -32,6 +32,7 @@ const SCHEMA_DEFS = {
   modifierOps: 'modifierOp',
   conditionRoll: 'conditionRoll',
   glyphs: 'glyphName',
+  emblems: 'emblem',
   skins: 'skin',
   slotResets: 'slotReset',
 } satisfies Record<keyof Registry, string>

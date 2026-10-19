@@ -4,11 +4,12 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
   "identity": {
+    "emblem": "nine-star",
     "name": "name",
     "chip": "tradition",
     "summary": ["concept", "essence"],

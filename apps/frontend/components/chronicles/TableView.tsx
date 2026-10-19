@@ -102,7 +102,7 @@ function TableRow({ row }: { readonly row: TableRowData }) {
         label={label}
         onPress={() => router.push(`/characters/${row.id}`)}
       >
-        <Avatar name={row.name} />
+        <Avatar name={row.name} emblem={model?.template.identity.emblem} />
         <View style={styles.text}>
           <Text variant="fieldLabel" numberOfLines={2}>
             {row.name}

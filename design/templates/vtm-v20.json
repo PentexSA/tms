@@ -4,11 +4,12 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.1.0",
+  "templateVersion": "1.2.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
   "identity": {
+    "emblem": "ankh",
     "name": "name",
     "chip": "clan",
     "summary": ["concept", "generation"],

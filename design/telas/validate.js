@@ -36,6 +36,7 @@ const REGISTRY = {
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
   glyphs: ['augur-moon'],
+  emblems: ['ankh', 'nine-star', 'claws'],
   skins: ['wod', 'dnd', 'coc', 'fate'],
   slotResets: ['longRest', 'shortRest'],
 }
@@ -338,6 +339,7 @@ function validateTemplate(t, palette) {
     if (!has(k)) err('identity.columns', `campo '${k}' não existe`)
     if (restricted.has(k)) err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
   }
+  if (id.emblem) oneOf('identity.emblem', id.emblem, REGISTRY.emblems, 'emblem')
   if (id.chipFormat) {
     text('identity.chipFormat', id.chipFormat, 60)
     for (const m of id.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g)) if (!has(m[1])) err('identity.chipFormat', `campo '${m[1]}' não existe`)

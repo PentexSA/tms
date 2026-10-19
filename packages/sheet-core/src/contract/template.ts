@@ -3,6 +3,7 @@ import type {
   DiceNotation,
   Die,
   EffectName,
+  EmblemName,
   FilterRule,
   LayoutName,
   RoleName,
@@ -57,6 +58,8 @@ export interface Identity {
   readonly summary?: readonly FieldId[]
   readonly voice?: FieldId
   readonly subtitle?: FieldId
+  /** Símbolo da criatura no lugar das iniciais (o Ankh do Vampiro). */
+  readonly emblem?: EmblemName
   /** Colunas do cabeçalho, como na ficha impressa (Editar e criação). */
   readonly columns?: readonly (readonly FieldId[])[]
 }

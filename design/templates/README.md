@@ -307,6 +307,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 | `identity.summary` | Até 4 campos no resumo sob o nome. |
 | `identity.voice` | Campo exibido como citação, na fonte de voz da skin. |
 | `identity.subtitle` | Campo acima do resumo (nome de feito do Garou). |
+| `identity.emblem` | Símbolo da criatura no lugar das iniciais do personagem, o mesmo para qualquer clã, tribo ou tradição: `ankh` (Vampiro), `nine-star` (Mago: as Nove Esferas e as Nove Tradições), `claws` (Lobisomem). O app desenha o símbolo; sem emblema, as iniciais. |
 | `accent.from` | Campo `choice` que define a cor (clã, tradição, tribo, classe, playbook). `null` = sem accent. |
 | `accent.map` | Opção → `accent-N`. Cada valor precisa estar na paleta validada (`design-system/tokens.json`, hoje `accent-1` a `accent-16`), checada para contraste e daltonismo no CI. |
 | `accent.fallback` | `accent-neutral` (ou um `accent-N`) para opção sem mapa (Caitiff, Órfão). |
@@ -415,6 +416,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `modifierOps` | `modifierOp` | `add`, `set` |
 | `conditionRoll` | `conditionRoll` | `advantage`, `disadvantage` |
 | `glyphs` | `glyphName` | `augur-moon` |
+| `emblems` | `emblem` | `ankh`, `nine-star`, `claws` |
 | `skins` | `skin` | `wod`, `dnd`, `coc`, `fate` |
 | `slotResets` | `slotReset` | `longRest`, `shortRest` |
 

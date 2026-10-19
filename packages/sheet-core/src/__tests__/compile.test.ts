@@ -36,8 +36,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.1.0')
-    expect(model.version).toBe('1.1.0')
+    expect(model.key).toBe('vtm-v20@1.2.0')
+    expect(model.version).toBe('1.2.0')
     expect(model.skin).toBe('wod')
   })
 

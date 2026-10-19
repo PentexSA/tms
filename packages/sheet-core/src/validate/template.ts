@@ -631,6 +631,8 @@ function check(
       if (restricted.has(k))
         err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
     }
+  if (identity.emblem)
+    oneOf('identity.emblem', identity.emblem, REGISTRY.emblems, 'emblem')
   if (identity.chipFormat) {
     text('identity.chipFormat', identity.chipFormat, 60)
     if (typeof identity.chipFormat === 'string')
