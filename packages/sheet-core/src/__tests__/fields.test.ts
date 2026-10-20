@@ -69,7 +69,7 @@ group('describe: gramática de anúncio (design system §9.2)', () => {
       'iara',
       'strength',
       { form: 'crinos' },
-      'Força, 7, base 3 mais 4 da forma Crinos',
+      'Força, 7, base 3 mais 4 em Crinos',
     ],
     ['lia', 'str', {}, 'Força, 8, modificador menos 1'],
     ['lia', 'initiative', {}, 'Iniciativa, mais 2'],
@@ -109,7 +109,7 @@ group('describe: gramática de anúncio (design system §9.2)', () => {
 
   it('set fixa o valor e diz a base', () => {
     expect(text('iara', 'appearance', { form: 'crinos' }).describe).toMatch(
-      /^Aparência, 0 de 5, 0 na forma Crinos, base \d$/
+      /^Aparência, 0 de 5, 0 em Crinos, base \d$/
     )
   })
 

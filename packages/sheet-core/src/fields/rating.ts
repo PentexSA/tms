@@ -16,6 +16,8 @@ export const rating: FieldType<'rating'> = {
   describe: (r, sheet) => {
     const f = r.field.def
     // Acima do máximo (Crinos: Força 7 numa escala de 5) não se diz "7 de 5".
+    // A origem é o rótulo da opção ("em Crinos"), sem dizer "forma": o mesmo
+    // texto serve a qualquer `state`.
     const parts = [
       r.value > r.max
         ? `${f.label}, ${r.value}`
@@ -27,8 +29,8 @@ export const rating: FieldType<'rating'> = {
     if (mod && r.modded !== r.base)
       parts.push(
         mod.op === 'set'
-          ? `${mod.value} na forma ${mod.source}, base ${r.base}`
-          : `base ${r.base} ${r.modded > r.base ? 'mais' : 'menos'} ${Math.abs(r.modded - r.base)} da forma ${mod.source}`
+          ? `${mod.value} em ${mod.source}, base ${r.base}`
+          : `base ${r.base} ${r.modded > r.base ? 'mais' : 'menos'} ${Math.abs(r.modded - r.base)} em ${mod.source}`
       )
     const inactive = inactiveNote(r)
     if (inactive) parts.push(inactive)

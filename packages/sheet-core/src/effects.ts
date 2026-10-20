@@ -266,3 +266,101 @@ export function planClock(
   if (!change.changed) return unavailable(change.note)
   return plan(model, sheet, [event(sheet, fieldId, change.counts)], change.note)
 }
+
+export interface StatePlanOptions {
+  // Paga o `cost` opcional da troca (a mudança instantânea por 1 Fúria). Um
+  // `cost` sem `optional` é sempre pago.
+  readonly payCost?: boolean
+}
+
+/**
+ * Troca a opção de um `state` (sheet da Forma). O lote tem a troca e, com o
+ * custo, o gasto do recurso: "Forma Hominídeo → Crinos, Fúria 4 → 3". Como o
+ * wod-stacking, é a conveniência do cliente: o servidor valida a forma do
+ * valor, não o custo (a troca sem pagar também é legal).
+ */
+export function planState(
+  model: SheetModel,
+  sheet: SheetData,
+  fieldId: FieldId,
+  optionId: string,
+  { payCost = false }: StatePlanOptions = {}
+): ActionPlan {
+  const def = model.fields.get(fieldId)?.def
+  if (def?.type !== 'state') return unavailable('Estado inexistente')
+  const option = def.options.find(o => o.id === optionId)
+  if (!option) return unavailable('Opção inexistente')
+  const resolved = resolve(model, sheet)
+  const current = resolved.get(fieldId)
+  if (current?.type === 'state' && current.option.id === option.id)
+    return unavailable(`Já em ${option.label}`)
+  const events = [event(sheet, fieldId, option.id)]
+  const cost = def.cost
+  if (!cost || !(payCost || !cost.optional))
+    return plan(model, sheet, events, `${def.label}: ${option.label}`)
+  const pay = resolved.get(cost.resource)
+  if (pay?.type !== 'resource') return unavailable('Recurso inexistente')
+  const r = pay as ResolvedResource
+  const label = r.field.def.shortLabel ?? r.field.def.label
+  if (r.current < cost.amount) return unavailable(`${label} insuficiente`)
+  events.push(event(sheet, r.id, spend(r, cost.amount)))
+  return plan(
+    model,
+    sheet,
+    events,
+    `${def.label}: ${option.label} (${cost.amount} ${label})`
+  )
+}
+
+export interface StateEffect {
+  readonly field: FieldId
+  // shortLabel do campo ("For"), para caber no hint da opção.
+  readonly label: string
+  readonly value: number
+}
+
+export interface StatePreviewOption {
+  readonly id: string
+  readonly label: string
+  readonly hint: string | null
+  readonly note: string | null
+  // Os valores efetivos dos campos que a opção modifica, nessa opção.
+  readonly effects: readonly StateEffect[]
+  // "For 7 · Des 4 · Vig 6 · Man 0 · Apa 0"; vazio sem modificador.
+  readonly summary: string
+}
+
+/**
+ * Cada opção do `state` com os valores efetivos que ela daria, a partir da
+ * ficha atual: o jogador vê o que a forma faz antes de trocar.
+ */
+export function statePreview(
+  model: SheetModel,
+  sheet: SheetData,
+  fieldId: FieldId
+): readonly StatePreviewOption[] {
+  const def = model.fields.get(fieldId)?.def
+  if (def?.type !== 'state') return []
+  return def.options.map(option => {
+    const as = resolve(model, {
+      ...sheet,
+      values: { ...sheet.values, [fieldId]: option.id },
+    })
+    const effects = (option.modifiers ?? []).flatMap(m => {
+      const r = as.get(m.field)
+      if (!r || !('value' in r) || typeof r.value !== 'number') return []
+      const f = r.field.def
+      return [
+        { field: m.field, label: f.shortLabel ?? f.label, value: r.value },
+      ]
+    })
+    return {
+      id: option.id,
+      label: option.label,
+      hint: option.hint ?? null,
+      note: option.note ?? null,
+      effects,
+      summary: effects.map(e => `${e.label} ${e.value}`).join(' · '),
+    }
+  })
+}
