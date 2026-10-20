@@ -176,6 +176,10 @@ describe('outros sistemas, o mesmo editor', () => {
     expect(
       resonance.getByRole('button', { name: 'Dinâmica, Elétrica, 2 de 5' })
     ).toBeTruthy()
+    // A linha sem pontos mostra os pips vazios, como na ficha de papel
+    expect(
+      resonance.getByRole('button', { name: 'Entrópica, 0 de 5' })
+    ).toBeTruthy()
     fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
     fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
     fireEvent(
