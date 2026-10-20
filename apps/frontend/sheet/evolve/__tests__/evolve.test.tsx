@@ -342,3 +342,37 @@ describe('Editar: editores', () => {
     expect(screen.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
   })
 })
+
+describe('valores iniciais derivados no Editar', () => {
+  it('subir Autocontrole e Coragem muda Humanidade e FdV, até o jogador marcá-las', async () => {
+    const { store } = await renderLive(
+      { model, sheet: nova, mode: 'evolve' },
+      fakeServer(model, nova).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    // Virtudes no mínimo: Humanidade 1 + 1, FdV = Coragem 1
+    expect(
+      screen.getByRole('adjustable', { name: 'Humanidade' })
+    ).toHaveAccessibilityValue({ now: 2 })
+    increment('Autocontrole')
+    increment('Coragem')
+    expect(
+      screen.getByRole('adjustable', { name: 'Humanidade' })
+    ).toHaveAccessibilityValue({ now: 3 })
+    expect(
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+    ).toHaveAccessibilityValue({ now: 2 })
+    // O jogador marca a Humanidade: ela deixa de acompanhar as Virtudes
+    increment('Humanidade')
+    increment('Consciência')
+    expect(
+      screen.getByRole('adjustable', { name: 'Humanidade' })
+    ).toHaveAccessibilityValue({ now: 4 })
+    const paths = store()
+      .getState()
+      .draftEvents()
+      .map(e => e.path)
+    expect(paths).toContain('values.humanity')
+    expect(paths).not.toContain('values.willpower')
+  })
+})

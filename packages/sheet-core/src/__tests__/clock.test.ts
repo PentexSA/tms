@@ -215,9 +215,21 @@ describe('rótulos da roda (toast, resumo e histórico)', () => {
     })
   })
 
-  it('sem valor guardado, o "de" efetivo é a roda vazia', () => {
+  it('sem valor guardado, o "de" efetivo é o padrão (Quintessência = Avatar 2)', () => {
     const sheet = otto()
     const { wheel: _, ...values } = sheet.values
+    const [event] = withEffectiveFrom(model, { ...sheet, values }, [
+      { path: 'values.wheel', from: null, to: w(3, 0) },
+    ])
+    expect(event && describeEvent(model, event)).toEqual({
+      label: 'Quintessência',
+      change: '2 → 3',
+    })
+  })
+
+  it('sem Avatar nem roda guardada, o "de" efetivo é a roda vazia', () => {
+    const sheet = otto()
+    const { wheel: _, backgrounds: __, ...values } = sheet.values
     const [event] = withEffectiveFrom(model, { ...sheet, values }, [
       { path: 'values.wheel', from: null, to: w(1, 0) },
     ])

@@ -454,7 +454,7 @@
       "type": "resource",
       "label": "Força de Vontade",
       "shortLabel": "FdV",
-      "permanent": { "min": 1, "max": 10 },
+      "permanent": { "min": 1, "max": 10, "default": 5 },
       "editableIn": ["play"],
       "defaultAction": "spend1",
       "help": "Permanente limita o temporário. O permanente só muda em Evoluir."
@@ -471,7 +471,11 @@
           "id": "quintessence",
           "label": "Quintessência",
           "colorRole": "accent",
-          "from": "start"
+          "from": "start",
+          "default": {
+            "derive": "sum",
+            "from": [{ "list": "backgrounds", "item": "Avatar" }]
+          }
         },
         {
           "id": "paradox",
@@ -480,7 +484,7 @@
           "from": "end"
         }
       ],
-      "help": "Quintessência e Paradoxo dividem as 20 casas da roda. Ganhar Paradoxo com a roda cheia consome 1 Quintessência."
+      "help": "Quintessência e Paradoxo dividem as 20 casas da roda. Ganhar Paradoxo com a roda cheia consome 1 Quintessência. A Quintessência começa igual ao Avatar."
     },
     "health": {
       "type": "track",

@@ -13,7 +13,7 @@ import { planClock } from '../effects'
 import { stored } from '../fields'
 import { type ResolvedRating, resolve } from '../resolve'
 import { validateSheet, validateTemplate } from '../validate'
-import { fmt, type Json, mta, palette, reference, vtm } from './fixtures'
+import { fmt, type Json, mta, palette, reference, vtm, wta } from './fixtures'
 
 // `default` com fórmula (README §3): o valor de uma ficha nova acompanha as
 // fontes até o jogador gravar o campo. Os templates de teste são os do
@@ -432,5 +432,113 @@ describe('propriedade: o valor inicial sempre cabe no campo', () => {
         expect(validateSheet(t, { values: out })).toEqual([])
       })
     )
+  })
+})
+
+describe('os templates do produto: valores iniciais do livro', () => {
+  const v20 = compileTemplate(vtm())
+  const m20 = compileTemplate(mta())
+  const w20 = compileTemplate(wta())
+
+  it('V20: Humanidade = Consciência + Autocontrole; FdV = Coragem', () => {
+    const fresh = resolve(v20, { values: { name: 'Nova', clan: 'toreador' } })
+    expect((fresh.get('humanity') as ResolvedRating).value).toBe(2)
+    expect(fresh.get('willpower')).toMatchObject({ permanent: 1, current: 1 })
+    const virtues = resolve(v20, {
+      values: { conscience: 3, selfControl: 4, courage: 2 },
+    })
+    expect((virtues.get('humanity') as ResolvedRating).value).toBe(7)
+    expect(virtues.get('willpower')).toMatchObject({
+      permanent: 2,
+      current: 2,
+    })
+  })
+
+  it('M20: FdV 5; Quintessência = Avatar', () => {
+    const fresh = resolve(m20, { values: { name: 'Novo' } })
+    expect(fresh.get('willpower')).toMatchObject({ permanent: 5, current: 5 })
+    expect(fresh.get('wheel')).toMatchObject({
+      fills: [{ n: 0 }, { n: 0 }],
+    })
+    const avatar = resolve(m20, {
+      values: { backgrounds: [{ id: 'b1', name: 'Avatar', value: 3 }] },
+    })
+    expect(avatar.get('wheel')).toMatchObject({
+      fills: [
+        { id: 'quintessence', n: 3 },
+        { id: 'paradox', n: 0 },
+      ],
+    })
+  })
+
+  it.each([
+    ['ragabash', 1, [0, 0, 0]],
+    ['theurge', 2, [0, 0, 3]],
+    ['philodox', 3, [0, 3, 0]],
+    ['galliard', 4, [2, 0, 1]],
+    ['ahroun', 5, [2, 1, 0]],
+  ] as const)(
+    'W20 %s: Fúria %i e Renome %p (Glória, Honra, Sabedoria)',
+    (auspice, rage, [glory, honor, wisdom]) => {
+      const r = resolve(w20, { values: { auspice } })
+      expect(r.get('rage')).toMatchObject({ permanent: rage, current: rage })
+      expect(r.get('glory')).toMatchObject({ permanent: glory, current: 0 })
+      expect(r.get('honor')).toMatchObject({ permanent: honor, current: 0 })
+      expect(r.get('wisdom')).toMatchObject({ permanent: wisdom, current: 0 })
+    }
+  )
+
+  it.each([
+    ['hominideo', 1],
+    ['impuro', 3],
+    ['lupino', 5],
+  ])('W20 %s: Gnose %i, e a Forma continua Hominídeo', (breed, gnosis) => {
+    const r = resolve(w20, { values: { breed } })
+    expect(r.get('gnosis')).toMatchObject({ permanent: gnosis })
+    expect(r.get('form')).toMatchObject({ option: { id: 'hominideo' } })
+  })
+
+  it.each([
+    ['furias-negras', 3],
+    ['roedores-de-ossos', 4],
+    ['filhos-de-gaia', 4],
+    ['fianna', 3],
+    ['crias-de-fenris', 3],
+    ['andarilhos-do-asfalto', 3],
+    ['garras-vermelhas', 3],
+    ['senhores-das-sombras', 3],
+    ['peregrinos-silenciosos', 3],
+    ['presas-de-prata', 3],
+    ['observadores-das-estrelas', 4],
+    ['uktena', 3],
+    ['wendigo', 4],
+  ])('W20 %s: Força de Vontade %i', (tribe, willpower) => {
+    const r = resolve(w20, { values: { tribe } })
+    expect(r.get('willpower')).toMatchObject({
+      permanent: willpower,
+      current: willpower,
+    })
+  })
+
+  it('W20: toda tribo do template tem a FdV na tabela', () => {
+    const tribe = w20.fields.get('tribe')?.def
+    const wp = w20.fields.get('willpower')?.def
+    if (tribe?.type !== 'choice' || wp?.type !== 'resource')
+      throw new Error('fixture')
+    const formula = wp.permanent?.default as { map: Record<string, number> }
+    expect(Object.keys(formula.map).sort()).toEqual(
+      tribe.options.map(o => o.id).sort()
+    )
+  })
+
+  it('W20 Ahroun Impuro Garras Vermelhas', () => {
+    const r = resolve(w20, {
+      values: { auspice: 'ahroun', breed: 'impuro', tribe: 'garras-vermelhas' },
+    })
+    expect(r.get('rage')).toMatchObject({ permanent: 5 })
+    expect(r.get('gnosis')).toMatchObject({ permanent: 3 })
+    expect(r.get('willpower')).toMatchObject({ permanent: 3 })
+    expect(r.get('glory')).toMatchObject({ permanent: 2 })
+    expect(r.get('honor')).toMatchObject({ permanent: 1 })
   })
 })

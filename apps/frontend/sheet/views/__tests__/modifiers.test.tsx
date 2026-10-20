@@ -123,13 +123,19 @@ describe('Renome e Augúrio', () => {
     expect(screen.getByText('Permanente 3 · Temporário 4')).toBeTruthy()
   })
 
-  it('numa ficha nova, o Renome temporário começa em 0, não no máximo', () => {
+  it('numa ficha nova, o Renome temporário começa em 0 e o permanente sai do Augúrio', () => {
     setup({ values: { name: 'Nova', auspice: 'ahroun' } }, 'read')
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    // Ahroun: 2 de Glória e 1 de Honra
     expect(
-      screen.getByLabelText('Glória: permanente 0, temporário 0')
+      screen.getByLabelText('Glória: permanente 2, temporário 0')
     ).toBeTruthy()
-    expect(screen.getAllByText('Permanente 0 · Temporário 0')).toHaveLength(3)
+    expect(
+      screen.getByLabelText('Honra: permanente 1, temporário 0')
+    ).toBeTruthy()
+    expect(
+      screen.getByLabelText('Sabedoria: permanente 0, temporário 0')
+    ).toBeTruthy()
   })
 
   it('o Augúrio leva a fase da lua; o Clã do Vampiro, nenhum glifo', () => {

@@ -461,7 +461,14 @@
     "rage": {
       "type": "resource",
       "label": "Fúria",
-      "permanent": { "min": 1, "max": 10 },
+      "permanent": {
+        "min": 1,
+        "max": 10,
+        "default": {
+          "from": "auspice",
+          "map": { "ragabash": 1, "theurge": 2, "philodox": 3, "galliard": 4, "ahroun": 5 }
+        }
+      },
       "editableIn": ["play"],
       "defaultAction": "spend1",
       "colorRole": "accent"
@@ -469,7 +476,14 @@
     "gnosis": {
       "type": "resource",
       "label": "Gnose",
-      "permanent": { "min": 1, "max": 10 },
+      "permanent": {
+        "min": 1,
+        "max": 10,
+        "default": {
+          "from": "breed",
+          "map": { "hominideo": 1, "impuro": 3, "lupino": 5 }
+        }
+      },
       "editableIn": ["play"],
       "defaultAction": "spend1",
       "colorRole": "alt-warm",
@@ -479,29 +493,62 @@
       "type": "resource",
       "label": "Força de Vontade",
       "shortLabel": "FdV",
-      "permanent": { "min": 1, "max": 10 },
+      "permanent": {
+        "min": 1,
+        "max": 10,
+        "default": {
+          "from": "tribe",
+          "map": {
+            "furias-negras": 3,
+            "roedores-de-ossos": 4,
+            "filhos-de-gaia": 4,
+            "fianna": 3,
+            "crias-de-fenris": 3,
+            "andarilhos-do-asfalto": 3,
+            "garras-vermelhas": 3,
+            "senhores-das-sombras": 3,
+            "peregrinos-silenciosos": 3,
+            "presas-de-prata": 3,
+            "observadores-das-estrelas": 4,
+            "uktena": 3,
+            "wendigo": 4
+          }
+        }
+      },
       "editableIn": ["play"],
       "defaultAction": "spend1"
     },
     "glory": {
       "type": "resource",
       "label": "Glória",
-      "permanent": { "min": 0, "max": 10 },
+      "permanent": {
+        "min": 0,
+        "max": 10,
+        "default": { "from": "auspice", "map": { "galliard": 2, "ahroun": 2 } }
+      },
       "tempUncapped": true,
       "max": 10,
-      "help": "O Renome temporário não é limitado pelo permanente (W20)."
+      "help": "O Renome temporário não é limitado pelo permanente (W20). O permanente começa pelo Augúrio; o Ragabash distribui 3 pontos à mão."
     },
     "honor": {
       "type": "resource",
       "label": "Honra",
-      "permanent": { "min": 0, "max": 10 },
+      "permanent": {
+        "min": 0,
+        "max": 10,
+        "default": { "from": "auspice", "map": { "philodox": 3, "ahroun": 1 } }
+      },
       "tempUncapped": true,
       "max": 10
     },
     "wisdom": {
       "type": "resource",
       "label": "Sabedoria",
-      "permanent": { "min": 0, "max": 10 },
+      "permanent": {
+        "min": 0,
+        "max": 10,
+        "default": { "from": "auspice", "map": { "theurge": 3, "galliard": 1 } }
+      },
       "tempUncapped": true,
       "max": 10
     },
