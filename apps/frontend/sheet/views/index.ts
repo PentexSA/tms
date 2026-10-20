@@ -14,6 +14,7 @@ import { ResourceChip } from './resource/ResourceChip'
 import { ResourceRow } from './resource/ResourceRow'
 import { ResourceSheet } from './resource/ResourceSheet'
 import { wodViews } from './skins/wod'
+import { StateRow, StateSheet } from './state/StateViews'
 import { TrackChip } from './track/TrackChip'
 import { TrackRow } from './track/TrackRow'
 import { TrackSheet } from './track/TrackSheet'
@@ -39,7 +40,8 @@ export const baseViews = {
   slots: {},
   // Jogo (v1, Etapa 4): a roda; muda só em Jogo, sem editor de Editar
   clock: { row: ClockRow, chip: ClockChip, sheet: ClockSheet },
-  state: { editor: ChoiceEditorRow },
+  // Jogo (v2, Etapa 3): a opção e o sheet de troca; o chip é o genérico
+  state: { row: StateRow, sheet: StateSheet, editor: ChoiceEditorRow },
   mark: {},
   text: { editor: TextEditorRow },
   longText: { editor: TextEditorRow },

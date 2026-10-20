@@ -8,6 +8,8 @@ export interface ChoiceOption {
   readonly id: string
   readonly label: string
   readonly meta?: string
+  // Nome acessível por extenso, quando o meta usa abreviações ("For 7").
+  readonly spoken?: string
 }
 
 export interface ChoiceProps {
@@ -47,7 +49,9 @@ export function Choice({
           <Pressable
             key={o.id}
             accessibilityRole="radio"
-            accessibilityLabel={o.meta ? `${o.label}, ${o.meta}` : o.label}
+            accessibilityLabel={
+              o.spoken ?? (o.meta ? `${o.label}, ${o.meta}` : o.label)
+            }
             aria-checked={checked}
             onPress={() => onChange(o.id)}
             style={[styles.row, grid && styles.cell]}
