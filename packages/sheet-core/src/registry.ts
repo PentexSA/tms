@@ -36,6 +36,7 @@ export const REGISTRY = {
     'half',
     'fifth',
     'difference',
+    'sum',
   ],
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],

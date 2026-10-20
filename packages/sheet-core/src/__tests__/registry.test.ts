@@ -88,6 +88,9 @@ describe('DERIVE', () => {
     ['difference', [12, 5], 7],
     ['difference', [3, 5], -2],
     ['difference', [4], 4],
+    ['sum', [3, 4], 7],
+    ['sum', [2], 2],
+    ['sum', [1, 2, 3, 4], 10],
   ] as const)('%s(%p) = %p', (name, args, expected) => {
     expect(DERIVE[name](...args)).toBe(expected)
   })

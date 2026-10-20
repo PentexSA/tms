@@ -43,6 +43,7 @@ export const DERIVE: Readonly<
   half: v => Math.floor(v / 2),
   fifth: v => Math.floor(v / 5),
   difference: (a, b = 0) => a - b,
+  sum: (...values) => values.reduce((total, v) => total + v, 0),
 }
 
 export function isDeriveName(name: unknown): name is DeriveName {

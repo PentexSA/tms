@@ -79,10 +79,61 @@ describe('schema.json (Ajv)', () => {
         }
       },
     ],
+    [
+      'default como expressão em texto (nunca fórmula interpretada)',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = { ...f.humanity, default: 'conscience + selfControl' }
+      },
+    ],
+    [
+      'default com derivação e mapa ao mesmo tempo',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = {
+          ...f.humanity,
+          default: { derive: 'sum', from: 'courage', map: { brujah: 1 } },
+        }
+      },
+    ],
+    [
+      'mapa com valor quebrado',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = {
+          ...f.humanity,
+          default: { from: 'clan', map: { brujah: 1.5 } },
+        }
+      },
+    ],
   ])('rejeita: %s', (_, mutate) => {
     const t = template('vtm-v20')
     mutate(t)
     expect(schemaIssues(t).length).toBeGreaterThan(0)
+  })
+
+  it('aceita default com fórmula no rating, no permanente e na roda', () => {
+    const t = template('vtm-v20')
+    const f = t.fields as Record<string, Json>
+    f.humanity = {
+      ...f.humanity,
+      default: { derive: 'sum', from: ['conscience', 'selfControl'] },
+    }
+    f.willpower = {
+      ...f.willpower,
+      permanent: {
+        min: 1,
+        max: 10,
+        default: { from: 'clan', map: { brujah: 3 } },
+      },
+    }
+    expect(schemaIssues(t)).toEqual([])
+    const m = template('mta-m20')
+    const wheel = (m.fields as Record<string, Json>).wheel as Json & {
+      fills: Json[]
+    }
+    wheel.fills = wheel.fills.map(x => ({ ...x, default: 2 }))
+    expect(schemaIssues(m)).toEqual([])
   })
 })
 

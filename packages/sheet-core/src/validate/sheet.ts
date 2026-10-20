@@ -1,3 +1,4 @@
+import { formulaValue } from '../defaults'
 import { DERIVE, isDeriveName } from '../derive'
 import type { Issue } from './issues'
 import {
@@ -326,21 +327,36 @@ function check(
 function numberOf(fields: Obj, values: Obj, id: unknown, depth = 0): number {
   const f = own(fields, id) ? rec(fields[id as string]) : undefined
   if (!f || depth > 4) return 0
-  if (f.readOnly && f.derive && isDeriveName(f.derive))
-    return DERIVE[f.derive](
-      ...flat1(f.from).map(x =>
-        isListItemRef(x)
-          ? listItemValue(get(values, x.list), x.item)
-          : numberOf(fields, values, x, depth + 1)
-      )
-    )
+  const derive = (name: unknown, from: unknown) =>
+    isDeriveName(name)
+      ? DERIVE[name](
+          ...flat1(from).map(x =>
+            isListItemRef(x)
+              ? listItemValue(get(values, x.list), x.item)
+              : numberOf(fields, values, x, depth + 1)
+          )
+        )
+      : 0
+  if (f.readOnly && f.derive) return derive(f.derive, f.from)
   const v = get(values, id)
   if (typeof v === 'number' && Number.isInteger(v)) return v
   if (isObj(v)) {
     const n = v.permanent ?? v.current
     if (typeof n === 'number' && Number.isInteger(n)) return n
   }
-  return numOr(f.default, numOr(f.min, 0))
+  // Sem valor gravado: o `default` (que pode ser fórmula) ou o mínimo
+  const read = { derive, choice: (c: string) => get(values, c) }
+  const permanent = rec(f.permanent)
+  if (f.type === 'resource' && permanent)
+    return formulaValue(
+      permanent.default,
+      read,
+      numOr(permanent.min, 0),
+      numOr(permanent.max, 100)
+    )
+  if (f.default == null || typeof f.default === 'number')
+    return numOr(f.default, numOr(f.min, 0))
+  return formulaValue(f.default, read, numOr(f.min, 0), numOr(f.max, 10))
 }
 
 // Teto do valor atual de um resource; null quando não há teto conhecido.

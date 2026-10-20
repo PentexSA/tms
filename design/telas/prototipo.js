@@ -164,6 +164,7 @@
     half: v => Math.floor(v / 2),
     fifth: v => Math.floor(v / 5),
     difference: (a, b = 0) => a - b,
+    sum: (...values) => values.reduce((total, v) => total + v, 0),
   }
   function derive(name, ...args) {
     if (!Object.hasOwn(DERIVE, name))
@@ -200,9 +201,26 @@
     return f.options.find(o => o.id === raw(m, id)) ?? f.options[0]
   }
 
+  // `default` com fórmula (README §3): inteiro, derivação ou valor por opção
+  // de um choice, limitado a min..max. Sem valor gravado, o campo acompanha.
+  function initial(m, formula, min, max) {
+    const clamp = n => Math.min(max, Math.max(min, n))
+    if (formula == null) return min
+    if (typeof formula === 'number') return clamp(formula)
+    if (formula.derive) {
+      const input = x =>
+        typeof x === 'string'
+          ? numOf(m, x)
+          : ((raw(m, x.list) ?? []).find(i => i.name === x.item)?.value ?? 0)
+      return clamp(derive(formula.derive, ...[formula.from].flat().map(input)))
+    }
+    const n = formula.map?.[raw(m, formula.from)]
+    return Number.isInteger(n) ? clamp(n) : min
+  }
+
   function ratingInfo(m, id) {
     const f = F(m, id)
-    const base = raw(m, id) ?? f.default ?? f.min ?? 0
+    const base = raw(m, id) ?? initial(m, f.default, f.min ?? 0, f.max ?? 5)
     let modded = base
     let mod = null
     for (const [sid, sf] of Object.entries(m.t.fields)) {
@@ -258,7 +276,10 @@
       max = derive(f.max.derive, ...[f.max.from].flat().map(x => numOf(m, x)))
     else if (f.max?.field) max = numOf(m, f.max.field)
     else if (f.max?.stored) max = v.max ?? f.max.min
-    const permanent = f.permanent ? (v.permanent ?? f.permanent.min) : null
+    const permanent = f.permanent
+      ? (v.permanent ??
+        initial(m, f.permanent.default, f.permanent.min, f.permanent.max))
+      : null
     const capped = permanent != null && !f.tempUncapped
     const cap = capped ? permanent : f.overMax ? null : max
     const shownMax = capped ? permanent : max
@@ -423,8 +444,13 @@
 
   function clockInfo(m, id) {
     const f = F(m, id)
-    const v = raw(m, id) ?? {}
-    const fills = f.fills.map(x => ({ ...x, n: v[x.id] ?? 0 }))
+    const v = raw(m, id)
+    let room = f.segments
+    const fills = f.fills.map(x => {
+      const n = v ? (v[x.id] ?? 0) : initial(m, x.default, 0, Math.max(0, room))
+      room -= n
+      return { ...x, n }
+    })
     const used = fills.reduce((s, x) => s + x.n, 0)
     return { f, fills, used, free: f.segments - used }
   }

@@ -7,8 +7,9 @@ export function NumberEditor({ id, def, value, onChange, error }: EditorProps) {
   if (def.type !== 'number' && def.type !== 'rating') return null
   const min = def.min ?? 0
   const max = def.type === 'rating' ? def.max : (def.max ?? 1_000_000)
-  const current =
-    typeof value === 'number' ? value : (def.default ?? def.min ?? 0)
+  // Na criação não há ficha para calcular um `default` com fórmula: o mínimo
+  const fallback = typeof def.default === 'number' ? def.default : min
+  const current = typeof value === 'number' ? value : fallback
   const suffix = def.type === 'number' ? (def.suffix ?? '') : ''
   return (
     <View testID={`editor-${id}`} style={styles.row}>
