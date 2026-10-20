@@ -99,14 +99,14 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: pnpm install --frozen-lockfile
+      # As migrations importam config e logger pelos artefatos compilados.
+      - run: pnpm turbo run build --filter='@tms/api^...'
       # Sobe tudo, desce tudo e sobe de novo: todo down desfaz o seu up
       - run: pnpm -C packages/db migrate:check
       - name: tipos do Kysely em dia com as migrations
         run: |
           pnpm db:codegen
           git diff --exit-code packages/db/src/types.ts
-      # Os pacotes de que a API depende (config, db, sheet-core, logger)
-      - run: pnpm turbo run build --filter='@tms/api^...'
       # O template da v0 publica num Postgres real (schema.json + contrato)
       - run: pnpm templates:publish --published
       # O PGLite serializa tudo; o FOR UPDATE dos eventos só se prova aqui

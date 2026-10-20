@@ -69,7 +69,8 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
     .fill('O Regente vai cobrar.')
   await page.getByRole('button', { name: 'Salvar' }).click()
   await expect(page.getByRole('button', { name: 'Desfazer' })).toBeVisible()
-  // O lote sai em segundo plano: espera o servidor confirmar
+  // Geração foi o primeiro lote; as notas do narrador são o segundo.
+  // O lote sai em segundo plano: espera o servidor confirmar.
   await expect
     .poll(
       async () =>
@@ -82,7 +83,7 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
           )
         ).sheetVersion
     )
-    .toBe(1)
+    .toBe(2)
 
   // O dano entra pelo sheet da Vitalidade, em Jogo, como narrador
   const hurt = page.waitForResponse(

@@ -5,6 +5,7 @@ import {
   DEFAULT_ZONE_LABELS,
   type SheetModel,
   UnsupportedTemplateError,
+  withValueDeps,
 } from '../compile'
 import { REGISTRY } from '../registry'
 import { clone, dnd, type Json, mta, templates, vtm, wta } from './fixtures'
@@ -203,6 +204,24 @@ describe('compileTemplate: o fixture de D&D (outra família)', () => {
   it('o campo derivado é readOnly', () => {
     expect(model.fields.get('initiative')?.readOnly).toBe(true)
     expect(model.fields.get('dex')?.readOnly).toBe(false)
+  })
+})
+
+describe('withValueDeps', () => {
+  it('inclui a cadeia de derivados e preserva ids desconhecidos', () => {
+    const template = compileTemplate(vtm()).template
+
+    expect(withValueDeps(template, ['blood', 'name', 'missing'])).toEqual(
+      new Set(['blood', 'generation', 'backgrounds', 'name', 'missing'])
+    )
+  })
+
+  it('inclui dependências de máximo por campo e de número derivado', () => {
+    const template = compileTemplate(dnd()).template
+
+    expect(withValueDeps(template, ['hitDice', 'initiative'])).toEqual(
+      new Set(['hitDice', 'level', 'initiative', 'dex'])
+    )
   })
 })
 

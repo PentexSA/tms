@@ -13,24 +13,29 @@ const fakeIp = () =>
 export async function signUp(context: BrowserContext, prefix: string) {
   const id = `${Date.now().toString(36)}${++seq}`
   const username = `${prefix}_${id}`.slice(0, 24)
+  const ip = fakeIp()
+  // Mantém o mesmo IP simulado também nas chamadas feitas pela página. Sem
+  // isso, todos os navegadores do runner parecem vir de localhost e dividem
+  // o limite de tentativas dos convites.
+  await context.setExtraHTTPHeaders({ 'x-forwarded-for': ip })
   const res = await context.request.post(`${API_URL}/auth/register`, {
     data: {
       email: `${username}@example.test`,
       username,
       password: 'correct horse battery staple',
     },
-    headers: { origin: WEB_URL, 'x-forwarded-for': fakeIp() },
+    headers: { origin: WEB_URL, 'x-forwarded-for': ip },
   })
   if (res.status() !== 201)
     throw new Error(`cadastro falhou: ${res.status()} ${await res.text()}`)
   const { accessToken } = (await res.json()) as { accessToken: string }
-  return { username, accessToken }
+  return { username, accessToken, ip }
 }
 
 /** Chamada à API como o usuário (token de acesso do cadastro). */
 export async function apiAs<T>(
   context: BrowserContext,
-  user: { accessToken: string },
+  user: { accessToken: string; ip?: string },
   method: 'GET' | 'POST',
   path: string,
   data?: unknown
@@ -38,7 +43,10 @@ export async function apiAs<T>(
   const res = await context.request.fetch(`${API_URL}${path}`, {
     method,
     data,
-    headers: { authorization: `Bearer ${user.accessToken}` },
+    headers: {
+      authorization: `Bearer ${user.accessToken}`,
+      ...(user.ip ? { 'x-forwarded-for': user.ip } : {}),
+    },
   })
   if (!res.ok())
     throw new Error(`${method} ${path}: ${res.status()} ${await res.text()}`)
@@ -51,7 +59,7 @@ export async function apiAs<T>(
  */
 export function eighthGeneration(
   context: BrowserContext,
-  user: { accessToken: string },
+  user: { accessToken: string; ip?: string },
   characterId: string
 ) {
   return apiAs(context, user, 'POST', `/characters/${characterId}/events`, {

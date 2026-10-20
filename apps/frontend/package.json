@@ -47,6 +47,7 @@
   "devDependencies": {
     "@react-native/jest-preset": "0.86.3",
     "@testing-library/react-native": "catalog:",
+    "@tms/api": "workspace:*",
     "@tms/jest-config": "workspace:*",
     "@types/jest": "catalog:",
     "@types/react": "catalog:",

@@ -42,7 +42,14 @@ export const createApp = (
           origin: [...options.corsOrigins],
           credentials: true,
           methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-          allowedHeaders: ['content-type', 'authorization', 'x-tms-client'],
+          allowedHeaders: [
+            'content-type',
+            'authorization',
+            'x-tms-client',
+            // No E2E, o navegador representa clientes distintos sem um proxy
+            // real. Em produção, o proxy confiável acrescenta este cabeçalho.
+            ...(options.trustProxy ? ['x-forwarded-for'] : []),
+          ],
           maxAge: 600,
         })
       )

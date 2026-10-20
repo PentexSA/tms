@@ -86,7 +86,8 @@ test('gastar Sangue e levar dano offline, recarregar e sincronizar', async ({
     sheetVersion: number
     sheet: { values: Record<string, unknown> }
   }>(context, user, 'GET', `/characters/${character.id}`)
-  expect(saved.sheetVersion).toBe(2)
+  // Geração foi o primeiro lote; Sangue e Vitalidade são mais dois lotes.
+  expect(saved.sheetVersion).toBe(3)
   expect(saved.sheet.values.blood).toEqual({ current: 14 })
   expect(saved.sheet.values.health).toMatchObject({ lethal: 1 })
 })

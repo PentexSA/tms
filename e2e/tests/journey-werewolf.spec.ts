@@ -65,7 +65,7 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   await page.getByRole('radio', { name: 'Hominídeo', exact: true }).click()
   await page.getByRole('radio', { name: /^Galliard/ }).click()
   await page.getByRole('radio', { name: 'Fianna', exact: true }).click()
-  await page.getByLabel('Seita').fill('Seita da Serra do Mar')
+  await page.getByLabel('Seita', { exact: true }).fill('Seita da Serra do Mar')
   await page.getByLabel('Totem da matilha').fill('Corvo')
   await page.getByRole('button', { name: 'Criar ficha' }).click()
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
@@ -179,7 +179,9 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   await page.reload()
   await page.getByRole('button', { name: 'Ações da ficha' }).click()
   await page.getByRole('button', { name: 'Regenerar 1 nível' }).click()
+  const regenerated = batchSaved(page, id)
   await page.getByRole('button', { name: 'Aplicar' }).click()
+  await regenerated
   await expect(indicator(page)).toHaveAccessibleName('Sincronização: Salvo', {
     timeout: 15_000,
   })
