@@ -26,10 +26,13 @@ import {
   clockSegmentsOf,
   EMBLEM_NAMES,
   EmptyState,
+  Glyph,
   IconButton,
   initials,
   isEmblem,
+  isGlyph,
   ListItem,
+  moonPath,
   pipsOf,
   RatingDots,
   Screen,
@@ -818,6 +821,29 @@ describe('listas e navegação', () => {
     screen.unmount()
     render(<Avatar name="Lia Tormenta" emblem={null} />)
     expect(screen.getByText('LT', { includeHiddenElements: true })).toBeTruthy()
+  })
+
+  it('fase da lua: nova sem preenchimento, meia com terminador reto, cheia', () => {
+    expect(moonPath(0)).toBeNull()
+    expect(moonPath(0.5)).toContain('A0.00 9')
+    // Crescente e gibosa voltam por lados opostos
+    expect(moonPath(0.25)).toMatch(/0 0 0 12 3 Z$/)
+    expect(moonPath(0.75)).toMatch(/0 0 1 12 3 Z$/)
+    expect(moonPath(1)).toContain('0 1 1')
+    expect(moonPath(7)).toBe(moonPath(1))
+  })
+
+  it.each([0, 0.25, 0.5, 0.75, 1])('glifo da lua (%s) é decorativo', param => {
+    render(<Glyph name="augur-moon" param={param} color="#000" testID="moon" />)
+    expect(screen.queryByTestId('moon')).toBeNull()
+    expect(
+      screen.getByTestId('moon', { includeHiddenElements: true })
+    ).toBeTruthy()
+  })
+
+  it('glifo desconhecido não é glifo', () => {
+    expect(isGlyph('augur-moon')).toBe(true)
+    expect(isGlyph('constructor')).toBe(false)
   })
 
   it('tela com o fundo do tema', () => {

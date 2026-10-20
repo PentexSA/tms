@@ -4,6 +4,7 @@ import { ListEditor } from '../evolve/ListEditor'
 import { NumberEditorRow } from '../evolve/NumberEditorRow'
 import { ResourceEditorRow } from '../evolve/ResourceEditorRow'
 import { TextEditorRow } from '../evolve/TextEditorRow'
+import { ChoiceFact } from './ChoiceFact'
 import { ClockChip, ClockRow, ClockSheet } from './clock/ClockViews'
 import { FieldDetail } from './FieldDetail'
 import { GenericChip } from './GenericChip'
@@ -45,7 +46,8 @@ export const baseViews = {
   mark: {},
   text: { editor: TextEditorRow },
   longText: { editor: TextEditorRow },
-  choice: { editor: ChoiceEditorRow },
+  // v2, Etapa 4: o fato com o glifo do template (a lua do Augúrio)
+  choice: { fact: ChoiceFact, editor: ChoiceEditorRow },
   tags: {},
   list: { row: ListRow, editor: ListEditor },
 } satisfies Record<FieldTypeName, FieldView>
