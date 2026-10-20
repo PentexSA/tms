@@ -302,6 +302,13 @@ const wtaOnlyMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    'atalho com campo fora das seções do slot',
+    t => {
+      const [rage] = (t.roll as Json).presets as Json[]
+      if (rage) rage.slots = { attribute: 'brawl' }
+    },
+  ],
+  [
     'regenerar fora de trilha wod-stacking',
     t => {
       const [regenerate] = t.actions as Json[]

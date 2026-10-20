@@ -145,6 +145,23 @@ describe('a parada sai da ficha', () => {
     expect(abilities.some(o => o.key === 'dexterity')).toBe(false)
   })
 
+  it('os atalhos de Fúria e Gnose do Lobisomem ficam disponíveis, pelo permanente', () => {
+    const wta = compileTemplate(templates['wta-w20'])
+    const c = character('iara')
+    c.sheet.values.rage = { current: 0, permanent: 4 }
+    const presets = poolPresets(
+      wta,
+      resolve(wta, c.sheet as unknown as SheetData),
+      ['owner']
+    )
+    expect(
+      presets.map(p => [p.id, p.available, p.slots.attribute?.value])
+    ).toEqual([
+      ['rage', true, 4],
+      ['gnosis', true, 4],
+    ])
+  })
+
   it('modificador de estado aparece com a origem (Lobisomem em Crinos)', () => {
     const c = character('iara')
     const wta = compileTemplate(templates['wta-w20'])

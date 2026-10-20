@@ -397,6 +397,48 @@ describe('menu ⋯: ações do template', () => {
     expect(screen.getByText('Sem pontos de sangue para gastar')).toBeTruthy()
   })
 
+  it('Regenerar (Lobisomem): cura 1 letal sem custo, com a prévia', () => {
+    const taina = example('taina')
+    const { batches } = setup(taina.sheet, { model: modelOf(taina.system) })
+    fireEvent.press(screen.getByRole('button', { name: 'Ações da ficha' }))
+    expect(
+      screen.getByText(
+        'Cura 1 nível contusivo ou letal, letal primeiro. O agravado fica.'
+      )
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Regenerar 1 nível' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(batches()).toEqual([
+      expect.objectContaining({
+        events: [
+          {
+            path: 'values.health',
+            from: { bashing: 1, lethal: 2, aggravated: 1 },
+            to: { aggravated: 1, lethal: 1, bashing: 1 },
+          },
+        ],
+      }),
+    ])
+  })
+
+  it('Regenerar só com agravado fica indisponível com o porquê', () => {
+    const taina = example('taina')
+    setup(
+      {
+        ...taina.sheet,
+        values: {
+          ...taina.sheet.values,
+          health: { aggravated: 1, lethal: 0, bashing: 0 },
+        },
+      },
+      { model: modelOf(taina.system) }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Ações da ficha' }))
+    expect(
+      screen.getByText('Nada a curar: sem dano contusivo ou letal')
+    ).toBeTruthy()
+  })
+
   it('template sem ação desta versão: o ⋯ some (D&D)', () => {
     const lia = example('lia')
     setup(lia.sheet, { model: modelOf(lia.system) })

@@ -783,7 +783,11 @@
     "label": "Dados",
     "die": 10,
     "slots": [
-      { "id": "attribute", "label": "Atributo", "from": ["attributes"] },
+      {
+        "id": "attribute",
+        "label": "Atributo",
+        "from": ["attributes", "play"]
+      },
       {
         "id": "ability",
         "label": "Habilidade",

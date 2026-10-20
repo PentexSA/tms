@@ -389,8 +389,13 @@ function validateTemplate(t, palette) {
 
   // Referências cruzadas que o JSON Schema não consegue expressar.
   if (r.penalty?.field && has(r.penalty.field) && fields[r.penalty.field].rule !== 'wod-stacking') err('roll.penalty.field', 'precisa ser uma trilha com níveis e penalidade (wod-stacking)')
-  const slotIds = (r.slots ?? []).map(sl => sl.id)
-  for (const pr of r.presets ?? []) for (const k of Object.keys(pr.slots ?? {})) if (!slotIds.includes(k)) err(`roll.presets.${pr.id}.slots.${k}`, 'slot inexistente na rolagem')
+  // O atalho só fixa o que o slot ofereceria: um campo fora das seções do slot deixaria o atalho sempre indisponível
+  const sectionFields = id => { const sec = (t.sections ?? []).find(x => x.id === id); return sec ? [...(sec.fields ?? []), ...(sec.groups ?? []).flatMap(g => g.fields ?? [])] : [] }
+  for (const pr of r.presets ?? []) for (const [k, fid] of Object.entries(pr.slots ?? {})) {
+    const sl = (r.slots ?? []).find(x => x.id === k)
+    if (!sl) err(`roll.presets.${pr.id}.slots.${k}`, 'slot inexistente na rolagem')
+    else if (has(fid) && !(sl.from ?? []).some(sid => sectionFields(sid).includes(fid))) err(`roll.presets.${pr.id}.slots.${k}`, `campo '${fid}' fora das seções do slot`)
+  }
   const boostModel = { autoSuccess: ['pool-success'], plus2: ['fudge'] }
   for (const b of r.boosts ?? []) if (boostModel[b.effect] && !boostModel[b.effect].includes(r.model)) err(`roll.boosts.${b.id}`, `efeito '${b.effect}' não se aplica ao modelo ${r.model} (gastaria o recurso sem efeito)`)
   // health.heal: no sheet de um recurso (paga o custo) ou no menu da ficha (Regenerar, sem custo)

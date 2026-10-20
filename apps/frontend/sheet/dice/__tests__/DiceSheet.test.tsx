@@ -425,6 +425,52 @@ describe('atalhos do template (Mago, v1)', () => {
   })
 })
 
+describe('o sheet Dados do Lobisomem (v2)', () => {
+  const werewolf = (values: SheetData['values']) => {
+    const { sheet } = sheetFor('iara', ['owner'])
+    return storeFor(
+      ['owner'],
+      { ...sheet, values: { ...sheet.values, ...values } },
+      'wta-w20'
+    ).store
+  }
+
+  it('Força + Briga em Crinos: a parada usa o efetivo e diz a origem', async () => {
+    calls.rollsPost.mockResolvedValue(
+      serverRoll({ label: 'Força + Briga', dice: 9 })
+    )
+    await open(werewolf({ form: 'crinos' }))
+    pick('Atributo', 'for', /^Força, 7, Crinos \+4/)
+    pick('Habilidade', 'brig', /^Briga, 2/)
+    expect(
+      screen.getByLabelText('Parada: 9 dados. Força: Crinos +4')
+    ).toBeTruthy()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    // O servidor resolve a forma pela ficha dele: só os slots vão
+    expect(calls.rollsPost).toHaveBeenCalledWith(ID, {
+      clientRollId: '00000000-0000-4000-8000-000000000001',
+      slots: { attribute: 'strength', ability: 'brawl' },
+      difficulty: 6,
+      specialty: false,
+      boosts: [],
+    })
+  })
+
+  it('Teste de Fúria usa o permanente, mesmo sem Fúria para gastar', async () => {
+    await open(werewolf({ rage: { current: 0, permanent: 4 } }))
+    fireEvent.press(screen.getByRole('button', { name: 'Teste de Fúria' }))
+    expect(
+      screen.getByRole('button', { name: /^Atributo: Fúria/ })
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Parada: 4 dados')).toBeTruthy()
+    expect(screen.getByTestId('preset-help')).toHaveTextContent(
+      'Parada de Fúria permanente.'
+    )
+  })
+})
+
 describe('quem vê os Dados', () => {
   it('o outro jogador da crônica não rola', async () => {
     renderWithSession(
