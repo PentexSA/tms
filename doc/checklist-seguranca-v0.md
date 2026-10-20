@@ -212,6 +212,16 @@ Os testes rodam no CI:
   - `app/app/__tests__/account.test.tsx`.
   - `e2e/account.spec.ts`: senha errada não exclui; com a senha, a conta não entra mais.
 
+## Sistemas novos (v1 Mago, v2 Lobisomem)
+
+Um sistema novo é dado: nenhuma rota, migration ou dependência nova. Revisto item a item para o Lobisomem (plano-v2, Etapa 7):
+
+- **Template malicioso:** o `wta-w20` passa pelas duas camadas e pelo Ajv antes de publicar; `glyph` e `emblem` são listas fechadas (`REGISTRY.glyphs`, `REGISTRY.emblems`), e um nome fora delas não desenha nada no app.
+- **Texto injetado:** rótulos, hints e notas das formas são texto do template, renderizados por `<Text>`, com o padrão de texto seguro.
+- **IDOR e Notas do Narrador:** `api/__tests__/werewolf.test.ts`: o outro jogador não troca a forma de quem não é dele (403), e as Notas do Narrador nunca chegam ao jogador.
+- **Cliente adulterado:** o servidor confere o id da opção e os limites da Fúria (422), não o custo da troca. A troca sem gastar Fúria é legal pelas regras (a mudança lenta), como o `wod-stacking` e a roda do Mago: um cliente adulterado só grava uma forma válida, na ficha que já pode editar.
+- **Nome de sistema no código:** `scripts/check-system-names.mjs` (CI) recusa também os ids das opções de `state` (`'crinos'`) no app, no `@tms/ui` e na API.
+
 ## Fora da v0, conhecido
 
 - Tempo real e notificações. Ver §8 do plano.

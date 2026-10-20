@@ -12,6 +12,7 @@ SQLCipher, dock com toque longo e modo avião.
 | `03-spend-blood` | toque longo no Sangue, aviso com Desfazer, fila confirma |
 | `04-airplane-mode` | gastar offline, reiniciar sem rede (dados do banco cifrado) e sincronizar ao voltar (só Android) |
 | `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
+| `06-werewolf-form` | a Forma do Lobisomem no dock: Crinos com a mudança instantânea e Desfazer (v2) |
 
 ## Preparar
 
@@ -36,7 +37,9 @@ maestro test apps/frontend/.maestro \
   -e EMAIL=<conta de teste> -e PASSWORD=<senha> \
   -e CHRONICLE="<nome da crônica>" -e CHARACTER="<nome da ficha>" \
   -e CHARACTER_ID=<uuid da ficha> \
-  -e MAGE_CHRONICLE="<crônica de Mago>" -e MAGE_CHARACTER="<ficha de Mago>"
+  -e MAGE_CHRONICLE="<crônica de Mago>" -e MAGE_CHARACTER="<ficha de Mago>" \
+  -e WEREWOLF_CHRONICLE="<crônica de Lobisomem>" \
+  -e WEREWOLF_CHARACTER="<ficha de Lobisomem fora de Crinos>"
 ```
 
 No iOS, exclua o fluxo de modo avião: `--exclude-tags android`.

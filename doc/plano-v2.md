@@ -35,6 +35,36 @@ A v2 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 
 O que fica fora está no §8.
 
+## Estado da v2 (19/10/2026)
+
+As 7 etapas estão na branch `feat/v2-ficha-lobisomem`, um commit por etapa, sobre a `feat/v1-ficha-mago` em `220270d`. Nenhuma migration e nenhuma rota nova.
+
+| Etapa | O que entrou |
+|---|---|
+| 1 | `wta-w20` 1.1.0 com colunas, abas, Ritos, Fetiches e Regenerar; as fichas Cauê e Tainá; o `health.heal` das ações do topo nas duas camadas |
+| 2 | `planState` e `statePreview` no core; o `describe` do atributo modificado diz "em Crinos" |
+| 3 | `StateRow` e `StateSheet`, o nome falado por opção no `Choice` e os ids de opção no `check-system-names.mjs` |
+| 4 | `modifierNote` na grade e nas linhas, os pips até o `max`, o aviso do efetivo no Editar e o `Glyph` `augur-moon` |
+| 5 | o slot Atributo lê Em jogo (os atalhos de Fúria e Gnose), a validação de atalho fora das seções do slot, os testes de rolagem e do Regenerar |
+| 6 | `wta-w20` em `PUBLISHED_SYSTEMS` e `api/__tests__/werewolf.test.ts` |
+| 7 | `journey-werewolf.spec.ts`, o fluxo `06-werewolf-form` do Maestro e a documentação |
+
+O que mudou em relação ao plano:
+
+- **Os atalhos de Fúria e Gnose nunca funcionaram.** Eles citavam campos fora das seções do slot Atributo e ficavam sempre indisponíveis. O slot passou a ler também Em jogo (Fúria, Gnose e FdV, pelo permanente), e as duas camadas de validação recusam agora esse caso. A checagem achou o mesmo defeito no fixture do CoC (Sanidade e Sorte). O template continua na 1.1.0, porque nunca foi publicado.
+- **Regenerar ficou no menu ⋯** (ação do topo do template), não no sheet da Vitalidade. Sem dano para curar, o motivo é "Nada a curar: sem dano contusivo ou letal".
+- **O chip do dock é o genérico** ("Forma · Crinos"). Um `StateChip` próprio não acrescentava nada.
+- **O `Choice` ganhou `spoken`, não `hint`.** O `meta` já mostrava o texto embaixo da opção; faltava só o nome por extenso para o leitor de tela ("Força 7", não "For 7").
+- **Acima da escala, sem "+2".** Os pips param no `max`, e o número ao lado diz o resto.
+- **Não entrou o teste "trocar de forma com o sheet Dados aberto".** Só um sheet abre por vez.
+- **A matriz de AuthZ continua rodando só com o Vampiro**, como na v1. O `werewolf.test.ts` cobre o dono, o outro jogador e o narrador nas rotas que o Lobisomem usa.
+
+Ainda falta provar fora desta máquina:
+
+- o E2E (`journey-werewolf.spec.ts` e as três jornadas juntas), que só roda no CI;
+- o fluxo `06-werewolf-form` do Maestro, num dev build;
+- a publicação no ambiente de verdade, só depois de a versão do app com a Forma estar no ar, e com a API reiniciada.
+
 ---
 
 ## 2. Ponto de partida
