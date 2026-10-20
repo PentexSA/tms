@@ -262,7 +262,7 @@
     const cap = capped ? permanent : f.overMax ? null : max
     const shownMax = capped ? permanent : max
     return {
-      current: v.current ?? shownMax ?? 0,
+      current: v.current ?? (f.tempUncapped ? 0 : (shownMax ?? 0)),
       max,
       permanent,
       cap,

@@ -292,8 +292,9 @@ export function resolve(
     const capped = permanent !== null && !f.tempUncapped
     const shownMax = capped ? permanent : max
     return {
-      // Ficha nova começa com o recurso cheio.
-      current: int(v.current) ?? shownMax ?? 0,
+      // Ficha nova começa com o recurso cheio. Sem o permanente como teto
+      // (`tempUncapped`, Renome do W20), não há "cheio": começa em 0.
+      current: int(v.current) ?? (f.tempUncapped ? 0 : (shownMax ?? 0)),
       permanent,
       temp: f.temp ? (int(v.temp) ?? 0) : null,
       max,
