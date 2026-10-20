@@ -13,6 +13,7 @@ import { StyleSheet, TextInput, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { ChipFlow } from './ChipFlow'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -21,10 +22,14 @@ import type { LayoutProps } from './types'
 // (`searchable`). O filtro some em Evoluir: é ali que se compra o primeiro
 // ponto. A lista visível é um seletor comparado por valor: gastar Sangue
 // não re-renderiza as Habilidades. Com `groupTabs`, no celular cada grupo é
-// uma aba; com busca, o resultado vem de todos os grupos.
+// uma aba (no Editar, ou com o filtro desligado); com busca, o resultado vem
+// de todos os grupos. Com o filtro ligado, fora do Editar, os traços viram
+// chips "Nome N" (ChipFlow), todos os grupos à vista. Com `badge`
+// (contrato §6), a linha cujo id é o valor do `choice` citado ganha o selo
+// (a Esfera de afinidade do Mago).
 
 export function GroupsLayout({ section }: LayoutProps) {
-  const { mode } = useSheet()
+  const { mode, model } = useSheet()
   const filter = section.def.filter
   const [on, setOn] = useState(filter?.default ?? false)
   const [search, setSearch] = useState('')
@@ -34,13 +39,25 @@ export function GroupsLayout({ section }: LayoutProps) {
     jsonEqual
   )
   const shown = new Set(visible)
+  // Item de lista (Disciplinas) tem várias linhas: não vira chip
+  const isList = (id: string) => model.fields.get(id)?.def.type === 'list'
+  const badge = section.def.badge
+  const badged = useSheetSelector(s => {
+    const r = badge ? s.resolved.get(badge.field) : undefined
+    return r?.type === 'choice' ? r.value : null
+  })
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
   const total = section.fieldIds.length
   const showFilter = Boolean(filter) && mode !== 'evolve'
   const searching = search.trim() !== ''
-  const tabs = useGroupTabs(section, groups, searching)
+  // Abas no Editar e, fora dele, quando a seção mostra tudo em linhas
+  // (filtro desligado); com o filtro ligado, os chips cabem inteiros
+  const tabs = useGroupTabs(section, groups, {
+    enabled: mode === 'evolve' || !filtered,
+    all: searching,
+  })
   // O título do grupo some quando a aba já diz qual é
   const titled = !tabs.bar || searching
 
@@ -82,8 +99,19 @@ export function GroupsLayout({ section }: LayoutProps) {
                 <SectionHeader title={g.title} level="group" />
               </View>
             ) : null}
-            {ids.length ? (
-              ids.map(id => <FieldSlot key={id} id={id} variant="row" />)
+            {ids.length && filtered && ids.every(id => !isList(id)) ? (
+              <ChipFlow ids={ids} />
+            ) : ids.length ? (
+              ids.map(id =>
+                badge && id === badged ? (
+                  <View key={id}>
+                    <FieldSlot id={id} variant="row" />
+                    <RowBadge id={id} label={badge.label} />
+                  </View>
+                ) : (
+                  <FieldSlot key={id} id={id} variant="row" />
+                )
+              )
             ) : (
               <Text color="inkMuted" style={styles.empty}>
                 {g.title
@@ -94,6 +122,26 @@ export function GroupsLayout({ section }: LayoutProps) {
           </View>
         )
       })}
+    </View>
+  )
+}
+
+// O selo da linha marcada: o nome do selo, nunca só a cor
+function RowBadge({
+  id,
+  label,
+}: {
+  readonly id: string
+  readonly label: string
+}) {
+  const { colors } = useTheme()
+  return (
+    <View testID={`badge-${id}`} style={styles.badgeRow}>
+      <View style={[styles.badge, { borderColor: colors.action }]}>
+        <Text variant="caption" color="action">
+          {`◆ ${label}`}
+        </Text>
+      </View>
     </View>
   )
 }
@@ -188,6 +236,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: tokens.layout.gutter,
+    paddingBottom: tokens.space[2],
+  },
+  badge: {
+    borderRadius: tokens.radius.pill,
+    borderWidth: tokens.borderWidth.hair,
+    paddingHorizontal: tokens.space[2],
   },
   empty: {
     paddingHorizontal: tokens.layout.gutter,

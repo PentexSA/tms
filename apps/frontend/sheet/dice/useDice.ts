@@ -8,6 +8,7 @@ import {
   type PoolResult,
   planPool,
   poolOptions,
+  poolPresets,
   poolRollOf,
   type RandomSource,
   rollPool,
@@ -27,7 +28,9 @@ import { commitMessage } from '../useCommit'
 // saem do mesmo planPool do core que o servidor usa. Com rede, quem rola é o
 // servidor (a API nunca aceita resultado do cliente); sem rede, o aparelho
 // rola com o CSPRNG do expo-crypto, o resultado fica marcado como local e o
-// custo (FdV) vai pela fila como qualquer lote.
+// custo (FdV) vai pela fila como qualquer lote. Um atalho do template
+// ("Conjurar efeito") fixa os slots dele; escolher outra opção num desses
+// slots desliga o atalho.
 
 /** Uma rolagem desta sessão (a lista do sheet). */
 export interface SessionRoll {
@@ -70,6 +73,7 @@ export function useDice(
   const resolved = useStore(store, s => s.resolved)
 
   const [slots, setSlots] = useState<Record<string, string>>({})
+  const [preset, setPreset] = useState<string | null>(null)
   const [difficulty, setDifficulty] = useState(roll?.difficulty.default ?? 6)
   const [specialty, setSpecialty] = useState(false)
   const [boosts, setBoosts] = useState<readonly string[]>([])
@@ -87,10 +91,26 @@ export function useDice(
       ),
     [model, resolved, roles, roll]
   )
+  const presets = useMemo(
+    () => poolPresets(model, resolved, roles),
+    [model, resolved, roles]
+  )
+  const active = presets.find(p => p.id === preset) ?? null
   const plan: PoolPlan = useMemo(
     () =>
-      planPool(model, values, { slots, difficulty, specialty, boosts }, roles),
-    [model, values, slots, difficulty, specialty, boosts, roles]
+      planPool(
+        model,
+        values,
+        {
+          slots,
+          difficulty,
+          specialty,
+          boosts,
+          ...(preset ? { preset } : {}),
+        },
+        roles
+      ),
+    [model, values, slots, difficulty, specialty, boosts, preset, roles]
   )
 
   const record = useCallback((entry: SessionRoll) => {
@@ -144,6 +164,7 @@ export function useDice(
           difficulty,
           specialty,
           boosts: [...boosts],
+          ...(preset ? { preset } : {}),
           ...(manual ? { manual } : {}),
         })
         if (res.error) {
@@ -193,6 +214,7 @@ export function useDice(
       difficulty,
       specialty,
       boosts,
+      preset,
       store,
       queryClient,
       record,
@@ -205,13 +227,32 @@ export function useDice(
     options,
     plan,
     slots,
-    choose: (slot: string, key: string | null) =>
+    presets,
+    preset: active,
+    // Ligar um atalho põe as opções dele nos slots; tocar de novo desliga
+    togglePreset: (id: string) => {
+      const next = presets.find(p => p.id === id && p.available)
+      if (!next || preset === id) {
+        setPreset(null)
+        return
+      }
+      setPreset(id)
+      setSlots(s => ({
+        ...s,
+        ...Object.fromEntries(
+          Object.entries(next.slots).map(([slot, o]) => [slot, o.key])
+        ),
+      }))
+    },
+    choose: (slot: string, key: string | null) => {
+      if (active && Object.hasOwn(active.slots, slot)) setPreset(null)
       setSlots(s => {
         const next = { ...s }
         if (key) next[slot] = key
         else delete next[slot]
         return next
-      }),
+      })
+    },
     difficulty,
     setDifficulty,
     specialty,

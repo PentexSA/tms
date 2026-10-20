@@ -15,7 +15,7 @@ const REGISTRY = {
   fieldTypes: ['rating', 'number', 'percent', 'resource', 'track', 'slots', 'clock', 'state', 'mark', 'text', 'longText', 'choice', 'tags', 'list'],
   numberDisplays: ['plain', 'score+mod', 'signed', 'ladder'],
   percentDisplays: ['percent', 'percent+half+fifth'],
-  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth'],
+  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'vtmGeneration', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth'],
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
@@ -36,6 +36,7 @@ const REGISTRY = {
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
   glyphs: ['augur-moon'],
+  emblems: ['ankh', 'nine-star', 'claws'],
   skins: ['wod', 'dnd', 'coc', 'fate'],
   slotResets: ['longRest', 'shortRest'],
 }
@@ -61,7 +62,7 @@ const KEYS = {
     tags: ['options'],
     list: ['itemLabel', 'item', 'catalog', 'searchable', 'density', 'fixed', 'rollAs'],
   },
-  section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
+  section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'groupTabs', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
   roll: ['model', 'label', 'die', 'dice', 'slots', 'difficulty', 'penalty', 'specialty', 'boosts', 'presets', 'advantage', 'target', 'conditions', 'bonusDice', 'ladder'],
 }
 
@@ -91,6 +92,7 @@ const DERIVE = {
   abilityModifier: s => Math.floor((s - 10) / 2),
   proficiencyBonus: l => 2 + Math.floor((Math.max(1, l) - 1) / 4),
   vtmBloodPool: g => BLOOD[g] ?? 10,
+  vtmGeneration: d => 13 - Math.min(5, Math.max(0, d)),
   cocHitPoints: (con, siz) => Math.floor((con + siz) / 10),
   cocMagicPoints: pow => Math.floor(pow / 5),
   cocSanityMax: mythos => 99 - mythos,
@@ -98,11 +100,19 @@ const DERIVE = {
   fifth: v => Math.floor(v / 5),
 }
 
+// Item de lista pelo nome ({ list, item }): os pontos dele, ou 0 sem o item.
+const isItemRef = x => isObj(x) && typeof x.list === 'string' && typeof x.item === 'string'
+const itemValue = (values, ref) => {
+  const it = (Array.isArray(values[ref.list]) ? values[ref.list] : []).find(i => i?.name === ref.item)
+  return Number.isInteger(it?.value) ? it.value : 0
+}
+const input = (t, values, x, depth) => (isItemRef(x) ? itemValue(values, x) : numberOf(t, values, x, depth))
+
 // Número de um campo a partir dos valores gravados (sem modificadores de estado).
 function numberOf(t, values, id, depth = 0) {
   const f = t.fields[id]
   if (!f || depth > 4) return 0
-  if (f.readOnly && f.derive && own(DERIVE, f.derive)) return DERIVE[f.derive](...[f.from].flat().map(x => numberOf(t, values, x, depth + 1)))
+  if (f.readOnly && f.derive && own(DERIVE, f.derive)) return DERIVE[f.derive](...[f.from].flat().map(x => input(t, values, x, depth + 1)))
   const v = own(values, id) ? values[id] : undefined
   if (Number.isInteger(v)) return v
   if (isObj(v) && Number.isInteger(v.permanent ?? v.current)) return v.permanent ?? v.current
@@ -116,7 +126,7 @@ function resourceCap(t, values, f, v) {
   if (typeof f.max === 'number') return f.max
   if (f.max?.stored) return v.max
   if (f.max?.field) return numberOf(t, values, f.max.field)
-  if (f.max?.derive && own(DERIVE, f.max.derive)) return DERIVE[f.max.derive](...[f.max.from].flat().map(x => numberOf(t, values, x)))
+  if (f.max?.derive && own(DERIVE, f.max.derive)) return DERIVE[f.max.derive](...[f.max.from].flat().map(x => input(t, values, x, 0)))
   return null
 }
 
@@ -142,6 +152,14 @@ function validateTemplate(t, palette) {
   }
   const fields = isObj(t.fields) ? t.fields : {}
   const has = id => own(fields, id)
+  const sources = (path, from) => {
+    for (const src of [from].flat().filter(Boolean)) {
+      if (!isItemRef(src)) { if (!has(src)) err(path, `campo '${src}' não existe`); continue }
+      const l = has(src.list) ? fields[src.list] : undefined
+      if (l?.type !== 'list') err(path, `campo '${src.list}' não é uma lista`)
+      else if (Array.isArray(l.catalog) && !l.catalog.includes(src.item)) err(path, `'${src.item}' não está no catálogo de '${src.list}'`)
+    }
+  }
   const accentOk = v => v === 'accent-neutral' || palette.includes(v)
 
   // Toda string do template, em qualquer profundidade, é texto puro e limitada.
@@ -175,7 +193,7 @@ function validateTemplate(t, palette) {
     if (f.colorRole) oneOf(`${p}.colorRole`, f.colorRole, REGISTRY.colorRoles, 'colorRole')
     if (f.defaultAction) oneOf(`${p}.defaultAction`, f.defaultAction, REGISTRY.defaultActions, 'defaultAction')
     if (f.derive) oneOf(`${p}.derive`, f.derive, REGISTRY.derive, 'derive')
-    for (const src of [f.from].flat().filter(Boolean)) if (!has(src)) err(`${p}.from`, `campo '${src}' não existe`)
+    sources(`${p}.from`, f.from)
     if (f.badge && !has(f.badge.field)) err(`${p}.badge.field`, `campo '${f.badge.field}' não existe`)
     if (f.maxLength != null) num(`${p}.maxLength`, f.maxLength, 1, 20000)
     if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
@@ -212,7 +230,7 @@ function validateTemplate(t, palette) {
       if (typeof max === 'number') num(`${p}.max`, max, 1, 9999)
       else if (isObj(max)) {
         if (max.derive) oneOf(`${p}.max.derive`, max.derive, REGISTRY.derive, 'derive')
-        for (const src of [max.from].flat().filter(Boolean)) if (!has(src)) err(`${p}.max.from`, `campo '${src}' não existe`)
+        sources(`${p}.max.from`, max.from)
         if (max.field && !has(max.field)) err(`${p}.max.field`, `campo '${max.field}' não existe`)
         if (max.stored) { num(`${p}.max.min`, max.min, 0, 9999); num(`${p}.max.max`, max.max, 1, 9999) }
       }
@@ -317,6 +335,11 @@ function validateTemplate(t, palette) {
     if (!has(k)) err('identity.summary', `campo '${k}' não existe`)
     if (restricted.has(k)) err('identity.summary', `campo '${k}' é de seção com leitura restrita`)
   }
+  for (const k of (id.columns ?? []).flat()) {
+    if (!has(k)) err('identity.columns', `campo '${k}' não existe`)
+    if (restricted.has(k)) err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
+  }
+  if (id.emblem) oneOf('identity.emblem', id.emblem, REGISTRY.emblems, 'emblem')
   if (id.chipFormat) {
     text('identity.chipFormat', id.chipFormat, 60)
     for (const m of id.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g)) if (!has(m[1])) err('identity.chipFormat', `campo '${m[1]}' não existe`)

@@ -81,7 +81,7 @@ describe('POST /chronicles/:id/characters', () => {
       user_id: owner.id,
       chronicle_id: chronicleId,
       name: 'Helena Varga',
-      template_version: '1.1.0',
+      template_version: '1.2.0',
       sheet_version: 0,
     })
     expect(row.sheet_data).toEqual({
@@ -194,7 +194,7 @@ describe('GET /characters/:id', () => {
     expect(body).toMatchObject({
       name: 'Helena Varga',
       systemCode: 'vtm-v20',
-      templateVersion: '1.1.0',
+      templateVersion: '1.2.0',
       sheetVersion: 0,
       chronicle: { id: chronicleId, name: 'Crônica da Liberdade' },
       owner: { id: owner.id, username: 'dona' },
@@ -291,7 +291,7 @@ describe('GET /systems/:code/template', () => {
   it('a versão mais recente, com ETag e revalidação', async () => {
     const res = await as(ctx, player, 'GET', '/systems/vtm-v20/template')
     expect(res.status).toBe(200)
-    expect(res.headers.get('etag')).toBe('"vtm-v20@1.1.0"')
+    expect(res.headers.get('etag')).toBe('"vtm-v20@1.2.0"')
     expect(res.headers.get('cache-control')).toBe('private, no-cache')
     expect(((await res.json()) as { system: string }).system).toBe('vtm-v20')
   })
@@ -301,12 +301,12 @@ describe('GET /systems/:code/template', () => {
       ctx,
       player,
       'GET',
-      '/systems/vtm-v20/template?version=1.1.0'
+      '/systems/vtm-v20/template?version=1.2.0'
     )
     expect(res.headers.get('cache-control')).toContain('immutable')
     const again = await ctx.app.handle(
-      new Request('http://localhost/systems/vtm-v20/template?version=1.1.0', {
-        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.1.0"' },
+      new Request('http://localhost/systems/vtm-v20/template?version=1.2.0', {
+        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.2.0"' },
       })
     )
     expect(again.status).toBe(304)

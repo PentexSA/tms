@@ -15,6 +15,7 @@ import { longText, text } from './text'
 import { track } from './track'
 import type { FieldType } from './types'
 
+export { inactiveNote } from './rating'
 export type { FieldType } from './types'
 
 // Um comportamento por tipo da lista fechada: o build quebra se faltar um.

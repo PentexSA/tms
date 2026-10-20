@@ -1,5 +1,6 @@
 import type { SheetModel } from './compile'
 import type {
+  ClockValue,
   FieldId,
   ResourceAction,
   SheetData,
@@ -16,6 +17,7 @@ import {
   type ResolvedStacking,
   resolve,
 } from './resolve'
+import { gain as clockGain, lose as clockLose } from './rules/clock'
 import { gain, spend, takeDamage } from './rules/resource'
 import { damage, heal } from './rules/wod-stacking'
 
@@ -229,6 +231,30 @@ export function planDamage(
     delta > 0
       ? damage(def, value ?? undefined, type, delta)
       : heal(def, value ?? undefined, type, -delta)
+  if (!change.changed) return unavailable(change.note)
+  return plan(model, sheet, [event(sheet, fieldId, change.counts)], change.note)
+}
+
+/**
+ * Um passo na roda (sheet do `clock`): + ganha e − tira do preenchimento, pela
+ * regra do template. A regra pode tocar outro preenchimento (o Paradoxo que
+ * consome Quintessência); o lote é um evento só, com a roda inteira.
+ */
+export function planClock(
+  model: SheetModel,
+  sheet: SheetData,
+  fieldId: FieldId,
+  fill: string,
+  delta: number
+): ActionPlan {
+  const def = model.fields.get(fieldId)?.def
+  if (def?.type !== 'clock' || delta === 0)
+    return unavailable('Roda inexistente')
+  const value = stored(sheet, fieldId) as ClockValue | undefined
+  const change =
+    delta > 0
+      ? clockGain(def, value ?? undefined, fill, delta)
+      : clockLose(def, value ?? undefined, fill, -delta)
   if (!change.changed) return unavailable(change.note)
   return plan(model, sheet, [event(sheet, fieldId, change.counts)], change.note)
 }

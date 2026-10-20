@@ -4,15 +4,21 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
   "identity": {
+    "emblem": "nine-star",
     "name": "name",
     "chip": "tradition",
     "summary": ["concept", "essence"],
-    "voice": "quote"
+    "voice": "quote",
+    "columns": [
+      ["name"],
+      ["nature", "demeanor", "concept"],
+      ["tradition", "essence", "house"]
+    ]
   },
   "accent": {
     "from": "tradition",
@@ -434,6 +440,14 @@
       ]
     },
 
+    "rotes": {
+      "type": "list",
+      "label": "Rotinas",
+      "itemLabel": "Rotina",
+      "item": { "notes": true },
+      "help": "Efeitos que o mago já domina. Anote as Esferas e o que a rotina faz nas notas de cada uma."
+    },
+
     "willpower": {
       "type": "resource",
       "label": "Força de Vontade",
@@ -522,6 +536,7 @@
       "zone": "build",
       "title": "Atributos",
       "layout": "grid",
+      "groupTabs": true,
       "groups": [
         {
           "id": "physical",
@@ -545,6 +560,7 @@
       "zone": "build",
       "title": "Habilidades",
       "layout": "groups",
+      "groupTabs": true,
       "filter": {
         "rule": "invested",
         "label": "Só com pontos",
@@ -612,7 +628,11 @@
       "layout": "groups",
       "badge": { "field": "affinity", "label": "Afinidade" },
       "groups": [
-        { "id": "arete", "title": "Arete", "fields": ["arete"] },
+        {
+          "id": "arete",
+          "title": "Arete",
+          "fields": ["arete", "affinity"]
+        },
         {
           "id": "spheres",
           "title": "Esferas",
@@ -642,6 +662,13 @@
           "fields": ["backgrounds"]
         }
       ]
+    },
+    {
+      "id": "rotes",
+      "zone": "powers",
+      "title": "Rotinas",
+      "layout": "groups",
+      "groups": [{ "id": "rotes", "title": "Rotinas", "fields": ["rotes"] }]
     },
     {
       "id": "focus",

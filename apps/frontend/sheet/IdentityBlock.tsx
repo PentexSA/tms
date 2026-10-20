@@ -36,7 +36,13 @@ export function IdentityBlock() {
   return (
     <View style={styles.block}>
       <View style={styles.head}>
-        <Avatar name={id.name} size="lg" />
+        {/* O símbolo da criatura (Ankh, estrela de nove pontas, garras), do
+            template; sem ele, as iniciais */}
+        <Avatar
+          name={id.name}
+          size="lg"
+          emblem={model.template.identity.emblem}
+        />
         <View style={styles.names}>
           {id.subtitle ? (
             <Text variant="caption" color="inkMuted">

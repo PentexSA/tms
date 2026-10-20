@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native'
+import { Emblem, isEmblem } from './Emblem'
 import { Text } from './Text'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
@@ -15,10 +16,13 @@ export const initials = (name: string) =>
 export interface AvatarProps {
   readonly name: string
   readonly size?: 'sm' | 'lg'
+  // Símbolo da criatura (identity.emblem do template) no lugar das
+  // iniciais; nome desconhecido ou ausente volta às iniciais.
+  readonly emblem?: string | null
 }
 
-/** Iniciais na cor do accent do contexto. Decorativo: o nome está ao lado. */
-export function Avatar({ name, size = 'sm' }: AvatarProps) {
+/** Símbolo ou iniciais na cor do accent do contexto. Decorativo: o nome está ao lado. */
+export function Avatar({ name, size = 'sm', emblem }: AvatarProps) {
   const { accent } = useTheme()
   const d = size === 'lg' ? tokens.size.avatarLg : tokens.size.avatarSm
   return (
@@ -30,12 +34,21 @@ export function Avatar({ name, size = 'sm' }: AvatarProps) {
         { width: d, height: d, backgroundColor: accent.fill },
       ]}
     >
-      <Text
-        variant={size === 'lg' ? 'displaySm' : 'fieldLabel'}
-        style={{ color: accent.on }}
-      >
-        {initials(name)}
-      </Text>
+      {isEmblem(emblem) ? (
+        <Emblem
+          name={emblem}
+          size={Math.round(d * 0.62)}
+          color={accent.on}
+          testID={`emblem-${emblem}`}
+        />
+      ) : (
+        <Text
+          variant={size === 'lg' ? 'displaySm' : 'fieldLabel'}
+          style={{ color: accent.on }}
+        >
+          {initials(name)}
+        </Text>
+      )}
     </View>
   )
 }

@@ -4,11 +4,12 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
   "identity": {
+    "emblem": "claws",
     "name": "name",
     "subtitle": "deedName",
     "chip": "tribe",

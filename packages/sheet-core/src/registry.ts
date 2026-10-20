@@ -68,6 +68,7 @@ export const REGISTRY = {
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
   glyphs: ['augur-moon'],
+  emblems: ['ankh', 'nine-star', 'claws'],
   skins: ['wod', 'dnd', 'coc', 'fate'],
   slotResets: ['longRest', 'shortRest'],
 } as const
@@ -98,6 +99,7 @@ export type DefaultAction = Registry['defaultActions'][number]
 export type ModifierOp = Registry['modifierOps'][number]
 export type ConditionRoll = Registry['conditionRoll'][number]
 export type GlyphName = Registry['glyphs'][number]
+export type EmblemName = Registry['emblems'][number]
 export type SlotReset = Registry['slotResets'][number]
 
 // Confere se um valor desconhecido (vindo do banco ou do cliente) está na lista.

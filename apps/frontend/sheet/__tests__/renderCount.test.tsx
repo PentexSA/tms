@@ -23,7 +23,9 @@ it('gastar Sangue re-renderiza só o Sangue', () => {
     sync: { enqueue: jest.fn() },
     uuid: () => '00000000-0000-4000-8000-000000000001',
   })
-  // Duas fichas do mesmo store (a do celular e uma prévia): ~90 FieldSlot
+  // Duas fichas do mesmo store (a do celular e uma prévia). As Habilidades
+  // com o filtro ligado viram chips (ChipFlow, memo por campo), fora da
+  // contagem do registry: sobram ~30 FieldSlot, e nenhum re-renderiza
   render(
     <>
       <SheetView store={store} />
@@ -31,7 +33,7 @@ it('gastar Sangue re-renderiza só o Sangue', () => {
     </>
   )
   const total = [...renders.values()].reduce((a, b) => a + b, 0)
-  expect(total).toBeGreaterThanOrEqual(50)
+  expect(total).toBeGreaterThanOrEqual(30)
   renders.clear()
 
   act(() => {
@@ -45,4 +47,33 @@ it('gastar Sangue re-renderiza só o Sangue', () => {
   expect(screen.getAllByLabelText(/^Pontos de Sangue, 8 de/)).toHaveLength(2)
   expect([...renders.keys()]).toEqual(['blood'])
   expect(renders.get('blood')).toBe(2)
+})
+
+it('mexer na roda do Mago re-renderiza só a roda (v1)', () => {
+  const { model, sheet } = sheetFor('tomas', ['owner'])
+  const store = createSheetStore({
+    characterId: 'c2',
+    model,
+    sheet,
+    sheetVersion: 1,
+    roles: ['owner'],
+    sync: { enqueue: jest.fn() },
+    uuid: () => '00000000-0000-4000-8000-000000000002',
+  })
+  render(<SheetView store={store} />)
+  renders.clear()
+
+  act(() => {
+    store.getState().commit(
+      [
+        {
+          path: 'values.wheel',
+          from: { quintessence: 6, paradox: 2 },
+          to: { quintessence: 6, paradox: 3 },
+        },
+      ],
+      'Paradoxo 2 → 3'
+    )
+  })
+  expect([...renders.keys()]).toEqual(['wheel'])
 })

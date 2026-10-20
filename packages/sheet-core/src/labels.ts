@@ -1,8 +1,9 @@
 import type { SheetModel } from './compile'
-import type { FieldDef, SheetData } from './contract'
+import type { ClockField, FieldDef, SheetData } from './contract'
 import { parsePath, type SheetEvent } from './events'
 import { stored } from './fields'
-import { resolve } from './resolve'
+import { inactiveNote } from './fields/rating'
+import { type ResolvedRating, resolve } from './resolve'
 import { plural } from './text'
 import { asArray, get, rec } from './validate/util'
 
@@ -27,6 +28,21 @@ const optionLabel = (options: unknown, id: unknown) =>
   (asArray(options)
     .map(rec)
     .find(o => o?.id === id)?.label as string) ?? DASH
+
+// Os preenchimentos que mudaram, na ordem do template.
+function clockChanges(def: ClockField, from: unknown, to: unknown) {
+  const count = (v: unknown, id: string) => {
+    const x = get(v, id)
+    return typeof x === 'number' ? x : 0
+  }
+  return def.fills
+    .map(f => ({
+      label: f.label,
+      from: count(from, f.id),
+      to: count(to, f.id),
+    }))
+    .filter(c => c.from !== c.to)
+}
 
 function change(def: FieldDef, from: unknown, to: unknown, model: SheetModel) {
   switch (def.type) {
@@ -81,6 +97,12 @@ function change(def: FieldDef, from: unknown, to: unknown, model: SheetModel) {
       return `${asArray(from).length} ${ARROW} ${plural(asArray(to).length, 'marcada', 'marcadas')}`
     case 'list':
       return `${asArray(from).length} ${ARROW} ${plural(asArray(to).length, 'item', 'itens')}`
+    case 'clock':
+      return (
+        clockChanges(def, from, to)
+          .map(c => `${c.label} ${c.from} ${ARROW} ${c.to}`)
+          .join(', ') || 'sem mudança'
+      )
     default:
       return 'alterado'
   }
@@ -95,6 +117,13 @@ export function describeEvent(
   if (!path || !def) return { label: 'Campo', change: 'alterado' }
   if (path.scope === 'specialties')
     return { label: `${def.label} · especialização`, change: 'atualizada' }
+  // Na roda, um preenchimento só leva o nome dele ("Paradoxo 2 → 3")
+  if (def.type === 'clock') {
+    const changes = clockChanges(def, event.from, event.to)
+    const [only] = changes
+    if (only && changes.length === 1)
+      return { label: only.label, change: `${only.from} ${ARROW} ${only.to}` }
+  }
   const text = change(def, event.from, event.to, model)
   // Como no protótipo: recursos usam o rótulo curto ("Sangue 10 → 9"), menos
   // na mudança do permanente, que é rara e merece o nome por extenso.
@@ -147,4 +176,31 @@ export function describeBatch(
     return `${label} ${change}`
   }
   return plural(events.length, 'alteração', 'alterações')
+}
+
+/**
+ * Os campos com teto não destrutivo (`cap`) cujos pontos inativos mudam de
+ * uma ficha para a outra: o resumo do Concluir avisa "Forças: 1 inativo,
+ * máx. pelo Arete 2" antes de salvar, e "volta a valer" quando o teto sobe.
+ * Nenhum valor muda: o aviso é só sobre o que a parada e a ficha vão usar.
+ */
+export function inactiveChanges(
+  model: SheetModel,
+  before: SheetData,
+  after: SheetData
+): ChangeLabel[] {
+  const a = resolve(model, before)
+  const b = resolve(model, after)
+  const out: ChangeLabel[] = []
+  for (const [id, field] of model.fields) {
+    if (field.def.type !== 'rating' || !field.def.cap) continue
+    const was = a.get(id) as ResolvedRating
+    const now = b.get(id) as ResolvedRating
+    if (was.inactive === now.inactive) continue
+    out.push({
+      label: field.def.label,
+      change: inactiveNote(now) ?? 'volta a valer',
+    })
+  }
+  return out
 }

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
 import { formatIssue, validateSheet } from '../validate'
-import { character, type Json, paths, templates, vtm } from './fixtures'
+import { character, type Json, mta, paths, templates, vtm } from './fixtures'
 
 // Vampiro é o template da v0; os casos de D&D garantem que o validador não
 // aprendeu nada específico de WoD (doc/arquitetura-motor-de-ficha.md §10.1).
@@ -124,6 +124,35 @@ describe('validateSheet: regras do Vampiro (v0)', () => {
     expect(paths(validateSheet(vtmTemplate(), c.sheet))).toEqual([
       'values.storytellerNotes',
     ])
+  })
+})
+
+describe('validateSheet: regras do Mago (v1)', () => {
+  it.each(['tomas', 'nadia', 'otto'])('a ficha de exemplo %s é válida', id => {
+    expect(validateSheet(mta(), character(id).sheet)).toEqual([])
+  })
+
+  it('Esfera acima do Arete é aceita: o teto não é destrutivo', () => {
+    const c = character('otto')
+    expect(c.sheet.values.forces).toBeGreaterThan(
+      c.sheet.values.arete as number
+    )
+    c.sheet.values.arete = 1
+    expect(validateSheet(mta(), c.sheet)).toEqual([])
+  })
+
+  it('a roda não passa das 20 casas', () => {
+    const c = character('otto')
+    c.sheet.values.wheel = { quintessence: 6, paradox: 15 }
+    expect(paths(validateSheet(mta(), c.sheet))).toEqual(['values.wheel'])
+  })
+
+  it('rotina só aceita nome e notas', () => {
+    const c = character('otto')
+    c.sheet.values.rotes = [{ id: 'r1', name: 'Escudo', value: 2 }]
+    expect(paths(validateSheet(mta(), c.sheet))).toContain(
+      'values.rotes.0.value'
+    )
   })
 })
 

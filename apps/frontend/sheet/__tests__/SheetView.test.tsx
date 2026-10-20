@@ -4,11 +4,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import {
   compileTemplate,
   describe as fieldDescribe,
+  REGISTRY,
   type RoleName,
   resolve,
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
+import { isEmblem } from '@tms/ui'
 import {
   example,
   modelOf,
@@ -92,6 +94,30 @@ describe('as fichas de Vampiro em Leitura', () => {
     expect(screen.queryByRole('header', { name: 'Helena Varga' })).toBeNull()
     expect(screen.getByText('Tremere')).toBeTruthy()
     expect(screen.getByText('Arquivista da Capela · 8ª geração')).toBeTruthy()
+  })
+
+  it.each([
+    ['helena', 'ankh'],
+    ['tomas', 'nine-star'],
+    ['iara', 'claws'],
+  ])('o cabeçalho de %s mostra o símbolo da criatura (%s)', (id, emblem) => {
+    const { model, sheet } = sheetFor(id, ['owner'])
+    renderSheet(model, sheet, ['owner'])
+    expect(
+      screen.getByTestId(`emblem-${emblem}`, { includeHiddenElements: true })
+    ).toBeTruthy()
+  })
+
+  it('sistema sem emblema (D&D) mantém as iniciais', () => {
+    const { model, sheet } = sheetFor('lia', ['owner'])
+    renderSheet(model, sheet, ['owner'])
+    expect(
+      screen.queryByTestId(/^emblem-/, { includeHiddenElements: true })
+    ).toBeNull()
+  })
+
+  it('todo emblema da lista fechada do core tem desenho no @tms/ui', () => {
+    expect(REGISTRY.emblems.filter(e => !isEmblem(e))).toEqual([])
   })
 
   it('o jogador não vê a seção do narrador (nem o título)', () => {

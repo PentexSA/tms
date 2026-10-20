@@ -353,6 +353,78 @@ describe('o sheet Dados', () => {
   })
 })
 
+describe('atalhos do template (Mago, v1)', () => {
+  // Otto: Arete 2, Forças 3 (1 inativo); sem ferimento para a parada limpa
+  const mage = () => {
+    const sheet = sheetFor('otto', ['owner']).sheet
+    return storeFor(
+      ['owner'],
+      {
+        ...sheet,
+        values: {
+          ...sheet.values,
+          health: { aggravated: 0, lethal: 0, bashing: 0 },
+        },
+      },
+      'mta-m20'
+    ).store
+  }
+
+  it('Conjurar efeito monta a parada de Arete e manda só o id do atalho', async () => {
+    calls.rollsPost.mockResolvedValue(
+      serverRoll({ label: 'Conjurar efeito: Arete', difficulty: 7 })
+    )
+    await open(mage())
+    fireEvent.press(screen.getByRole('button', { name: 'Conjurar efeito' }))
+    expect(
+      screen.getByRole('button', { name: 'Conjurar efeito' })
+    ).toBeSelected()
+    expect(
+      screen.getByRole('button', { name: /^Atributo: Arete, 2/ })
+    ).toBeTruthy()
+    expect(screen.getByTestId('preset-help')).toHaveTextContent(
+      /Dificuldade: 3 \+ Esfera mais alta/
+    )
+    expect(screen.getByLabelText('Parada: 2 dados')).toBeTruthy()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Dificuldade' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(calls.rollsPost).toHaveBeenCalledWith(ID, {
+      clientRollId: '00000000-0000-4000-8000-000000000001',
+      slots: { attribute: 'arete' },
+      difficulty: 7,
+      specialty: false,
+      boosts: [],
+      preset: 'magick',
+    })
+  })
+
+  it('trocar o slot fixado desliga o atalho; a Esfera inativa avisa', async () => {
+    await open(mage())
+    fireEvent.press(screen.getByRole('button', { name: 'Conjurar efeito' }))
+    pick('Atributo', 'for', /^Forças, 2, 1 inativo, máx\. pelo Arete 2/)
+    expect(
+      screen.getByRole('button', { name: 'Conjurar efeito' })
+    ).not.toBeSelected()
+    expect(screen.queryByTestId('preset-help')).toBeNull()
+    expect(
+      screen.getByLabelText(
+        'Parada: 2 dados. Forças: 1 inativo, máx. pelo Arete 2'
+      )
+    ).toBeTruthy()
+  })
+
+  it('o Vampiro não tem atalhos', async () => {
+    await open()
+    expect(screen.queryByTestId('dice-presets')).toBeNull()
+  })
+})
+
 describe('quem vê os Dados', () => {
   it('o outro jogador da crônica não rola', async () => {
     renderWithSession(

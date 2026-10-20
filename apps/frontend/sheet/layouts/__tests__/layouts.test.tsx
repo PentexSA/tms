@@ -101,26 +101,63 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(section.getByLabelText(startsWith(accented))).toBeTruthy()
   })
 
-  it('no celular, abas por grupo; a busca procura em todos', () => {
+  it('no celular, fora do Editar: filtro ligado vira chips; desligado, abas', () => {
     dims(390)
     renderSheet(model, sheet)
     const section = within(screen.getByTestId('groups-abilities'))
+    // Sem abas: os três grupos à vista, como no protótipo
+    expect(section.queryByRole('tab')).toBeNull()
+    expect(section.getByRole('header', { name: 'Talentos' })).toBeTruthy()
+    expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
+    // "Nome N" em fluxo, com o nome acessível da linha completa
+    const occult = section.getByLabelText(/^Ocultismo, /)
+    expect(within(occult).getByText('Ocultismo')).toBeTruthy()
+    expect(
+      section.queryAllByTestId('pip-on', { includeHiddenElements: true })
+    ).toHaveLength(0)
+    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
     expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
+    expect(
+      section.getAllByTestId('pip-on', { includeHiddenElements: true }).length
+    ).toBeGreaterThan(0)
     expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
     fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    // A busca procura em todas as abas
+    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.changeText(
+      section.getByLabelText('Buscar em Habilidades'),
+      'ocultismo'
+    )
+    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    // Religar o filtro tira as abas: chips de todos os grupos
+    fireEvent.changeText(section.getByLabelText('Buscar em Habilidades'), '')
+    fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
+    expect(section.queryByRole('tab')).toBeNull()
+  })
+
+  it('no Editar do celular, abas por grupo; a busca procura em todos', async () => {
+    dims(390)
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    const section = within(screen.getByTestId('groups-abilities'))
+    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('adjustable', { name: 'Ocultismo' })).toBeNull()
+    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
 
     fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
     )
-    // Achou fora da aba aberta, com o título do grupo e sem grupos vazios
-    expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
+    // Achou fora da aba aberta, com o título do grupo
+    expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
     expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
-    expect(section.queryByText('Nada para mostrar em Talentos.')).toBeNull()
   })
 
   it('seção sem filtro nem busca (Vantagens) não tem barra', () => {
@@ -186,18 +223,24 @@ describe('grid: Atributos', () => {
     expect(grid.getByLabelText('Força, 2 de 5')).toBeTruthy()
   })
 
-  it('tela estreita: cada grupo é uma aba (groupTabs)', () => {
+  it('celular, fora do Editar: a grade 3×3 inteira, sem abas', () => {
+    dims(390)
+    renderSheet(model, sheet)
+    const grid = within(screen.getByTestId('grid-attributes'))
+    expect(grid.queryByRole('tab')).toBeNull()
+    expect(grid.getByLabelText('Força, 2 de 5')).toBeTruthy()
+    expect(grid.getByLabelText(/^Carisma/)).toBeTruthy()
+    expect(grid.getByLabelText(/^Raciocínio/)).toBeTruthy()
+  })
+
+  it('tela estreita (< 360): a grade vira lista com os títulos dos grupos', () => {
     dims(340)
     renderSheet(model, sheet)
     const grid = within(screen.getByTestId('grid-attributes'))
-    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
-    expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
+    expect(grid.queryByRole('tab')).toBeNull()
+    expect(grid.getByRole('header', { name: 'Físicos' })).toBeTruthy()
+    expect(grid.getByRole('header', { name: 'Sociais' })).toBeTruthy()
     expect(grid.getByLabelText('Força, 2 de 5')).toBeTruthy()
-    expect(grid.queryByLabelText(/^Carisma/)).toBeNull()
-    fireEvent.press(grid.getByRole('tab', { name: 'Sociais' }))
-    expect(grid.getByRole('tab', { name: 'Sociais' })).toBeSelected()
-    expect(grid.queryByLabelText(/^Força/)).toBeNull()
-    expect(grid.getByLabelText(/^Carisma/)).toBeTruthy()
   })
 
   it('Editar no celular: lista com Stepper; no tablet, colunas', async () => {

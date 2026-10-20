@@ -1,4 +1,5 @@
-import { Stepper, textStyle, tokens, useTheme } from '@tms/ui'
+import { inactiveNote } from '@tms/sheet-core'
+import { Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
@@ -8,7 +9,9 @@ import { SpecialtyEditor } from './SpecialtyEditor'
 
 // rating, number e percent em Evoluir (DS: FieldRow com Stepper inline). O
 // Stepper muda 1 por toque; tocar no valor abre o teclado numérico. O que
-// passa da faixa do template o core recusa (e a mensagem aparece aqui).
+// passa da faixa do template o core recusa (e a mensagem aparece aqui). Com
+// teto não destrutivo (`cap`, Esferas ≤ Arete), o Stepper passa do teto até o
+// máximo do campo, e a linha diz quanto fica inativo.
 
 interface Range {
   readonly value: number
@@ -20,8 +23,17 @@ interface Range {
 function rangeOf(props: FieldViewProps): Range | null {
   const r = props.resolved
   if (r.type === 'rating') {
-    const { min = 0, max } = r.field.def
-    return { value: r.base, min, max, spoken: n => `${n} de ${max}` }
+    const { min = 0, max, cap } = r.field.def
+    const ceiling = r.cap
+    return {
+      value: r.base,
+      min,
+      max,
+      spoken: n =>
+        cap && ceiling !== null && n > ceiling
+          ? `${n} de ${max}, ${n - ceiling} inativo, ${cap.label} ${ceiling}`
+          : `${n} de ${max}`,
+    }
   }
   if (r.type === 'percent') {
     const max = r.field.def.max ?? 99
@@ -56,6 +68,12 @@ export function NumberEditorRow(props: FieldViewProps) {
     setTyping(false)
     apply(n)
   }
+  // O teto e, acima dele, o que fica inativo ("1 inativo, máx. pelo Arete 3")
+  const capNote =
+    resolved.type === 'rating' && resolved.field.def.cap
+      ? (inactiveNote(resolved) ??
+        `${resolved.field.def.cap.label} ${resolved.cap}`)
+      : null
   const specialty =
     'specialty' in def && def.specialty ? (
       <SpecialtyEditor
@@ -68,7 +86,26 @@ export function NumberEditorRow(props: FieldViewProps) {
     <EditorShell
       label={def.label}
       error={error ?? issue}
-      below={specialty}
+      below={
+        capNote || specialty ? (
+          <>
+            {capNote ? (
+              <Text
+                variant="caption"
+                color={
+                  resolved.type === 'rating' && resolved.inactive
+                    ? 'ink'
+                    : 'inkMuted'
+                }
+                testID={`cap-${resolved.id}`}
+              >
+                {capNote}
+              </Text>
+            ) : null}
+            {specialty}
+          </>
+        ) : null
+      }
       testID={`editor-${resolved.id}`}
     >
       {typing ? (

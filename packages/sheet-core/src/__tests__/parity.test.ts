@@ -174,6 +174,12 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    'emblema fora da lista fechada',
+    t => {
+      ;(t.identity as Json).emblem = 'caveira'
+    },
+  ],
+  [
     'campo de seção restrita nas colunas do cabeçalho',
     t => {
       ;(t.identity as Json).columns = [[restrictedField(t)]]

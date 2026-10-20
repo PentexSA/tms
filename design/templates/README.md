@@ -153,6 +153,7 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 - `segments` (2 a 24) e `fills` (até 2 preenchimentos: `{ id, label, colorRole, from: start | end }`). Cada preenchimento tem amostra própria (cheia ou hachurada): forma e cor, nunca só cor.
 - `rule` é obrigatória. Hoje só existe `mage-quint-paradox`: Quintessência e Paradoxo dividem as casas; ganhar Paradoxo com a roda cheia consome 1 Quintessência; ganhar Quintessência com a roda cheia é bloqueado. Exige um preenchimento `start` e um `end`.
 - Valor: `{ "quintessence": 6, "paradox": 2 }`, com soma até `segments`.
+- No app (v1): a regra roda no cliente, no `planClock` do core; o servidor confere só a forma e a soma, como no `wod-stacking`. Um nome de regra sem implementação deixa a roda sem Stepper ("Esta versão do app não conhece a regra desta roda").
 
 ### `state`
 
@@ -263,11 +264,11 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   - `aboveBase`: `percent` acima da base.
 - Com `default: true`, a seção abre filtrada e mostra "Mostrando N de M · Mostrar todos". O filtro é desligado em Evoluir: é ali que se compra o primeiro ponto.
 - `searchable: true` mostra busca por rótulo, sem diferenciar acentos, em `groups`, `list` e `pyramid`.
-- `groupTabs: true` (em `grid` e `groups`, com `groups`): no celular, os grupos viram abas e só um aparece por vez (Físicos, Sociais, Mentais). Com busca, o resultado vem de todos os grupos. Em telas largas, a grade continua em colunas.
+- `groupTabs: true` (em `grid` e `groups`, com `groups`): no Editar do celular, os grupos viram abas e só um aparece por vez (Físicos, Sociais, Mentais), porque a linha com Stepper não cabe numa coluna. Em Jogo e Leitura, a grade 3×3 aparece inteira; numa seção com filtro, o filtro ligado mostra chips "Nome N" de todos os grupos, e desligado (todos os traços) volta às abas. Com busca, o resultado vem de todos os grupos. Em telas largas, a grade continua em colunas.
 
 ### Badge e pinTop
 
-- `badge: { field, label }` na seção marca a linha cujo id é o valor de um `choice` (Esfera de afinidade do Mago). Só em `groups` e `list`. Não confundir com `badge` de `number` (§3).
+- `badge: { field, label }` na seção marca a linha cujo id é o valor de um `choice` (Esfera de afinidade do Mago). Só em `groups` e `list`. Não confundir com `badge` de `number` (§3). O campo do `choice` precisa estar numa seção para ser editável (no Mago, no grupo do Arete).
 - `pinTop: true` fixa a seção no topo da zona `play` como blocos de texto (aspectos do Fate). Só em `play`.
 - `collapsed: true`: extensão documentada (seção começa recolhida), aceita pelo validador e ainda não consumida pelo protótipo.
 
@@ -306,6 +307,7 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 | `identity.summary` | Até 4 campos no resumo sob o nome. |
 | `identity.voice` | Campo exibido como citação, na fonte de voz da skin. |
 | `identity.subtitle` | Campo acima do resumo (nome de feito do Garou). |
+| `identity.emblem` | Símbolo da criatura no lugar das iniciais do personagem, o mesmo para qualquer clã, tribo ou tradição: `ankh` (Vampiro), `nine-star` (Mago: as Nove Esferas e as Nove Tradições), `claws` (Lobisomem). O app desenha o símbolo; sem emblema, as iniciais. |
 | `accent.from` | Campo `choice` que define a cor (clã, tradição, tribo, classe, playbook). `null` = sem accent. |
 | `accent.map` | Opção → `accent-N`. Cada valor precisa estar na paleta validada (`design-system/tokens.json`, hoje `accent-1` a `accent-16`), checada para contraste e daltonismo no CI. |
 | `accent.fallback` | `accent-neutral` (ou um `accent-N`) para opção sem mapa (Caitiff, Órfão). |
@@ -351,7 +353,7 @@ A casca é única: seleção por slots, modificadores com origem, total, "Rolar 
 - `penalty: { field }`: trilha `wod-stacking` cuja penalidade reduz a parada; "Incapacitado" bloqueia a rolagem.
 - `specialty: tenCountsDouble`: com especialização, cada 10 vale dois sucessos. Exige d10 (`die` ausente ou 10).
 - `boosts: [{ id, label, resource, cost, effect }]` (`cost` de 0 a 10): gasto opcional que é debitado ao rolar. Só os efeitos que o modelo aplica são aceitos (`autoSuccess` em `pool-success`, `plus2` em `fudge`), para nunca debitar um recurso sem efeito.
-- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito").
+- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito"). O atalho fixa os slots que declara; o pedido de rolagem leva só o id dele, e o servidor monta a parada (v1). O `help` aparece embaixo da dificuldade.
 - `conditions: { field }`: tags com `roll` dão vantagem ou desvantagem automática em `sum-vs-target`.
 - `bonusDice: { min, max }` (−3 a 3): dados de bônus e penalidade do CoC.
 - `ladder`: escada usada no resultado do `fudge`.
@@ -414,6 +416,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `modifierOps` | `modifierOp` | `add`, `set` |
 | `conditionRoll` | `conditionRoll` | `advantage`, `disadvantage` |
 | `glyphs` | `glyphName` | `augur-moon` |
+| `emblems` | `emblem` | `ankh`, `nine-star`, `claws` |
 | `skins` | `skin` | `wod`, `dnd`, `coc`, `fate` |
 | `slotResets` | `slotReset` | `longRest`, `shortRest` |
 

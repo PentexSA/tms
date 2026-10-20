@@ -323,6 +323,10 @@
       "description": "REGISTRY.glyphs: glifos desenhados pela skin.",
       "enum": ["augur-moon"]
     },
+    "emblem": {
+      "description": "REGISTRY.emblems: símbolos de criatura desenhados pelo app (Ankh do Vampiro, estrela de nove pontas do Mago, garras do Lobisomem).",
+      "enum": ["ankh", "nine-star", "claws"]
+    },
     "skin": {
       "description": "REGISTRY.skins",
       "enum": ["wod", "dnd", "coc", "fate"]
@@ -1578,6 +1582,10 @@
         "subtitle": {
           "description": "Campo exibido acima do resumo (ex.: nome de feito do Garou).",
           "$ref": "#/$defs/fieldRef"
+        },
+        "emblem": {
+          "description": "Símbolo da criatura no lugar das iniciais do personagem (ex.: o Ankh do Vampiro), o mesmo para qualquer clã, tribo ou tradição. Nome da lista fechada REGISTRY.emblems, desenhado pelo app. Sem emblema, as iniciais.",
+          "$ref": "#/$defs/emblem"
         },
         "columns": {
           "description": "Colunas do cabeçalho, como na ficha impressa (até 3, com até 6 campos cada). Dão a ordem da identidade no Editar e na criação.",

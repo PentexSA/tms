@@ -17,9 +17,10 @@ test('narrador convida e o jogador entra com o código', async ({
 
   await page.getByRole('button', { name: 'Criar crônica' }).click()
   await page.getByLabel('Nome da crônica').fill('Crônica da Liberdade')
-  await expect(
-    page.getByRole('radio', { name: /Vampiro: A Máscara/ })
-  ).toBeChecked()
+  // Com Vampiro e Mago publicados, o sistema é escolhido (v1)
+  const vampire = page.getByRole('radio', { name: /Vampiro: A Máscara/ })
+  await vampire.click()
+  await expect(vampire).toBeChecked()
   await page.getByRole('button', { name: 'Criar crônica' }).click()
   await expect(
     page.getByRole('heading', { name: 'Crônica da Liberdade' })

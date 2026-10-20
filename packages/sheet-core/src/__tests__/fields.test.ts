@@ -85,7 +85,12 @@ group('describe: gramática de anúncio (design system §9.2)', () => {
       'Vitalidade: Machucado, penalidade menos 1; 1 letal, 1 contusivo',
     ],
     ['marta', 'health', {}, 'Vitalidade: Sem ferimentos; sem dano'],
-    ['tomas', 'wheel', {}, 'Quintessência 6, Paradoxo 2, de 20 casas'],
+    [
+      'tomas',
+      'wheel',
+      {},
+      'Quintessência e Paradoxo: Quintessência 6, Paradoxo 2, de 20 casas',
+    ],
     ['iara', 'form', { form: 'crinos' }, 'Forma: Crinos'],
     ['lia', 'conditions', {}, 'Condições: nenhuma'],
     ['helena', 'disciplines', {}, 'Disciplinas: 3 itens'],

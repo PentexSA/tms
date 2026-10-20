@@ -1,4 +1,11 @@
+import type { ResolvedRating } from '../resolve'
 import type { FieldType } from './types'
+
+/** O teto não destrutivo, quando há pontos acima dele ("1 inativo, máx. pelo Arete 3"). */
+export const inactiveNote = (r: ResolvedRating): string | null =>
+  r.inactive
+    ? `${r.inactive} inativo, ${r.field.def.cap?.label ?? 'acima do teto'} ${r.cap}`
+    : null
 
 export const rating: FieldType<'rating'> = {
   short: r => String(r.value),
@@ -23,10 +30,8 @@ export const rating: FieldType<'rating'> = {
           ? `${mod.value} na forma ${mod.source}, base ${r.base}`
           : `base ${r.base} ${r.modded > r.base ? 'mais' : 'menos'} ${Math.abs(r.modded - r.base)} da forma ${mod.source}`
       )
-    if (r.inactive)
-      parts.push(
-        `${r.inactive} inativo, ${f.cap?.label ?? 'acima do teto'} ${r.cap}`
-      )
+    const inactive = inactiveNote(r)
+    if (inactive) parts.push(inactive)
     const specialty = sheet.specialty(r.id)
     if (specialty) parts.push(`especialização ${specialty}`)
     return parts.join(', ')
