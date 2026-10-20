@@ -4,7 +4,7 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.1.0",
+  "templateVersion": "1.2.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
@@ -16,9 +16,9 @@
     "summary": ["rank", "auspice"],
     "voice": "quote",
     "columns": [
-      ["name", "deedName", "concept"],
-      ["breed", "auspice", "tribe"],
-      ["sept", "totem"]
+      ["name", "deedName", "concept", "sept"],
+      ["breed", "auspice", "camp"],
+      ["tribe", "packName", "totem"]
     ]
   },
   "accent": {
@@ -128,6 +128,14 @@
     },
     "sept": { "type": "text", "label": "Seita", "maxLength": 80 },
     "totem": { "type": "text", "label": "Totem da matilha", "maxLength": 60 },
+    "packName": { "type": "text", "label": "Nome da matilha", "maxLength": 80 },
+    "camp": { "type": "text", "label": "Campo", "maxLength": 80 },
+    "metisDeformity": {
+      "type": "text",
+      "label": "Deformidade",
+      "maxLength": 200,
+      "help": "Só para Impuros."
+    },
     "quote": { "type": "text", "label": "Citação", "maxLength": 160 },
 
     "strength": {
@@ -601,6 +609,62 @@
         "Raça Pura"
       ]
     },
+    "battleScars": {
+      "type": "list",
+      "label": "Cicatrizes de batalha",
+      "itemLabel": "Cicatriz",
+      "item": { "notes": true }
+    },
+
+    "merits": {
+      "type": "list",
+      "label": "Qualidades",
+      "itemLabel": "Qualidade",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "cost", "type": "number", "label": "Custo", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo (Físico, Social, Mental, Sobrenatural) e custo em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "flaws": {
+      "type": "list",
+      "label": "Defeitos",
+      "itemLabel": "Defeito",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "bonus", "type": "number", "label": "Bônus", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo e bônus em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "xpTotal": {
+      "type": "number",
+      "label": "Experiência total",
+      "shortLabel": "Total",
+      "min": 0,
+      "max": 9999
+    },
+    "xpSpent": {
+      "type": "number",
+      "label": "Experiência gasta",
+      "shortLabel": "Gasta",
+      "min": 0,
+      "max": 9999
+    },
+    "xpAvailable": {
+      "type": "number",
+      "label": "Experiência disponível",
+      "shortLabel": "Disponível",
+      "readOnly": true,
+      "derive": "difference",
+      "from": ["xpTotal", "xpSpent"]
+    },
+
     "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
     "storytellerNotes": {
       "type": "longText",
@@ -614,7 +678,7 @@
       "zone": "identity",
       "title": "Identidade",
       "layout": "facts",
-      "fields": ["breed", "auspice", "sept", "totem"]
+      "fields": ["breed", "auspice", "camp", "packName", "totem", "sept"]
     },
     {
       "id": "play",
@@ -761,11 +825,43 @@
       ]
     },
     {
+      "id": "merits-flaws",
+      "zone": "powers",
+      "title": "Qualidades e Defeitos",
+      "layout": "groups",
+      "groups": [
+        { "id": "merits", "title": "Qualidades", "fields": ["merits"] },
+        { "id": "flaws", "title": "Defeitos", "fields": ["flaws"] }
+      ]
+    },
+    {
+      "id": "experience",
+      "zone": "powers",
+      "title": "Experiência",
+      "layout": "groups",
+      "groups": [
+        {
+          "id": "experience",
+          "title": "Experiência",
+          "fields": ["xpTotal", "xpSpent", "xpAvailable"]
+        }
+      ]
+    },
+    {
       "id": "about",
       "zone": "lore",
       "title": "Sobre",
       "layout": "text",
-      "fields": ["quote", "notes"]
+      "fields": ["quote", "metisDeformity", "notes"]
+    },
+    {
+      "id": "battle-scars",
+      "zone": "lore",
+      "title": "Cicatrizes de batalha",
+      "layout": "groups",
+      "groups": [
+        { "id": "battleScars", "title": "Cicatrizes", "fields": ["battleScars"] }
+      ]
     },
     {
       "id": "storyteller",

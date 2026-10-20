@@ -204,6 +204,7 @@ group('stored: o valor no formato de sheet_data', () => {
       'marta',
       'beto',
       'tomas',
+      'otto',
       'iara',
       'lia',
       'joana',

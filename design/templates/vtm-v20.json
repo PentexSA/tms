@@ -4,7 +4,7 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.2.0",
+  "templateVersion": "1.3.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
@@ -403,6 +403,12 @@
       "min": 0,
       "max": 10
     },
+    "weakness": {
+      "type": "longText",
+      "label": "Fraqueza do clã",
+      "maxLength": 600,
+      "help": "Escreva a fraqueza com as suas palavras."
+    },
 
     "willpower": {
       "type": "resource",
@@ -451,6 +457,55 @@
         { "id": "lethal", "label": "Letal", "glyph": "X" },
         { "id": "bashing", "label": "Contusivo", "glyph": "/" }
       ]
+    },
+
+    "merits": {
+      "type": "list",
+      "label": "Qualidades",
+      "itemLabel": "Qualidade",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "cost", "type": "number", "label": "Custo", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo (Físico, Social, Mental, Sobrenatural) e custo em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "flaws": {
+      "type": "list",
+      "label": "Defeitos",
+      "itemLabel": "Defeito",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "bonus", "type": "number", "label": "Bônus", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo e bônus em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "xpTotal": {
+      "type": "number",
+      "label": "Experiência total",
+      "shortLabel": "Total",
+      "min": 0,
+      "max": 9999
+    },
+    "xpSpent": {
+      "type": "number",
+      "label": "Experiência gasta",
+      "shortLabel": "Gasta",
+      "min": 0,
+      "max": 9999
+    },
+    "xpAvailable": {
+      "type": "number",
+      "label": "Experiência disponível",
+      "shortLabel": "Disponível",
+      "readOnly": true,
+      "derive": "difference",
+      "from": ["xpTotal", "xpSpent"]
     },
 
     "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
@@ -583,7 +638,31 @@
           "title": "Virtudes",
           "fields": ["conscience", "selfControl", "courage"]
         },
-        { "id": "morality", "title": "Trilha", "fields": ["humanity"] }
+        { "id": "morality", "title": "Trilha", "fields": ["humanity"] },
+        { "id": "weakness", "title": "Fraqueza", "fields": ["weakness"] }
+      ]
+    },
+    {
+      "id": "merits-flaws",
+      "zone": "powers",
+      "title": "Qualidades e Defeitos",
+      "layout": "groups",
+      "groups": [
+        { "id": "merits", "title": "Qualidades", "fields": ["merits"] },
+        { "id": "flaws", "title": "Defeitos", "fields": ["flaws"] }
+      ]
+    },
+    {
+      "id": "experience",
+      "zone": "powers",
+      "title": "Experiência",
+      "layout": "groups",
+      "groups": [
+        {
+          "id": "experience",
+          "title": "Experiência",
+          "fields": ["xpTotal", "xpSpent", "xpAvailable"]
+        }
       ]
     },
     {

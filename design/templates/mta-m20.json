@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.1.0",
+  "templateVersion": "1.2.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
@@ -49,7 +49,7 @@
         { "id": "irmandade-akashica", "label": "Irmandade Akáshica" },
         { "id": "sonhadores", "label": "Sonhadores (Kha'vadi)" },
         { "id": "verbena", "label": "Verbena" },
-        { "id": "filhos-do-eter", "label": "Filhos do Éter" },
+        { "id": "filhos-do-eter", "label": "Sociedade do Éter" },
         { "id": "virtualidade", "label": "Adeptos da Virtualidade" },
         { "id": "orfao", "label": "Órfão" }
       ]
@@ -432,7 +432,9 @@
         "Contatos",
         "Destino",
         "Fama",
+        "Familiar",
         "Influência",
+        "Maravilha",
         "Mentor",
         "Nodo",
         "Recursos",
@@ -509,6 +511,83 @@
       "label": "Instrumentos",
       "maxLength": 600
     },
+    "resonance": {
+      "type": "list",
+      "label": "Ressonância",
+      "itemLabel": "Descritor",
+      "item": { "value": { "type": "rating", "min": 0, "max": 5 } },
+      "fixed": [
+        { "id": "dynamic", "label": "Dinâmica" },
+        { "id": "entropic", "label": "Entrópica" },
+        { "id": "static", "label": "Estática" }
+      ],
+      "help": "Pontos e um descritor livre para cada tipo de Ressonância."
+    },
+    "wonders": {
+      "type": "list",
+      "label": "Maravilhas",
+      "itemLabel": "Maravilha",
+      "item": {
+        "meta": [
+          { "id": "level", "type": "number", "label": "Nível", "min": 1, "max": 10 },
+          { "id": "arete", "type": "number", "label": "Arete", "min": 1, "max": 10 },
+          { "id": "quintessence", "type": "number", "label": "Quintessência", "min": 0, "max": 100 }
+        ],
+        "notes": true
+      },
+      "help": "Arete e Quintessência só quando a Maravilha tem. Anote o efeito nas notas."
+    },
+    "familiar": { "type": "longText", "label": "Familiar", "maxLength": 600 },
+
+    "merits": {
+      "type": "list",
+      "label": "Qualidades",
+      "itemLabel": "Qualidade",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "cost", "type": "number", "label": "Custo", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo (Físico, Social, Mental, Sobrenatural) e custo em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "flaws": {
+      "type": "list",
+      "label": "Defeitos",
+      "itemLabel": "Defeito",
+      "item": {
+        "meta": [
+          { "id": "kind", "type": "text", "label": "Tipo" },
+          { "id": "bonus", "type": "number", "label": "Bônus", "min": 1, "max": 10 }
+        ],
+        "notes": true
+      },
+      "help": "Tipo e bônus em pontos, como na ficha de papel. Anote o efeito nas notas."
+    },
+    "xpTotal": {
+      "type": "number",
+      "label": "Experiência total",
+      "shortLabel": "Total",
+      "min": 0,
+      "max": 9999
+    },
+    "xpSpent": {
+      "type": "number",
+      "label": "Experiência gasta",
+      "shortLabel": "Gasta",
+      "min": 0,
+      "max": 9999
+    },
+    "xpAvailable": {
+      "type": "number",
+      "label": "Experiência disponível",
+      "shortLabel": "Disponível",
+      "readOnly": true,
+      "derive": "difference",
+      "from": ["xpTotal", "xpSpent"]
+    },
+
     "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
     "storytellerNotes": {
       "type": "longText",
@@ -651,6 +730,15 @@
       ]
     },
     {
+      "id": "resonance",
+      "zone": "powers",
+      "title": "Ressonância",
+      "layout": "groups",
+      "groups": [
+        { "id": "resonance", "title": "Ressonância", "fields": ["resonance"] }
+      ]
+    },
+    {
       "id": "backgrounds",
       "zone": "powers",
       "title": "Antecedentes",
@@ -669,6 +757,39 @@
       "title": "Rotinas",
       "layout": "groups",
       "groups": [{ "id": "rotes", "title": "Rotinas", "fields": ["rotes"] }]
+    },
+    {
+      "id": "wonders",
+      "zone": "powers",
+      "title": "Maravilhas e Familiar",
+      "layout": "groups",
+      "groups": [
+        { "id": "wonders", "title": "Maravilhas", "fields": ["wonders"] },
+        { "id": "familiar", "title": "Familiar", "fields": ["familiar"] }
+      ]
+    },
+    {
+      "id": "merits-flaws",
+      "zone": "powers",
+      "title": "Qualidades e Defeitos",
+      "layout": "groups",
+      "groups": [
+        { "id": "merits", "title": "Qualidades", "fields": ["merits"] },
+        { "id": "flaws", "title": "Defeitos", "fields": ["flaws"] }
+      ]
+    },
+    {
+      "id": "experience",
+      "zone": "powers",
+      "title": "Experiência",
+      "layout": "groups",
+      "groups": [
+        {
+          "id": "experience",
+          "title": "Experiência",
+          "fields": ["xpTotal", "xpSpent", "xpAvailable"]
+        }
+      ]
     },
     {
       "id": "focus",

@@ -299,3 +299,22 @@ describe('outros sistemas em Editar', () => {
     }
   )
 })
+
+describe('a ficha de papel: Vantagens do Vampiro', () => {
+  it('Qualidades, Defeitos, Fraqueza e Experiência na aba Vantagens', () => {
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    renderSheet(model, sheet)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getByText('Fraqueza do clã')).toBeTruthy()
+    const merits = within(screen.getByTestId('groups-merits-flaws'))
+    expect(
+      merits.getByLabelText('Memória Eidética, Tipo Mental, Custo 2')
+    ).toBeTruthy()
+    expect(merits.getByLabelText('Inimigo, Tipo Social, Bônus 2')).toBeTruthy()
+    const xp = within(screen.getByTestId('groups-experience'))
+    expect(xp.getByText('Experiência disponível')).toBeTruthy()
+    // Total 14, gasta 9: o disponível é calculado, como no quadro do papel
+    expect(xp.getByText('5')).toBeTruthy()
+  })
+})
