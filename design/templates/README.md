@@ -201,7 +201,16 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 | `aspect: true` | `text` (até 200) | aspecto do Fate |
 
 - O servidor rejeita no item qualquer chave não declarada: `notes` sem `item.notes`, `value` sem `item.value`, chave de `meta` que não está em `item.meta`.
-- `fixed: [{ id, label, meta? }]`: itens fixos, sem adicionar nem remover. Cada um guarda `{ id, text }` (consequências Suave, Moderada e Grave do Fate) e o `id` precisa ser um dos fixos. Atenção: aqui `meta` é texto ("absorve 2"), diferente de `item.meta`.
+- `fixed: [{ id, label, meta? }]`: itens fixos, sem adicionar nem remover. Cada um guarda `{ id, text }` (consequências Suave, Moderada e Grave do Fate) e o `id` precisa ser um dos fixos. O rótulo vem do template e não é gravado. Atenção: aqui `meta` é texto ("absorve 2"), diferente de `item.meta`.
+- Item fixo também guarda o que `item` declara (`value`, `meta`, `notes`). É assim que a Ressonância do Mago fica como na ficha de papel: três linhas sempre presentes, cada uma com pontos e um descritor livre no `text`.
+
+```json
+"resonance": { "type": "list", "label": "Ressonância", "itemLabel": "Descritor",
+  "item": { "value": { "type": "rating", "min": 0, "max": 5 } },
+  "fixed": [{ "id": "dynamic", "label": "Dinâmica" }, { "id": "entropic", "label": "Entrópica" }, { "id": "static", "label": "Estática" }] }
+```
+
+Valor: `[{ "id": "dynamic", "text": "Ardente", "value": 2 }]`.
 - `catalog`: sugestões ao adicionar. **Só nomes**: descrições protegidas não entram no template (§12).
 - Itens com `value` numérico ou `meta.bonus` numérico viram opções da parada quando a seção está em `roll.slots[].from`.
 - Extensões documentadas, fora do `REGISTRY` e ainda não consumidas pelo protótipo: `searchable` e `density` (dicas visuais) e `rollAs` (`ability` ou `attack`).
@@ -396,7 +405,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `fieldTypes` | `fieldType` | `rating`, `number`, `percent`, `resource`, `track`, `slots`, `clock`, `state`, `mark`, `text`, `longText`, `choice`, `tags`, `list` |
 | `numberDisplays` | `numberDisplay` | `plain`, `score+mod`, `signed`, `ladder` |
 | `percentDisplays` | `percentDisplay` | `percent`, `percent+half+fifth` |
-| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `vtmGeneration`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth` |
+| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `vtmGeneration`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth`, `difference` |
 | `trackRules` | `trackRule` | `wod-stacking`, `boxes` |
 | `resourceRules` | `resourceRule` | `tempFirst` |
 | `clockRules` | `clockRule` | `mage-quint-paradox` |
@@ -433,6 +442,7 @@ Derivações, com assinatura:
 | `cocMagicPoints(pow)` | ⌊POD / 5⌋ |
 | `cocSanityMax(mythos)` | 99 − Mitos de Cthulhu |
 | `half(v)` / `fifth(v)` | ⌊v / 2⌋ / ⌊v / 5⌋ |
+| `difference(a, b)` | a − b (Experiência disponível = total − gasto) |
 
 ### Como adicionar um nome novo
 

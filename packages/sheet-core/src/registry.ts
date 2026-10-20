@@ -35,6 +35,7 @@ export const REGISTRY = {
     'cocSanityMax',
     'half',
     'fifth',
+    'difference',
   ],
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],

@@ -85,6 +85,9 @@ describe('DERIVE', () => {
     ['cocSanityMax', [5], 94],
     ['half', [45], 22],
     ['fifth', [45], 9],
+    ['difference', [12, 5], 7],
+    ['difference', [3, 5], -2],
+    ['difference', [4], 4],
   ] as const)('%s(%p) = %p', (name, args, expected) => {
     expect(DERIVE[name](...args)).toBe(expected)
   })

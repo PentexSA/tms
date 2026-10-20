@@ -163,6 +163,7 @@
     cocSanityMax: mythos => 99 - mythos,
     half: v => Math.floor(v / 2),
     fifth: v => Math.floor(v / 5),
+    difference: (a, b = 0) => a - b,
   }
   function derive(name, ...args) {
     if (!Object.hasOwn(DERIVE, name))
@@ -449,10 +450,10 @@
     const f = F(m, id)
     const v = raw(m, id) ?? []
     if (f.fixed)
-      return f.fixed.map(fx => ({
-        ...fx,
-        text: v.find(x => x.id === fx.id)?.text ?? '',
-      }))
+      return f.fixed.map(fx => {
+        const it = v.find(x => x.id === fx.id) ?? {}
+        return { ...it, ...fx, text: it.text ?? '' }
+      })
     return v
   }
 

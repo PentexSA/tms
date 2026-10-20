@@ -15,7 +15,7 @@ const REGISTRY = {
   fieldTypes: ['rating', 'number', 'percent', 'resource', 'track', 'slots', 'clock', 'state', 'mark', 'text', 'longText', 'choice', 'tags', 'list'],
   numberDisplays: ['plain', 'score+mod', 'signed', 'ladder'],
   percentDisplays: ['percent', 'percent+half+fifth'],
-  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'vtmGeneration', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth'],
+  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'vtmGeneration', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth', 'difference'],
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
@@ -98,6 +98,7 @@ const DERIVE = {
   cocSanityMax: mythos => 99 - mythos,
   half: v => Math.floor(v / 2),
   fifth: v => Math.floor(v / 5),
+  difference: (a, b = 0) => a - b,
 }
 
 // Item de lista pelo nome ({ list, item }): os pontos dele, ou 0 sem o item.

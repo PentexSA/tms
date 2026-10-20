@@ -231,7 +231,8 @@
         "cocMagicPoints",
         "cocSanityMax",
         "half",
-        "fifth"
+        "fifth",
+        "difference"
       ]
     },
     "trackRule": {
@@ -1215,7 +1216,7 @@
           "uniqueItems": true
         },
         "fixed": {
-          "description": "Itens fixos (não se adiciona nem remove): cada um guarda só { id, text }. Ex.: consequências Suave, Moderada e Grave do Fate.",
+          "description": "Itens fixos (não se adiciona nem remove): cada um guarda { id, text } e o que item declarar (value, meta, notes). Ex.: consequências Suave, Moderada e Grave do Fate; Ressonância Dinâmica, Entrópica e Estática do Mago, com pontos.",
           "type": "array",
           "items": {
             "type": "object",

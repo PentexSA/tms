@@ -13,7 +13,7 @@ import { identityOf, UNNAMED } from '../identity'
 import { REGISTRY } from '../registry'
 import { type ResolvedRating, resolve } from '../resolve'
 import { validateSheet } from '../validate'
-import { character, type Json, templates } from './fixtures'
+import { character, clone, type Json, templates } from './fixtures'
 
 // Frases da gramática de anúncio do design system (§9.2), com as fichas de
 // exemplo de cada sistema. A ficha é ajustada só quando o exemplo pede.
@@ -227,6 +227,46 @@ group('stored: o valor no formato de sheet_data', () => {
       for (const [k, v] of Object.entries(c.sheet.values))
         expect({ [k]: values[k] }).toEqual({ [k]: v })
     }
+  })
+
+  it('lista fixa com valor: o item guarda o texto e os pontos, não o rótulo', () => {
+    const t = clone(templates['vtm-v20'] as Json)
+    ;(t.fields as Record<string, Json>).resonance = {
+      type: 'list',
+      label: 'Ressonância',
+      itemLabel: 'Descritor',
+      item: { value: { type: 'rating', min: 0, max: 5 }, notes: true },
+      fixed: [
+        { id: 'dynamic', label: 'Dinâmica' },
+        { id: 'static', label: 'Estática' },
+      ],
+    }
+    const values = {
+      resonance: [{ id: 'dynamic', text: 'Ardente', value: 2, notes: 'n' }],
+    }
+    const sheet = resolve(compileTemplate(t), { values })
+    const r = sheet.get('resonance')
+    expect(r).toMatchObject({
+      items: [
+        { id: 'dynamic', name: 'Dinâmica', text: 'Ardente', value: 2 },
+        { id: 'static', name: 'Estática', text: '' },
+      ],
+    })
+    if (!r) throw new Error('campo ausente')
+    const out = stored(r, sheet)
+    expect(out).toEqual([
+      { id: 'dynamic', text: 'Ardente', value: 2, notes: 'n' },
+      { id: 'static', text: '' },
+    ])
+    expect(validateSheet(t, { values: { resonance: out } })).toEqual([])
+    // O valor do item fixo respeita o `item.value` como qualquer item
+    expect(
+      validateSheet(t, {
+        values: { resonance: [{ id: 'static', text: '', value: 6 }] },
+      })
+    ).toEqual([
+      { path: 'values.resonance.0.value', message: 'acima do máximo 5' },
+    ])
   })
 
   it('ficha nova: os padrões preenchidos passam no validador', () => {

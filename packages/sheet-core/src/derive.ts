@@ -42,6 +42,7 @@ export const DERIVE: Readonly<
   cocSanityMax: mythos => 99 - mythos,
   half: v => Math.floor(v / 2),
   fifth: v => Math.floor(v / 5),
+  difference: (a, b = 0) => a - b,
 }
 
 export function isDeriveName(name: unknown): name is DeriveName {

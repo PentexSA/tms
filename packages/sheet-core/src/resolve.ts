@@ -489,12 +489,21 @@ export function resolve(
       }
       case 'list': {
         const stored = asArray(raw(id)).filter(isObj) as unknown as ListItem[]
+        // Item fixo: o rótulo é do template; o texto e o que `item` declara
+        // (pontos da Ressonância, meta, notas) são da ficha
         const items = d.fixed
-          ? d.fixed.map(fx => ({
-              id: fx.id,
-              name: fx.label,
-              text: stored.find(x => x.id === fx.id)?.text ?? '',
-            }))
+          ? d.fixed.map(fx => {
+              const { value, meta, notes, text } =
+                stored.find(x => x.id === fx.id) ?? {}
+              return {
+                id: fx.id,
+                name: fx.label,
+                text: text ?? '',
+                ...(value !== undefined && { value }),
+                ...(meta !== undefined && { meta }),
+                ...(notes !== undefined && { notes }),
+              }
+            })
           : stored
         return { ...base, type: 'list', items } as ResolvedList
       }
