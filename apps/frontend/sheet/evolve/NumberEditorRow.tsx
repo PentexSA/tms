@@ -1,4 +1,4 @@
-import { inactiveNote } from '@tms/sheet-core'
+import { inactiveNote, modifierNote } from '@tms/sheet-core'
 import { Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, TextInput } from 'react-native'
@@ -74,6 +74,11 @@ export function NumberEditorRow(props: FieldViewProps) {
       ? (inactiveNote(resolved) ??
         `${resolved.field.def.cap.label} ${resolved.cap}`)
       : null
+  // Em outro estado (Crinos), o stepper edita a base; o efetivo fica escrito
+  const modNote =
+    resolved.type === 'rating' && resolved.modded !== resolved.base
+      ? `Efetivo ${resolved.value} (${modifierNote(resolved)})`
+      : null
   const specialty =
     'specialty' in def && def.specialty ? (
       <SpecialtyEditor
@@ -87,8 +92,17 @@ export function NumberEditorRow(props: FieldViewProps) {
       label={def.label}
       error={error ?? issue}
       below={
-        capNote || specialty ? (
+        capNote || modNote || specialty ? (
           <>
+            {modNote ? (
+              <Text
+                variant="caption"
+                color="inkMuted"
+                testID={`mod-${resolved.id}`}
+              >
+                {modNote}
+              </Text>
+            ) : null}
             {capNote ? (
               <Text
                 variant="caption"

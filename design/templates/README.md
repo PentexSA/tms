@@ -96,7 +96,7 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 - `cap: { field, label }`: teto **não destrutivo** vindo de um `rating` ou `number` (Esferas ≤ Arete). Baixar o teto não apaga pontos: o excedente fica "inativo" e volta a valer quando o teto sobe. O servidor aceita valor acima do teto.
 - `valueLabels`: nome por valor (`{ "2": "Fostern" }`), exibido junto do número.
 - `specialty: true`: aceita especialização em `sheet_data.specialties[id]` (até 80 caracteres). Vale também para `number` e `percent`, que o editor de Evoluir trata igual.
-- Modificadores de `state` alteram o valor efetivo; a UI mostra base, modificador e origem ("3 + 4 da forma Crinos = 7").
+- Modificadores de `state` alteram o valor efetivo; a UI mostra o efetivo e a origem ("3 + 4 Crinos", "Crinos: 0"), sem passar de `max` pips. O Editar edita sempre a base e avisa o efetivo (v2).
 
 ### `number`
 
@@ -161,6 +161,7 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 - `modifiers: [{ field, op, value }]`: `add` soma (o resultado nunca fica abaixo de 0) e `set` fixa o valor. O valor efetivo aparece na grade e na parada, com a origem.
 - `cost: { resource, amount, optional, label }`: custo opcional da troca (gastar 1 Fúria para mudança instantânea).
 - Valor: id da opção (`"crinos"`).
+- No app (v2): a linha e o sheet da Forma. O sheet lista as opções com os valores efetivos de cada uma (`statePreview` do core) e, com `cost`, a alternância do custo; a troca e o gasto saem num lote só (`planState`). Sem recurso, a alternância fica desabilitada com o motivo. O servidor confere a opção e os limites do recurso, não o custo: a troca sem pagar também é legal.
 
 ### `mark`
 
@@ -177,7 +178,7 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 
 ### `choice` e `tags`
 
-- `choice.options: [{ id, label, meta?, glyphParam? }]`. `glyph: augur-moon` desenha a fase da lua a partir de `glyphParam` (0 a 1).
+- `choice.options: [{ id, label, meta?, glyphParam? }]`. `glyph: augur-moon` desenha a fase da lua a partir de `glyphParam` (0 a 1), no fato do campo (v2).
 - `tags.options: [{ id, label, roll? }]`. `roll: advantage | disadvantage` muda a rolagem `sum-vs-target` quando `roll.conditions.field` aponta para estas tags.
 - Valor: `choice` guarda o id; `tags` guarda a lista de ids.
 
@@ -353,7 +354,7 @@ A casca é única: seleção por slots, modificadores com origem, total, "Rolar 
 - `penalty: { field }`: trilha `wod-stacking` cuja penalidade reduz a parada; "Incapacitado" bloqueia a rolagem.
 - `specialty: tenCountsDouble`: com especialização, cada 10 vale dois sucessos. Exige d10 (`die` ausente ou 10).
 - `boosts: [{ id, label, resource, cost, effect }]` (`cost` de 0 a 10): gasto opcional que é debitado ao rolar. Só os efeitos que o modelo aplica são aceitos (`autoSuccess` em `pool-success`, `plus2` em `fudge`), para nunca debitar um recurso sem efeito.
-- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito"). O atalho fixa os slots que declara; o pedido de rolagem leva só o id dele, e o servidor monta a parada (v1). O `help` aparece embaixo da dificuldade.
+- `presets: [{ id, label, slots, help? }]`: atalhos ("Teste de Sanidade", "Conjurar efeito"). O campo de cada slot precisa estar numa das seções do `from` do slot (v2: as duas camadas recusam). O atalho fixa os slots que declara; o pedido de rolagem leva só o id dele, e o servidor monta a parada (v1). O `help` aparece embaixo da dificuldade.
 - `conditions: { field }`: tags com `roll` dão vantagem ou desvantagem automática em `sum-vs-target`.
 - `bonusDice: { min, max }` (−3 a 3): dados de bônus e penalidade do CoC.
 - `ladder`: escada usada no resultado do `fudge`.
@@ -374,7 +375,7 @@ Ações aparecem no menu ⋯ da ficha (`actions`, no topo do template) ou no she
 
 | `effect` | `params` | Efeito | Exemplo |
 |---|---|---|---|
-| `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso | Curar 1 nível por 1 Sangue |
+| `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso. No menu da ficha (`actions` do topo), não tem custo | Curar 1 nível por 1 Sangue; Regenerar (Lobisomem) |
 | `resource.spend` | `field`, `amount` | Debita `amount` do recurso (mínimo 0) | Despertar: −1 Sangue |
 | `resource.gain` | `field`, `amount` | Credita `amount` respeitando o teto | Recuperar Força de Vontade |
 | `rest.long` | – | Recursos com `tempFirst` ao máximo e sem temporários; recursos com `max.field` recuperam metade; `slots` zerados; `track boxes` zeradas | Descanso longo D&D |

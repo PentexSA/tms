@@ -77,3 +77,33 @@ it('mexer na roda do Mago re-renderiza só a roda (v1)', () => {
   })
   expect([...renders.keys()]).toEqual(['wheel'])
 })
+
+it('trocar de forma re-renderiza a forma e os atributos que ela muda (v2)', () => {
+  const { model, sheet } = sheetFor('iara', ['owner'])
+  const store = createSheetStore({
+    characterId: 'c3',
+    model,
+    sheet,
+    sheetVersion: 1,
+    roles: ['owner'],
+    sync: { enqueue: jest.fn() },
+    uuid: () => '00000000-0000-4000-8000-000000000003',
+  })
+  render(<SheetView store={store} />)
+  renders.clear()
+
+  act(() => {
+    store
+      .getState()
+      .commit(
+        [{ path: 'values.form', from: 'hominideo', to: 'crinos' }],
+        'Forma Hominídeo → Crinos'
+      )
+  })
+  // Crinos mexe em For, Des, Vig, Man e Apa; a Vitalidade, a Fúria e a FdV
+  // ficam de fora
+  const changed = [...renders.keys()]
+  expect(changed).toContain('form')
+  for (const id of ['health', 'rage', 'gnosis', 'willpower', 'charisma'])
+    expect(changed).not.toContain(id)
+})

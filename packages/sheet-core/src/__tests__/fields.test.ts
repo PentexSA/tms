@@ -1,10 +1,17 @@
 /// <reference types="bun-types" />
 import { expect, describe as group, it } from 'bun:test'
 import { compileTemplate } from '../compile'
-import { describe, FIELD_TYPES, plain, short, stored } from '../fields'
+import {
+  describe,
+  FIELD_TYPES,
+  modifierNote,
+  plain,
+  short,
+  stored,
+} from '../fields'
 import { identityOf, UNNAMED } from '../identity'
 import { REGISTRY } from '../registry'
-import { resolve } from '../resolve'
+import { type ResolvedRating, resolve } from '../resolve'
 import { validateSheet } from '../validate'
 import { character, type Json, templates } from './fixtures'
 
@@ -69,7 +76,7 @@ group('describe: gramática de anúncio (design system §9.2)', () => {
       'iara',
       'strength',
       { form: 'crinos' },
-      'Força, 7, base 3 mais 4 da forma Crinos',
+      'Força, 7, base 3 mais 4 em Crinos',
     ],
     ['lia', 'str', {}, 'Força, 8, modificador menos 1'],
     ['lia', 'initiative', {}, 'Iniciativa, mais 2'],
@@ -109,8 +116,19 @@ group('describe: gramática de anúncio (design system §9.2)', () => {
 
   it('set fixa o valor e diz a base', () => {
     expect(text('iara', 'appearance', { form: 'crinos' }).describe).toMatch(
-      /^Aparência, 0 de 5, 0 na forma Crinos, base \d$/
+      /^Aparência, 0 de 5, 0 em Crinos, base \d$/
     )
+  })
+
+  it.each([
+    ['strength', 'crinos', '3 + 4 Crinos'],
+    ['manipulation', 'crinos', '2 − 2 Crinos'],
+    ['appearance', 'crinos', 'Crinos: 0'],
+    ['charisma', 'crinos', null],
+    ['strength', 'hominideo', null],
+  ])('modifierNote: %s em %s → %p', (field, form, expected) => {
+    const r = sheetOf('iara', { form }).get(field) as ResolvedRating
+    expect(modifierNote(r)).toBe(expected)
   })
 
   it('Vitalidade cheia anuncia incapacitado', () => {

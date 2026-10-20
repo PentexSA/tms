@@ -752,11 +752,31 @@ function check(
       'roll.penalty.field',
       'precisa ser uma trilha com níveis e penalidade (wod-stacking)'
     )
-  const slotIds = slots.map(sl => sl.id)
+  // O atalho só fixa o que o slot ofereceria: um campo fora das seções do
+  // slot deixaria o atalho sempre indisponível
+  const sectionFields = (id: unknown): unknown[] => {
+    const sec = sections.find(x => x.id === id)
+    return sec
+      ? [
+          ...asArray(sec.fields),
+          ...asArray(sec.groups).flatMap(g => asArray(rec(g)?.fields)),
+        ]
+      : []
+  }
   for (const pr of presets)
-    for (const k of Object.keys(rec(pr.slots) ?? {}))
-      if (!slotIds.includes(k))
+    for (const [k, fid] of Object.entries(rec(pr.slots) ?? {})) {
+      const sl = slots.find(x => x.id === k)
+      if (!sl)
         err(`roll.presets.${pr.id}.slots.${k}`, 'slot inexistente na rolagem')
+      else if (
+        has(fid) &&
+        !asArray(sl.from).some(sid => sectionFields(sid).includes(fid))
+      )
+        err(
+          `roll.presets.${pr.id}.slots.${k}`,
+          `campo '${fid}' fora das seções do slot`
+        )
+    }
   for (const b of boosts) {
     const models =
       typeof b.effect === 'string' && Object.hasOwn(BOOST_MODELS, b.effect)
@@ -768,28 +788,27 @@ function check(
         `efeito '${b.effect}' não se aplica ao modelo ${r.model} (gastaria o recurso sem efeito)`
       )
   }
+  // health.heal: no sheet de um recurso (paga o custo) ou no menu da ficha
+  // (Regenerar, sem custo)
+  const checkHeal = (p: string, a: Obj | undefined) => {
+    if (a?.effect !== 'health.heal') return
+    const params = rec(a.params)
+    const track = field(params?.field)
+    if (!track || track.rule !== 'wod-stacking') {
+      err(`${p}.params.field`, 'precisa ser uma trilha wod-stacking')
+      return
+    }
+    const typeIds = asArray(track.types).map(x => rec(x)?.id)
+    for (const ty of asArray(params?.types))
+      if (!typeIds.includes(ty))
+        err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
+  }
+  for (const a of asArray(t.actions).map(rec)) checkHeal(`actions.${a?.id}`, a)
   for (const [fid, raw] of Object.entries(fields)) {
     const f = rec(raw)
     if (!f) continue
-    for (const a of asArray(f.actions).map(rec)) {
-      if (a?.effect !== 'health.heal') continue
-      const params = rec(a.params)
-      const track = field(params?.field)
-      if (!track || track.rule !== 'wod-stacking') {
-        err(
-          `fields.${fid}.actions.${a.id}.params.field`,
-          'precisa ser uma trilha wod-stacking'
-        )
-        continue
-      }
-      const typeIds = asArray(track.types).map(x => rec(x)?.id)
-      for (const ty of asArray(params?.types))
-        if (!typeIds.includes(ty))
-          err(
-            `fields.${fid}.actions.${a.id}.params.types`,
-            `tipo '${ty}' não existe na trilha`
-          )
-    }
+    for (const a of asArray(f.actions).map(rec))
+      checkHeal(`fields.${fid}.actions.${a?.id}`, a)
     if (f.type === 'track' && f.rule === 'boxes')
       for (const row of asArray(f.rows).map(rec)) {
         const boxValues = row?.boxValues

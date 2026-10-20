@@ -4,6 +4,7 @@ import { ListEditor } from '../evolve/ListEditor'
 import { NumberEditorRow } from '../evolve/NumberEditorRow'
 import { ResourceEditorRow } from '../evolve/ResourceEditorRow'
 import { TextEditorRow } from '../evolve/TextEditorRow'
+import { ChoiceFact } from './ChoiceFact'
 import { ClockChip, ClockRow, ClockSheet } from './clock/ClockViews'
 import { FieldDetail } from './FieldDetail'
 import { GenericChip } from './GenericChip'
@@ -14,6 +15,7 @@ import { ResourceChip } from './resource/ResourceChip'
 import { ResourceRow } from './resource/ResourceRow'
 import { ResourceSheet } from './resource/ResourceSheet'
 import { wodViews } from './skins/wod'
+import { StateRow, StateSheet } from './state/StateViews'
 import { TrackChip } from './track/TrackChip'
 import { TrackRow } from './track/TrackRow'
 import { TrackSheet } from './track/TrackSheet'
@@ -39,11 +41,13 @@ export const baseViews = {
   slots: {},
   // Jogo (v1, Etapa 4): a roda; muda só em Jogo, sem editor de Editar
   clock: { row: ClockRow, chip: ClockChip, sheet: ClockSheet },
-  state: { editor: ChoiceEditorRow },
+  // Jogo (v2, Etapa 3): a opção e o sheet de troca; o chip é o genérico
+  state: { row: StateRow, sheet: StateSheet, editor: ChoiceEditorRow },
   mark: {},
   text: { editor: TextEditorRow },
   longText: { editor: TextEditorRow },
-  choice: { editor: ChoiceEditorRow },
+  // v2, Etapa 4: o fato com o glifo do template (a lua do Augúrio)
+  choice: { fact: ChoiceFact, editor: ChoiceEditorRow },
   tags: {},
   list: { row: ListRow, editor: ListEditor },
 } satisfies Record<FieldTypeName, FieldView>

@@ -64,7 +64,7 @@ const send = (user: TestUser, id: string, events: unknown[]) =>
   })
 
 describe('GET /systems', () => {
-  it('os dois sistemas publicados', async () => {
+  it('os dois sistemas publicados neste teste', async () => {
     const res = await as(ctx, owner, 'GET', '/systems')
     const systems = (await res.json()) as { code: string }[]
     expect(systems.map(s => s.code).sort()).toEqual(['mta-m20', 'vtm-v20'])

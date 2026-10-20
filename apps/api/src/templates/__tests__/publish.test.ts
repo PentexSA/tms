@@ -264,22 +264,24 @@ describe('pnpm templates:publish (CLI)', () => {
     expect(out.map(l => l.split(' (')[0])).toEqual([
       'publicado: vtm-v20@1.2.0',
       'publicado: mta-m20@1.1.0',
+      'publicado: wta-w20@1.1.0',
     ])
   })
 })
 
-describe('os templates do produto (plano-v1, Etapa 7)', () => {
+describe('os templates do produto (plano-v1, Etapa 7; plano-v2, Etapa 6)', () => {
   const examples = (
     JSON.parse(
       readFileSync(join(DESIGN, 'templates/exemplos/personagens.json'), 'utf8')
     ) as { characters: { system: string }[] }
   ).characters
 
-  it('a lista é Vampiro e Mago, e cada arquivo existe', () => {
-    expect([...PUBLISHED_SYSTEMS]).toEqual(['vtm-v20', 'mta-m20'])
+  it('a lista é Vampiro, Mago e Lobisomem, e cada arquivo existe', () => {
+    expect([...PUBLISHED_SYSTEMS]).toEqual(['vtm-v20', 'mta-m20', 'wta-w20'])
     expect(publishedFiles().map(f => f.split('/').at(-1))).toEqual([
       'vtm-v20.json',
       'mta-m20.json',
+      'wta-w20.json',
     ])
   })
 

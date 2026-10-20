@@ -1,4 +1,9 @@
-import { describe, type ResolvedRating, short } from '@tms/sheet-core'
+import {
+  describe,
+  modifierNote,
+  type ResolvedRating,
+  short,
+} from '@tms/sheet-core'
 import { type PipSegment, RatingDots, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { FieldTarget } from './FieldTarget'
@@ -7,11 +12,18 @@ import type { FieldViewProps } from './types'
 // rating (DS: FieldRow e Cell). Os pips são só visual: o número está ao lado
 // e a frase acessível vem do describe() do core, que começa pelo rótulo.
 
-/** Pips: pontos próprios, bônus de estado, inativos (acima do teto) e vazios. */
+/**
+ * Pips: pontos próprios, bônus de estado, pontos que não valem agora (acima
+ * do teto, ou tirados por um estado: Manipulação em Crinos) e vazios. Nunca
+ * mais pips que a escala: Força 7 numa escala de 5 são 5 pips, e o número
+ * ao lado diz o resto.
+ */
 export function pipSegments(r: ResolvedRating): PipSegment[] {
-  const own = Math.max(0, Math.min(r.base, r.value))
-  const bonus = Math.max(0, r.value - r.base)
-  const lost = Math.max(0, r.inactive)
+  const fit = (n: number, used: number) =>
+    Math.max(0, Math.min(n, r.max - used))
+  const own = fit(Math.min(r.base, r.value), 0)
+  const bonus = fit(r.value - r.base, own)
+  const lost = fit(Math.max(r.inactive, r.base - r.value), own + bonus)
   const off = Math.max(0, r.max - own - bonus - lost)
   return [
     { kind: 'on', n: own },
@@ -44,6 +56,7 @@ export function RatingRow({ resolved, sheet }: FieldViewProps) {
             {specialty}
           </Text>
         ) : null}
+        <ModifierNote r={resolved} />
       </View>
       <RatingDots segments={pipSegments(resolved)} size="sm" />
       <Text variant="number" style={styles.num}>
@@ -86,7 +99,19 @@ export function RatingCell({
           {specialty}
         </Text>
       ) : null}
+      <ModifierNote r={resolved} />
     </FieldTarget>
+  )
+}
+
+/** A origem do valor efetivo ("3 + 4 Crinos"); o describe já a anuncia. */
+function ModifierNote({ r }: { readonly r: ResolvedRating }) {
+  const note = modifierNote(r)
+  if (!note) return null
+  return (
+    <Text variant="caption" color="action" numberOfLines={1}>
+      {note}
+    </Text>
   )
 }
 

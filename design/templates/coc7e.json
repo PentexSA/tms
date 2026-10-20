@@ -522,7 +522,7 @@
       {
         "id": "skill",
         "label": "Perícia ou característica",
-        "from": ["characteristics", "skills"]
+        "from": ["characteristics", "skills", "play"]
       }
     ],
     "bonusDice": { "min": -2, "max": 2 },

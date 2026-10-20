@@ -14,7 +14,12 @@
     "subtitle": "deedName",
     "chip": "tribe",
     "summary": ["rank", "auspice"],
-    "voice": "quote"
+    "voice": "quote",
+    "columns": [
+      ["name", "deedName", "concept"],
+      ["breed", "auspice", "tribe"],
+      ["sept", "totem"]
+    ]
   },
   "accent": {
     "from": "tribe",
@@ -531,6 +536,49 @@
         "notes": true
       }
     },
+    "rites": {
+      "type": "list",
+      "label": "Ritos",
+      "itemLabel": "Rito",
+      "item": {
+        "meta": [
+          {
+            "id": "level",
+            "type": "number",
+            "label": "Nível",
+            "min": 0,
+            "max": 5
+          }
+        ],
+        "notes": true
+      },
+      "help": "Nível 0 é rito menor. Anote o que o rito faz nas notas de cada um."
+    },
+    "fetishes": {
+      "type": "list",
+      "label": "Fetiches",
+      "itemLabel": "Fetiche",
+      "item": {
+        "meta": [
+          {
+            "id": "level",
+            "type": "number",
+            "label": "Nível",
+            "min": 1,
+            "max": 5
+          },
+          {
+            "id": "gnosis",
+            "type": "number",
+            "label": "Gnose",
+            "min": 1,
+            "max": 10
+          }
+        ],
+        "notes": true
+      },
+      "help": "Ativar um fetiche é um teste de Gnose contra a Gnose do fetiche."
+    },
     "backgrounds": {
       "type": "list",
       "label": "Antecedentes",
@@ -578,6 +626,7 @@
     {
       "id": "attributes",
       "zone": "build",
+      "groupTabs": true,
       "title": "Atributos",
       "layout": "grid",
       "groups": [
@@ -601,6 +650,7 @@
     {
       "id": "abilities",
       "zone": "build",
+      "groupTabs": true,
       "title": "Habilidades",
       "layout": "groups",
       "filter": {
@@ -682,6 +732,22 @@
       "groups": [{ "id": "gifts", "title": "Dons", "fields": ["gifts"] }]
     },
     {
+      "id": "rites",
+      "zone": "powers",
+      "title": "Ritos",
+      "layout": "groups",
+      "groups": [{ "id": "rites", "title": "Ritos", "fields": ["rites"] }]
+    },
+    {
+      "id": "fetishes",
+      "zone": "powers",
+      "title": "Fetiches",
+      "layout": "groups",
+      "groups": [
+        { "id": "fetishes", "title": "Fetiches", "fields": ["fetishes"] }
+      ]
+    },
+    {
       "id": "backgrounds",
       "zone": "powers",
       "title": "Antecedentes",
@@ -717,7 +783,11 @@
     "label": "Dados",
     "die": 10,
     "slots": [
-      { "id": "attribute", "label": "Atributo", "from": ["attributes"] },
+      {
+        "id": "attribute",
+        "label": "Atributo",
+        "from": ["attributes", "play"]
+      },
       {
         "id": "ability",
         "label": "Habilidade",
@@ -752,5 +822,13 @@
       }
     ]
   },
-  "actions": []
+  "actions": [
+    {
+      "id": "regenerate",
+      "label": "Regenerar 1 nível",
+      "effect": "health.heal",
+      "params": { "field": "health", "types": ["bashing", "lethal"] },
+      "help": "Cura 1 nível contusivo ou letal, letal primeiro. O agravado fica."
+    }
+  ]
 }

@@ -1,0 +1,32 @@
+# As formas do Lobisomem (plano-v2, Etapa 7): o sheet da Forma, Crinos com a
+# mudança instantânea (a forma e 1 Fúria num lote só) e Desfazer. Sem Fúria,
+# a alternância fica desabilitada e a troca é lenta: "Forma X → Crinos"
+appId: com.tms.app
+name: Forma do Lobisomem e desfazer
+---
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "${WEREWOLF_CHRONICLE}, .*"
+- extendedWaitUntil:
+    visible:
+      text: "${WEREWOLF_CHARACTER}, .*"
+    timeout: 20000
+- tapOn:
+    text: "${WEREWOLF_CHARACTER}, .*"
+- extendedWaitUntil:
+    visible:
+      id: "dock-form"
+    timeout: 20000
+- tapOn:
+    id: "dock-form"
+- tapOn:
+    id: "state-cost-form"
+- tapOn:
+    text: "Crinos, .*"
+- assertVisible:
+    text: "Forma.*Crinos.*"
+- tapOn: "Desfazer"
+- extendedWaitUntil:
+    visible:
+      text: "Sincronização: Salvo"
+    timeout: 15000

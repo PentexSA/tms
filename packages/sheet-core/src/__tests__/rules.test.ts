@@ -303,6 +303,39 @@ describe('ações do template', () => {
   })
 })
 
+describe('Regenerar (Lobisomem, ação do menu sem custo)', () => {
+  const wta = compileTemplate(templates['wta-w20'])
+  const regenerate = wta.template.actions?.find(
+    a => a.id === 'regenerate'
+  ) as TemplateAction
+  const taina = () => character('taina').sheet as unknown as SheetData
+
+  it('cura 1 nível letal antes do contusivo, sem gastar recurso', () => {
+    const plan = planAction(wta, taina(), regenerate)
+    expect(plan).toMatchObject({
+      ok: true,
+      events: [
+        {
+          path: 'values.health',
+          to: { aggravated: 1, lethal: 1, bashing: 1 },
+        },
+      ],
+    })
+  })
+
+  it('o agravado fica: só com agravado, nada a curar', () => {
+    const s = taina()
+    const sheet = {
+      ...s,
+      values: { ...s.values, health: { aggravated: 2, lethal: 0, bashing: 0 } },
+    } as SheetData
+    expect(planAction(wta, sheet, regenerate)).toEqual({
+      ok: false,
+      reason: 'Nada a curar: sem dano contusivo ou letal',
+    })
+  })
+})
+
 describe('ação padrão do dock (toque longo)', () => {
   it('spend1 no Sangue e na FdV', () => {
     expect(planDefaultAction(model, helena(), 'blood')).toMatchObject({

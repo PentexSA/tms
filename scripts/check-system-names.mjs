@@ -1,7 +1,9 @@
 // O código conhece tipos; o template conhece o sistema (doc/arquitetura §1).
 // Falha se o código do app, do @tms/ui ou da API citar um sistema pelo nome:
 // o código de um sistema (de design/templates/*.json) ou um nome da lista
-// fechada que leva o sistema no nome (vtmBloodPool, mage-quint-paradox).
+// fechada que leva o sistema no nome (vtmBloodPool, mage-quint-paradox), ou
+// o id de uma opção de `state` entre aspas ('crinos'): a view da forma não
+// pode saber qual forma é qual.
 // Esses nomes só podem aparecer no @tms/sheet-core, nos templates e nos
 // testes (plano-v1 §4). Comentários não contam.
 //
@@ -21,15 +23,18 @@ const DIRS = [
 // A lista dos templates do produto é o único lugar com o código do sistema
 const ALLOWED = new Set(['apps/api/src/templates/published.ts'])
 
-const systems = readdirSync(join(ROOT, 'design/templates'))
+const templates = readdirSync(join(ROOT, 'design/templates'))
   .filter(f => f.endsWith('.json') && f !== 'schema.json')
-  .map(
-    f =>
-      JSON.parse(readFileSync(join(ROOT, 'design/templates', f), 'utf8')).system
-  )
+  .map(f => JSON.parse(readFileSync(join(ROOT, 'design/templates', f), 'utf8')))
+const systems = templates.map(t => t.system)
+const stateOptions = templates.flatMap(t =>
+  Object.values(t.fields ?? {})
+    .filter(f => f.type === 'state')
+    .flatMap(f => (f.options ?? []).map(o => o.id))
+)
 const literal = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const FORBIDDEN = new RegExp(
-  `['"\`](?:${systems.map(literal).join('|')})['"\`]|\\b(?:vtm|mta|wta|dnd5e|coc|fate)[A-Z]\\w*|\\bmage-[a-z-]+`
+  `['"\`](?:${[...systems, ...stateOptions].map(literal).join('|')})['"\`]|\\b(?:vtm|mta|wta|dnd5e|coc|fate)[A-Z]\\w*|\\bmage-[a-z-]+`
 )
 
 // Tira comentários de linha e de bloco, sem mexer em strings
