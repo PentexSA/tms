@@ -374,7 +374,7 @@ Ações aparecem no menu ⋯ da ficha (`actions`, no topo do template) ou no she
 
 | `effect` | `params` | Efeito | Exemplo |
 |---|---|---|---|
-| `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso | Curar 1 nível por 1 Sangue |
+| `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso. No menu da ficha (`actions` do topo), não tem custo | Curar 1 nível por 1 Sangue; Regenerar (Lobisomem) |
 | `resource.spend` | `field`, `amount` | Debita `amount` do recurso (mínimo 0) | Despertar: −1 Sangue |
 | `resource.gain` | `field`, `amount` | Credita `amount` respeitando o teto | Recuperar Força de Vontade |
 | `rest.long` | – | Recursos com `tempFirst` ao máximo e sem temporários; recursos com `max.field` recuperam metade; `slots` zerados; `track boxes` zeradas | Descanso longo D&D |

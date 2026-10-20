@@ -510,6 +510,20 @@
             },
             { "id": "b4", "name": "Totem", "value": 2 }
           ],
+          "rites": [
+            {
+              "id": "r1",
+              "name": "Rito da Contrição",
+              "meta": { "level": 1 }
+            }
+          ],
+          "fetishes": [
+            {
+              "id": "f1",
+              "name": "Viola de Corda de Prata",
+              "meta": { "level": 1, "gnosis": 5 }
+            }
+          ],
           "notes": "",
           "storytellerNotes": ""
         },
@@ -517,6 +531,77 @@
           "expression": "Canções de saga",
           "performance": "Violão"
         }
+      }
+    },
+    {
+      "id": "caue",
+      "chronicleId": "serra-do-mar",
+      "system": "wta-w20",
+      "ownerId": "u-bruno",
+      "updatedAt": "2026-09-26T21:05:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Cauê",
+          "concept": "Lobo criado na mata",
+          "breed": "lupino",
+          "auspice": "theurge",
+          "tribe": "garras-vermelhas"
+        },
+        "specialties": {}
+      }
+    },
+    {
+      "id": "taina",
+      "chronicleId": "serra-do-mar",
+      "system": "wta-w20",
+      "ownerId": "u-carla",
+      "updatedAt": "2026-09-26T23:50:00-03:00",
+      "sheet": {
+        "values": {
+          "name": "Tainá Ferraz",
+          "deedName": "Rasga-Muralha",
+          "concept": "Guarda-costas",
+          "breed": "impuro",
+          "auspice": "ahroun",
+          "tribe": "crias-de-fenris",
+          "rank": 1,
+          "sept": "Seita da Serra do Mar",
+          "totem": "Corvo",
+          "strength": 4,
+          "dexterity": 3,
+          "stamina": 3,
+          "charisma": 2,
+          "manipulation": 1,
+          "appearance": 2,
+          "perception": 2,
+          "intelligence": 2,
+          "wits": 3,
+          "alertness": 2,
+          "athletics": 2,
+          "brawl": 4,
+          "intimidation": 3,
+          "primalUrge": 2,
+          "melee": 2,
+          "survival": 1,
+          "form": "crinos",
+          "rage": { "current": 0, "permanent": 5 },
+          "gnosis": { "current": 1, "permanent": 3 },
+          "willpower": { "current": 2, "permanent": 4 },
+          "glory": { "current": 6, "permanent": 2 },
+          "honor": { "current": 1, "permanent": 1 },
+          "wisdom": { "current": 0, "permanent": 0 },
+          "health": { "bashing": 1, "lethal": 2, "aggravated": 1 },
+          "gifts": [
+            {
+              "id": "g1",
+              "name": "Garras Afiadas",
+              "meta": { "rank": 1, "source": "Augúrio · Ahroun" }
+            }
+          ],
+          "notes": "Gastou a última Fúria na mudança instantânea.",
+          "storytellerNotes": "A ferida agravada é de prata: não regenera."
+        },
+        "specialties": { "brawl": "Garras" }
       }
     },
     {

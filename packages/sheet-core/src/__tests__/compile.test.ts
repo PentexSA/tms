@@ -7,7 +7,7 @@ import {
   UnsupportedTemplateError,
 } from '../compile'
 import { REGISTRY } from '../registry'
-import { clone, dnd, type Json, mta, templates, vtm } from './fixtures'
+import { clone, dnd, type Json, mta, templates, vtm, wta } from './fixtures'
 
 type Fields = Record<string, Json>
 const fieldsOf = (t: Json) => t.fields as Fields
@@ -143,6 +143,45 @@ describe('compileTemplate: o Mago (M20, v1)', () => {
 
   it('dock com a roda entre a Vitalidade e a FdV', () => {
     expect(model.dock).toEqual(['health', 'wheel', 'willpower'])
+  })
+})
+
+describe('compileTemplate: o Lobisomem (W20, v2)', () => {
+  const model = compileTemplate(wta())
+
+  it('identityFields seguem as colunas da ficha impressa', () => {
+    // O Posto vem do resumo; é um rating e não entra no formulário de criação
+    expect(model.identityFields).toEqual([
+      'name',
+      'deedName',
+      'concept',
+      'breed',
+      'auspice',
+      'tribe',
+      'sept',
+      'totem',
+      'rank',
+    ])
+  })
+
+  it('Atributos e Habilidades viram abas no celular, como no Vampiro', () => {
+    expect(model.sections.get('attributes')?.def.groupTabs).toBe(true)
+    expect(model.sections.get('abilities')?.def.groupTabs).toBe(true)
+  })
+
+  it('Ritos e Fetiches são listas em Vantagens, depois dos Dons', () => {
+    for (const id of ['rites', 'fetishes']) {
+      expect(model.fields.get(id)?.def.type).toBe('list')
+      expect(model.fields.get(id)?.zone).toBe('powers')
+    }
+    const powers = [...model.sections.values()]
+      .filter(s => s.zone === 'powers')
+      .map(s => s.id)
+    expect(powers.indexOf('rites')).toBe(powers.indexOf('gifts') + 1)
+  })
+
+  it('dock com a Forma ao lado da Vitalidade e da Fúria', () => {
+    expect(model.dock).toEqual(['health', 'rage', 'form'])
   })
 })
 

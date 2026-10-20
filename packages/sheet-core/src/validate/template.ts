@@ -768,28 +768,27 @@ function check(
         `efeito '${b.effect}' não se aplica ao modelo ${r.model} (gastaria o recurso sem efeito)`
       )
   }
+  // health.heal: no sheet de um recurso (paga o custo) ou no menu da ficha
+  // (Regenerar, sem custo)
+  const checkHeal = (p: string, a: Obj | undefined) => {
+    if (a?.effect !== 'health.heal') return
+    const params = rec(a.params)
+    const track = field(params?.field)
+    if (!track || track.rule !== 'wod-stacking') {
+      err(`${p}.params.field`, 'precisa ser uma trilha wod-stacking')
+      return
+    }
+    const typeIds = asArray(track.types).map(x => rec(x)?.id)
+    for (const ty of asArray(params?.types))
+      if (!typeIds.includes(ty))
+        err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
+  }
+  for (const a of asArray(t.actions).map(rec)) checkHeal(`actions.${a?.id}`, a)
   for (const [fid, raw] of Object.entries(fields)) {
     const f = rec(raw)
     if (!f) continue
-    for (const a of asArray(f.actions).map(rec)) {
-      if (a?.effect !== 'health.heal') continue
-      const params = rec(a.params)
-      const track = field(params?.field)
-      if (!track || track.rule !== 'wod-stacking') {
-        err(
-          `fields.${fid}.actions.${a.id}.params.field`,
-          'precisa ser uma trilha wod-stacking'
-        )
-        continue
-      }
-      const typeIds = asArray(track.types).map(x => rec(x)?.id)
-      for (const ty of asArray(params?.types))
-        if (!typeIds.includes(ty))
-          err(
-            `fields.${fid}.actions.${a.id}.params.types`,
-            `tipo '${ty}' não existe na trilha`
-          )
-    }
+    for (const a of asArray(f.actions).map(rec))
+      checkHeal(`fields.${fid}.actions.${a?.id}`, a)
     if (f.type === 'track' && f.rule === 'boxes')
       for (const row of asArray(f.rows).map(rec)) {
         const boxValues = row?.boxValues

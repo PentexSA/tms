@@ -11,6 +11,7 @@ import {
   reference,
   templates,
   vtm,
+  wta,
 } from './fixtures'
 
 // Teste diferencial: a porta em TS precisa dar exatamente os mesmos erros que a
@@ -290,15 +291,37 @@ const vtmOnlyMutations: [string, (t: Json) => void][] = [
   ],
 ]
 
+// As ações do menu da ficha (Regenerar, sem custo) passam pela mesma checagem
+// das ações de recurso.
+const wtaOnlyMutations: [string, (t: Json) => void][] = [
+  [
+    'regenerar com tipo de dano inexistente',
+    t => {
+      const [regenerate] = t.actions as Json[]
+      if (regenerate) regenerate.params = { field: 'health', types: ['fire'] }
+    },
+  ],
+  [
+    'regenerar fora de trilha wod-stacking',
+    t => {
+      const [regenerate] = t.actions as Json[]
+      if (regenerate) regenerate.params = { field: 'rage', types: ['lethal'] }
+    },
+  ],
+]
+
 describe('paridade em templates inválidos', () => {
   for (const [name, base] of [
     ['vtm-v20', vtm],
     ['dnd5e-2014', dnd],
+    ['wta-w20', wta],
   ] as const) {
     const mutations =
       name === 'vtm-v20'
         ? [...templateMutations, ...vtmOnlyMutations]
-        : templateMutations
+        : name === 'wta-w20'
+          ? wtaOnlyMutations
+          : templateMutations
     for (const [label, mutate] of mutations) {
       it(`${name}: ${label}`, () => {
         const t = base()
@@ -506,10 +529,31 @@ const sheetMutations: [
       if (first) first.meta = { ...(first.meta as Json), script: 'x' }
     },
   ],
+  [
+    'lobisomem',
+    'forma que não existe',
+    v => {
+      v.form = 'urrah'
+    },
+  ],
+  [
+    'lobisomem',
+    'rito com valor (a lista não tem valor)',
+    v => {
+      v.rites = [{ id: 'r1', name: 'Rito da Contrição', value: 2 }]
+    },
+  ],
+  [
+    'lobisomem',
+    'Gnose do fetiche acima de 10',
+    v => {
+      v.fetishes = [{ id: 'f1', name: 'Viola', meta: { level: 1, gnosis: 11 } }]
+    },
+  ],
 ]
 
 describe('paridade em fichas inválidas', () => {
-  const ids = { vampiro: 'helena', 'd&d': 'lia' } as const
+  const ids = { vampiro: 'helena', 'd&d': 'lia', lobisomem: 'iara' } as const
   for (const [who, label, mutate] of sheetMutations) {
     it(`${who}: ${label}`, () => {
       const c = character(ids[who as keyof typeof ids])

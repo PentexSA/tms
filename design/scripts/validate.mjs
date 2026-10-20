@@ -391,13 +391,16 @@ export function validateTemplate(t, palette) {
   for (const pr of r.presets ?? []) for (const k of Object.keys(pr.slots ?? {})) if (!slotIds.includes(k)) err(`roll.presets.${pr.id}.slots.${k}`, 'slot inexistente na rolagem')
   const boostModel = { autoSuccess: ['pool-success'], plus2: ['fudge'] }
   for (const b of r.boosts ?? []) if (boostModel[b.effect] && !boostModel[b.effect].includes(r.model)) err(`roll.boosts.${b.id}`, `efeito '${b.effect}' não se aplica ao modelo ${r.model} (gastaria o recurso sem efeito)`)
+  // health.heal: no sheet de um recurso (paga o custo) ou no menu da ficha (Regenerar, sem custo)
+  const checkHeal = (p, a) => {
+    if (a.effect !== 'health.heal') return
+    const track = fields[a.params?.field]
+    if (!track || track.rule !== 'wod-stacking') { err(`${p}.params.field`, 'precisa ser uma trilha wod-stacking'); return }
+    for (const ty of a.params.types ?? []) if (!track.types.some(x => x.id === ty)) err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
+  }
+  for (const a of t.actions ?? []) checkHeal(`actions.${a.id}`, a)
   for (const [fid, f] of Object.entries(fields)) {
-    for (const a of f.actions ?? []) {
-      if (a.effect !== 'health.heal') continue
-      const track = fields[a.params?.field]
-      if (!track || track.rule !== 'wod-stacking') { err(`fields.${fid}.actions.${a.id}.params.field`, 'precisa ser uma trilha wod-stacking'); continue }
-      for (const ty of a.params.types ?? []) if (!track.types.some(x => x.id === ty)) err(`fields.${fid}.actions.${a.id}.params.types`, `tipo '${ty}' não existe na trilha`)
-    }
+    for (const a of f.actions ?? []) checkHeal(`fields.${fid}.actions.${a.id}`, a)
     if (f.type === 'track' && f.rule === 'boxes') for (const row of f.rows ?? []) if (row.boxValues && row.boxValues.length !== row.boxes) err(`fields.${fid}.rows.${row.id}.boxValues`, 'precisa ter um valor por caixa')
     if (f.type === 'clock' && f.rule === 'mage-quint-paradox') {
       const from = (f.fills ?? []).map(x => x.from).sort().join(',')

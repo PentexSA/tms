@@ -123,7 +123,15 @@ export function planAction(
       const type = [...(action.params?.types ?? [])]
         .reverse()
         .find(id => (t.counts[id] ?? 0) > 0)
-      if (!type) return unavailable('Nada a curar com este recurso')
+      if (!type) {
+        if (cost > 0) return unavailable('Nada a curar com este recurso')
+        // Sem custo (Regenerar): diz quais danos a ação cura
+        const labels = (action.params?.types ?? []).flatMap(id => {
+          const label = def.types?.find(x => x.id === id)?.label
+          return label ? [label.toLowerCase()] : []
+        })
+        return unavailable(`Nada a curar: sem dano ${labels.join(' ou ')}`)
+      }
       const events: SheetEvent[] = []
       const change = heal(def, stored(sheet, t.id) as StackingValue, type, 1)
       events.push(event(sheet, t.id, change.counts))
