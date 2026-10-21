@@ -1,6 +1,10 @@
+import type { SystemCase } from './matrix-systems'
+
 // Matriz de AuthZ (doc/plano-v0.md §4): cada rota protegida diz, para cada
 // ator, o status esperado. Rota nova sem linha aqui falha o teste da matriz
-// (o mesmo fail secure da API, aplicado aos testes).
+// (o mesmo fail secure da API, aplicado aos testes). Roda nos três sistemas
+// do produto (doc/plano-v3.md, Etapa 3): o corpo que cita campo sai do caso
+// do sistema, nunca de um nome escrito aqui.
 
 export type Actor =
   // narrador da crônica do cenário
@@ -20,7 +24,9 @@ export interface MatrixRow {
   // Caminho do Elysia, com :id e afins (:id é a crônica ou a ficha)
   readonly route: string
   readonly expect: Readonly<Record<Actor, number>>
-  readonly body?: unknown
+  readonly body?: (s: SystemCase) => unknown
+  // A linha muda o cenário (excluir, gravar): monta um cenário por ator
+  readonly mutates?: true
 }
 
 const denied = { otherStoryteller: 404, stranger: 404, anonymous: 401 } as const
@@ -35,7 +41,8 @@ export const MATRIX: readonly MatrixRow[] = [
     // O cenário tem a ficha da dona: só sai com o nome da crônica digitado
     method: 'DELETE',
     route: '/chronicles/:id',
-    body: { confirm: 'Crônica da Liberdade' },
+    body: () => ({ confirm: 'Crônica da Liberdade' }),
+    mutates: true,
     expect: { storyteller: 204, owner: 403, player: 403, ...denied },
   },
   {
@@ -51,6 +58,7 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'DELETE',
     route: '/chronicles/:id/invites/:inviteId',
+    mutates: true,
     expect: { storyteller: 204, owner: 403, player: 403, ...denied },
   },
   {
@@ -68,7 +76,7 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'POST',
     route: '/chronicles/:id/characters',
-    body: { values: { name: 'Nova' } },
+    body: () => ({ values: { name: 'Nova' } }),
     expect: { storyteller: 201, owner: 201, player: 201, ...denied },
   },
   {
@@ -79,15 +87,17 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'DELETE',
     route: '/characters/:id',
+    mutates: true,
     expect: { storyteller: 204, owner: 204, player: 404, ...denied },
   },
   {
     method: 'POST',
     route: '/characters/:id/events',
-    body: {
-      clientBatchId: '00000000-0000-4000-8000-0000000000b1',
-      events: [{ path: 'values.concept', from: null, to: 'Arquivista' }],
-    },
+    body: s => ({
+      clientBatchId: crypto.randomUUID(),
+      events: [{ path: `values.${s.textField}`, from: null, to: 'Arquivista' }],
+    }),
+    mutates: true,
     expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
@@ -98,11 +108,12 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'POST',
     route: '/characters/:id/rolls',
-    body: {
-      clientRollId: '00000000-0000-4000-8000-0000000000d1',
-      slots: { attribute: 'dexterity' },
+    // Sem custo: não muda a ficha
+    body: s => ({
+      clientRollId: crypto.randomUUID(),
+      slots: s.slots,
       difficulty: 6,
-    },
+    }),
     expect: { storyteller: 201, owner: 201, player: 404, ...denied },
   },
   {
