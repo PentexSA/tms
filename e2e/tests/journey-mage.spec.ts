@@ -80,9 +80,13 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
   await page.getByRole('radio', { name: 'Forças' }).click()
   await expect(page.getByText('◆ Afinidade')).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar Rotina' }).click()
-  await page
-    .getByRole('textbox', { name: 'Nome', exact: true })
-    .fill('Bobina de bolso')
+  // No WebKit, o foco da folha modal chega depois do autoFocus e pode levar
+  // o texto digitado durante a animação: preenche de novo até o campo ficar
+  const routine = page.getByRole('textbox', { name: 'Nome', exact: true })
+  await expect(async () => {
+    await routine.fill('Bobina de bolso')
+    await expect(routine).toHaveValue('Bobina de bolso', { timeout: 1000 })
+  }).toPass()
   await page
     .getByRole('button', { name: 'Adicionar “Bobina de bolso”' })
     .click()
