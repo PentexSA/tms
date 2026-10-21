@@ -54,15 +54,21 @@ function CharacterRow({
   )
 }
 
+// O narrador vê todas as fichas; o jogador, só as dele (a API já filtra: a
+// ficha de outro jogador nunca chega ao aparelho).
 export function CharacterList({
   chronicleId,
   systemCode,
+  narrating,
 }: {
   readonly chronicleId: string
   readonly systemCode: string
+  readonly narrating: boolean
 }) {
   const router = useRouter()
   const characters = useChronicleCharacters(chronicleId)
+  const rows = (characters.data ?? []) as Row[]
+  const shown = narrating ? rows : rows.filter(r => r.mine)
   const create = (
     <Button
       title="Nova ficha"
@@ -73,7 +79,10 @@ export function CharacterList({
   return (
     <View>
       <View style={styles.header}>
-        <SectionHeader title="Fichas" right={create} />
+        <SectionHeader
+          title={narrating ? 'Fichas' : 'Suas fichas'}
+          right={create}
+        />
       </View>
       {characters.isPending ? (
         <Skeleton lines={2} label="Carregando as fichas" />
@@ -81,13 +90,15 @@ export function CharacterList({
         <Text color="danger" style={styles.text}>
           {messageOf(characters.error)}
         </Text>
-      ) : characters.data.length === 0 ? (
+      ) : shown.length === 0 ? (
         <Text color="inkMuted" style={styles.text}>
-          Nenhuma ficha ainda.
+          {narrating
+            ? 'Nenhuma ficha ainda.'
+            : 'Você ainda não tem ficha nesta crônica.'}
         </Text>
       ) : (
-        characters.data.map(row => (
-          <CharacterRow key={row.id} row={row as Row} systemCode={systemCode} />
+        shown.map(row => (
+          <CharacterRow key={row.id} row={row} systemCode={systemCode} />
         ))
       )}
     </View>

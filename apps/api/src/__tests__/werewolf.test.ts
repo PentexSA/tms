@@ -229,7 +229,7 @@ describe('a troca de forma', () => {
           { path: 'values.form', from: null, to: 'crinos' },
         ])
       ).status
-    ).toBe(403)
+    ).toBe(404)
   })
 })
 

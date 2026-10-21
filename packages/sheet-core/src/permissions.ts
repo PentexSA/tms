@@ -7,14 +7,15 @@ import { REGISTRY, type RoleName } from './registry'
 // conjunto vazio não lê nada, e campo citado por várias seções obedece à mais
 // restrita.
 //
-// Papéis: `owner` (dono da ficha), `storyteller` (narrador da crônica) e
-// `player` (outro jogador da crônica). Quem chama resolve os papéis no banco,
-// nunca a partir do cliente; o narrador pode ser também o dono.
+// Papéis na ficha: `owner` (dono) e `storyteller` (narrador da crônica). Outro
+// jogador da crônica não tem papel: não lê nem escreve a ficha (doc/plano-v3.md,
+// Etapa 2). Quem chama resolve os papéis no banco, nunca a partir do cliente;
+// o narrador pode ser também o dono.
 
 export type Roles = Iterable<RoleName | string>
 
-// Sem `permissions`: todos da crônica leem; dono e narrador escrevem.
-const DEFAULT_WRITERS: readonly RoleName[] = ['owner', 'storyteller']
+// Sem `permissions`: dono e narrador leem e escrevem.
+const DEFAULT_ACCESS: readonly RoleName[] = ['owner', 'storyteller']
 
 const known = (roles: Roles): Set<RoleName> => {
   const out = new Set<RoleName>()
@@ -35,8 +36,7 @@ export function canReadSection(
   const section = model.sections.get(sectionId)
   const mine = known(roles)
   if (!section || mine.size === 0) return false
-  const read = section.def.permissions?.read
-  return read ? allows(read, mine) : true
+  return allows(section.def.permissions?.read ?? DEFAULT_ACCESS, mine)
 }
 
 export function canRead(
@@ -47,6 +47,7 @@ export function canRead(
   const field = model.fields.get(fieldId)
   const mine = known(roles)
   if (!field || mine.size === 0) return false
+  if (field.sectionIds.length === 0) return allows(DEFAULT_ACCESS, mine)
   return field.sectionIds.every(s => canReadSection(model, s, mine))
 }
 
@@ -58,10 +59,10 @@ export function canWrite(
   const field = model.fields.get(fieldId)
   const mine = known(roles)
   if (!field || field.readOnly || !canRead(model, fieldId, mine)) return false
-  if (field.sectionIds.length === 0) return allows(DEFAULT_WRITERS, mine)
+  if (field.sectionIds.length === 0) return allows(DEFAULT_ACCESS, mine)
   return field.sectionIds.every(id => {
     const write = model.sections.get(id)?.def.permissions?.write
-    return allows(write ?? DEFAULT_WRITERS, mine)
+    return allows(write ?? DEFAULT_ACCESS, mine)
   })
 }
 

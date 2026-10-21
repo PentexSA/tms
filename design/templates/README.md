@@ -323,8 +323,8 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   "fields": ["storytellerNotes"], "permissions": { "read": ["storyteller"], "write": ["storyteller"] } }
 ```
 
-- Papéis: `owner` (dono da ficha), `storyteller` (narrador da crônica) e `player` (outro jogador da mesma crônica).
-- Sem `permissions`: todos da crônica leem; dono e narrador escrevem.
+- Papéis: `owner` (dono da ficha) e `storyteller` (narrador da crônica). Outro jogador da crônica não tem papel na ficha: não a lê nem a escreve (o servidor responde 404).
+- Sem `permissions`: dono e narrador leem e escrevem.
 - `read` restrito: o **servidor** remove os campos da seção antes de responder a quem não pode ler (§11). Esconder na UI não basta. Por isso esses campos não podem aparecer em `identity` (header, cartões, mesa) nem no `dock`: `validateTemplate` rejeita.
 - `write` restrito: o servidor rejeita a escrita de quem não está na lista.
 
@@ -455,7 +455,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `layouts` | `layout` | `grid`, `groups`, `list`, `pyramid`, `fields`, `facts`, `text` |
 | `filterRules` | `filterRule` | `invested`, `proficient`, `aboveBase` |
 | `modes` | `mode` | `play`, `edit` |
-| `roles` | `role` | `owner`, `storyteller`, `player` |
+| `roles` | `role` | `owner`, `storyteller` |
 | `defaultActions` | `defaultAction` | `spend1`, `gain1`, `damage1`, `use1` |
 | `modifierOps` | `modifierOp` | `add`, `set` |
 | `conditionRoll` | `conditionRoll` | `advantage`, `disadvantage` |

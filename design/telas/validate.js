@@ -31,7 +31,7 @@ const REGISTRY = {
   layouts: ['grid', 'groups', 'list', 'pyramid', 'fields', 'facts', 'text'],
   filterRules: ['invested', 'proficient', 'aboveBase'],
   modes: ['play', 'edit'],
-  roles: ['owner', 'storyteller', 'player'],
+  roles: ['owner', 'storyteller'],
   defaultActions: ['spend1', 'gain1', 'damage1', 'use1'],
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],

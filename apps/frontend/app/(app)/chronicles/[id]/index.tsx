@@ -155,7 +155,11 @@ function SheetsPanel({
 }) {
   return (
     <>
-      <CharacterList chronicleId={c.id} systemCode={c.system.code} />
+      <CharacterList
+        chronicleId={c.id}
+        systemCode={c.system.code}
+        narrating={narrating}
+      />
 
       <SectionHeader
         title="Participantes"

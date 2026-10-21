@@ -151,10 +151,10 @@ describe('Editar: o rascunho e o resumo', () => {
     expect(screen.queryByText(/^Editando/)).toBeNull()
   })
 
-  it('o jogador sem escrita não vê os modos', async () => {
+  it('sem papel de escrita, não há modos (fail secure)', async () => {
     const helena = example('helena').sheet
     await renderLive(
-      { model, sheet: helena, roles: ['player'] },
+      { model, sheet: helena, roles: [] },
       fakeServer(model, helena).post
     )
     expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()

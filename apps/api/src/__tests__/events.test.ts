@@ -371,7 +371,7 @@ describe('GET /characters/:id/history', () => {
     ])
   })
 
-  it('o jogador não vê as alterações das Notas do Narrador (nem o rótulo)', async () => {
+  it('a dona não vê as alterações das Notas do Narrador (nem o rótulo)', async () => {
     await send(storyteller, [
       {
         path: 'values.storytellerNotes',
@@ -387,14 +387,28 @@ describe('GET /characters/:id/history', () => {
         to: 'De novo.',
       },
     ])
-    const forPlayer = await history(player)
-    expect(JSON.stringify(forPlayer)).not.toContain('Narrador')
-    expect(forPlayer.items).toHaveLength(1)
-    expect(forPlayer.items[0]?.changes).toEqual([
+    const forOwner = await history(owner)
+    expect(JSON.stringify(forOwner)).not.toContain('Narrador')
+    expect(forOwner.items).toHaveLength(1)
+    expect(forOwner.items[0]?.changes).toEqual([
       { label: 'Sangue', change: '9 → 8' },
     ])
     const forStoryteller = await history(storyteller)
     expect(forStoryteller.items).toHaveLength(2)
+  })
+
+  it('o outro jogador não recebe o histórico (404, sem nada da ficha)', async () => {
+    await send(owner, [spendBlood])
+    const res = await as(
+      ctx,
+      player,
+      'GET',
+      `/characters/${characterId}/history`
+    )
+    expect(res.status).toBe(404)
+    const text = await res.text()
+    expect(text).not.toContain('Sangue')
+    expect(text).not.toContain('Helena')
   })
 
   it('Sangue ainda no padrão: o histórico mostra o efetivo (10 → 9)', async () => {
@@ -423,7 +437,7 @@ describe('GET /characters/:id/history', () => {
     await send(owner, [
       { path: 'values.notes', from: helena.notes, to: 'novo segredo' },
     ])
-    const text = JSON.stringify(await history(player))
+    const text = JSON.stringify(await history(owner))
     expect(text).toContain('atualizado')
     expect(text).not.toContain('novo segredo')
     expect(text).not.toContain('Primógeno')

@@ -216,6 +216,14 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    // v3: outro jogador não tem papel na ficha (doc/plano-v3.md, decisão 2)
+    'papel player, que saiu da lista',
+    t => {
+      const s = sectionsOf(t).find(x => x.permissions)
+      if (s) s.permissions = { read: ['storyteller', 'player'] }
+    },
+  ],
+  [
     'aninhamento acima de 12 níveis',
     t => {
       let deep: Json = { x: 1 }

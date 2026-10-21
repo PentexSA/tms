@@ -120,10 +120,10 @@ describe('as fichas de Vampiro em Leitura', () => {
     expect(REGISTRY.emblems.filter(e => !isEmblem(e))).toEqual([])
   })
 
-  it('o jogador não vê a seção do narrador (nem o título)', () => {
-    const { model, sheet } = sheetFor('helena', ['player'])
+  it('a dona não vê a seção do narrador (nem o título)', () => {
+    const { model, sheet } = sheetFor('helena', ['owner'])
     expect(Object.hasOwn(sheet.values, 'storytellerNotes')).toBe(false)
-    renderSheet(model, sheet, ['player'])
+    renderSheet(model, sheet, ['owner'])
     fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
     expect(screen.queryByText('Narrador')).toBeNull()
     expect(screen.queryByLabelText(/Notas do Narrador/)).toBeNull()
@@ -157,7 +157,7 @@ describe('as fichas de Vampiro em Leitura', () => {
       values: { name: 'Sem Sobre' },
       specialties: {},
     } as SheetData
-    renderSheet(model, sheet, ['player'])
+    renderSheet(model, sheet, ['owner'])
     expect(
       screen.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)
     ).toEqual(['Ficha', 'Vantagens'])

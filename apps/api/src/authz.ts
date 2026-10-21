@@ -3,16 +3,23 @@ import type { RoleName } from '@tms/sheet-core'
 import type { Kysely } from 'kysely'
 
 // AuthZ por crônica (contrato §11), sempre resolvida no banco a partir do
-// usuário da sessão; nunca de papel, dono ou id vindos do cliente. Conjunto
-// vazio = sem vínculo = 404 (não 403, para não confirmar que o recurso existe).
+// usuário da sessão; nunca de papel, dono ou id vindos do cliente. Sem vínculo
+// = 404 (não 403, para não confirmar que o recurso existe).
+//
+// Dois tipos de papel, que não se misturam: o papel na crônica (narrador ou
+// membro), que decide quem entra nas rotas da crônica, e os papéis na ficha
+// (dono e narrador, do core), que decidem o que se lê e escreve nela. Outro
+// membro não tem papel na ficha alheia (doc/plano-v3.md, Etapa 2).
 
 export type Roles = ReadonlySet<RoleName>
 
-export async function chronicleRoles(
+export type ChronicleRole = 'storyteller' | 'member' | null
+
+export async function chronicleAccess(
   db: Kysely<DB>,
   userId: string,
   chronicleId: string
-): Promise<Roles> {
+): Promise<ChronicleRole> {
   const row = await db
     .selectFrom('chronicles')
     .leftJoin('chronicle_members', join =>
@@ -26,11 +33,9 @@ export async function chronicleRoles(
     ])
     .where('chronicles.id', '=', chronicleId)
     .executeTakeFirst()
-  const roles = new Set<RoleName>()
-  if (!row) return roles
-  if (row.storyteller_id === userId) roles.add('storyteller')
-  if (row.member) roles.add('player')
-  return roles
+  if (!row) return null
+  if (row.storyteller_id === userId) return 'storyteller'
+  return row.member ? 'member' : null
 }
 
 export interface CharacterAccess {
@@ -45,8 +50,8 @@ export interface CharacterAccess {
 }
 
 /**
- * Papéis na ficha: dono (characters.user_id), narrador da crônica e jogador
- * (outro membro da crônica). Ficha excluída ou sem vínculo: null (404).
+ * Papéis na ficha: dono (characters.user_id) e narrador da crônica. Outro
+ * membro, ficha excluída ou sem vínculo: null (404).
  */
 export async function characterAccess(
   db: Kysely<DB>,
@@ -56,11 +61,6 @@ export async function characterAccess(
   const row = await db
     .selectFrom('characters as ch')
     .innerJoin('chronicles as c', 'c.id', 'ch.chronicle_id')
-    .leftJoin('chronicle_members as m', join =>
-      join
-        .onRef('m.chronicle_id', '=', 'ch.chronicle_id')
-        .on('m.user_id', '=', userId)
-    )
     .select([
       'ch.id',
       'ch.user_id',
@@ -68,7 +68,6 @@ export async function characterAccess(
       'ch.system_id',
       'ch.template_version',
       'c.storyteller_id',
-      'm.user_id as member',
     ])
     .where('ch.id', '=', characterId)
     .where('ch.deleted_at', 'is', null)
@@ -77,7 +76,6 @@ export async function characterAccess(
   const roles = new Set<RoleName>()
   if (row.user_id === userId) roles.add('owner')
   if (row.storyteller_id === userId) roles.add('storyteller')
-  if (row.member && row.user_id !== userId) roles.add('player')
   if (roles.size === 0) return null
   return {
     roles,

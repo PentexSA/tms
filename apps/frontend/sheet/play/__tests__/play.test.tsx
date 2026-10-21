@@ -4,16 +4,22 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native'
-import type {
-  RoleName,
-  SheetData,
-  SheetMode,
-  SheetModel,
+import {
+  compileTemplate,
+  type RoleName,
+  type SheetData,
+  type SheetMode,
+  type SheetModel,
 } from '@tms/sheet-core'
 import { ToastProvider } from '@tms/ui'
 import * as Haptics from 'expo-haptics'
 import { AccessibilityInfo, Dimensions } from 'react-native'
-import { example, modelOf, sheetFor } from '../../../test/fixtures'
+import {
+  example,
+  modelOf,
+  sheetFor,
+  templateJson,
+} from '../../../test/fixtures'
 import { defaultMode } from '../../SheetScreen'
 import { SheetView } from '../../SheetView'
 import { createSheetStore } from '../../store/sheetStore'
@@ -457,11 +463,10 @@ describe('o que muda em Jogo', () => {
     expect(screen.queryByRole('adjustable')).toBeNull()
   })
 
-  it('o dono abre em Jogo; narrador e outros jogadores, em Leitura', () => {
+  it('o dono abre em Jogo; o narrador, em Leitura', () => {
     expect(defaultMode(['owner'])).toBe('play')
     expect(defaultMode(['owner', 'storyteller'])).toBe('play')
     expect(defaultMode(['storyteller'])).toBe('read')
-    expect(defaultMode(['player'])).toBe('read')
   })
 
   it('Dados ficam na barra de Jogo, ao lado do ⋯', () => {
@@ -494,10 +499,12 @@ describe('o que muda em Jogo', () => {
   })
 
   it('quem não escreve não ganha controle, mesmo em Jogo', () => {
-    setup(sheetFor('helena', ['player']).sheet, {
-      roles: ['player'],
-      mode: 'play',
-    })
+    // O dock numa seção que o dono lê e só o narrador escreve
+    const t = templateJson('vtm-v20')
+    t.templateVersion = '9.9.0'
+    for (const s of t.sections as { id: string; permissions?: unknown }[])
+      if (s.id === 'play') s.permissions = { write: ['storyteller'] }
+    setup(helena(), { model: compileTemplate(t), mode: 'play' })
     fireEvent.press(screen.getByTestId('dock-blood'))
     expect(screen.getByText('Você não pode alterar este campo.')).toBeTruthy()
     expect(screen.queryByRole('adjustable')).toBeNull()

@@ -7,7 +7,7 @@ export type Actor =
   | 'storyteller'
   // jogador da crônica, dono da ficha do cenário
   | 'owner'
-  // outro jogador da mesma crônica
+  // outro jogador da mesma crônica: sem papel na ficha da dona (v3, Etapa 2)
   | 'player'
   // narrador de outra crônica
   | 'otherStoryteller'
@@ -54,6 +54,7 @@ export const MATRIX: readonly MatrixRow[] = [
     expect: { storyteller: 204, owner: 403, player: 403, ...denied },
   },
   {
+    // O jogador recebe só as fichas dele (o corpo é conferido em characters.test.ts)
     method: 'GET',
     route: '/chronicles/:id/characters',
     expect: { storyteller: 200, owner: 200, player: 200, ...denied },
@@ -73,12 +74,12 @@ export const MATRIX: readonly MatrixRow[] = [
   {
     method: 'GET',
     route: '/characters/:id',
-    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
     method: 'DELETE',
     route: '/characters/:id',
-    expect: { storyteller: 204, owner: 204, player: 403, ...denied },
+    expect: { storyteller: 204, owner: 204, player: 404, ...denied },
   },
   {
     method: 'POST',
@@ -87,12 +88,12 @@ export const MATRIX: readonly MatrixRow[] = [
       clientBatchId: '00000000-0000-4000-8000-0000000000b1',
       events: [{ path: 'values.concept', from: null, to: 'Arquivista' }],
     },
-    expect: { storyteller: 200, owner: 200, player: 403, ...denied },
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
     method: 'GET',
     route: '/characters/:id/history',
-    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
     method: 'POST',
@@ -102,12 +103,12 @@ export const MATRIX: readonly MatrixRow[] = [
       slots: { attribute: 'dexterity' },
       difficulty: 6,
     },
-    expect: { storyteller: 201, owner: 201, player: 403, ...denied },
+    expect: { storyteller: 201, owner: 201, player: 404, ...denied },
   },
   {
     method: 'GET',
     route: '/characters/:id/rolls',
-    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
 ]
 

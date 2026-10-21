@@ -2,6 +2,7 @@ import type { DB } from '@tms/db'
 import {
   canWrite,
   type Issue,
+  type RoleName,
   type SheetData,
   stripRestricted,
   validateSheet,
@@ -11,7 +12,7 @@ import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { characterAccess, chronicleRoles } from '../authz'
+import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
 import { latestTemplate, modelFor } from './models'
@@ -92,8 +93,8 @@ export function sheetRoutes(
       '/chronicles/:id/characters',
       async ({ params, body, userId, set }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
+        if ((await chronicleAccess(db, me, params.id)) === null)
+          throw notFound()
         const chronicle = await db
           .selectFrom('chronicles')
           .select('system_id')
@@ -172,9 +173,9 @@ export function sheetRoutes(
       '/chronicles/:id/characters',
       async ({ params, userId }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
-        const rows = await db
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null) throw notFound()
+        let q = db
           .selectFrom('characters as ch')
           .innerJoin('users as u', 'u.id', 'ch.user_id')
           .select([
@@ -189,12 +190,14 @@ export function sheetRoutes(
           ])
           .where('ch.chronicle_id', '=', params.id)
           .where('ch.deleted_at', 'is', null)
-          .orderBy('ch.created_at')
-          .execute()
+        // O jogador só recebe as fichas dele; o narrador, todas
+        if (role !== 'storyteller') q = q.where('ch.user_id', '=', me)
+        const rows = await q.orderBy('ch.created_at').execute()
         const out = []
         for (const r of rows) {
           const model = await modelFor(db, r.system_id, r.template_version)
-          const mine = new Set(roles)
+          const mine = new Set<RoleName>()
+          if (role === 'storyteller') mine.add('storyteller')
           if (r.user_id === me) mine.add('owner')
           const { identity, dock } = model.template
           // Só o que a lista e a mesa mostram (identidade e dock), com o que os

@@ -44,7 +44,7 @@ export const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 export const APP_VERSION = Constants.expoConfig?.version ?? '0'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ROLES = new Set(['owner', 'storyteller', 'player'])
+const ROLES = new Set(['owner', 'storyteller'])
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)

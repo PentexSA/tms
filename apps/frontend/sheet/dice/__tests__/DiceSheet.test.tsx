@@ -472,9 +472,9 @@ describe('o sheet Dados do Lobisomem (v2)', () => {
 })
 
 describe('quem vê os Dados', () => {
-  it('o outro jogador da crônica não rola', async () => {
+  it('sem papel na ficha, não rola (fail secure)', async () => {
     renderWithSession(
-      <DiceButton characterId={ID} store={storeFor(['player']).store} />,
+      <DiceButton characterId={ID} store={storeFor([]).store} />,
       await signedIn()
     )
     expect(screen.queryByRole('button', { name: 'Dados' })).toBeNull()

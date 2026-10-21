@@ -1,10 +1,10 @@
 import type { DB } from '@tms/db'
-import { type RoleName, type SheetData, stripRestricted } from '@tms/sheet-core'
+import { type SheetData, stripRestricted } from '@tms/sheet-core'
 import { Elysia } from 'elysia'
 import type { Kysely } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { chronicleRoles } from '../authz'
+import { chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
 import { modelFor } from '../sheets/models'
@@ -26,8 +26,8 @@ export function tableRoutes(
     '/chronicles/:id/table',
     async ({ params, userId }) => {
       const me = requireUser(userId)
-      const roles = await chronicleRoles(db, me, params.id)
-      if (!roles.has('storyteller')) throw notFound()
+      if ((await chronicleAccess(db, me, params.id)) !== 'storyteller')
+        throw notFound()
       const rows = await db
         .selectFrom('characters as ch')
         .innerJoin('users as u', 'u.id', 'ch.user_id')
@@ -51,8 +51,6 @@ export function tableRoutes(
       const out = []
       for (const r of rows) {
         const model = await modelFor(db, r.system_id, r.template_version)
-        const mine = new Set<RoleName>(roles)
-        if (r.user_id === me) mine.add('owner')
         out.push({
           id: r.id,
           name: r.name,
@@ -61,11 +59,9 @@ export function tableRoutes(
           templateVersion: r.template_version,
           sheetVersion: r.sheet_version,
           updatedAt: r.updated_at,
-          sheet: stripRestricted(
-            model,
-            r.sheet_data as unknown as SheetData,
-            mine
-          ),
+          sheet: stripRestricted(model, r.sheet_data as unknown as SheetData, [
+            'storyteller',
+          ]),
         })
       }
       return out

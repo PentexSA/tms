@@ -4,7 +4,7 @@ import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { chronicleRoles } from '../authz'
+import { chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import { clientIp } from '../http/security'
@@ -36,10 +36,9 @@ export function chronicleRoutes(
   guard: ReturnType<typeof authGuard>
 ) {
   const requireStoryteller = async (userId: string, chronicleId: string) => {
-    const roles = await chronicleRoles(db, userId, chronicleId)
-    if (roles.size === 0) throw notFound()
-    if (!roles.has('storyteller')) throw storytellerOnly()
-    return roles
+    const role = await chronicleAccess(db, userId, chronicleId)
+    if (role === null) throw notFound()
+    if (role !== 'storyteller') throw storytellerOnly()
   }
 
   return new Elysia()
@@ -118,11 +117,18 @@ export function chronicleRoutes(
           'g.code as systemCode',
           'g.name as systemName',
           'st.username as storyteller',
+          // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
           eb
             .selectFrom('characters as ch')
             .select(eb.fn.countAll<string>().as('n'))
             .whereRef('ch.chronicle_id', '=', 'c.id')
             .where('ch.deleted_at', 'is', null)
+            .where(eb =>
+              eb.or([
+                eb('ch.user_id', '=', me),
+                eb('c.storyteller_id', '=', me),
+              ])
+            )
             .as('characterCount'),
         ])
         .orderBy('c.created_at', 'desc')
@@ -143,8 +149,8 @@ export function chronicleRoutes(
       '/chronicles/:id',
       async ({ params, userId }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null) throw notFound()
         const c = await db
           .selectFrom('chronicles as c')
           .innerJoin('game_systems as g', 'g.id', 'c.system_id')
@@ -170,9 +176,11 @@ export function chronicleRoutes(
           id: c.id,
           name: c.name,
           system: { code: c.systemCode, name: c.systemName },
-          role: roles.has('storyteller')
-            ? ('storyteller' as const)
-            : ('player' as const),
+          // O rótulo da crônica para o app; o papel na ficha é outro
+          role:
+            role === 'storyteller'
+              ? ('storyteller' as const)
+              : ('player' as const),
           storyteller: { id: c.storytellerId, username: c.storyteller },
           members,
         }
@@ -357,13 +365,14 @@ export function chronicleRoutes(
             invite.uses >= invite.max_uses
           )
             throw new ApiError(404, INVALID_INVITE)
-          const roles = await chronicleRoles(trx, me, invite.chronicle_id)
-          if (roles.size > 0)
+          const role = await chronicleAccess(trx, me, invite.chronicle_id)
+          if (role !== null)
             return {
               chronicleId: invite.chronicle_id,
-              role: roles.has('storyteller')
-                ? ('storyteller' as const)
-                : ('player' as const),
+              role:
+                role === 'storyteller'
+                  ? ('storyteller' as const)
+                  : ('player' as const),
             }
           await trx
             .insertInto('chronicle_members')

@@ -306,8 +306,8 @@
       "enum": ["play", "edit"]
     },
     "role": {
-      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica; player = outro jogador da crônica.",
-      "enum": ["owner", "storyteller", "player"]
+      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica. Outro jogador da crônica não tem papel na ficha (não lê nem escreve).",
+      "enum": ["owner", "storyteller"]
     },
     "defaultAction": {
       "description": "REGISTRY.defaultActions: ação do toque longo no dock.",

@@ -162,7 +162,6 @@ describe('Editar como narrador', () => {
 
   it.each([
     ['dono', ['owner']],
-    ['jogador', ['player']],
     ['narrador dono da própria ficha', ['owner', 'storyteller']],
   ] as const)('%s: sem a barra do narrador', async (_, roles) => {
     await open([...roles])
@@ -277,7 +276,7 @@ describe('Histórico de alterações', () => {
   it('página só com lotes que o papel não lê: ainda dá para carregar mais', async () => {
     calls.historyGet.mockResolvedValueOnce(ok({ items: [], next: 'c' }))
     calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
-    await open(['player'])
+    await open(['owner'])
     fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
     fireEvent.press(
       await screen.findByRole('button', { name: 'Carregar mais' })

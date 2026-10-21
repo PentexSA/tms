@@ -66,18 +66,6 @@ it('o dono abre a ficha nova em Editar', async () => {
   expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
 })
 
-it('quem só lê fica em Leitura mesmo com ?mode=evolve', async () => {
-  calls.characterGet.mockResolvedValue(character(['player']))
-  calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
-  renderWithSession(
-    <SheetScreen id={ID} initialMode="evolve" />,
-    await signedIn()
-  )
-  expect(await screen.findByLabelText(/^Força, /)).toBeTruthy()
-  expect(screen.queryByText(/^Editando/)).toBeNull()
-  expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
-})
-
 it('sem parâmetro, o dono abre em Jogo (Etapa 17), com o seletor de modo', async () => {
   calls.characterGet.mockResolvedValue(
     ok({
