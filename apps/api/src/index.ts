@@ -15,6 +15,7 @@ import { type AppOptions, resolveOptions } from './options'
 import { rollRoutes } from './rolls/routes'
 import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
+import { statusRoutes } from './sheets/status'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -69,6 +70,7 @@ export const createApp = (
       .use(chronicleRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
+      .use(statusRoutes(db, options, guard))
       .use(tableRoutes(db, guard))
       .use(rollRoutes(db, options, guard))
   )

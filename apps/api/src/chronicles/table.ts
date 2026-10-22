@@ -41,6 +41,8 @@ export function tableRoutes(
           'ch.sheet_data',
           'ch.sheet_version',
           'ch.updated_at',
+          'ch.status',
+          'ch.locked_at',
           'u.username',
           'g.code as systemCode',
         ])
@@ -58,6 +60,8 @@ export function tableRoutes(
           systemCode: r.systemCode,
           templateVersion: r.template_version,
           sheetVersion: r.sheet_version,
+          status: r.status,
+          lockedAt: r.locked_at,
           updatedAt: r.updated_at,
           sheet: stripRestricted(model, r.sheet_data as unknown as SheetData, [
             'storyteller',

@@ -4,6 +4,7 @@ import { CHANGE_CLASSES, type ChangeClass, strictest } from '../classify'
 import {
   CHARACTER_STATUSES,
   isCharacterStatus,
+  rollPolicy,
   type WriteAccess,
   writePolicy,
 } from '../policy'
@@ -87,6 +88,28 @@ describe('writePolicy: a tabela do 5.1', () => {
       expect(code(writePolicy(OWNER, status, false, ['play']))).toBe(
         'SHEET_NOT_EDITABLE'
       )
+  })
+})
+
+describe('rollPolicy', () => {
+  it('travada: o dono rola sem custo, e não rola gastando', () => {
+    expect(code(rollPolicy(OWNER, 'active', true, null))).toBe('ok')
+    expect(code(rollPolicy(OWNER, 'active', true, ['play']))).toBe(
+      'SHEET_LOCKED'
+    )
+    expect(code(rollPolicy(OWNER, 'active', false, ['play']))).toBe('ok')
+  })
+
+  it('sem custo, o estado e o vínculo continuam valendo', () => {
+    expect(code(rollPolicy(OWNER, 'creating', false, null))).toBe('ok')
+    expect(code(rollPolicy(OWNER, 'archived', false, null))).toBe(
+      'SHEET_NOT_EDITABLE'
+    )
+    expect(code(rollPolicy(FORMER, 'active', false, null))).toBe('NOT_MEMBER')
+    expect(code(rollPolicy(FORMER, 'active', false, ['play']))).toBe(
+      'NOT_MEMBER'
+    )
+    expect(code(rollPolicy(STORYTELLER, 'dead', true, ['play']))).toBe('ok')
   })
 })
 

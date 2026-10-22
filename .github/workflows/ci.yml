@@ -121,6 +121,13 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_rolls_test
           NODE_ENV: test
         run: pnpm -C apps/api exec bun test src/rolls/__tests__/rolls.pg.test.ts
+      # A política vale o estado de quando o lote chega: concluir a criação
+      # e um lote de Evoluir ao mesmo tempo (v3, Etapa 5)
+      - name: política contra a conclusão (lock da ficha)
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_policy_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/policy.pg.test.ts
 
   e2e:
     name: E2E web (Playwright, Chromium e WebKit)

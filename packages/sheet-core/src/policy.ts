@@ -73,3 +73,20 @@ export function writePolicy(
       return refuse('SHEET_NOT_EDITABLE')
   }
 }
+
+/**
+ * A política de uma rolagem, antes de rolar. Com custo (`cost`: as classes do
+ * lote que paga), é a da escrita: travada, não rola gastando FdV. Sem custo
+ * (null), a rolagem não muda a ficha e a trava não conta (decisão 10 da
+ * proposta), mas o estado e o vínculo continuam valendo.
+ */
+export function rollPolicy(
+  access: WriteAccess,
+  status: CharacterStatus | string,
+  locked: boolean,
+  cost: Iterable<ChangeClass> | null
+): PolicyResult {
+  return cost
+    ? writePolicy(access, status, locked, cost)
+    : writePolicy(access, status, false, [])
+}

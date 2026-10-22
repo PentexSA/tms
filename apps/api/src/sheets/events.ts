@@ -2,14 +2,15 @@ import type { DB } from '@tms/db'
 import {
   applyBatch,
   canRead,
+  classifyBatch,
   describeEvent,
   MAX_EVENTS_PER_BATCH,
   parsePath,
   type RoleName,
-  type SheetData,
   type SheetEvent,
   stripRestricted,
   withEffectiveFrom,
+  writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
@@ -20,11 +21,12 @@ import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
 import { modelFor } from './models'
+import { lockCharacter, refusal, writeAccess } from './policy'
 
 // O pipeline de um lote no servidor (doc/arquitetura §8.2): sessão e papéis
 // do banco, limites, idempotência, trava da linha, applyBatch do core com o
-// modelo da versão da ficha, e o lote gravado com o histórico na mesma
-// transação, com `by` e `at` do servidor.
+// modelo da versão da ficha, a política de escrita do estado atual (v3), e o
+// lote gravado com o histórico na mesma transação, com `by` e `at` do servidor.
 
 export const MAX_BATCH_BYTES = 64 * 1024
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -73,14 +75,8 @@ export function eventRoutes(
         )
 
         return db.transaction().execute(async trx => {
-          const character = await trx
-            .selectFrom('characters')
-            .select(['sheet_data', 'sheet_version', 'deleted_at'])
-            .where('id', '=', params.id)
-            .forUpdate()
-            .executeTakeFirstOrThrow()
-          if (character.deleted_at !== null) throw notFound()
-          const current = character.sheet_data as unknown as SheetData
+          const character = await lockCharacter(trx, params.id)
+          const current = character.sheet
 
           // Reenvio da fila offline: o mesmo lote não é aplicado duas vezes
           const done = await trx
@@ -92,7 +88,7 @@ export function eventRoutes(
           if (done)
             return {
               clientBatchId: body.clientBatchId,
-              sheetVersion: character.sheet_version,
+              sheetVersion: character.sheetVersion,
               duplicate: true,
               sheet: stripRestricted(model, current, roles),
             }
@@ -122,7 +118,7 @@ export function eventRoutes(
               throw new ApiError(409, 'a ficha mudou antes deste lote', {
                 issues: issuesOut(result.issues),
                 current: now,
-                sheetVersion: character.sheet_version,
+                sheetVersion: character.sheetVersion,
               })
             }
             throw new ApiError(
@@ -134,7 +130,25 @@ export function eventRoutes(
             )
           }
 
-          const sheetVersion = character.sheet_version + 1
+          // A política vale o estado de agora, com a ficha travada: um lote de
+          // Evoluir feito em `creating` que chega depois da conclusão cai aqui.
+          // Só um lote que aplicaria chega a ela (o conflito volta 409 antes)
+          const classes = classifyBatch(model, current, body.events)
+          const verdict = writePolicy(
+            await writeAccess(trx, roles, character.chronicleId, me),
+            character.status,
+            character.lockedAt !== null,
+            classes.parts.map(p => p.kind)
+          )
+          if (!verdict.ok)
+            throw refusal(verdict, {
+              model,
+              roles,
+              paths: body.events.map(e => e.path),
+              parts: classes.parts,
+            })
+
+          const sheetVersion = character.sheetVersion + 1
           const nameField = model.template.identity.name
           const nameEvent = body.events.find(
             e => e.path === `values.${nameField}`

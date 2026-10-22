@@ -13,6 +13,7 @@ import {
   createChronicle,
   createUser,
   publish,
+  setStatus,
   type TestUser,
 } from '../test/factories'
 import {
@@ -104,6 +105,13 @@ async function check(
   actor: Actor,
   status: number
 ) {
+  if (row.sheet)
+    await setStatus(
+      sc.ctx,
+      sc.characterId,
+      row.sheet.status,
+      row.sheet.locked ?? false
+    )
   const res = await request(sc, s, row, actor)
   expect(res.status).toBe(status)
   if (actor !== 'storyteller') expect(await res.text()).not.toContain(SECRET)

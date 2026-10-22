@@ -7,15 +7,18 @@ import {
   stripRestricted,
   validateSheet,
   withValueDeps,
+  writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
+import { audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
 import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
 import { latestTemplate, modelFor } from './models'
+import { lockCharacter, refusal, writeAccess } from './policy'
 
 // Fichas: leitura e criação (doc/plano-v0.md, Etapa 12). Toda saída passa por
 // stripRestricted com os papéis resolvidos no banco: o aparelho de quem não
@@ -255,6 +258,8 @@ export function sheetRoutes(
             'ch.sheet_version',
             'ch.template_version',
             'ch.updated_at',
+            'ch.status',
+            'ch.locked_at',
             'c.id as chronicleId',
             'c.name as chronicleName',
             'g.code as systemCode',
@@ -277,6 +282,8 @@ export function sheetRoutes(
           templateVersion: row.template_version,
           sheetVersion: row.sheet_version,
           roles: [...access.roles],
+          status: row.status,
+          lockedAt: row.locked_at,
           updatedAt: row.updated_at,
           sheet: stripRestricted(
             model,
@@ -293,16 +300,40 @@ export function sheetRoutes(
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
         if (!access) throw notFound()
-        if (!access.roles.has('owner') && !access.roles.has('storyteller'))
-          throw new ApiError(
-            403,
-            'só o dono ou o narrador pode excluir a ficha'
+        const model = await modelFor(
+          db,
+          access.character.systemId,
+          access.character.templateVersion
+        )
+        // A política da escrita, sem classe (doc/plano-v3.md §7, decisão 5):
+        // o dono exclui em creating e em active sem trava; o ex-membro, nunca;
+        // o narrador, sempre. Entra no registro da crônica
+        await db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const verdict = writePolicy(
+            await writeAccess(trx, access.roles, row.chronicleId, me),
+            row.status,
+            row.lockedAt !== null,
+            []
           )
-        await db
-          .updateTable('characters')
-          .set({ deleted_at: new Date() })
-          .where('id', '=', params.id)
-          .execute()
+          if (!verdict.ok)
+            throw refusal(verdict, { model, roles: access.roles, paths: [] })
+          const now = new Date()
+          await trx
+            .updateTable('characters')
+            .set({ deleted_at: now })
+            .where('id', '=', params.id)
+            .execute()
+          await audit(trx, {
+            chronicleId: row.chronicleId,
+            actorId: me,
+            action: 'character.delete',
+            characterId: params.id,
+            userId: row.userId,
+            payload: { status: row.status },
+            at: now,
+          })
+        })
         set.status = 204
         return null
       },

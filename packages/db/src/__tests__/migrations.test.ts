@@ -28,6 +28,7 @@ describe('migrations', () => {
         'character_events',
         'character_rolls',
         'characters',
+        'chronicle_audit',
         'chronicle_invites',
         'chronicle_members',
         'chronicles',
@@ -203,6 +204,109 @@ describe('migrations', () => {
       ).toEqual([])
       expect(
         await db.selectFrom('character_rolls').select('id').execute()
+      ).toEqual([])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0014: a ficha nasce em creating, o estado é uma lista fechada e o registro sobrevive a quem agiu', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = (username: string) =>
+        db
+          .insertInto('users')
+          .values({
+            username,
+            email: `${username}@x.test`,
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const storyteller = await user('narra')
+      const owner = await user('dona')
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({
+          name: 'c',
+          storyteller_id: storyteller.id,
+          system_id: system.id,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: owner.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning(['id', 'status', 'locked_at'])
+        .executeTakeFirstOrThrow()
+      expect(character).toMatchObject({ status: 'creating', locked_at: null })
+
+      // `pending` chega na v4: até lá, o banco recusa
+      await expect(
+        db
+          .updateTable('characters')
+          .set({ status: 'pending' })
+          .where('id', '=', character.id)
+          .execute()
+      ).rejects.toThrow()
+
+      await db
+        .updateTable('characters')
+        .set({
+          status: 'active',
+          creation_completed_at: new Date(),
+          creation_completed_by: storyteller.id,
+        })
+        .where('id', '=', character.id)
+        .execute()
+      await db
+        .insertInto('chronicle_audit')
+        .values({
+          chronicle_id: chronicle.id,
+          actor_id: owner.id,
+          action: 'character.delete',
+          target_character_id: character.id,
+          target_user_id: owner.id,
+        })
+        .execute()
+
+      // Quem agiu sai: a linha fica, sem autor nem alvo
+      await db.deleteFrom('users').where('id', '=', owner.id).execute()
+      expect(
+        await db
+          .selectFrom('chronicle_audit')
+          .select([
+            'actor_id',
+            'target_character_id',
+            'target_user_id',
+            'payload',
+          ])
+          .execute()
+      ).toEqual([
+        {
+          actor_id: null,
+          target_character_id: null,
+          target_user_id: null,
+          payload: {},
+        },
+      ])
+
+      // A crônica sai: o registro dela vai junto
+      await db.deleteFrom('chronicles').execute()
+      expect(
+        await db.selectFrom('chronicle_audit').select('id').execute()
       ).toEqual([])
     } finally {
       await destroy()

@@ -30,6 +30,8 @@ interface TableRow {
   systemCode: string
   templateVersion: string
   sheetVersion: number
+  status: string
+  lockedAt: string | null
   updatedAt: string
   sheet: { values: Record<string, unknown>; specialties?: unknown }
 }
@@ -72,6 +74,8 @@ describe('GET /chronicles/:id/table', () => {
       systemCode: 'vtm-v20',
       templateVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
       sheetVersion: 0,
+      status: 'creating',
+      lockedAt: null,
       updatedAt: expect.any(String),
       sheet: {
         // O antecedente Geração entra: o máximo do Sangue no dock depende dele

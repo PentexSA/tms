@@ -27,6 +27,8 @@ export interface MatrixRow {
   readonly body?: (s: SystemCase) => unknown
   // A linha muda o cenário (excluir, gravar): monta um cenário por ator
   readonly mutates?: true
+  // Estado da ficha antes da requisição (travar pede `active`)
+  readonly sheet?: { readonly status: 'active'; readonly locked?: true }
 }
 
 const denied = { otherStoryteller: 404, stranger: 404, anonymous: 401 } as const
@@ -99,6 +101,34 @@ export const MATRIX: readonly MatrixRow[] = [
     }),
     mutates: true,
     expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  // Ações do narrador (v3, Etapa 5): o dono vê a ficha, mas recebe 403
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/complete',
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/status',
+    body: () => ({ status: 'archived' }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/lock',
+    sheet: { status: 'active' },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'DELETE',
+    route: '/characters/:id/lock',
+    sheet: { status: 'active', locked: true },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
   },
   {
     method: 'GET',

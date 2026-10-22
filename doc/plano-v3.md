@@ -39,11 +39,12 @@ O que fica fora está no §8.
 
 ## Estado da v3 (22/10/2026)
 
-Marco A pronto (etapas 1 a 3) e a Etapa 4 feita, no branch `feat/v3-mesa`:
+Marco A pronto (etapas 1 a 3) e as etapas 4 e 5 feitas, no branch `feat/v3-mesa`:
 
 - **Etapa 4:** `classify.ts` (`classifyChange`, `classifyBatch`, um classificador por tipo num mapa que quebra o build se faltar um) e `policy.ts` (`writePolicy`, os estados da v3) no `@tms/sheet-core`; o Ouro e o inventário do fixture de D&D com `editableIn: ["play"]`. Os códigos de recusa seguem a decisão 18 (§7).
+- **Etapa 5:** migração `0014_character_status`; a política dentro da transação em `/events`, `/rolls` (com `rollPolicy`: sem custo, a trava não conta) e `DELETE /characters/:id`; as rotas do narrador em `sheets/status.ts`, cada uma com uma linha no `chronicle_audit` (`audit.ts`); `status` e `lockedAt` na ficha e na Mesa; `policy.test.ts` (a tabela nos três sistemas e os critérios do 5.1) e `policy.pg.test.ts` no job `postgres`. Uma ação que não muda nada (concluir de novo, travar a travada, o mesmo estado) é 409 sem linha no registro; de `creating` para `active`, só concluindo.
 
-Próxima: Etapa 5.
+Próxima: Etapa 6.
 
 ---
 

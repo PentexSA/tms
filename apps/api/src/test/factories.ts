@@ -120,3 +120,20 @@ export async function createCharacter(
     .executeTakeFirstOrThrow()
   return row.id
 }
+
+/**
+ * Estado da ficha direto no banco, sem passar pelas rotas do narrador nem
+ * pelo `chronicle_audit`: para montar o cenário de um teste.
+ */
+export async function setStatus(
+  ctx: TestContext,
+  characterId: string,
+  status: 'creating' | 'active' | 'archived' | 'dead',
+  locked = false
+) {
+  await ctx.db
+    .updateTable('characters')
+    .set({ status, locked_at: locked ? new Date() : null })
+    .where('id', '=', characterId)
+    .execute()
+}
