@@ -13,7 +13,7 @@ SQLCipher, dock com toque longo e modo avião.
 | `04-airplane-mode` | gastar offline, reiniciar sem rede (dados do banco cifrado) e sincronizar ao voltar (só Android) |
 | `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
 | `06-werewolf-form` | a Forma do Lobisomem no dock: Crinos com a mudança instantânea e Desfazer (v2) |
-| `07-storyteller-table` | Mesa do narrador: dano em duas fichas, prévia e reversão no servidor (v3) |
+| `07-storyteller-table` | Mesa do narrador: dano e Nova noite em duas fichas, prévia e reversão no servidor (v3) |
 
 ## Preparar
 
@@ -70,3 +70,5 @@ Para conferir a cifra num Android de desenvolvimento, copie
 com.tms.app cat files/SQLite/tms-offline.db > /tmp/x.db`. O arquivo não pode
 abrir no `sqlite3` comum ("file is not a database") nem conter o texto da ficha
 (`strings /tmp/x.db | grep -i sangue` não acha nada).
+
+O fechamento da v3 e os resultados da rodada estão em [validacao-v3.md](../../../doc/validacao-v3.md) e no [PR #31](https://github.com/PentexSA/tms/pull/31). A execução iOS permanece pendente por decisão do usuário.
