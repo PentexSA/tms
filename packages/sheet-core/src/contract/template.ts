@@ -188,6 +188,8 @@ export interface Template {
   readonly fields: Readonly<Record<FieldId, FieldDef>>
   readonly sections: readonly Section[]
   readonly zoneLabels?: Readonly<Partial<Record<TabZone, string>>>
+  // Rótulo do estado `dead` da ficha ("Torpor"); sem ele, "Fora de jogo"
+  readonly statusLabels?: { readonly dead?: string }
   readonly dock: readonly FieldId[]
   readonly roll: Roll
   readonly actions?: readonly TemplateAction[]

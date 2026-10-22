@@ -660,6 +660,7 @@
     }
   ],
   "zoneLabels": { "lore": "Itens e notas" },
+  "statusLabels": { "dead": "Morto" },
   "dock": ["hp", "ac", "spellSlots"],
   "roll": {
     "model": "sum-vs-target",

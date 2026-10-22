@@ -51,6 +51,8 @@ const character = (roles: string[]) =>
     templateVersion: '1.0.0',
     sheetVersion: 0,
     roles,
+    status: 'creating',
+    lockedAt: null,
     updatedAt: '2026-10-18T12:00:00Z',
     sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
   })

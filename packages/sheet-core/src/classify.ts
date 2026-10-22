@@ -201,6 +201,41 @@ export function classifyChange(
   }))
 }
 
+/**
+ * A classe de mexer no campo pelo editor de Evoluir, sem saber o valor novo:
+ * o app desabilita o que a política vai recusar (o servidor confere o lote de
+ * verdade com `classifyBatch`). O editor de recurso muda o permanente e o
+ * máximo guardado, quando há; o de espaços, o máximo de cada nível. Lista: a classe da parte mais solta (nome, notas),
+ * para não travar o que passa; a parte de evolução o servidor recusa com o
+ * motivo.
+ */
+export function editClass(field: CompiledField): ChangeClass {
+  const { def } = field
+  switch (def.type) {
+    case 'rating':
+    case 'number':
+    case 'percent':
+    case 'mark':
+    case 'tags':
+      return playOr(field, 'advance')
+    case 'resource': {
+      // Sem permanente nem máximo guardado, o editor só muda o atual
+      const stored = typeof def.max === 'object' && 'stored' in def.max
+      return def.permanent || stored ? 'advance' : 'play'
+    }
+    case 'slots':
+      return 'advance'
+    case 'track':
+    case 'clock':
+    case 'state':
+      return 'play'
+    case 'list':
+      return playOr(field, 'edit')
+    default:
+      return 'edit'
+  }
+}
+
 // O lote aplicado sem conferir nada: quem chama já passou pelo applyBatch.
 function applied(sheet: SheetData, events: readonly SheetEvent[]): SheetData {
   const values: Record<string, unknown> = { ...sheet.values }

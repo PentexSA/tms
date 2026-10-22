@@ -7,9 +7,11 @@ import {
   type SheetEvent,
 } from '@tms/sheet-core'
 import { useSheet } from '../context'
+import { blockedBy, blockedNote, useLifecycle } from '../policy'
 
 // O que a tela de Jogo pode mexer num campo. O modo é UX (doc/arquitetura
-// §6.5): a permissão vem do canWrite e o servidor confere de novo.
+// §6.5): a permissão vem do canWrite e da política do estado da ficha
+// (travada, arquivada), e o servidor confere de novo.
 
 export interface Editability {
   readonly editable: boolean
@@ -21,6 +23,7 @@ export const PERMANENT_NOTE = 'Traço permanente: muda só em Editar.'
 
 export function useEditable(id: FieldId): Editability {
   const { model, roles, mode } = useSheet()
+  const lifecycle = useLifecycle()
   const field = model.fields.get(id)
   if (!field) return { editable: false, reason: null }
   if (field.readOnly)
@@ -31,6 +34,9 @@ export function useEditable(id: FieldId): Editability {
     return { editable: false, reason: 'Somente leitura neste modo.' }
   if (!isEditableIn(field, mode))
     return { editable: false, reason: PERMANENT_NOTE }
+  // Em Jogo tudo é jogo ou texto, que passam juntos: a classe mais solta
+  const blocked = blockedBy(roles, lifecycle, 'play')
+  if (blocked) return { editable: false, reason: blockedNote(blocked) }
   return { editable: true, reason: null }
 }
 

@@ -19,8 +19,9 @@ import { AccessibilityInfo } from 'react-native'
 import { useStore } from 'zustand'
 
 import { api } from '../../lib/api'
-import { messageOf } from '../../lib/errors'
+import { messageOf, statusOf } from '../../lib/errors'
 import { sheetKeys } from '../data'
+import { refusalCodeOf, refusalReason } from '../policy'
 import type { SheetStore } from '../store/sheetStore'
 import { commitMessage } from '../useCommit'
 
@@ -168,7 +169,18 @@ export function useDice(
           ...(manual ? { manual } : {}),
         })
         if (res.error) {
-          setError(messageOf(res.error, 'Não foi possível rolar.'))
+          // Recusa da política (travada, arquivada): o motivo, e a ficha
+          // rebuscada mostra o estado novo
+          const why =
+            statusOf(res.error) === 403
+              ? refusalReason(refusalCodeOf(res.error.value))
+              : null
+          if (why) {
+            setError(`${why} A rolagem não foi feita.`)
+            void queryClient.invalidateQueries({
+              queryKey: sheetKeys.character(characterId),
+            })
+          } else setError(messageOf(res.error, 'Não foi possível rolar.'))
           return
         }
         const { roll: r, sheet, sheetVersion } = res.data

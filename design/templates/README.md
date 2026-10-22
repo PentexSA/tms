@@ -53,6 +53,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `fields` | sim | objeto | Catálogo de campos indexado por id. O id é a chave em `sheet_data.values` (§3). |
 | `sections` | sim | lista | Seções por zona, em ordem (§4). |
 | `zoneLabels` | não | objeto | Rótulo das abas por zona (`build`, `powers`, `lore`), até 14 caracteres (§4). |
+| `statusLabels` | não | objeto | Rótulo do estado `dead` da ficha (`{ "dead": "Torpor" }`), até 20 caracteres. Sem ele, "Fora de jogo". |
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |

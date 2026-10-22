@@ -255,6 +255,29 @@ describe('o sheet Dados', () => {
     expect(screen.getByText('Nesta sessão')).toBeTruthy()
   })
 
+  // v3, Etapa 6: a recusa da política diz o motivo, como na fila
+  it.each([
+    ['SHEET_LOCKED', 'O narrador travou a ficha. A rolagem não foi feita.'],
+    [
+      'NOT_MEMBER',
+      'Você saiu desta crônica: a ficha é só leitura. A rolagem não foi feita.',
+    ],
+  ])('403 %s: a frase do código', async (code, message) => {
+    calls.rollsPost.mockResolvedValueOnce({
+      data: null,
+      error: {
+        status: 403,
+        value: { error: 'x', code, paths: ['values.willpower'] },
+      },
+    })
+    await open()
+    pick('Atributo', 'des', /^Destreza, 2/)
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(screen.getByText(message)).toBeTruthy()
+  })
+
   it('busca sem acento acha Disciplina e a especialização liga o 10 duplo', async () => {
     calls.rollsPost.mockResolvedValue(serverRoll())
     await open()

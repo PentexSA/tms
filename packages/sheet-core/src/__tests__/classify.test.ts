@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
-import { classifyBatch } from '../classify'
+import { classifyBatch, classifyChange, editClass } from '../classify'
 import { compileTemplate, type SheetModel } from '../compile'
 import type { SheetData } from '../contract'
 import { jsonEqual } from '../equal'
@@ -543,5 +543,53 @@ describe('propriedades', () => {
         expect(before).toEqual(copy)
       })
     )
+  })
+})
+
+describe('editClass: o editor de Evoluir, sem o valor novo', () => {
+  const of = (system: string, id: string) =>
+    editClass(model(system).fields.get(id)!)
+
+  it('o que muda um traço é advance; o que o jogo gasta é play; texto é edit', () => {
+    expect(of('vtm-v20', 'strength')).toBe('advance')
+    expect(of('vtm-v20', 'willpower')).toBe('advance')
+    expect(of('vtm-v20', 'blood')).toBe('play')
+    expect(of('dnd5e-2014', 'hp')).toBe('advance')
+    expect(of('vtm-v20', 'health')).toBe('play')
+    expect(of('vtm-v20', 'concept')).toBe('edit')
+    expect(of('vtm-v20', 'clan')).toBe('edit')
+    expect(of('wta-w20', 'form')).toBe('play')
+    expect(of('mta-m20', 'wheel')).toBe('play')
+    expect(of('dnd5e-2014', 'inspiration')).toBe('play')
+    expect(of('dnd5e-2014', 'arcana')).toBe('advance')
+    expect(of('dnd5e-2014', 'spellSlots')).toBe('advance')
+  })
+
+  it('lista: a parte mais solta (o servidor recusa a de evolução)', () => {
+    expect(of('vtm-v20', 'disciplines')).toBe('edit')
+    expect(of('dnd5e-2014', 'inventory')).toBe('play')
+  })
+
+  it('é a classe que classifyChange dá ao valor principal do campo', () => {
+    for (const [system, m] of Object.entries(models))
+      for (const field of m.fields.values()) {
+        if (field.readOnly || field.type === 'list') continue
+        const r = resolve(m, { values: {} } as unknown as SheetData)
+        const value = stored(r.get(field.id)!, r)
+        const kinds = [
+          ...new Set(classifyChange(field, value, undefined).map(p => p.kind)),
+        ]
+        // Sem valor efetivo (choice vazio) não há o que comparar
+        if (!kinds.length) continue
+        // O editor muda várias partes: a mais restrita está entre elas
+        if (field.type === 'resource' || field.type === 'slots')
+          expect(kinds).toContain(editClass(field))
+        else
+          expect([system, field.id, kinds]).toEqual([
+            system,
+            field.id,
+            [editClass(field)],
+          ])
+      }
   })
 })

@@ -42,7 +42,7 @@ export const REGISTRY = {
 // Chaves permitidas (allowlist). Chave desconhecida é erro: impede atributos como "onclick"
 // ou campos que o renderizador ignoraria e algum código futuro poderia interpretar.
 const KEYS = {
-  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'dock', 'roll', 'actions'],
+  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'dock', 'roll', 'actions'],
   fieldCommon: ['type', 'label', 'shortLabel', 'help', 'editableIn', 'specialty', 'sublabel', 'badge', 'readOnly', 'derive', 'from'],
   field: {
     rating: ['min', 'max', 'default', 'cap', 'valueLabels'],
@@ -356,6 +356,12 @@ export function validateTemplate(t, palette) {
   if (t.zoneLabels != null) {
     keys('zoneLabels', t.zoneLabels, ['build', 'powers', 'lore'])
     for (const [z, label] of Object.entries(isObj(t.zoneLabels) ? t.zoneLabels : {})) text(`zoneLabels.${z}`, label, 14)
+  }
+
+  // Estados da ficha (doc/painel-narrador.md §5.1): o template só nomeia o `dead` ("Torpor").
+  if (t.statusLabels != null) {
+    keys('statusLabels', t.statusLabels, ['dead'])
+    for (const [s, label] of Object.entries(isObj(t.statusLabels) ? t.statusLabels : {})) text(`statusLabels.${s}`, label, 20)
   }
 
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não pode vir

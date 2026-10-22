@@ -25,6 +25,11 @@ export function createFakeApi() {
     historyGet: jest.fn(),
     rollsPost: jest.fn(),
     rollsGet: jest.fn(),
+    // Ações do narrador (v3, Etapa 6)
+    completePost: jest.fn(),
+    statusPost: jest.fn(),
+    lockPost: jest.fn(),
+    lockDelete: jest.fn(),
     templateGet: jest.fn(),
     systemsGet: jest.fn(),
     chroniclesGet: jest.fn(),
@@ -50,6 +55,14 @@ export function createFakeApi() {
       rolls: {
         post: (...a: unknown[]) => calls.rollsPost(id, ...a),
         get: (...a: unknown[]) => calls.rollsGet(id, ...a),
+      },
+      creation: {
+        complete: { post: (...a: unknown[]) => calls.completePost(id, ...a) },
+      },
+      status: { post: (...a: unknown[]) => calls.statusPost(id, ...a) },
+      lock: {
+        post: (...a: unknown[]) => calls.lockPost(id, ...a),
+        delete: (...a: unknown[]) => calls.lockDelete(id, ...a),
       },
     }),
     chronicles: Object.assign(

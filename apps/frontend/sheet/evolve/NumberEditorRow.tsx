@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
 import { EditorShell } from './EditorShell'
-import { useFieldIssue, useSetDraft } from './hooks'
+import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
 import { SpecialtyEditor } from './SpecialtyEditor'
 
 // rating, number e percent em Evoluir (DS: FieldRow com Stepper inline). O
@@ -52,6 +52,7 @@ export function NumberEditorRow(props: FieldViewProps) {
   const { colors } = theme
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
+  const blocked = useBlockedNote(resolved.id)
   const [error, setError] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
   const range = rangeOf(props)
@@ -90,6 +91,7 @@ export function NumberEditorRow(props: FieldViewProps) {
   return (
     <EditorShell
       label={def.label}
+      sub={blocked}
       error={error ?? issue}
       below={
         capNote || modNote || specialty ? (
@@ -147,7 +149,8 @@ export function NumberEditorRow(props: FieldViewProps) {
           max={range.max}
           onChange={apply}
           valueText={range.spoken}
-          onValuePress={() => setTyping(true)}
+          disabled={blocked !== null}
+          onValuePress={blocked ? undefined : () => setTyping(true)}
         />
       )}
     </EditorShell>

@@ -46,6 +46,7 @@ const KEYS = {
     'ladders',
     'sections',
     'zoneLabels',
+    'statusLabels',
     'dock',
     'roll',
     'actions',
@@ -641,6 +642,14 @@ function check(
     keys('zoneLabels', t.zoneLabels, ['build', 'powers', 'lore'])
     for (const [z, label] of Object.entries(rec(t.zoneLabels) ?? {}))
       text(`zoneLabels.${z}`, label, 14)
+  }
+
+  // Estados da ficha (doc/painel-narrador.md §5.1): o template só nomeia o
+  // `dead` ("Torpor", "Desaparecido"); os outros têm nome fixo no app.
+  if (t.statusLabels != null) {
+    keys('statusLabels', t.statusLabels, ['dead'])
+    for (const [s, label] of Object.entries(rec(t.statusLabels) ?? {}))
+      text(`statusLabels.${s}`, label, 20)
   }
 
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não

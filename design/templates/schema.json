@@ -106,6 +106,14 @@
       },
       "additionalProperties": false
     },
+    "statusLabels": {
+      "description": "Opcional. Rótulo do estado 'dead' da ficha, que o narrador marca (doc/painel-narrador.md §5.1): 'Torpor', 'Morto', 'Desaparecido'. Sem ele, o app diz 'Fora de jogo'. Os outros estados têm nome fixo.",
+      "type": "object",
+      "properties": {
+        "dead": { "$ref": "#/$defs/label", "maxLength": 20 }
+      },
+      "additionalProperties": false
+    },
     "dock": {
       "description": "De 1 a 3 campos jogáveis mostrados no dock (celular) e na mesa do narrador. O tipo precisa ser jogável (resource, track, slots, clock, state, number, list, tags, rating) e o campo não pode ser de seção com leitura restrita; validateTemplate checa.",
       "type": "array",

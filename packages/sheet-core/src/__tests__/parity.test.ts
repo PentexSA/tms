@@ -255,6 +255,18 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    'rótulo de estado acima de 20 caracteres',
+    t => {
+      t.statusLabels = { dead: 'x'.repeat(21) }
+    },
+  ],
+  [
+    'rótulo de estado que não é o dead',
+    t => {
+      t.statusLabels = { archived: 'Guardada' }
+    },
+  ],
+  [
     'modelo de rolagem fora da lista',
     t => {
       ;(t.roll as Json).model = 'custom'
