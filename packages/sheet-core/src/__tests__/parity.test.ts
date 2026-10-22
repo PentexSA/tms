@@ -572,3 +572,46 @@ describe('paridade em fichas inválidas', () => {
     })
   }
 })
+
+describe('paridade: derivação difference e lista fixa com valor', () => {
+  const withNew = () => {
+    const t = vtm()
+    fieldsOf(t).xpTotal = { type: 'number', label: 'Total', min: 0 }
+    fieldsOf(t).xpSpent = { type: 'number', label: 'Gasto', min: 0 }
+    fieldsOf(t).xpAvailable = {
+      type: 'number',
+      label: 'Disponível',
+      readOnly: true,
+      derive: 'difference',
+      from: ['xpTotal', 'xpSpent'],
+    }
+    fieldsOf(t).resonance = {
+      type: 'list',
+      label: 'Ressonância',
+      itemLabel: 'Descritor',
+      item: { value: { type: 'rating', min: 0, max: 5 } },
+      fixed: [{ id: 'dynamic', label: 'Dinâmica' }],
+    }
+    return t
+  }
+
+  it('o template passa nos dois validadores', () => {
+    const t = withNew()
+    expect(validateTemplate(t, palette)).toEqual([])
+    expect(reference.validateTemplate(t, palette)).toEqual([])
+  })
+
+  it.each([
+    ['válida', { resonance: [{ id: 'dynamic', text: 'Ardente', value: 2 }] }],
+    ['valor acima do máximo', { resonance: [{ id: 'dynamic', value: 6 }] }],
+    ['item fixo inexistente', { resonance: [{ id: 'x', text: 'a' }] }],
+    ['disponível gravado', { xpTotal: 10, xpAvailable: 3 }],
+  ])('ficha %s', (_, extra) => {
+    const t = withNew()
+    const c = character('helena')
+    Object.assign(c.sheet.values, extra)
+    expect(fmt(c.id, validateSheet(t, c.sheet))).toEqual(
+      reference.validateSheet(t, c.sheet, c.id)
+    )
+  })
+})

@@ -296,6 +296,24 @@ function check(
         err(path, `'${src.item}' não está no catálogo de '${src.list}'`)
     }
   }
+  // `default` com fórmula (§3): inteiro, derivação ou valor por opção de um choice
+  const formula = (path: string, v: unknown, min: number, max: number) => {
+    if (v == null) return
+    if (!isObj(v)) return num(path, v, min, max)
+    if (v.derive !== undefined) {
+      oneOf(`${path}.derive`, v.derive, REGISTRY.derive, 'derive')
+      return sources(`${path}.from`, v.from)
+    }
+    const choice = field(v.from)
+    if (choice?.type !== 'choice')
+      return err(`${path}.from`, `campo '${v.from}' não é um choice`)
+    const options = asArray(choice.options).map(o => rec(o)?.id)
+    for (const [k, n] of Object.entries(rec(v.map) ?? {})) {
+      if (!options.includes(k))
+        err(`${path}.map.${k}`, `opção '${k}' não existe em '${v.from}'`)
+      num(`${path}.map.${k}`, n, min, max)
+    }
+  }
   const accentOk = (v: unknown) =>
     v === 'accent-neutral' || (typeof v === 'string' && palette.includes(v))
 
@@ -363,7 +381,9 @@ function check(
     if (f.badge && !has(badge?.field))
       err(`${p}.badge.field`, `campo '${badge?.field}' não existe`)
     if (f.maxLength != null) num(`${p}.maxLength`, f.maxLength, 1, 20000)
-    if (f.default != null)
+    if (f.type === 'rating')
+      formula(`${p}.default`, f.default, numOr(f.min, 0), numOr(f.max, 10))
+    else if (f.default != null)
       num(
         `${p}.default`,
         f.default,
@@ -427,6 +447,12 @@ function check(
         const permanent = rec(f.permanent)
         num(`${p}.permanent.min`, permanent?.min, 0, 100)
         num(`${p}.permanent.max`, permanent?.max, 1, 100)
+        formula(
+          `${p}.permanent.default`,
+          permanent?.default,
+          numOr(permanent?.min, 0),
+          numOr(permanent?.max, 100)
+        )
       }
       const perTurn = rec(f.perTurn)
       if (perTurn?.derive)
@@ -490,6 +516,12 @@ function check(
           fill.colorRole,
           REGISTRY.colorRoles,
           'colorRole'
+        )
+        formula(
+          `${p}.fills.${fill.id}.default`,
+          fill.default,
+          0,
+          numOr(f.segments, 24)
         )
       }
     }

@@ -9,6 +9,7 @@ import type {
 } from './contract'
 import { jsonEqual } from './equal'
 import type { SheetEvent } from './events'
+import { clock as clockType } from './fields/clock'
 import { resource as resourceType } from './fields/resource'
 import { type ChangeLabel, describeEvent, withEffectiveFrom } from './labels'
 import type { EffectName } from './registry'
@@ -258,7 +259,13 @@ export function planClock(
   const def = model.fields.get(fieldId)?.def
   if (def?.type !== 'clock' || delta === 0)
     return unavailable('Roda inexistente')
-  const value = stored(sheet, fieldId) as ClockValue | undefined
+  // Sem roda gravada, parte do padrão resolvido (o `default` dos
+  // preenchimentos), não de zero
+  const resolved = resolve(model, sheet).get(fieldId)
+  const value = (stored(sheet, fieldId) ??
+    (resolved?.type === 'clock' ? clockType.stored(resolved) : null)) as
+    | ClockValue
+    | undefined
   const change =
     delta > 0
       ? clockGain(def, value ?? undefined, fill, delta)

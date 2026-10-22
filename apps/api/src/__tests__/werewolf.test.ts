@@ -1,5 +1,8 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { compileTemplate, resolve } from '@tms/sheet-core'
 import {
   addMember,
   as,
@@ -91,7 +94,7 @@ describe('ficha de Lobisomem', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('wta-w20')
-    expect(body.templateVersion).toBe('1.1.0')
+    expect(body.templateVersion).toBe('1.2.0')
     expect(body.sheet.values).toEqual({
       name: 'Iara Moreira',
       deedName: 'Canta-Tempestade',
@@ -99,6 +102,54 @@ describe('ficha de Lobisomem', () => {
       auspice: 'galliard',
       tribe: 'fianna',
     })
+  })
+
+  it('os valores iniciais saem da identidade, no cliente, pelo template publicado', async () => {
+    // O servidor grava só a identidade; quem resolve a ficha com o template
+    // chega aos números do livro (Galliard, Hominídeo, Fianna)
+    const id = await iara()
+    const body = (await (
+      await as(ctx, owner, 'GET', `/characters/${id}`)
+    ).json()) as { sheet: { values: Record<string, unknown> } }
+    const template = JSON.parse(
+      readFileSync(
+        join(import.meta.dir, '../../../../design/templates/wta-w20.json'),
+        'utf8'
+      )
+    )
+    const r = resolve(compileTemplate(template), body.sheet)
+    expect(r.get('rage')).toMatchObject({ permanent: 4, current: 4 })
+    expect(r.get('gnosis')).toMatchObject({ permanent: 1, current: 1 })
+    expect(r.get('willpower')).toMatchObject({ permanent: 3, current: 3 })
+    expect(r.get('glory')).toMatchObject({ permanent: 2, current: 0 })
+    expect(r.get('honor')).toMatchObject({ permanent: 0, current: 0 })
+    expect(r.get('wisdom')).toMatchObject({ permanent: 1, current: 0 })
+    expect(r.get('form')).toMatchObject({ option: { id: 'hominideo' } })
+  })
+
+  it('a lista da crônica leva o que a Fúria do dock lê (o Augúrio)', async () => {
+    await iara()
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${werewolf}/characters`)
+    ).json()) as { values: Record<string, unknown> }[]
+    expect(list[0]?.values.auspice).toBe('galliard')
+  })
+
+  it('a lista da crônica do Mago leva os Antecedentes (a roda lê o Avatar)', async () => {
+    const res = await create(
+      { name: 'Otto', tradition: 'filhos-do-eter' },
+      mage
+    )
+    const { id } = (await res.json()) as { id: string }
+    const avatar = [{ id: 'b1', name: 'Avatar', value: 3 }]
+    const sent = await send(owner, id, [
+      { path: 'values.backgrounds', from: null, to: avatar },
+    ])
+    expect(sent.status).toBe(200)
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${mage}/characters`)
+    ).json()) as { values: Record<string, unknown> }[]
+    expect(list[0]?.values.backgrounds).toEqual(avatar)
   })
 
   it('Forma, Fúria ou Dom na criação: 422', async () => {

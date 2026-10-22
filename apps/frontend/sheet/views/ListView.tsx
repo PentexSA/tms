@@ -19,13 +19,28 @@ export const itemTitle = (list: ResolvedList, item: ListItem): string => {
   return item.name ?? fixed?.label ?? item.text ?? ''
 }
 
+/**
+ * Pontos do item. A linha fixa com valor mostra os pips mesmo vazia, como a
+ * linha em branco da ficha de papel (Ressonância: ○○○○○).
+ */
+export const itemValue = (
+  list: ResolvedList,
+  item: ListItem
+): number | undefined => {
+  const value = list.field.def.item.value
+  if (!value) return undefined
+  if (typeof item.value === 'number') return item.value
+  return list.field.def.fixed ? (value.min ?? 0) : undefined
+}
+
 /** "Taumaturgia, 3 de 5, especialização Trilha do Sangue". */
 export function describeItem(list: ResolvedList, item: ListItem): string {
   const def = list.field.def
   const parts = [itemTitle(list, item)]
   if (def.fixed && item.text) parts.push(item.text)
-  if (def.item.value && typeof item.value === 'number')
-    parts.push(`${item.value} de ${def.item.value.max}`)
+  const value = itemValue(list, item)
+  if (def.item.value && value !== undefined)
+    parts.push(`${value} de ${def.item.value.max}`)
   for (const m of def.item.meta ?? []) {
     const v = item.meta?.[m.id]
     if (v !== undefined && v !== '') parts.push(`${m.label} ${v}`)
@@ -65,6 +80,7 @@ export function ItemLine({
     .map(m => item.meta?.[m.id])
     .filter(v => v !== undefined && v !== '')
     .join(' · ')
+  const value = itemValue(list, item)
   return (
     <>
       <View style={styles.itemText}>
@@ -83,10 +99,10 @@ export function ItemLine({
           </Text>
         ) : null}
       </View>
-      {def.item.value && typeof item.value === 'number' ? (
+      {def.item.value && value !== undefined ? (
         <>
-          <RatingDots value={item.value} max={def.item.value.max} size="sm" />
-          <Text variant="number">{String(item.value)}</Text>
+          <RatingDots value={value} max={def.item.value.max} size="sm" />
+          <Text variant="number">{String(value)}</Text>
         </>
       ) : null}
     </>
@@ -137,8 +153,8 @@ export function ListRow({ resolved, sheet }: FieldViewProps) {
           accessible
           accessibilityLabel={describeItem(resolved, item)}
           accessibilityValue={
-            typeof item.value === 'number'
-              ? { text: String(item.value) }
+            itemValue(resolved, item) !== undefined
+              ? { text: String(itemValue(resolved, item)) }
               : undefined
           }
           style={[styles.row, border]}

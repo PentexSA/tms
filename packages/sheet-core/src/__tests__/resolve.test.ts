@@ -225,6 +225,23 @@ describe('resolve: outros sistemas (o código não sabe de Vampiro)', () => {
     ).toBeGreaterThanOrEqual(0)
   })
 
+  it('Lobisomem: o Renome temporário de uma ficha nova começa em 0', () => {
+    const model = compileTemplate(templates['wta-w20'])
+    const r = resolve(model, { values: { name: 'Nova' } })
+    for (const id of ['glory', 'honor', 'wisdom'])
+      expect(r.get(id)).toMatchObject({ current: 0, permanent: 0 })
+    // O recurso limitado pelo permanente continua nascendo cheio
+    expect(r.get('willpower')).toMatchObject({ current: 1, permanent: 1 })
+  })
+
+  it('Lobisomem: o Renome temporário gravado não muda', () => {
+    const model = compileTemplate(templates['wta-w20'])
+    const r = resolve(model, {
+      values: { glory: { current: 4, permanent: 3 } },
+    })
+    expect(r.get('glory')).toMatchObject({ current: 4, permanent: 3 })
+  })
+
   it('todos os exemplos resolvem sem exceção', () => {
     for (const id of [
       'helena',

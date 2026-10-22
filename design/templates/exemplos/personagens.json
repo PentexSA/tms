@@ -125,6 +125,24 @@
           "willpower": { "current": 5, "permanent": 7 },
           "blood": { "current": 9 },
           "health": { "bashing": 1, "lethal": 1, "aggravated": 0 },
+          "weakness": "Enquanto está ferida, não consegue recusar uma ordem de quem bebeu do seu sangue.",
+          "merits": [
+            {
+              "id": "m1",
+              "name": "Memória Eidética",
+              "meta": { "kind": "Mental", "cost": 2 }
+            }
+          ],
+          "flaws": [
+            {
+              "id": "f1",
+              "name": "Inimigo",
+              "meta": { "kind": "Social", "bonus": 2 },
+              "notes": "Um Carniçal do Príncipe que a viu no incêndio."
+            }
+          ],
+          "xpTotal": 14,
+          "xpSpent": 9,
           "notes": "Deve um favor ao Primógeno Nosferatu desde a noite do incêndio na Liberdade. Guarda as atas da Capela num cofre sob a Biblioteca Mário de Andrade.",
           "storytellerNotes": "O Regente sabe do favor ao Nosferatu e vai cobrar na próxima sessão."
         },
@@ -419,6 +437,22 @@
           "paradigm": "O universo é uma máquina etérica, e toda máquina pode ser melhorada.",
           "practice": "Ciência Estranha",
           "instruments": "Aparelhos de válvula, éter destilado, cálculos em lousa.",
+          "resonance": [
+            { "id": "dynamic", "text": "Elétrica", "value": 2 },
+            { "id": "entropic", "text": "" },
+            { "id": "static", "text": "Metódica", "value": 1 }
+          ],
+          "wonders": [
+            {
+              "id": "w1",
+              "name": "Transmissor de pulso",
+              "meta": { "level": 2, "arete": 2, "quintessence": 5 },
+              "notes": "Talismã de Forças."
+            }
+          ],
+          "familiar": "Um gato malhado que dorme no rádio da oficina.",
+          "xpTotal": 6,
+          "xpSpent": 0,
           "notes": "Fez um experimento vulgar diante de testemunhas no último capítulo.",
           "storytellerNotes": "A roda cheia de Paradoxo: um Sinal está para aparecer."
         },
@@ -524,6 +558,16 @@
               "meta": { "level": 1, "gnosis": 5 }
             }
           ],
+          "packName": "Uivo do Ribeira",
+          "battleScars": [
+            {
+              "id": "s1",
+              "name": "Orelha rasgada",
+              "notes": "Luta com um Dançarino da Espiral Negra."
+            }
+          ],
+          "xpTotal": 3,
+          "xpSpent": 3,
           "notes": "",
           "storytellerNotes": ""
         },

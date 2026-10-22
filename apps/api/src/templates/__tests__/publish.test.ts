@@ -79,10 +79,61 @@ describe('schema.json (Ajv)', () => {
         }
       },
     ],
+    [
+      'default como expressão em texto (nunca fórmula interpretada)',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = { ...f.humanity, default: 'conscience + selfControl' }
+      },
+    ],
+    [
+      'default com derivação e mapa ao mesmo tempo',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = {
+          ...f.humanity,
+          default: { derive: 'sum', from: 'courage', map: { brujah: 1 } },
+        }
+      },
+    ],
+    [
+      'mapa com valor quebrado',
+      (t: Json) => {
+        const f = t.fields as Record<string, Json>
+        f.humanity = {
+          ...f.humanity,
+          default: { from: 'clan', map: { brujah: 1.5 } },
+        }
+      },
+    ],
   ])('rejeita: %s', (_, mutate) => {
     const t = template('vtm-v20')
     mutate(t)
     expect(schemaIssues(t).length).toBeGreaterThan(0)
+  })
+
+  it('aceita default com fórmula no rating, no permanente e na roda', () => {
+    const t = template('vtm-v20')
+    const f = t.fields as Record<string, Json>
+    f.humanity = {
+      ...f.humanity,
+      default: { derive: 'sum', from: ['conscience', 'selfControl'] },
+    }
+    f.willpower = {
+      ...f.willpower,
+      permanent: {
+        min: 1,
+        max: 10,
+        default: { from: 'clan', map: { brujah: 3 } },
+      },
+    }
+    expect(schemaIssues(t)).toEqual([])
+    const m = template('mta-m20')
+    const wheel = (m.fields as Record<string, Json>).wheel as Json & {
+      fills: Json[]
+    }
+    wheel.fills = wheel.fills.map(x => ({ ...x, default: 2 }))
+    expect(schemaIssues(m)).toEqual([])
   })
 })
 
@@ -102,7 +153,7 @@ describe('publishTemplate', () => {
     expect(result).toMatchObject({
       status: 'published',
       system: 'vtm-v20',
-      version: '1.2.0',
+      version: '1.3.0',
     })
     expect(result.hash).toMatch(/^[0-9a-f]{64}$/)
     const system = await db
@@ -114,7 +165,7 @@ describe('publishTemplate', () => {
       .selectFrom('trait_templates')
       .selectAll()
       .executeTakeFirstOrThrow()
-    expect(row.version).toBe('1.2.0')
+    expect(row.version).toBe('1.3.0')
     expect(row.published_at).toBeInstanceOf(Date)
     expect(canonicalJson(row.template_data)).toBe(
       canonicalJson(template('vtm-v20'))
@@ -145,7 +196,7 @@ describe('publishTemplate', () => {
         stage: 'version',
         path: 'templateVersion',
         message:
-          'vtm-v20@1.2.0 já foi publicado com outro conteúdo: suba o templateVersion',
+          'vtm-v20@1.3.0 já foi publicado com outro conteúdo: suba o templateVersion',
       },
     ])
   })
@@ -153,14 +204,14 @@ describe('publishTemplate', () => {
   it('uma versão nova convive com a anterior', async () => {
     await publishTemplate(db, template('vtm-v20'))
     const next = template('vtm-v20')
-    next.templateVersion = '1.3.0'
+    next.templateVersion = '1.4.0'
     expect((await publishTemplate(db, next)).status).toBe('published')
     const versions = await db
       .selectFrom('trait_templates')
       .select('version')
       .orderBy('version')
       .execute()
-    expect(versions.map(v => v.version)).toEqual(['1.2.0', '1.3.0'])
+    expect(versions.map(v => v.version)).toEqual(['1.3.0', '1.4.0'])
   })
 
   it.each([
@@ -235,10 +286,10 @@ describe('pnpm templates:publish (CLI)', () => {
     expect(await run(['vtm.json'])).toBe(0)
     expect(out).toHaveLength(1)
     expect(out[0]).toMatch(
-      /^publicado: vtm-v20@1\.2\.0 \(sha256 [0-9a-f]{12}\)$/
+      /^publicado: vtm-v20@1\.3\.0 \(sha256 [0-9a-f]{12}\)$/
     )
     expect(await run(['vtm.json'])).toBe(0)
-    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.2.0')
+    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.3.0')
   })
 
   it('sai com 1 e lista os problemas quando recusa', async () => {
@@ -262,9 +313,9 @@ describe('pnpm templates:publish (CLI)', () => {
   it('--published grava os templates do produto, na ordem', async () => {
     expect(await run(['--published'])).toBe(0)
     expect(out.map(l => l.split(' (')[0])).toEqual([
-      'publicado: vtm-v20@1.2.0',
-      'publicado: mta-m20@1.1.0',
-      'publicado: wta-w20@1.1.0',
+      'publicado: vtm-v20@1.3.0',
+      'publicado: mta-m20@1.2.0',
+      'publicado: wta-w20@1.2.0',
     ])
   })
 })

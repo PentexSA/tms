@@ -62,7 +62,7 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
   await page.getByLabel('Natureza').fill('Inovador')
   await page.getByLabel('Comportamento').fill('Excêntrico')
   await page.getByLabel('Conceito').fill('Engenheiro de rádio')
-  await page.getByRole('radio', { name: 'Filhos do Éter' }).click()
+  await page.getByRole('radio', { name: 'Sociedade do Éter' }).click()
   await page.getByRole('radio', { name: 'Essência Questionadora' }).click()
   await page.getByLabel('Casa').fill('Engenheiros Etéricos')
   await page.getByRole('button', { name: 'Criar ficha' }).click()
@@ -161,7 +161,7 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
   await st.goto(chronicleUrl)
   await st.getByRole('tab', { name: 'Mesa' }).click()
   await expect(
-    st.getByRole('button', { name: /^Otto Brandt, Filhos do Éter\./ })
+    st.getByRole('button', { name: /^Otto Brandt, Sociedade do Éter\./ })
   ).toHaveAccessibleName(/Quintessência 4, Paradoxo 16/)
   const history = await apiAs<{
     items: { changes: { label: string; change: string }[] }[]

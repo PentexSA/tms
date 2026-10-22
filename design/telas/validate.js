@@ -15,7 +15,7 @@ const REGISTRY = {
   fieldTypes: ['rating', 'number', 'percent', 'resource', 'track', 'slots', 'clock', 'state', 'mark', 'text', 'longText', 'choice', 'tags', 'list'],
   numberDisplays: ['plain', 'score+mod', 'signed', 'ladder'],
   percentDisplays: ['percent', 'percent+half+fifth'],
-  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'vtmGeneration', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth'],
+  derive: ['abilityModifier', 'proficiencyBonus', 'dnd5eCheckBonus', 'vtmBloodPool', 'vtmBloodPerTurn', 'vtmGeneration', 'cocHitPoints', 'cocMagicPoints', 'cocSanityMax', 'half', 'fifth', 'difference', 'sum'],
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
@@ -98,6 +98,8 @@ const DERIVE = {
   cocSanityMax: mythos => 99 - mythos,
   half: v => Math.floor(v / 2),
   fifth: v => Math.floor(v / 5),
+  difference: (a, b = 0) => a - b,
+  sum: (...values) => values.reduce((total, v) => total + v, 0),
 }
 
 // Item de lista pelo nome ({ list, item }): os pontos dele, ou 0 sem o item.
@@ -116,7 +118,27 @@ function numberOf(t, values, id, depth = 0) {
   const v = own(values, id) ? values[id] : undefined
   if (Number.isInteger(v)) return v
   if (isObj(v) && Number.isInteger(v.permanent ?? v.current)) return v.permanent ?? v.current
-  return f.default ?? f.min ?? 0
+  // Sem valor gravado: o `default` (que pode ser fórmula) ou o mínimo
+  if (f.type === 'resource' && f.permanent) return formulaValue(t, values, f.permanent.default, f.permanent.min ?? 0, f.permanent.max ?? 100, depth)
+  if (f.default == null || typeof f.default === 'number') return f.default ?? f.min ?? 0
+  return formulaValue(t, values, f.default, f.min ?? 0, f.max ?? 10, depth)
+}
+
+// `default` com fórmula: inteiro, derivação ou valor por opção de um choice, limitado a min..max.
+function formulaValue(t, values, formula, min, max, depth) {
+  const clamp = n => Math.min(max, Math.max(min, n))
+  if (typeof formula === 'number') return Number.isInteger(formula) ? clamp(formula) : min
+  if (isObj(formula) && formula.derive !== undefined) {
+    if (!own(DERIVE, formula.derive)) return clamp(0)
+    const n = DERIVE[formula.derive](...[formula.from].flat().map(x => input(t, values, x, depth + 1)))
+    return Number.isFinite(n) ? clamp(Math.trunc(n)) : min
+  }
+  if (isObj(formula) && typeof formula.from === 'string' && isObj(formula.map)) {
+    const choice = own(values, formula.from) ? values[formula.from] : undefined
+    const n = own(formula.map, choice) ? formula.map[choice] : undefined
+    return Number.isInteger(n) ? clamp(n) : min
+  }
+  return min
 }
 
 // Teto do valor atual de um resource; null quando não há teto conhecido.
@@ -160,6 +182,19 @@ function validateTemplate(t, palette) {
       else if (Array.isArray(l.catalog) && !l.catalog.includes(src.item)) err(path, `'${src.item}' não está no catálogo de '${src.list}'`)
     }
   }
+  // `default` com fórmula (§3): inteiro, derivação ou valor por opção de um choice
+  const formula = (path, v, min, max) => {
+    if (v == null) return
+    if (!isObj(v)) return num(path, v, min, max)
+    if (v.derive !== undefined) { oneOf(`${path}.derive`, v.derive, REGISTRY.derive, 'derive'); return sources(`${path}.from`, v.from) }
+    const choice = has(v.from) ? fields[v.from] : undefined
+    if (choice?.type !== 'choice') return err(`${path}.from`, `campo '${v.from}' não é um choice`)
+    const options = (choice.options ?? []).map(o => o?.id)
+    for (const [k, n] of Object.entries(isObj(v.map) ? v.map : {})) {
+      if (!options.includes(k)) err(`${path}.map.${k}`, `opção '${k}' não existe em '${v.from}'`)
+      num(`${path}.map.${k}`, n, min, max)
+    }
+  }
   const accentOk = v => v === 'accent-neutral' || palette.includes(v)
 
   // Toda string do template, em qualquer profundidade, é texto puro e limitada.
@@ -196,7 +231,8 @@ function validateTemplate(t, palette) {
     sources(`${p}.from`, f.from)
     if (f.badge && !has(f.badge.field)) err(`${p}.badge.field`, `campo '${f.badge.field}' não existe`)
     if (f.maxLength != null) num(`${p}.maxLength`, f.maxLength, 1, 20000)
-    if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
+    if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
+    else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
     if (f.spendLabel) text(`${p}.spendLabel`, f.spendLabel, 24)
     if (f.gainLabel) text(`${p}.gainLabel`, f.gainLabel, 24)
     if (f.type === 'rating') {
@@ -234,7 +270,7 @@ function validateTemplate(t, palette) {
         if (max.field && !has(max.field)) err(`${p}.max.field`, `campo '${max.field}' não existe`)
         if (max.stored) { num(`${p}.max.min`, max.min, 0, 9999); num(`${p}.max.max`, max.max, 1, 9999) }
       }
-      if (f.permanent) { num(`${p}.permanent.min`, f.permanent.min, 0, 100); num(`${p}.permanent.max`, f.permanent.max, 1, 100) }
+      if (f.permanent) { num(`${p}.permanent.min`, f.permanent.min, 0, 100); num(`${p}.permanent.max`, f.permanent.max, 1, 100); formula(`${p}.permanent.default`, f.permanent.default, f.permanent.min ?? 0, f.permanent.max ?? 100) }
       if (f.perTurn?.derive) oneOf(`${p}.perTurn.derive`, f.perTurn.derive, REGISTRY.derive, 'derive')
       for (const a of f.actions ?? []) {
         text(`${p}.actions.${a.id}.label`, a.label)
@@ -261,7 +297,7 @@ function validateTemplate(t, palette) {
     if (f.type === 'clock') {
       oneOf(`${p}.rule`, f.rule, REGISTRY.clockRules, 'rule')
       if (!Number.isInteger(f.segments) || f.segments < 2 || f.segments > 24) err(`${p}.segments`, 'entre 2 e 24')
-      for (const fill of f.fills ?? []) { text(`${p}.fills.${fill.id}.label`, fill.label); oneOf(`${p}.fills.${fill.id}.colorRole`, fill.colorRole, REGISTRY.colorRoles, 'colorRole') }
+      for (const fill of f.fills ?? []) { text(`${p}.fills.${fill.id}.label`, fill.label); oneOf(`${p}.fills.${fill.id}.colorRole`, fill.colorRole, REGISTRY.colorRoles, 'colorRole'); formula(`${p}.fills.${fill.id}.default`, fill.default, 0, f.segments ?? 24) }
     }
     if (f.type === 'slots') {
       num(`${p}.levels`, f.levels, 1, 9)

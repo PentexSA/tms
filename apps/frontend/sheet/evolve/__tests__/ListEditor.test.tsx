@@ -163,6 +163,39 @@ describe('outros sistemas, o mesmo editor', () => {
     })
   })
 
+  it('Mago: a Ressonância tem três linhas fixas, com pontos e descritor', async () => {
+    const c = example('otto')
+    const model = modelOf(c.system)
+    const { store } = await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const resonance = within(screen.getByTestId('editor-resonance'))
+    expect(resonance.queryByRole('button', { name: /^Adicionar/ })).toBeNull()
+    expect(
+      resonance.getByRole('button', { name: 'Dinâmica, Elétrica, 2 de 5' })
+    ).toBeTruthy()
+    // A linha sem pontos mostra os pips vazios, como na ficha de papel
+    expect(
+      resonance.getByRole('button', { name: 'Entrópica, 0 de 5' })
+    ).toBeTruthy()
+    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
+    fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Entrópica, valor' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    const items = store().getState().draftEvents()[0]?.to as ListItem[]
+    expect(items).toEqual([
+      { id: 'dynamic', text: 'Elétrica', value: 2 },
+      { id: 'entropic', text: 'Fria', value: 1 },
+      { id: 'static', text: 'Metódica', value: 1 },
+    ])
+  })
+
   it('Fate: consequências (lista fixa) e aspectos (texto)', async () => {
     const c = example('dandara')
     const model = modelOf(c.system)

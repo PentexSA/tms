@@ -9,6 +9,7 @@ import type {
   TabZone,
   Template,
 } from './contract'
+import { formulaDeps } from './defaults'
 import { parseTemplate } from './parse'
 import {
   type FieldTypeName,
@@ -231,7 +232,7 @@ export function numericDeps(def: FieldDef): FieldId[] {
     )
   switch (def.type) {
     case 'rating':
-      return def.cap ? [def.cap.field] : []
+      return [...(def.cap ? [def.cap.field] : []), ...formulaDeps(def.default)]
     case 'number':
       return def.readOnly && def.from ? refs(def.from) : []
     case 'percent': {
@@ -239,6 +240,11 @@ export function numericDeps(def: FieldDef): FieldId[] {
       if (base == null || typeof base === 'number') return []
       return 'field' in base ? [base.field] : refs(base.from)
     }
+    // O valor inicial com fórmula também é dependência (a FdV lê a Coragem)
+    case 'resource':
+      return formulaDeps(def.permanent?.default)
+    case 'clock':
+      return def.fills.flatMap(x => formulaDeps(x.default))
     default:
       return []
   }

@@ -8,6 +8,8 @@ import {
   withValueDeps,
 } from '../compile'
 import { REGISTRY } from '../registry'
+import { resolve } from '../resolve'
+import { validateSheet } from '../validate'
 import { clone, dnd, type Json, mta, templates, vtm, wta } from './fixtures'
 
 type Fields = Record<string, Json>
@@ -37,8 +39,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.2.0')
-    expect(model.version).toBe('1.2.0')
+    expect(model.key).toBe('vtm-v20@1.3.0')
+    expect(model.version).toBe('1.3.0')
     expect(model.skin).toBe('wod')
   })
 
@@ -51,9 +53,26 @@ describe('compileTemplate: o modelo do Vampiro', () => {
       identity: ['about-facts'],
       play: ['play'],
       build: ['attributes', 'abilities'],
-      powers: ['advantages'],
+      powers: ['advantages', 'merits-flaws', 'experience'],
       lore: ['about', 'storyteller'],
     })
+  })
+
+  it('a Fraqueza fica em Vantagens, ao lado da Trilha, como na ficha de papel', () => {
+    const groups = model.sections.get('advantages')?.groups ?? []
+    expect(groups.map(g => g.id).slice(-2)).toEqual(['morality', 'weakness'])
+  })
+
+  it('a Experiência disponível é derivada: total menos gasta', () => {
+    const r = resolve(model, { values: { xpTotal: 12, xpSpent: 9 } })
+    expect(r.number('xpAvailable')).toBe(3)
+    expect(model.fields.get('xpAvailable')?.readOnly).toBe(true)
+  })
+
+  it('Qualidades e Defeitos ficam fora da parada de dados', () => {
+    const from = model.roll.slots.flatMap(s => s.from)
+    expect(from).not.toContain('merits-flaws')
+    expect(from).not.toContain('experience')
   })
 
   it('rotula as abas com zoneLabels ou o padrão', () => {
@@ -145,6 +164,32 @@ describe('compileTemplate: o Mago (M20, v1)', () => {
   it('dock com a roda entre a Vitalidade e a FdV', () => {
     expect(model.dock).toEqual(['health', 'wheel', 'willpower'])
   })
+
+  it('Vantagens na ordem da ficha: Esferas, Ressonância e o resto', () => {
+    const powers = model.zones.find(z => z.id === 'powers')?.sections ?? []
+    expect(powers.map(s => s.id)).toEqual([
+      'spheres',
+      'resonance',
+      'backgrounds',
+      'rotes',
+      'wonders',
+      'merits-flaws',
+      'experience',
+    ])
+  })
+
+  it('a Ressonância tem as três linhas fixas, com pontos e descritor', () => {
+    const r = resolve(model, {
+      values: { resonance: [{ id: 'entropic', text: 'Frio', value: 2 }] },
+    }).get('resonance')
+    expect(r).toMatchObject({
+      items: [
+        { id: 'dynamic', name: 'Dinâmica', text: '' },
+        { id: 'entropic', name: 'Entrópica', text: 'Frio', value: 2 },
+        { id: 'static', name: 'Estática', text: '' },
+      ],
+    })
+  })
 })
 
 describe('compileTemplate: o Lobisomem (W20, v2)', () => {
@@ -156,10 +201,12 @@ describe('compileTemplate: o Lobisomem (W20, v2)', () => {
       'name',
       'deedName',
       'concept',
+      'sept',
       'breed',
       'auspice',
+      'camp',
       'tribe',
-      'sept',
+      'packName',
       'totem',
       'rank',
     ])
@@ -183,6 +230,37 @@ describe('compileTemplate: o Lobisomem (W20, v2)', () => {
 
   it('dock com a Forma ao lado da Vitalidade e da Fúria', () => {
     expect(model.dock).toEqual(['health', 'rage', 'form'])
+  })
+})
+
+describe('os campos da ficha de papel nos três sistemas', () => {
+  it.each([
+    ['vtm-v20', '1.3.0'],
+    ['mta-m20', '1.2.0'],
+    ['wta-w20', '1.2.0'],
+  ])('%s %s: Qualidades e Defeitos com custo de 1 a 10', (system, version) => {
+    const t = templates[system] as Json
+    expect(t.templateVersion).toBe(version)
+    const ok = {
+      merits: [{ id: 'm1', name: 'Q', meta: { kind: 'Social', cost: 2 } }],
+      flaws: [{ id: 'f1', name: 'D', meta: { bonus: 3 }, notes: 'n' }],
+    }
+    expect(validateSheet(t, { values: ok })).toEqual([])
+    const over = { merits: [{ id: 'm1', name: 'Q', meta: { cost: 11 } }] }
+    expect(validateSheet(t, { values: over })).toEqual([
+      { path: 'values.merits.0.meta.cost', message: 'acima do máximo 10' },
+    ])
+  })
+
+  it('Lobisomem: Deformidade em Sobre e Cicatrizes numa seção própria', () => {
+    const model = compileTemplate(wta())
+    const lore = model.zones.find(z => z.id === 'lore')?.sections ?? []
+    expect(lore.map(s => s.id)).toEqual([
+      'about',
+      'battle-scars',
+      'storyteller',
+    ])
+    expect(model.sections.get('about')?.fieldIds).toContain('metisDeformity')
   })
 })
 

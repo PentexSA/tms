@@ -231,7 +231,9 @@
         "cocMagicPoints",
         "cocSanityMax",
         "half",
-        "fifth"
+        "fifth",
+        "difference",
+        "sum"
       ]
     },
     "trackRule": {
@@ -361,6 +363,29 @@
       "properties": {
         "list": { "$ref": "#/$defs/fieldRef" },
         "item": { "type": "string", "minLength": 1, "maxLength": 80 }
+      },
+      "additionalProperties": false
+    },
+    "defaultFormula": {
+      "description": "Fórmula de valor inicial (README §3, default): uma derivação da lista fechada ou um valor por opção de um choice. Nunca expressão.",
+      "oneOf": [
+        { "$ref": "#/$defs/deriveRef" },
+        { "$ref": "#/$defs/choiceMap" }
+      ]
+    },
+    "choiceMap": {
+      "description": "Valor por opção de um campo choice (Fúria pelo Augúrio). Opção sem entrada, ou choice vazio, vale o mínimo do campo.",
+      "type": "object",
+      "required": ["from", "map"],
+      "properties": {
+        "from": { "$ref": "#/$defs/fieldRef" },
+        "map": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "minProperties": 1,
+          "maxProperties": 60
+        }
       },
       "additionalProperties": false
     },
@@ -536,10 +561,11 @@
           "maximum": 10
         },
         "default": {
-          "description": "Valor de uma ficha nova (padrão: min). Ex.: atributos de WoD começam em 1.",
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10
+          "description": "Valor de uma ficha nova enquanto o campo não é gravado (padrão: min). Inteiro (atributos de WoD começam em 1) ou fórmula (Humanidade = Consciência + Autocontrole).",
+          "oneOf": [
+            { "type": "integer", "minimum": 0, "maximum": 10 },
+            { "$ref": "#/$defs/defaultFormula" }
+          ]
         },
         "specialty": {
           "description": "Aceita especialização (texto em sheet_data.specialties[id]).",
@@ -729,7 +755,14 @@
           "required": ["min", "max"],
           "properties": {
             "min": { "type": "integer", "minimum": 0, "maximum": 100 },
-            "max": { "type": "integer", "minimum": 1, "maximum": 100 }
+            "max": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "default": {
+              "description": "Permanente de uma ficha nova enquanto o recurso não é gravado (padrão: min). Ex.: Fúria pelo Augúrio.",
+              "oneOf": [
+                { "type": "integer", "minimum": 0, "maximum": 100 },
+                { "$ref": "#/$defs/defaultFormula" }
+              ]
+            }
           },
           "additionalProperties": false
         },
@@ -967,6 +1000,13 @@
               "from": {
                 "description": "De onde o preenchimento cresce na roda.",
                 "enum": ["start", "end"]
+              },
+              "default": {
+                "description": "Casas de uma ficha nova enquanto a roda não é gravada (padrão: 0). Ex.: Quintessência inicial = Avatar.",
+                "oneOf": [
+                  { "type": "integer", "minimum": 0, "maximum": 24 },
+                  { "$ref": "#/$defs/defaultFormula" }
+                ]
               }
             },
             "additionalProperties": false
@@ -1215,7 +1255,7 @@
           "uniqueItems": true
         },
         "fixed": {
-          "description": "Itens fixos (não se adiciona nem remove): cada um guarda só { id, text }. Ex.: consequências Suave, Moderada e Grave do Fate.",
+          "description": "Itens fixos (não se adiciona nem remove): cada um guarda { id, text } e o que item declarar (value, meta, notes). Ex.: consequências Suave, Moderada e Grave do Fate; Ressonância Dinâmica, Entrópica e Estática do Mago, com pontos.",
           "type": "array",
           "items": {
             "type": "object",

@@ -14,6 +14,7 @@ import type {
   TrackLevel,
   TrackRow,
 } from './contract'
+import { formulaValue } from './defaults'
 import { DERIVE, isDeriveName } from './derive'
 import type { FieldTypeName, ModifierOp } from './registry'
 import {
@@ -252,9 +253,12 @@ export function resolve(
     return DERIVE[name](...args)
   }
   const deriveRef = (ref: DeriveRef) => derive(ref.derive, ref.from)
+  // Valor inicial de um campo sem valor gravado (`default` com fórmula)
+  const initial = (formula: unknown, min: number, max: number) =>
+    formulaValue(formula, { derive, choice: raw }, min, max)
 
   const rating = (f: FieldDefOf<'rating'>, id: FieldId) => {
-    const base = int(raw(id)) ?? f.default ?? f.min ?? 0
+    const base = int(raw(id)) ?? initial(f.default, f.min ?? 0, f.max)
     const mods = modifiers.get(id) ?? []
     let modded = base
     for (const m of mods)
@@ -288,12 +292,16 @@ export function resolve(
     else if (f.max && 'derive' in f.max) max = deriveRef(f.max)
     else if (f.max && 'field' in f.max) max = number(f.max.field)
     else if (f.max && 'stored' in f.max) max = int(v.max) ?? f.max.min
-    const permanent = f.permanent ? (int(v.permanent) ?? f.permanent.min) : null
+    const permanent = f.permanent
+      ? (int(v.permanent) ??
+        initial(f.permanent.default, f.permanent.min, f.permanent.max))
+      : null
     const capped = permanent !== null && !f.tempUncapped
     const shownMax = capped ? permanent : max
     return {
-      // Ficha nova começa com o recurso cheio.
-      current: int(v.current) ?? shownMax ?? 0,
+      // Ficha nova começa com o recurso cheio. Sem o permanente como teto
+      // (`tempUncapped`, Renome do W20), não há "cheio": começa em 0.
+      current: int(v.current) ?? (f.tempUncapped ? 0 : (shownMax ?? 0)),
       permanent,
       temp: f.temp ? (int(v.temp) ?? 0) : null,
       max,
@@ -423,8 +431,17 @@ export function resolve(
         return { ...base, type: 'slots', levels } as ResolvedSlots
       }
       case 'clock': {
-        const v = rec(raw(id)) ?? {}
-        const fills = d.fills.map(x => ({ ...x, n: int(get(v, x.id)) ?? 0 }))
+        // Sem roda gravada, cada preenchimento vale o `default`, sem passar
+        // das casas que sobram (a Quintessência inicial do Mago = Avatar)
+        const v = rec(raw(id))
+        let room = d.segments
+        const fills = d.fills.map(x => {
+          const n = v
+            ? (int(get(v, x.id)) ?? 0)
+            : initial(x.default, 0, Math.max(0, room))
+          room -= n
+          return { ...x, n }
+        })
         const used = fills.reduce((n, x) => n + x.n, 0)
         return {
           ...base,
@@ -488,12 +505,21 @@ export function resolve(
       }
       case 'list': {
         const stored = asArray(raw(id)).filter(isObj) as unknown as ListItem[]
+        // Item fixo: o rótulo é do template; o texto e o que `item` declara
+        // (pontos da Ressonância, meta, notas) são da ficha
         const items = d.fixed
-          ? d.fixed.map(fx => ({
-              id: fx.id,
-              name: fx.label,
-              text: stored.find(x => x.id === fx.id)?.text ?? '',
-            }))
+          ? d.fixed.map(fx => {
+              const { value, meta, notes, text } =
+                stored.find(x => x.id === fx.id) ?? {}
+              return {
+                id: fx.id,
+                name: fx.label,
+                text: text ?? '',
+                ...(value !== undefined && { value }),
+                ...(meta !== undefined && { meta }),
+                ...(notes !== undefined && { notes }),
+              }
+            })
           : stored
         return { ...base, type: 'list', items } as ResolvedList
       }

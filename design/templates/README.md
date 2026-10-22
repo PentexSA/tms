@@ -93,6 +93,7 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 ### `rating`
 
 - `min` (padrão 0) e `max` (obrigatório no schema, até 10). Acima de 5, os pips ficam menores. Sem valor na ficha, vale `default` (se declarado) ou `min`.
+- `default` aceita um inteiro ou uma **fórmula de valor inicial** (abaixo): Humanidade = Consciência + Autocontrole.
 - `cap: { field, label }`: teto **não destrutivo** vindo de um `rating` ou `number` (Esferas ≤ Arete). Baixar o teto não apaga pontos: o excedente fica "inativo" e volta a valer quando o teto sobe. O servidor aceita valor acima do teto.
 - `valueLabels`: nome por valor (`{ "2": "Fostern" }`), exibido junto do número.
 - `specialty: true`: aceita especialização em `sheet_data.specialties[id]` (até 80 caracteres). Vale também para `number` e `percent`, que o editor de Evoluir trata igual.
@@ -120,10 +121,10 @@ Valor: `{ current, permanent?, temp?, max? }`, com `current` de 0 a 9999. Precis
 
 | Propriedade | Efeito | Exemplo |
 |---|---|---|
-| `permanent: { min, max }` | Valor permanente guardado em `permanent`. Limita o atual e só muda em Evoluir. | Força de Vontade 5/7 |
+| `permanent: { min, max, default? }` | Valor permanente guardado em `permanent`. Limita o atual e só muda em Evoluir. `default` é o permanente de uma ficha nova: inteiro ou fórmula (abaixo); sem ele, `min`. | Força de Vontade 5/7; FdV = Coragem; Fúria pelo Augúrio |
 | `temp: true` | Pontos temporários em `temp`. | PV temporários de D&D |
 | `rule: tempFirst` | Dano consome primeiro os temporários. | PV 27 + 5 |
-| `tempUncapped: true` | O atual não é limitado pelo permanente. Exige `permanent`. A UI mostra "Permanente 3 · Temporário 4". | Glória, Honra, Sabedoria (W20) |
+| `tempUncapped: true` | O atual não é limitado pelo permanente. Exige `permanent`. A UI mostra "Permanente 3 · Temporário 4". Sem valor na ficha, o atual começa em 0 (não há "cheio"). | Glória, Honra, Sabedoria (W20) |
 | `overMax: true` | O atual pode passar do máximo. Exige `max`. | Pontos de Destino acima da recarga |
 | `max: <número>` | Máximo fixo (até 9999). | Sorte 99 |
 | `max: { derive, from }` | Máximo derivado. | Sangue por Geração; PV de CoC por CON + TAM |
@@ -136,6 +137,39 @@ Valor: `{ current, permanent?, temp?, max? }`, com `current` de 0 a 9999. Precis
 | `spendLabel`, `gainLabel` | Verbo das ações rápidas −1/+1 (padrão "Gastar 1" e "Recuperar 1"). O verbo é do sistema, não do app. | Sanidade e PV do CoC: "Perder 1" |
 
 Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com stepper.
+
+Sem valor na ficha, o atual começa cheio (no permanente ou no máximo), exceto com `tempUncapped`, que começa em 0.
+
+### Fórmula de valor inicial (`default`)
+
+Valores que o livro calcula a partir de outros traços (Humanidade, Força de Vontade, Fúria, Quintessência) não são gravados na criação: a criação só pede a identidade, e Virtudes e Antecedentes vêm depois, em Editar. Por isso o `default` é um **valor de leitura**: enquanto o campo não tem valor gravado, ele vale a fórmula e acompanha as fontes. Quando o jogador grava o campo, o valor dele vale e a fórmula para de valer.
+
+Aceito em `rating.default`, `resource.permanent.default` e `clock.fills[].default`. `number.default` continua só inteiro.
+
+| Forma | Efeito | Exemplo |
+|---|---|---|
+| inteiro | Valor fixo | FdV inicial do Mago: `5` |
+| `{ derive, from }` | Uma derivação da lista fechada (§9), com as mesmas fontes de `from` (campo ou item de lista) | `{ "derive": "sum", "from": ["conscience", "selfControl"] }` |
+| `{ from, map }` | Valor por opção de um `choice`. Opção sem entrada, ou `choice` vazio, vale o mínimo | `{ "from": "auspice", "map": { "ahroun": 5 } }` |
+
+```json
+"humanity": { "type": "rating", "label": "Humanidade", "min": 0, "max": 10,
+  "default": { "derive": "sum", "from": ["conscience", "selfControl"] } },
+"rage": { "type": "resource", "label": "Fúria",
+  "permanent": { "min": 1, "max": 10,
+    "default": { "from": "auspice", "map": { "ragabash": 1, "theurge": 2, "philodox": 3, "galliard": 4, "ahroun": 5 } } } },
+"wheel": { "type": "clock", "fills": [
+  { "id": "quintessence", "label": "Quintessência", "colorRole": "accent", "from": "start",
+    "default": { "derive": "sum", "from": [{ "list": "backgrounds", "item": "Avatar" }] } } ] }
+```
+
+Regras:
+
+- O resultado fica sempre em `min..max` do destino (na roda, nas casas que sobram).
+- `validateTemplate` confere que as fontes existem (item de lista no catálogo), que o `from` do mapa é um `choice`, que as chaves do mapa são opções dele e que os valores cabem no destino. Um ciclo pelo `default` é recusado no compile.
+- Um recurso é gravado inteiro (`current` e `permanent` juntos): o primeiro gasto em Jogo fixa o permanente calculado.
+- A roda é gravada inteira: o primeiro passo parte do padrão calculado.
+- Nunca é expressão: só as duas formas fechadas acima.
 
 ### `track`
 
@@ -150,7 +184,7 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 
 ### `clock`
 
-- `segments` (2 a 24) e `fills` (até 2 preenchimentos: `{ id, label, colorRole, from: start | end }`). Cada preenchimento tem amostra própria (cheia ou hachurada): forma e cor, nunca só cor.
+- `segments` (2 a 24) e `fills` (até 2 preenchimentos: `{ id, label, colorRole, from: start | end, default? }`). `default` são as casas de uma roda nunca gravada: inteiro ou fórmula (§3, `resource`). Cada preenchimento tem amostra própria (cheia ou hachurada): forma e cor, nunca só cor.
 - `rule` é obrigatória. Hoje só existe `mage-quint-paradox`: Quintessência e Paradoxo dividem as casas; ganhar Paradoxo com a roda cheia consome 1 Quintessência; ganhar Quintessência com a roda cheia é bloqueado. Exige um preenchimento `start` e um `end`.
 - Valor: `{ "quintessence": 6, "paradox": 2 }`, com soma até `segments`.
 - No app (v1): a regra roda no cliente, no `planClock` do core; o servidor confere só a forma e a soma, como no `wod-stacking`. Um nome de regra sem implementação deixa a roda sem Stepper ("Esta versão do app não conhece a regra desta roda").
@@ -201,7 +235,16 @@ Com máximo até 20, o recurso aparece como caixas; acima disso, como barra com 
 | `aspect: true` | `text` (até 200) | aspecto do Fate |
 
 - O servidor rejeita no item qualquer chave não declarada: `notes` sem `item.notes`, `value` sem `item.value`, chave de `meta` que não está em `item.meta`.
-- `fixed: [{ id, label, meta? }]`: itens fixos, sem adicionar nem remover. Cada um guarda `{ id, text }` (consequências Suave, Moderada e Grave do Fate) e o `id` precisa ser um dos fixos. Atenção: aqui `meta` é texto ("absorve 2"), diferente de `item.meta`.
+- `fixed: [{ id, label, meta? }]`: itens fixos, sem adicionar nem remover. Cada um guarda `{ id, text }` (consequências Suave, Moderada e Grave do Fate) e o `id` precisa ser um dos fixos. O rótulo vem do template e não é gravado. Atenção: aqui `meta` é texto ("absorve 2"), diferente de `item.meta`.
+- Item fixo também guarda o que `item` declara (`value`, `meta`, `notes`). É assim que a Ressonância do Mago fica como na ficha de papel: três linhas sempre presentes, cada uma com pontos e um descritor livre no `text`.
+
+```json
+"resonance": { "type": "list", "label": "Ressonância", "itemLabel": "Descritor",
+  "item": { "value": { "type": "rating", "min": 0, "max": 5 } },
+  "fixed": [{ "id": "dynamic", "label": "Dinâmica" }, { "id": "entropic", "label": "Entrópica" }, { "id": "static", "label": "Estática" }] }
+```
+
+Valor: `[{ "id": "dynamic", "text": "Ardente", "value": 2 }]`.
 - `catalog`: sugestões ao adicionar. **Só nomes**: descrições protegidas não entram no template (§12).
 - Itens com `value` numérico ou `meta.bonus` numérico viram opções da parada quando a seção está em `roll.slots[].from`.
 - Extensões documentadas, fora do `REGISTRY` e ainda não consumidas pelo protótipo: `searchable` e `density` (dicas visuais) e `rollAs` (`ability` ou `attack`).
@@ -396,7 +439,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `fieldTypes` | `fieldType` | `rating`, `number`, `percent`, `resource`, `track`, `slots`, `clock`, `state`, `mark`, `text`, `longText`, `choice`, `tags`, `list` |
 | `numberDisplays` | `numberDisplay` | `plain`, `score+mod`, `signed`, `ladder` |
 | `percentDisplays` | `percentDisplay` | `percent`, `percent+half+fifth` |
-| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `vtmGeneration`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth` |
+| `derive` | `deriveName` | `abilityModifier`, `proficiencyBonus`, `dnd5eCheckBonus`, `vtmBloodPool`, `vtmBloodPerTurn`, `vtmGeneration`, `cocHitPoints`, `cocMagicPoints`, `cocSanityMax`, `half`, `fifth`, `difference`, `sum` |
 | `trackRules` | `trackRule` | `wod-stacking`, `boxes` |
 | `resourceRules` | `resourceRule` | `tempFirst` |
 | `clockRules` | `clockRule` | `mage-quint-paradox` |
@@ -433,6 +476,8 @@ Derivações, com assinatura:
 | `cocMagicPoints(pow)` | ⌊POD / 5⌋ |
 | `cocSanityMax(mythos)` | 99 − Mitos de Cthulhu |
 | `half(v)` / `fifth(v)` | ⌊v / 2⌋ / ⌊v / 5⌋ |
+| `difference(a, b)` | a − b (Experiência disponível = total − gasto) |
+| `sum(a, b, …)` | soma de até 4 fontes (Humanidade = Consciência + Autocontrole; com uma fonte, o próprio valor) |
 
 ### Como adicionar um nome novo
 

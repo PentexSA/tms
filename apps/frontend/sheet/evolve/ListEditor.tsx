@@ -16,6 +16,7 @@ import {
   describeItem,
   ItemLine,
   itemTitle,
+  itemValue,
   ListHeader,
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
@@ -88,8 +89,8 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
           accessibilityRole="button"
           accessibilityLabel={describeItem(list, item)}
           accessibilityValue={
-            typeof item.value === 'number'
-              ? { text: String(item.value) }
+            itemValue(list, item) !== undefined
+              ? { text: String(itemValue(list, item)) }
               : undefined
           }
           accessibilityHint="Abre o item"

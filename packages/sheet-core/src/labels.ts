@@ -52,8 +52,13 @@ function change(def: FieldDef, from: unknown, to: unknown, model: SheetModel) {
     case 'rating':
     case 'number':
     case 'percent': {
+      // Um `default` com fórmula não tem número fixo: sem valor, vale o mínimo
       const fallback =
-        def.type === 'percent' ? DASH : (def.default ?? def.min ?? 0)
+        def.type === 'percent'
+          ? DASH
+          : typeof def.default === 'number'
+            ? def.default
+            : (def.min ?? 0)
       return `${n(from, fallback)} ${ARROW} ${n(to, fallback)}`
     }
     case 'resource': {

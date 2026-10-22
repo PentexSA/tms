@@ -42,6 +42,17 @@ export interface FieldValueRef {
   readonly field: FieldId
 }
 
+/** Valor por opção de um `choice` (Fúria pelo Augúrio). Sem entrada: o mínimo. */
+export interface ChoiceMapRef {
+  readonly from: FieldId
+  readonly map: Readonly<Record<string, number>>
+}
+
+// Valor inicial de uma ficha nova (§3, `default`): um inteiro, uma derivação
+// da lista fechada ou um valor por opção. Vale enquanto a ficha não grava o
+// campo, então acompanha as fontes (Humanidade = Consciência + Autocontrole).
+export type DefaultFormula = number | DeriveRef | ChoiceMapRef
+
 export interface ActionParams {
   readonly field?: FieldId
   readonly amount?: number
@@ -70,7 +81,7 @@ interface FieldBase<T extends FieldTypeName> {
 export interface RatingField extends FieldBase<'rating'> {
   readonly min?: number
   readonly max: number
-  readonly default?: number
+  readonly default?: DefaultFormula
   readonly specialty?: boolean
   // Teto não destrutivo: o excedente fica inativo e volta quando o teto sobe.
   readonly cap?: { readonly field: FieldId; readonly label?: string }
@@ -111,7 +122,11 @@ export interface StoredMax {
 }
 
 export interface ResourceField extends FieldBase<'resource'> {
-  readonly permanent?: { readonly min: number; readonly max: number }
+  readonly permanent?: {
+    readonly min: number
+    readonly max: number
+    readonly default?: DefaultFormula
+  }
   readonly temp?: boolean
   readonly tempUncapped?: boolean
   readonly overMax?: boolean
@@ -167,6 +182,7 @@ export interface ClockFill {
   readonly label: string
   readonly colorRole: ColorRole
   readonly from: 'start' | 'end'
+  readonly default?: DefaultFormula
 }
 
 export interface ClockField extends FieldBase<'clock'> {
