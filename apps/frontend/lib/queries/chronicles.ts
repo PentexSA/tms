@@ -87,6 +87,39 @@ export const useDeleteChronicle = (id: string) => {
   })
 }
 
+/**
+ * Tira um jogador da crônica (só o narrador; v3, Etapa 7): as fichas dele vão
+ * para arquivadas e, por padrão, os convites ativos são revogados.
+ */
+export const useRemoveMember = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      readonly userId: string
+      readonly revokeInvites: boolean
+    }) =>
+      unwrap(
+        await api
+          .chronicles({ id })
+          .members({ userId: args.userId })
+          .delete({ revokeInvites: args.revokeInvites })
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: chronicleKeys.one(id) }),
+  })
+}
+
+/** Sair da crônica (o próprio jogador): as fichas ficam, só leitura. */
+export const useLeaveChronicle = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.chronicles({ id }).members.me.delete()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
+  })
+}
+
 export const useAcceptInvite = () => {
   const queryClient = useQueryClient()
   return useMutation({

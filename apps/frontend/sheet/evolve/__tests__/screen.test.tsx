@@ -53,6 +53,7 @@ const character = (roles: string[]) =>
     roles,
     status: 'creating',
     lockedAt: null,
+    member: true,
     updatedAt: '2026-10-18T12:00:00Z',
     sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
   })

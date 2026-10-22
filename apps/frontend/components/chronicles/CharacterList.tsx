@@ -60,10 +60,13 @@ export function CharacterList({
   chronicleId,
   systemCode,
   narrating,
+  canCreate = true,
 }: {
   readonly chronicleId: string
   readonly systemCode: string
   readonly narrating: boolean
+  // O ex-membro não cria ficha (a API dá 403)
+  readonly canCreate?: boolean
 }) {
   const router = useRouter()
   const characters = useChronicleCharacters(chronicleId)
@@ -81,7 +84,7 @@ export function CharacterList({
       <View style={styles.header}>
         <SectionHeader
           title={narrating ? 'Fichas' : 'Suas fichas'}
-          right={create}
+          right={canCreate ? create : undefined}
         />
       </View>
       {characters.isPending ? (

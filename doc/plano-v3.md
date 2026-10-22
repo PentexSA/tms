@@ -39,13 +39,14 @@ O que fica fora está no §8.
 
 ## Estado da v3 (22/10/2026)
 
-Marcos A e B prontos (etapas 1 a 6), no branch `feat/v3-mesa`:
+Marcos A, B e C prontos (etapas 1 a 7), no branch `feat/v3-mesa`:
 
 - **Etapa 4:** `classify.ts` (`classifyChange`, `classifyBatch`, um classificador por tipo num mapa que quebra o build se faltar um) e `policy.ts` (`writePolicy`, os estados da v3) no `@tms/sheet-core`; o Ouro e o inventário do fixture de D&D com `editableIn: ["play"]`. Os códigos de recusa seguem a decisão 18 (§7).
 - **Etapa 5:** migração `0014_character_status`; a política dentro da transação em `/events`, `/rolls` (com `rollPolicy`: sem custo, a trava não conta) e `DELETE /characters/:id`; as rotas do narrador em `sheets/status.ts`, cada uma com uma linha no `chronicle_audit` (`audit.ts`); `status` e `lockedAt` na ficha e na Mesa; `policy.test.ts` (a tabela nos três sistemas e os critérios do 5.1) e `policy.pg.test.ts` no job `postgres`. Uma ação que não muda nada (concluir de novo, travar a travada, o mesmo estado) é 409 sem linha no registro; de `creating` para `active`, só concluindo.
 - **Etapa 6:** `sheet/policy.ts` no app (a frase de cada código, o contexto com o estado e `blockedBy`, a mesma `writePolicy` do core); o `rejectionMessage` e a rolagem leem o `code`; em `active`, o editor de Evoluir desabilita o que é `advance` ("Peça ao narrador", pelo `editClass` do core), e texto, especialização e o atual de um recurso continuam editáveis; travada, a ficha do dono fica em Jogo sem nada editável (a rolagem sem custo continua) e o dock diz o motivo em vez de abrir o gasto; arquivada ou fora de jogo, em Leitura; o menu ⋯ do narrador (`StatusMenu.tsx`). `statusLabels` entrou no contrato (decisão 7), com o rótulo no fixture de D&D; os três templates do produto o ganham na Etapa 8, junto com `alerts`.
+- **Etapa 7:** `former` no `ChronicleRole` (quem tem ficha e não tem vínculo), com o que cada rota faz com ele; `DELETE /chronicles/:id/members/:userId` e `/members/me` pelo protocolo de trava (o vínculo, depois as fichas em ordem de `id`), com as fichas em `archived`, a linha no `chronicle_audit` e, ao remover, os convites revogados por padrão; a criação de ficha trava o vínculo e conta o limite dentro da transação; `GET /characters/:id` devolve `member`; o app mostra "Você saiu", a lista de membros do narrador com as fichas e a data de entrada, "Remover" e "Sair da crônica"; os convites dizem os usos restantes. A matriz ganhou o ator `former`, e `members.pg.test.ts` entrou no job `postgres` (conferido: sem a trava do vínculo na criação, dois dos três cenários falham).
 
-Marco B pronto. Próxima: Etapa 7.
+Marcos A, B e C prontos. Próxima: Etapa 8.
 
 ---
 

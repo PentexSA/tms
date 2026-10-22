@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { Share, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
-import { shortDate } from '../../lib/format'
+import { plural, shortDate } from '../../lib/format'
 import {
   formatInviteCode,
   useCreateInvite,
@@ -105,7 +105,8 @@ export function InviteSheet({
             <ListItem
               key={i.id}
               title={`Criado em ${shortDate(i.createdAt)}`}
-              subtitle={`Usado ${i.uses} de ${i.maxUses} · vale até ${shortDate(i.expiresAt)}`}
+              // Os usos que restam, não os gastos (doc/plano-v3.md, Etapa 7)
+              subtitle={`${plural(i.maxUses - i.uses, 'uso restante', 'usos restantes')} · vale até ${shortDate(i.expiresAt)}`}
               trailing={
                 <Button
                   title="Revogar"

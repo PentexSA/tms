@@ -18,6 +18,9 @@ export function createFakeApi() {
     invitesGet: jest.fn(),
     invitesPost: jest.fn(),
     invitesDelete: jest.fn(),
+    // Membros (v3, Etapa 7): remover e sair
+    memberDelete: jest.fn(),
+    leaveDelete: jest.fn(),
   }
   const calls = {
     characterGet: jest.fn(),
@@ -76,6 +79,12 @@ export function createFakeApi() {
             post: (...a: unknown[]) => chronicle.charactersPost(...a),
           },
           table: { get: (...a: unknown[]) => chronicle.tableGet(...a) },
+          members: Object.assign(
+            ({ userId }: { userId: string }) => ({
+              delete: (...a: unknown[]) => chronicle.memberDelete(userId, ...a),
+            }),
+            { me: { delete: (...a: unknown[]) => chronicle.leaveDelete(...a) } }
+          ),
           invites: Object.assign(
             ({ inviteId }: { inviteId: string }) => ({
               delete: () => chronicle.invitesDelete(inviteId),

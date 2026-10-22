@@ -13,6 +13,8 @@ export type Actor =
   | 'owner'
   // outro jogador da mesma crônica: sem papel na ficha da dona (v3, Etapa 2)
   | 'player'
+  // ex-membro: saiu (ou foi removido) e tem ficha na crônica (v3, Etapa 7)
+  | 'former'
   // narrador de outra crônica
   | 'otherStoryteller'
   // usuário sem vínculo
@@ -31,13 +33,26 @@ export interface MatrixRow {
   readonly sheet?: { readonly status: 'active'; readonly locked?: true }
 }
 
-const denied = { otherStoryteller: 404, stranger: 404, anonymous: 401 } as const
+// O ex-membro responde como quem não tem vínculo, salvo onde a linha diz
+const denied = {
+  former: 404,
+  otherStoryteller: 404,
+  stranger: 404,
+  anonymous: 401,
+} as const
 
 export const MATRIX: readonly MatrixRow[] = [
   {
+    // O ex-membro lê o nome, o sistema e o narrador, sem os membros
     method: 'GET',
     route: '/chronicles/:id',
-    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+    expect: {
+      storyteller: 200,
+      owner: 200,
+      player: 200,
+      ...denied,
+      former: 200,
+    },
   },
   {
     // O cenário tem a ficha da dona: só sai com o nome da crônica digitado
@@ -67,7 +82,26 @@ export const MATRIX: readonly MatrixRow[] = [
     // O jogador recebe só as fichas dele (o corpo é conferido em characters.test.ts)
     method: 'GET',
     route: '/chronicles/:id/characters',
-    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+    expect: {
+      storyteller: 200,
+      owner: 200,
+      player: 200,
+      ...denied,
+      former: 200,
+    },
+  },
+  // Membros (v3, Etapa 7): o narrador remove; o membro sai
+  {
+    method: 'DELETE',
+    route: '/chronicles/:id/members/:userId',
+    mutates: true,
+    expect: { storyteller: 204, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'DELETE',
+    route: '/chronicles/:id/members/me',
+    mutates: true,
+    expect: { storyteller: 403, owner: 204, player: 204, ...denied },
   },
   {
     // A Mesa é do narrador; para jogador a rota não existe (fail secure)
@@ -79,7 +113,14 @@ export const MATRIX: readonly MatrixRow[] = [
     method: 'POST',
     route: '/chronicles/:id/characters',
     body: () => ({ values: { name: 'Nova' } }),
-    expect: { storyteller: 201, owner: 201, player: 201, ...denied },
+    // O ex-membro sabe que a crônica existe: 403 NOT_MEMBER
+    expect: {
+      storyteller: 201,
+      owner: 201,
+      player: 201,
+      ...denied,
+      former: 403,
+    },
   },
   {
     method: 'GET',

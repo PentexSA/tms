@@ -206,6 +206,7 @@ describe('a tela da ficha com o estado', () => {
       roles,
       status,
       lockedAt,
+      member: true,
       updatedAt: '2026-10-18T12:00:00Z',
       sheet: helena,
     })

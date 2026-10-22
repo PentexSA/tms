@@ -53,6 +53,7 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     'storyteller',
     'owner',
     'player',
+    'former',
     'otherStoryteller',
     'stranger',
   ] as const)
@@ -62,6 +63,8 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   await addMember(ctx, chronicleId, users.player)
   await createChronicle(ctx, users.otherStoryteller, s.system, 'Outra')
   const characterId = await createCharacter(ctx, users.owner, chronicleId)
+  // O ex-membro: tem ficha na crônica e não tem mais o vínculo
+  await createCharacter(ctx, users.former, chronicleId, { name: 'Antiga' })
   const notes = await as(
     ctx,
     users.storyteller,
@@ -93,7 +96,11 @@ async function request(
   const id = row.route.startsWith('/characters')
     ? sc.characterId
     : sc.chronicleId
-  const path = row.route.replace(':id', id).replace(':inviteId', sc.inviteId)
+  const path = row.route
+    .replace(':id', id)
+    .replace(':inviteId', sc.inviteId)
+    // Remover: o outro jogador
+    .replace(':userId', sc.users.player.id)
   const user = actor === 'anonymous' ? null : sc.users[actor]
   return as(sc.ctx, user, row.method, path, row.body?.(s))
 }
@@ -114,7 +121,12 @@ async function check(
     )
   const res = await request(sc, s, row, actor)
   expect(res.status).toBe(status)
-  if (actor !== 'storyteller') expect(await res.text()).not.toContain(SECRET)
+  const text = await res.text()
+  if (actor !== 'storyteller') expect(text).not.toContain(SECRET)
+  // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
+  if (actor === 'former')
+    for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])
+      expect(text).not.toContain(other)
 }
 
 afterAll(async () => {

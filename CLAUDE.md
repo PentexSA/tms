@@ -144,6 +144,7 @@ cd apps/api
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_events_test bun test src/__tests__/events.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_rolls_test bun test src/rolls/__tests__/rolls.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_policy_test bun test src/__tests__/policy.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_members_test bun test src/__tests__/members.pg.test.ts
 ```
 
 #### Test Infrastructure

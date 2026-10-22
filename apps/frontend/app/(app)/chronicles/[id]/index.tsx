@@ -1,6 +1,7 @@
 import {
   AppBar,
   Avatar,
+  Banner,
   Button,
   EmptyState,
   ListItem,
@@ -18,9 +19,17 @@ import { ScrollView, StyleSheet, View } from 'react-native'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
 import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
+import {
+  LeaveChronicleSheet,
+  RemoveMemberSheet,
+} from '../../../../components/chronicles/MemberSheets'
 import { TableView } from '../../../../components/chronicles/TableView'
 import { messageOf, statusOf } from '../../../../lib/errors'
-import { useChronicle } from '../../../../lib/queries/chronicles'
+import { shortDate } from '../../../../lib/format'
+import {
+  useChronicle,
+  useChronicleCharacters,
+} from '../../../../lib/queries/chronicles'
 
 export default function ChronicleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -28,6 +37,7 @@ export default function ChronicleScreen() {
   const chronicle = useChronicle(id)
   const [inviting, setInviting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const [view, setView] = useState<'sheets' | 'table'>('sheets')
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
@@ -64,12 +74,22 @@ export default function ChronicleScreen() {
 
   const c = chronicle.data
   const narrating = c.role === 'storyteller'
+  // Ex-membro (v3, Etapa 7): só as fichas dele, em Leitura; sem Nova ficha,
+  // Mesa, convites nem membros
+  const former = c.role === 'former'
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
   const showing = narrating ? view : 'sheets'
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
       <ScrollView contentContainerStyle={styles.content}>
+        {former ? (
+          <Banner
+            title="Você saiu"
+            message="Suas fichas desta crônica são só leitura. Para voltar, peça um convite ao narrador."
+            testID="former-banner"
+          />
+        ) : null}
         <View style={styles.info}>
           <Text variant="caption" color="inkMuted">
             {c.system.name}
@@ -99,9 +119,20 @@ export default function ChronicleScreen() {
           <SheetsPanel
             chronicle={c}
             narrating={narrating}
+            former={former}
             onInvite={() => setInviting(true)}
           />
         )}
+        {c.role === 'player' ? (
+          <View style={styles.danger}>
+            <Button
+              title="Sair da crônica"
+              variant="danger"
+              accessibilityHint="Suas fichas ficam arquivadas, só leitura"
+              onPress={() => setLeaving(true)}
+            />
+          </View>
+        ) : null}
         {narrating ? (
           <View style={styles.danger}>
             <Button
@@ -129,6 +160,13 @@ export default function ChronicleScreen() {
           />
         </>
       ) : null}
+      {leaving ? (
+        <LeaveChronicleSheet
+          chronicleId={c.id}
+          chronicleName={c.name}
+          onClose={() => setLeaving(false)}
+        />
+      ) : null}
     </Screen>
   )
 }
@@ -140,6 +178,7 @@ interface ChronicleData {
   readonly members: readonly {
     readonly id: string
     readonly username: string
+    readonly joinedAt?: string | Date
   }[]
 }
 
@@ -147,12 +186,30 @@ interface ChronicleData {
 function SheetsPanel({
   chronicle: c,
   narrating,
+  former,
   onInvite,
 }: {
   readonly chronicle: ChronicleData
   readonly narrating: boolean
+  readonly former: boolean
   readonly onInvite: () => void
 }) {
+  const [removing, setRemoving] = useState<ChronicleData['members'][number]>()
+  // As fichas de cada membro, na lista do narrador (a API manda todas a ele)
+  const characters = useChronicleCharacters(c.id)
+  const sheetsOf = (userId: string) =>
+    (characters.data ?? [])
+      .filter(ch => ch.owner.id === userId)
+      .map(ch => ch.name)
+  if (former)
+    return (
+      <CharacterList
+        chronicleId={c.id}
+        systemCode={c.system.code}
+        narrating={false}
+        canCreate={false}
+      />
+    )
   return (
     <>
       <CharacterList
@@ -181,15 +238,41 @@ function SheetsPanel({
             : 'Você é o primeiro jogador.'}
         </Text>
       ) : (
-        c.members.map(m => (
-          <ListItem
-            key={m.id}
-            title={m.username}
-            subtitle="Jogador"
-            leading={<Avatar name={m.username} />}
-          />
-        ))
+        c.members.map(m => {
+          const sheets = narrating ? sheetsOf(m.id) : []
+          return (
+            <ListItem
+              key={m.id}
+              title={m.username}
+              subtitle={
+                narrating && m.joinedAt
+                  ? `Jogador · entrou em ${shortDate(m.joinedAt)}`
+                  : 'Jogador'
+              }
+              meta={sheets.length ? sheets.join(', ') : undefined}
+              leading={<Avatar name={m.username} />}
+              trailing={
+                narrating ? (
+                  <Button
+                    title="Remover"
+                    variant="ghost"
+                    accessibilityHint={`Tira ${m.username} da crônica`}
+                    testID={`remove-${m.id}`}
+                    onPress={() => setRemoving(m)}
+                  />
+                ) : undefined
+              }
+            />
+          )
+        })
       )}
+      {removing ? (
+        <RemoveMemberSheet
+          chronicleId={c.id}
+          member={removing}
+          onClose={() => setRemoving(undefined)}
+        />
+      ) : null}
     </>
   )
 }

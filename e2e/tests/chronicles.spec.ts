@@ -31,7 +31,7 @@ test('narrador convida e o jogador entra com o código', async ({
   await page.getByRole('button', { name: 'Gerar convite' }).click()
   const code = (await page.getByTestId('invite-code-value').innerText()).trim()
   expect(code).toMatch(/^[0-9A-Z ]{30,32}$/)
-  await expect(page.getByText(/Usado 0 de 10/)).toBeVisible()
+  await expect(page.getByText(/10 usos restantes/)).toBeVisible()
 
   // O jogador, em outro navegador, entra com o código digitado em minúsculas
   const other = await browser.newContext()

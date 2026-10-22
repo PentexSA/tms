@@ -13,7 +13,10 @@ import type { Kysely } from 'kysely'
 
 export type Roles = ReadonlySet<RoleName>
 
-export type ChronicleRole = 'storyteller' | 'member' | null
+// `former`: quem saiu ou foi removido e ainda tem ficha (não excluída) na
+// crônica (doc/plano-v3.md, Etapa 7). Nunca é membro: cada rota diz o que faz
+// com ele, e o padrão é a resposta de quem não tem vínculo.
+export type ChronicleRole = 'storyteller' | 'member' | 'former' | null
 
 export async function chronicleAccess(
   db: Kysely<DB>,
@@ -27,15 +30,26 @@ export async function chronicleAccess(
         .onRef('chronicle_members.chronicle_id', '=', 'chronicles.id')
         .on('chronicle_members.user_id', '=', userId)
     )
-    .select([
+    .select(eb => [
       'chronicles.storyteller_id',
       'chronicle_members.user_id as member',
+      eb
+        .exists(
+          eb
+            .selectFrom('characters')
+            .select('characters.id')
+            .whereRef('characters.chronicle_id', '=', 'chronicles.id')
+            .where('characters.user_id', '=', userId)
+            .where('characters.deleted_at', 'is', null)
+        )
+        .as('hasCharacter'),
     ])
     .where('chronicles.id', '=', chronicleId)
     .executeTakeFirst()
   if (!row) return null
   if (row.storyteller_id === userId) return 'storyteller'
-  return row.member ? 'member' : null
+  if (row.member) return 'member'
+  return row.hasCharacter ? 'former' : null
 }
 
 export interface CharacterAccess {

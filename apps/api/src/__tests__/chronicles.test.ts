@@ -174,7 +174,9 @@ describe('GET /chronicles/:id', () => {
       },
       role: 'player',
       storyteller: { id: storyteller.id, username: 'narradora' },
-      members: [{ id: player.id, username: 'jogador' }],
+      members: [
+        { id: player.id, username: 'jogador', joinedAt: expect.any(String) },
+      ],
     })
     expect(JSON.stringify(body)).not.toContain('@example.test')
   })

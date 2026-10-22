@@ -12,6 +12,8 @@ export type AuditAction =
   | 'character.lock'
   | 'character.unlock'
   | 'character.delete'
+  | 'member.remove'
+  | 'member.leave'
 
 export async function audit(
   trx: Transaction<DB>,
@@ -21,7 +23,9 @@ export async function audit(
     readonly action: AuditAction
     readonly characterId?: string
     readonly userId?: string
-    readonly payload?: Readonly<Record<string, string | boolean | null>>
+    readonly payload?: Readonly<
+      Record<string, string | boolean | null | readonly string[]>
+    >
     readonly at: Date
   }
 ): Promise<void> {

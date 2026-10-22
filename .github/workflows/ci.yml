@@ -128,6 +128,13 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_policy_test
           NODE_ENV: test
         run: pnpm -C apps/api exec bun test src/__tests__/policy.pg.test.ts
+      # O protocolo de trava do vínculo: criar, escrever e remover ao mesmo
+      # tempo, sem ficha órfã nem deadlock (v3, Etapa 7)
+      - name: membros contra criação e escrita (lock do vínculo)
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_members_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/members.pg.test.ts
 
   e2e:
     name: E2E web (Playwright, Chromium e WebKit)

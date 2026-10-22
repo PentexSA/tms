@@ -368,7 +368,7 @@ describe('Crônica (detalhe)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Convidar' }))
 
     expect(
-      await screen.findByText('Usado 2 de 10 · vale até 25/10')
+      await screen.findByText('8 usos restantes · vale até 25/10')
     ).toBeTruthy()
     // Só os ativos aparecem
     expect(screen.queryByText(/vale até 08\/10/)).toBeNull()

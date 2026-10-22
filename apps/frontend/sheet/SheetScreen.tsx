@@ -167,10 +167,10 @@ function LiveSheet({
   readonly initialMode?: SheetMode
 }) {
   const sync = useSync()
-  const { id, sheet, sheetVersion, status, lockedAt } = state.character
+  const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
   const lifecycle = useMemo<SheetLifecycle>(
-    () => ({ status, locked: lockedAt !== null, member: true }),
-    [status, lockedAt]
+    () => ({ status, locked: lockedAt !== null, member }),
+    [status, lockedAt, member]
   )
   const forced = policyMode(state.roles, lifecycle)
   const [store] = useState(() => {
