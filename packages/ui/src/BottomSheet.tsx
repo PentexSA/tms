@@ -11,6 +11,7 @@ import { IconButton } from './IconButton'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
+import { ModalToastHost } from './Toast'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
 
@@ -84,6 +85,7 @@ export function BottomSheet({
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
+          <ModalToastHost visible={visible} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

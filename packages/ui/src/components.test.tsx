@@ -580,6 +580,65 @@ describe('Toast', () => {
     expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
   })
 
+  it('o aviso fica dentro do modal nativo e volta à raiz ao fechar, com a mesma ação', async () => {
+    const undo = jest.fn()
+    const content = (visible: boolean) => (
+      <ToastProvider>
+        <BottomSheet
+          visible={visible}
+          title="Recurso"
+          onClose={() => undefined}
+        >
+          <Trigger onUndo={undo} />
+        </BottomSheet>
+      </ToastProvider>
+    )
+    const { rerender } = render(content(true))
+    await act(async () => undefined)
+    fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+    expect(
+      within(screen.UNSAFE_getByType(Modal)).getByText('Sangue 10 → 9')
+    ).toBeTruthy()
+    expect(screen.getAllByText('Sangue 10 → 9')).toHaveLength(1)
+    rerender(content(false))
+    expect(screen.getByText('Sangue 10 → 9')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
+    expect(undo).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+  })
+
+  it('só o modal superior apresenta o aviso, que acompanha o fechamento da pilha', async () => {
+    const content = (top: boolean) => (
+      <ToastProvider>
+        <BottomSheet visible title="Base" onClose={() => undefined}>
+          <Trigger onUndo={() => undefined} />
+        </BottomSheet>
+        <BottomSheet visible={top} title="Acima" onClose={() => undefined}>
+          <RNText>Segundo modal</RNText>
+        </BottomSheet>
+      </ToastProvider>
+    )
+    const { rerender } = render(content(true))
+    await act(async () => undefined)
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Gastar',
+        includeHiddenElements: true,
+      })
+    )
+    const modals = screen.UNSAFE_getAllByType(Modal)
+    expect(within(modals[0]!).queryByText('Sangue 10 → 9')).toBeNull()
+    expect(within(modals[1]!).getByText('Sangue 10 → 9')).toBeTruthy()
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1)
+    rerender(content(false))
+    expect(
+      within(screen.UNSAFE_getAllByType(Modal)[0]!).getByText('Sangue 10 → 9')
+    ).toBeTruthy()
+    expect(screen.getAllByText('Sangue 10 → 9')).toHaveLength(1)
+    act(() => jest.advanceTimersByTime(TOAST_MS))
+    expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+  })
+
   it(`some em ${TOAST_MS / 1000} s`, async () => {
     await setup()
     act(() => jest.advanceTimersByTime(TOAST_MS - 1))
