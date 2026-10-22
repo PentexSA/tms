@@ -15,6 +15,8 @@ export function createFakeApi() {
     charactersGet: jest.fn(),
     charactersPost: jest.fn(),
     tableGet: jest.fn(),
+    operationPreview: jest.fn(),
+    operationPost: jest.fn(),
     invitesGet: jest.fn(),
     invitesPost: jest.fn(),
     invitesDelete: jest.fn(),
@@ -79,6 +81,12 @@ export function createFakeApi() {
             post: (...a: unknown[]) => chronicle.charactersPost(...a),
           },
           table: { get: (...a: unknown[]) => chronicle.tableGet(...a) },
+          operations: {
+            preview: {
+              post: (...a: unknown[]) => chronicle.operationPreview(...a),
+            },
+            post: (...a: unknown[]) => chronicle.operationPost(...a),
+          },
           members: Object.assign(
             ({ userId }: { userId: string }) => ({
               delete: (...a: unknown[]) => chronicle.memberDelete(userId, ...a),

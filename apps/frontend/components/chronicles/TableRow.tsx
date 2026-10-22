@@ -24,9 +24,15 @@ import type { TableItem } from './tableItems'
 export const TableRow = memo(function TableRow({
   item,
   onOpen,
+  selecting = false,
+  selected = false,
+  onSelect,
 }: {
   readonly item: TableItem
   readonly onOpen: (id: string) => void
+  readonly selecting?: boolean
+  readonly selected?: boolean
+  readonly onSelect?: (id: string) => void
 }) {
   const { row, model, store, alerts, state } = item
   const { colors } = useTheme()
@@ -64,13 +70,21 @@ export const TableRow = memo(function TableRow({
   return (
     <ThemeProvider accent={identity?.accent ?? 'accent-neutral'}>
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityHint="Abre a ficha em leitura"
-        onPress={() => onOpen(row.id)}
+        accessibilityRole={selecting ? 'checkbox' : 'button'}
+        accessibilityLabel={selecting ? `Selecionar ${row.name}` : label}
+        aria-checked={selecting ? selected : undefined}
+        accessibilityHint={
+          selecting ? 'Inclui na operação em grupo' : 'Abre a ficha em leitura'
+        }
+        onPress={() => (selecting ? onSelect?.(row.id) : onOpen(row.id))}
         testID={`table-row-${row.id}`}
         style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
       >
+        {selecting ? (
+          <Text color={selected ? 'action' : 'inkMuted'}>
+            {selected ? '☑' : '☐'}
+          </Text>
+        ) : null}
         <Avatar name={row.name} emblem={model?.template.identity.emblem} />
         <View style={styles.text}>
           <Text variant="fieldLabel" numberOfLines={2}>

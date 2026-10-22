@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { hhmm } from '../../lib/format'
+import { useOnline } from '../../lib/network'
 import {
   type TableScope,
   useChronicleTable,
@@ -14,6 +15,7 @@ import {
 import { useRefetchOnFocus } from '../../lib/queries/focus'
 import { useTableOrder } from '../../lib/tableOrder'
 import { compileSafe, templateQuery } from '../../sheet/data'
+import { OperationSheet } from './OperationSheet'
 import { TableRow } from './TableRow'
 import {
   arrange,
@@ -114,10 +116,31 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [scope, setScope] = useState<TableScope>('playing')
   const [sort, setSort] = useState<TableSort>('name')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
+  const online = useOnline()
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [operation, setOperation] = useState<{
+    kind: 'damage' | 'heal'
+    items: readonly TableItem[]
+  } | null>(null)
+  const select = useCallback(
+    (id: string) =>
+      setSelected(old => {
+        const next = new Set(old)
+        if (next.has(id)) next.delete(id)
+        else if (next.size < 20) next.add(id)
+        return next
+      }),
+    []
+  )
   const table = useChronicleTable(chronicleId, true, scope)
   useRefetchOnFocus(() => table.refetch({ cancelRefetch: false }))
   const rows = (table.data ?? []) as TableRowData[]
   const items = useItems(rows)
+  const chosen = useMemo(
+    () => items.filter(i => selected.has(i.row.id)),
+    [items, selected]
+  )
   const shown = useMemo(
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
@@ -145,7 +168,10 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             { id: 'out', label: 'Arquivadas e fora de jogo' },
           ]}
           selected={scope}
-          onSelect={id => setScope(id as TableScope)}
+          onSelect={id => {
+            setScope(id as TableScope)
+            setSelected(new Set())
+          }}
         />
         <View style={styles.chips}>
           <Chip
@@ -167,6 +193,37 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           />
         </View>
         <UpdatedAt at={table.dataUpdatedAt} />
+        <Button
+          title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
+          variant="secondary"
+          onPress={() => {
+            setSelecting(v => !v)
+            setSelected(new Set())
+          }}
+        />
+        {selecting ? (
+          <View style={styles.hint}>
+            <Text>{chosen.length} de 20 selecionados</Text>
+            <View style={styles.chips}>
+              <Button
+                title="Aplicar dano"
+                disabled={!online || !chosen.length}
+                onPress={() => setOperation({ kind: 'damage', items: chosen })}
+              />
+              <Button
+                title="Curar"
+                variant="secondary"
+                disabled={!online || !chosen.length}
+                onPress={() => setOperation({ kind: 'heal', items: chosen })}
+              />
+            </View>
+            {!online ? (
+              <Text color="inkMuted">
+                Conecte-se para aplicar uma operação em grupo.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </View>
       {table.isPending ? (
         <Skeleton lines={3} label="Carregando a mesa" />
@@ -189,9 +246,24 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
         </Text>
       ) : (
         shown.map(item => (
-          <TableRow key={item.row.id} item={item} onOpen={open} />
+          <TableRow
+            key={item.row.id}
+            item={item}
+            onOpen={open}
+            selecting={selecting}
+            selected={selected.has(item.row.id)}
+            onSelect={select}
+          />
         ))
       )}
+      {operation ? (
+        <OperationSheet
+          chronicleId={chronicleId}
+          items={operation.items}
+          kind={operation.kind}
+          onClose={() => setOperation(null)}
+        />
+      ) : null}
     </View>
   )
 }

@@ -1,3 +1,4 @@
+import type { SheetModel } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
@@ -7,10 +8,13 @@ import {
   tokens,
   useTheme,
 } from '@tms/ui'
+import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { useRevertOperation } from '../../components/chronicles/useRevertOperation'
 import { messageOf } from '../../lib/errors'
 import { whenLabel } from '../../lib/format'
+import { useOnline } from '../../lib/network'
 import { useCharacterHistory } from '../../lib/queries/history'
 
 // "Histórico de alterações" (doc/plano-v0.md, Etapa 19; design/telas/
@@ -24,6 +28,8 @@ export interface HistoryItem {
   // Null: a conta de quem alterou foi excluída (o histórico fica, anônimo)
   readonly by: { readonly username: string } | null
   readonly byRole: string
+  readonly operationId?: string | null
+  readonly reversible?: boolean
   readonly changes: readonly {
     readonly label: string
     readonly change: string
@@ -37,36 +43,64 @@ export const whoLabel = (item: Pick<HistoryItem, 'by' | 'byRole'>) =>
     item.byRole === 'storyteller' ? ' (narrador)' : ''
   }`
 
-function HistoryRow({ item }: { readonly item: HistoryItem }) {
+function HistoryRow({
+  item,
+  undo,
+  disabled,
+}: {
+  readonly item: HistoryItem
+  readonly undo?: () => void
+  readonly disabled: boolean
+}) {
   const { colors } = useTheme()
   const lines = item.changes.map(c => `${c.label}: ${c.change}`)
   const meta = `${whenLabel(item.at)} · ${whoLabel(item)}`
   return (
-    <View
-      accessible
-      accessibilityLabel={`${lines.join('; ')}. ${meta}`}
-      style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
-    >
-      {lines.map(line => (
-        <Text key={line}>{line}</Text>
-      ))}
-      <Text variant="caption" color="inkMuted">
-        {meta}
-      </Text>
+    <View style={[styles.row, { borderBottomColor: colors.borderSubtle }]}>
+      <View accessible accessibilityLabel={`${lines.join('; ')}. ${meta}`}>
+        {lines.map(line => (
+          <Text key={line}>{line}</Text>
+        ))}
+        <Text variant="caption" color="inkMuted">
+          {meta}
+        </Text>
+      </View>
+      {undo ? (
+        <Button
+          title="Desfazer"
+          variant="ghost"
+          disabled={disabled}
+          onPress={undo}
+        />
+      ) : null}
     </View>
   )
 }
 
 export function HistorySheet({
   characterId,
+  chronicleId,
+  characterName,
+  model,
+  storyteller,
   visible,
   onClose,
 }: {
   readonly characterId: string
+  readonly chronicleId: string
+  readonly characterName: string
+  readonly model: SheetModel
+  readonly storyteller: boolean
   readonly visible: boolean
   readonly onClose: () => void
 }) {
   const history = useCharacterHistory(characterId, visible)
+  const online = useOnline()
+  const characters = useMemo(
+    () => new Map([[characterId, { name: characterName, model }]]),
+    [characterId, characterName, model]
+  )
+  const { revert, pending } = useRevertOperation(chronicleId, characters)
   const items = (history.data?.pages.flatMap(p => p.items) ??
     []) as HistoryItem[]
   let body: React.JSX.Element
@@ -94,8 +128,22 @@ export function HistorySheet({
     body = (
       <View>
         {items.map(item => (
-          <HistoryRow key={item.id} item={item} />
+          <HistoryRow
+            key={item.id}
+            item={item}
+            disabled={!online || pending}
+            undo={
+              storyteller && item.reversible
+                ? () => {
+                    void revert({ revertsBatchId: item.id })
+                  }
+                : undefined
+            }
+          />
         ))}
+        {storyteller && !online ? (
+          <Text color="inkMuted">Conecte-se para desfazer uma operação.</Text>
+        ) : null}
         {history.hasNextPage ? (
           <View style={styles.more}>
             <Button

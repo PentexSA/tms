@@ -137,6 +137,10 @@ export function SheetScreen({
       {state.status === 'ready' ? (
         <HistorySheet
           characterId={id}
+          chronicleId={state.character.chronicle.id}
+          characterName={state.character.name}
+          model={state.model}
+          storyteller={state.roles.includes('storyteller')}
           visible={history}
           onClose={() => setHistory(false)}
         />
