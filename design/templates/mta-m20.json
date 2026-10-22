@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.2.0",
+  "templateVersion": "1.3.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
@@ -820,6 +820,11 @@
     }
   ],
   "zoneLabels": { "powers": "Vantagens" },
+  "statusLabels": { "dead": "Morto" },
+  "alerts": [
+    { "id": "incapacitated", "label": "Incapacitado", "rule": "track-at-level", "field": "health", "level": 7 },
+    { "id": "noWillpower", "label": "Força de Vontade zerada", "rule": "resource-at-most", "field": "willpower", "value": 0 }
+  ],
   "dock": ["health", "wheel", "willpower"],
   "roll": {
     "model": "pool-success",

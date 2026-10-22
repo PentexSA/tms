@@ -15,6 +15,7 @@ const SCHEMA_DEFS = {
   trackRules: 'trackRule',
   resourceRules: 'resourceRule',
   clockRules: 'clockRule',
+  alertRules: 'alertRule',
   atZero: 'atZero',
   effects: 'effect',
   rollModels: 'rollModel',

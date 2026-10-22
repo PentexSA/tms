@@ -1,5 +1,5 @@
 import type { FieldDefOf, Roll, Section, Template } from '../contract'
-import { type FieldTypeName, REGISTRY } from '../registry'
+import { type AlertRule, type FieldTypeName, REGISTRY } from '../registry'
 import type { Issue } from './issues'
 import { isSafeText } from './safe-text'
 import {
@@ -15,6 +15,19 @@ import {
   own,
   rec,
 } from './util'
+
+// O tipo de campo e o parâmetro de cada regra de alerta: uma regra nova no
+// REGISTRY sem entrada aqui quebra o build.
+const ALERT_PARAMS: {
+  readonly [R in AlertRule]: {
+    readonly type: FieldTypeName
+    readonly key: 'level' | 'value' | 'share'
+  }
+} = {
+  'track-at-level': { type: 'track', key: 'level' },
+  'resource-at-most': { type: 'resource', key: 'value' },
+  'resource-below-share': { type: 'resource', key: 'share' },
+}
 
 // Porta de validateTemplate (design/scripts/validate.mjs) com as mesmas
 // mensagens e caminhos. Checa o que JSON Schema não expressa: referências entre
@@ -47,6 +60,7 @@ const KEYS = {
     'sections',
     'zoneLabels',
     'statusLabels',
+    'alerts',
     'dock',
     'roll',
     'actions',
@@ -650,6 +664,48 @@ function check(
     keys('statusLabels', t.statusLabels, ['dead'])
     for (const [s, label] of Object.entries(rec(t.statusLabels) ?? {}))
       text(`statusLabels.${s}`, label, 20)
+  }
+
+  // Alertas da Mesa (doc/plano-v3.md, Etapa 8): regra da lista fechada, o
+  // tipo do campo que ela lê e só o parâmetro dela, nunca expressão.
+  const alertIds = new Set<unknown>()
+  const alerts = objs('alerts', t.alerts)
+  if (alerts.length > 10) err('alerts', 'no máximo 10 alertas')
+  for (const a of alerts) {
+    const p = `alerts.${a.id}`
+    keys(p, a, ['id', 'label', 'rule', 'field', 'level', 'value', 'share'])
+    if (!isId(a.id) || alertIds.has(a.id))
+      err(`${p}.id`, 'id inválido ou repetido')
+    alertIds.add(a.id)
+    text(`${p}.label`, a.label, 40)
+    oneOf(`${p}.rule`, a.rule, REGISTRY.alertRules, 'regra de alerta')
+    const f = field(a.field)
+    if (!f) err(`${p}.field`, `campo '${a.field}' não existe`)
+    const param = ALERT_PARAMS[a.rule as keyof typeof ALERT_PARAMS]
+    if (!param) continue
+    if (f && f.type !== param.type)
+      err(`${p}.field`, `a regra '${a.rule}' lê um campo ${param.type}`)
+    for (const k of ['level', 'value', 'share'])
+      if (k !== param.key && a[k] !== undefined)
+        err(`${p}.${k}`, `parâmetro de outra regra`)
+    if (param.key === 'level') {
+      const total =
+        f?.rule === 'boxes'
+          ? asArray(f.rows).reduce<number>(
+              (n, r) => n + (Number(rec(r)?.boxes) || 0),
+              0
+            )
+          : asArray(f?.levels).length
+      if (!isIntIn(a.level, 1, Math.max(total, 1)))
+        err(`${p}.level`, `precisa ser inteiro entre 1 e ${Math.max(total, 1)}`)
+    }
+    if (param.key === 'value' && !isIntIn(a.value, 0, NUM_LIMIT))
+      err(`${p}.value`, `precisa ser inteiro entre 0 e ${NUM_LIMIT}`)
+    if (
+      param.key === 'share' &&
+      !(typeof a.share === 'number' && a.share > 0 && a.share < 1)
+    )
+      err(`${p}.share`, 'precisa ser um número entre 0 e 1')
   }
 
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não

@@ -661,6 +661,9 @@
   ],
   "zoneLabels": { "lore": "Itens e notas" },
   "statusLabels": { "dead": "Morto" },
+  "alerts": [
+    { "id": "lowHp", "label": "PV abaixo da metade", "rule": "resource-below-share", "field": "hp", "share": 0.5 }
+  ],
   "dock": ["hp", "ac", "spellSlots"],
   "roll": {
     "model": "sum-vs-target",

@@ -3,6 +3,7 @@
 // (Expo) usam o mesmo código: no servidor ele é a autoridade; no cliente,
 // conveniência.
 
+export * from './alerts'
 export * from './classify'
 export * from './compile'
 export type * from './contract'

@@ -114,6 +114,12 @@
       },
       "additionalProperties": false
     },
+    "alerts": {
+      "description": "Opcional. Quando uma linha da Mesa merece atenção: Incapacitado, Força de Vontade zerada, PV abaixo da metade. O painel só pinta; o core calcula (alertsOf).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/alert" },
+      "maxItems": 10
+    },
     "dock": {
       "description": "De 1 a 3 campos jogáveis mostrados no dock (celular) e na mesa do narrador. O tipo precisa ser jogável (resource, track, slots, clock, state, number, list, tags, rating) e o campo não pode ser de seção com leitura restrita; validateTemplate checa.",
       "type": "array",
@@ -255,6 +261,25 @@
     "clockRule": {
       "description": "REGISTRY.clockRules",
       "enum": ["mage-quint-paradox"]
+    },
+    "alertRule": {
+      "description": "REGISTRY.alertRules: quando uma linha da Mesa merece atenção. track-at-level: a trilha marcada até o nível `level`; resource-at-most: o atual de um recurso em `value` ou menos; resource-below-share: o atual abaixo da fração `share` do máximo.",
+      "enum": ["track-at-level", "resource-at-most", "resource-below-share"]
+    },
+    "alert": {
+      "description": "Um alerta da Mesa do narrador (doc/painel-narrador.md §5.3). Regra da lista fechada, nunca expressão. O tipo do campo e o parâmetro de cada regra são checados por validateTemplate.",
+      "type": "object",
+      "required": ["id", "label", "rule", "field"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label", "maxLength": 40 },
+        "rule": { "$ref": "#/$defs/alertRule" },
+        "field": { "$ref": "#/$defs/fieldRef" },
+        "level": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "value": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "share": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 }
+      },
+      "additionalProperties": false
     },
     "atZero": { "description": "REGISTRY.atZero", "enum": ["deathSaves"] },
     "effect": {

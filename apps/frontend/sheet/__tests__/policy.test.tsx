@@ -149,21 +149,25 @@ describe('as ações do narrador por estado', () => {
     expect(ids('creating')).toEqual([
       'Concluir criação',
       'Arquivar',
-      'Marcar como Fora de jogo',
+      'Marcar como Torpor',
     ])
-    expect(ids('active')).toEqual([
+    expect(ids('active')).toEqual(['Travar', 'Arquivar', 'Marcar como Torpor'])
+    expect(ids('active', true)).toEqual([
+      'Destravar',
+      'Arquivar',
+      'Marcar como Torpor',
+    ])
+    expect(ids('archived')).toEqual(['Reativar', 'Marcar como Torpor'])
+    expect(ids('dead')).toEqual(['Reativar', 'Arquivar'])
+    expect(ids('pending')).toEqual([])
+  })
+
+  it('sem statusLabels no template (CoC), o rótulo é "Fora de jogo"', () => {
+    expect(ids('active', false, 'coc7e')).toEqual([
       'Travar',
       'Arquivar',
       'Marcar como Fora de jogo',
     ])
-    expect(ids('active', true)).toEqual([
-      'Destravar',
-      'Arquivar',
-      'Marcar como Fora de jogo',
-    ])
-    expect(ids('archived')).toEqual(['Reativar', 'Marcar como Fora de jogo'])
-    expect(ids('dead')).toEqual(['Reativar', 'Arquivar'])
-    expect(ids('pending')).toEqual([])
   })
 
   it('o fixture de D&D mostra o mesmo menu, com o rótulo de dead dele', () => {

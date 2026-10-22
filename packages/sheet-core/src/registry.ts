@@ -41,6 +41,8 @@ export const REGISTRY = {
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
+  // Quando uma linha da Mesa merece atenção (doc/plano-v3.md, Etapa 8)
+  alertRules: ['track-at-level', 'resource-at-most', 'resource-below-share'],
   atZero: ['deathSaves'],
   effects: [
     'health.heal',
@@ -90,6 +92,7 @@ export type PercentDisplay = Registry['percentDisplays'][number]
 export type TrackRule = Registry['trackRules'][number]
 export type ResourceRule = Registry['resourceRules'][number]
 export type ClockRule = Registry['clockRules'][number]
+export type AlertRule = Registry['alertRules'][number]
 export type AtZeroRule = Registry['atZero'][number]
 export type Die = Registry['dice'][number]
 export type DiceNotation = Registry['diceNotation'][number]

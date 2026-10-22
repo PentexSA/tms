@@ -254,6 +254,104 @@ const templateMutations: [string, (t: Json) => void][] = [
       t.zoneLabels = { build: 'x'.repeat(15) }
     },
   ],
+  // Alertas da Mesa (v3, Etapa 8): o campo de cada tipo vem do template
+  [
+    'regra de alerta fora da lista',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'expression',
+          field: firstOf(t, 'resource'),
+        },
+      ]
+    },
+  ],
+  [
+    'alerta num campo que não existe',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-at-most',
+          field: 'nope',
+          value: 0,
+        },
+      ]
+    },
+  ],
+  [
+    'track-at-level num resource',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'track-at-level',
+          field: firstOf(t, 'resource'),
+          level: 1,
+        },
+      ]
+    },
+  ],
+  [
+    'parâmetro de outra regra no alerta',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-at-most',
+          field: firstOf(t, 'resource'),
+          value: 0,
+          share: 0.5,
+        },
+      ]
+    },
+  ],
+  [
+    'nível de alerta acima da trilha',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'track-at-level',
+          field: firstOf(t, 'track'),
+          level: 99,
+        },
+      ]
+    },
+  ],
+  [
+    'fração de alerta fora de 0 a 1',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-below-share',
+          field: firstOf(t, 'resource'),
+          share: 1,
+        },
+      ]
+    },
+  ],
+  [
+    'id de alerta repetido',
+    t => {
+      const alert = {
+        id: 'x',
+        label: 'X',
+        rule: 'resource-at-most',
+        field: firstOf(t, 'resource'),
+        value: 0,
+      }
+      t.alerts = [alert, { ...alert }]
+    },
+  ],
   [
     'rótulo de estado acima de 20 caracteres',
     t => {
@@ -273,6 +371,12 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
 ]
+
+/** O primeiro campo do tipo no template (o alerta não cita nome de sistema). */
+function firstOf(t: Json, type: string): string {
+  const fields = t.fields as Record<string, Json>
+  return Object.keys(fields).find(id => fields[id]?.type === type) ?? 'nope'
+}
 
 const vtmOnlyMutations: [string, (t: Json) => void][] = [
   [

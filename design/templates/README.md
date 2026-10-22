@@ -54,6 +54,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `sections` | sim | lista | Seções por zona, em ordem (§4). |
 | `zoneLabels` | não | objeto | Rótulo das abas por zona (`build`, `powers`, `lore`), até 14 caracteres (§4). |
 | `statusLabels` | não | objeto | Rótulo do estado `dead` da ficha (`{ "dead": "Torpor" }`), até 20 caracteres. Sem ele, "Fora de jogo". |
+| `alerts` | não | lista (até 10) | Quando uma linha da Mesa merece atenção (§6). |
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |
@@ -379,6 +380,16 @@ Regras:
 
 **Multi-sistema:** Vampiro usa Vitalidade, Sangue e FdV; D&D usa PV, CA e espaços; CoC usa PV, Sanidade e Sorte; Fate usa Estresse, Destino e Consequências. A moldura é a mesma.
 
+**Alertas da Mesa.** `alerts` diz quando a linha de um personagem na Mesa do narrador merece atenção; o painel só pinta o selo, com o `label` como nome acessível. Cada alerta é `{ id, label, rule, field }` mais o parâmetro da regra, de uma lista fechada (`REGISTRY.alertRules`), nunca expressão:
+
+| `rule` | Campo | Parâmetro | Ativo quando |
+|---|---|---|---|
+| `track-at-level` | `track` | `level` (inteiro ≥ 1) | a trilha está marcada até o nível `level` (Incapacitado é o último nível do WoD) |
+| `resource-at-most` | `resource` | `value` (inteiro ≥ 0) | o atual está em `value` ou menos (FdV zerada é `value: 0`) |
+| `resource-below-share` | `resource` | `share` (entre 0 e 1) | o atual está abaixo da fração do máximo (PV do D&D abaixo da metade é `share: 0.5`) |
+
+Um alerta sobre campo que o papel não lê não existe para ele. `label` até 40 caracteres.
+
 ---
 
 ## 7. Rolagem
@@ -446,6 +457,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `trackRules` | `trackRule` | `wod-stacking`, `boxes` |
 | `resourceRules` | `resourceRule` | `tempFirst` |
 | `clockRules` | `clockRule` | `mage-quint-paradox` |
+| `alertRules` | `alertRule` | `track-at-level`, `resource-at-most`, `resource-below-share` |
 | `atZero` | `atZero` | `deathSaves` |
 | `effects` | `effect` | `health.heal`, `resource.spend`, `resource.gain`, `rest.long`, `rest.short` |
 | `rollModels` | `rollModel` | `pool-success`, `sum-vs-target`, `roll-under-percent`, `fudge`, `pbta-2d6` |

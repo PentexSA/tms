@@ -19,6 +19,7 @@ const REGISTRY = {
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
+  alertRules: ['track-at-level', 'resource-at-most', 'resource-below-share'],
   atZero: ['deathSaves'],
   effects: ['health.heal', 'resource.spend', 'resource.gain', 'rest.long', 'rest.short'],
   rollModels: ['pool-success', 'sum-vs-target', 'roll-under-percent', 'fudge', 'pbta-2d6'],
@@ -44,7 +45,7 @@ const REGISTRY = {
 // Chaves permitidas (allowlist). Chave desconhecida é erro: impede atributos como "onclick"
 // ou campos que o renderizador ignoraria e algum código futuro poderia interpretar.
 const KEYS = {
-  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'dock', 'roll', 'actions'],
+  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'alerts', 'dock', 'roll', 'actions'],
   fieldCommon: ['type', 'label', 'shortLabel', 'help', 'editableIn', 'specialty', 'sublabel', 'badge', 'readOnly', 'derive', 'from'],
   field: {
     rating: ['min', 'max', 'default', 'cap', 'valueLabels'],
@@ -67,6 +68,12 @@ const KEYS = {
 }
 
 const ID = /^[a-zA-Z][a-zA-Z0-9-]*$/
+// O tipo de campo e o parâmetro de cada regra de alerta (REGISTRY.alertRules)
+const ALERT_PARAMS = {
+  'track-at-level': { type: 'track', key: 'level' },
+  'resource-at-most': { type: 'resource', key: 'value' },
+  'resource-below-share': { type: 'resource', key: 'share' },
+}
 const NUM_LIMIT = 1_000_000
 
 // Texto puro: sem < > (nunca HTML), sem controles C0/C1 (exceto tab e quebras), sem DEL,
@@ -364,6 +371,32 @@ function validateTemplate(t, palette) {
   if (t.statusLabels != null) {
     keys('statusLabels', t.statusLabels, ['dead'])
     for (const [s, label] of Object.entries(isObj(t.statusLabels) ? t.statusLabels : {})) text(`statusLabels.${s}`, label, 20)
+  }
+
+  // Alertas da Mesa (doc/plano-v3.md, Etapa 8): regra da lista fechada, o tipo do campo que
+  // ela lê e só o parâmetro dela, nunca expressão.
+  const alertIds = new Set()
+  const alerts = Array.isArray(t.alerts) ? t.alerts : []
+  if (alerts.length > 10) err('alerts', 'no máximo 10 alertas')
+  for (const a of alerts) {
+    const p = `alerts.${a.id}`
+    keys(p, a, ['id', 'label', 'rule', 'field', 'level', 'value', 'share'])
+    if (typeof a.id !== 'string' || !ID.test(a.id) || alertIds.has(a.id)) err(`${p}.id`, 'id inválido ou repetido')
+    alertIds.add(a.id)
+    text(`${p}.label`, a.label, 40)
+    oneOf(`${p}.rule`, a.rule, REGISTRY.alertRules, 'regra de alerta')
+    const f = has(a.field) ? fields[a.field] : undefined
+    if (!f) err(`${p}.field`, `campo '${a.field}' não existe`)
+    const param = ALERT_PARAMS[a.rule]
+    if (!param) continue
+    if (f && f.type !== param.type) err(`${p}.field`, `a regra '${a.rule}' lê um campo ${param.type}`)
+    for (const k of ['level', 'value', 'share']) if (k !== param.key && a[k] !== undefined) err(`${p}.${k}`, 'parâmetro de outra regra')
+    if (param.key === 'level') {
+      const total = f?.rule === 'boxes' ? (f.rows ?? []).reduce((n, r) => n + (Number(r?.boxes) || 0), 0) : (f?.levels ?? []).length
+      if (!Number.isInteger(a.level) || a.level < 1 || a.level > Math.max(total, 1)) err(`${p}.level`, `precisa ser inteiro entre 1 e ${Math.max(total, 1)}`)
+    }
+    if (param.key === 'value' && (!Number.isInteger(a.value) || a.value < 0 || a.value > NUM_LIMIT)) err(`${p}.value`, `precisa ser inteiro entre 0 e ${NUM_LIMIT}`)
+    if (param.key === 'share' && !(typeof a.share === 'number' && a.share > 0 && a.share < 1)) err(`${p}.share`, 'precisa ser um número entre 0 e 1')
   }
 
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não pode vir
