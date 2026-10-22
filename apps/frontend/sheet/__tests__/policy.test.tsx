@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { SheetData } from '@tms/sheet-core'
+import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import { AccessibilityInfo, Dimensions } from 'react-native'
 
@@ -28,6 +29,10 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Medium: 'medium' },
   NotificationFeedbackType: { Warning: 'warning' },
 }))
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(),
+  getRandomValues: jest.fn(),
+}))
 jest.mock('../../lib/api', () => {
   const { createFakeApi } = require('../../test/fake-api')
   const fake = createFakeApi()
@@ -50,6 +55,9 @@ const lifecycle = (status: string, locked = false): SheetLifecycle => ({
 })
 
 beforeEach(() => {
+  jest
+    .mocked(randomUUID)
+    .mockReturnValue('00000000-0000-4000-8000-00000000b001')
   Dimensions.set({ window: PHONE, screen: PHONE })
   jest
     .spyOn(AccessibilityInfo, 'announceForAccessibility')
@@ -221,6 +229,35 @@ describe('a tela da ficha com o estado', () => {
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
   }
+
+  it.each(['NOT_MEMBER', 'SHEET_NOT_EDITABLE'])(
+    'a recusa %s continua visível depois de a rebusca fechar os Dados',
+    async code => {
+      await open(['owner'], 'active')
+      const next = character(['owner'], 'archived')
+      next.data.member = code !== 'NOT_MEMBER'
+      calls.characterGet.mockResolvedValue(next)
+      calls.rollsPost.mockResolvedValue({
+        data: null,
+        error: { status: 403, value: { code } },
+      })
+      fireEvent.press(screen.getByRole('button', { name: 'Dados' }))
+      fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+      fireEvent.changeText(screen.getByLabelText('Buscar atributo'), 'destreza')
+      fireEvent.press(screen.getByRole('button', { name: 'Destreza, 2' }))
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+      await waitFor(() => expect(calls.rollsPost).toHaveBeenCalled())
+      await waitFor(() => expect(calls.characterGet).toHaveBeenCalledTimes(2))
+      await waitFor(() =>
+        expect(screen.queryByRole('header', { name: 'Dados' })).toBeNull()
+      )
+      const message =
+        code === 'NOT_MEMBER'
+          ? 'Você saiu desta crônica: a ficha é só leitura. A rolagem não foi feita.'
+          : 'A ficha está arquivada ou fora de jogo: só o narrador muda isto agora. A rolagem não foi feita.'
+      expect(screen.getByText(message)).toBeTruthy()
+    }
+  )
 
   it('o dono não tem o menu do narrador', async () => {
     await open(['owner'], 'creating')

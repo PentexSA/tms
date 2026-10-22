@@ -13,6 +13,7 @@ import {
   type RandomSource,
   rollPool,
 } from '@tms/sheet-core'
+import { useToast } from '@tms/ui'
 import { getRandomValues, randomUUID } from 'expo-crypto'
 import { useCallback, useMemo, useState } from 'react'
 import { AccessibilityInfo } from 'react-native'
@@ -68,6 +69,7 @@ export function useDice(
   const random = deps.random ?? deviceRandom
   const uuid = deps.uuid ?? randomUUID
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { model, roles } = store.getState()
   const roll = poolRollOf(model)
   const values = useStore(store, s => s.values)
@@ -171,12 +173,16 @@ export function useDice(
         if (res.error) {
           // Recusa da política (travada, arquivada): o motivo, e a ficha
           // rebuscada mostra o estado novo
-          const why =
-            statusOf(res.error) === 403
-              ? refusalReason(refusalCodeOf(res.error.value))
-              : null
+          const code =
+            statusOf(res.error) === 403 ? refusalCodeOf(res.error.value) : null
+          const why = refusalReason(code)
           if (why) {
-            setError(`${why} A rolagem não foi feita.`)
+            const message = `${why} A rolagem não foi feita.`
+            // A passagem para Leitura desmonta o sheet de Dados. O aviso
+            // precisa sobreviver à rebusca que aplica o estado novo.
+            if (code === 'NOT_MEMBER' || code === 'SHEET_NOT_EDITABLE')
+              toast.show({ message })
+            else setError(message)
             void queryClient.invalidateQueries({
               queryKey: sheetKeys.character(characterId),
             })
@@ -229,6 +235,7 @@ export function useDice(
       preset,
       store,
       queryClient,
+      toast,
       record,
       local,
     ]
