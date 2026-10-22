@@ -1,0 +1,21 @@
+# v3: a conta narra uma crônica com duas fichas que ainda podem levar dano.
+appId: com.tms.app
+name: Mesa do narrador, dano em grupo e desfazer
+---
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "${STORYTELLER_CHRONICLE}, .*"
+- tapOn: "Mesa"
+- tapOn: "Selecionar personagens"
+- tapOn: "Selecionar ${STORYTELLER_CHARACTER_A}"
+- tapOn: "Selecionar ${STORYTELLER_CHARACTER_B}"
+- tapOn: "Aplicar dano"
+- tapOn: "Letal"
+- tapOn: "Ver prévia"
+- assertVisible: "Confirmar operação"
+- tapOn: "Confirmar operação"
+- assertVisible: "Dano aplicado em 2 personagens."
+- tapOn: "Desfazer"
+- extendedWaitUntil:
+    visible: "Alteração desfeita."
+    timeout: 15000

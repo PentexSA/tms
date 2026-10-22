@@ -39,7 +39,7 @@ O que fica fora está no §8.
 
 ## Estado da v3 (22/10/2026)
 
-Marcos A a D prontos (etapas 1 a 9), no branch `feat/v3-mesa`:
+Etapas 1 a 12 implementadas no branch `feat/v3-mesa`; fechamento da Etapa 14 em validação local. A Etapa 13 fica para a v3.1, pela linha de corte prevista neste plano:
 
 - **Etapa 4:** `classify.ts` (`classifyChange`, `classifyBatch`, um classificador por tipo num mapa que quebra o build se faltar um) e `policy.ts` (`writePolicy`, os estados da v3) no `@tms/sheet-core`; o Ouro e o inventário do fixture de D&D com `editableIn: ["play"]`. Os códigos de recusa seguem a decisão 18 (§7).
 - **Etapa 5:** migração `0014_character_status`; a política dentro da transação em `/events`, `/rolls` (com `rollPolicy`: sem custo, a trava não conta) e `DELETE /characters/:id`; as rotas do narrador em `sheets/status.ts`, cada uma com uma linha no `chronicle_audit` (`audit.ts`); `status` e `lockedAt` na ficha e na Mesa; `policy.test.ts` (a tabela nos três sistemas e os critérios do 5.1) e `policy.pg.test.ts` no job `postgres`. Uma ação que não muda nada (concluir de novo, travar a travada, o mesmo estado) é 409 sem linha no registro; de `creating` para `active`, só concluindo.
@@ -49,7 +49,12 @@ Marcos A a D prontos (etapas 1 a 9), no branch `feat/v3-mesa`:
 - **Etapa 9:** `GET /chronicles/:id/table?status=` (sem filtro, `creating` e `active`); a Mesa carrega os templates das linhas de uma vez, calcula cada linha uma vez (`tableItems.ts`) e a desenha com `TableRow` (memo): o estado da ficha, os alertas como selo e no nome acessível, "Em jogo" e "Arquivadas e fora de jogo", ordenar por nome e pela última alteração, "Só com alerta" e "Atualizado há N min". Abrir uma linha guarda a ordem da tela (`lib/tableOrder.ts`), e a ficha do narrador passa à vizinha deslizando (a 24 px da borda) ou pelos botões "Anterior" e "Próxima". O teste de render conta as linhas (conferido: com o `onOpen` mudando com o filtro, ele falha).
 - **Etapa 10:** `group.ts` no core: `damageTargets` (a trilha `wod-stacking` e o recurso com `damage1`), `planGroupDamage` (com mais de um alvo na ficha, pede a escolha), `invertBatch` (recebe os eventos do histórico com `fromAbsent`; recusa o lote sem conteúdo e o conflito, sem reversão parcial) e `isReversible`; as propriedades de aplicar e reverter nas fichas de exemplo.
 
-Marcos A a D prontos. Próxima: Etapa 11.
+- **Etapa 11:** migração `0015_chronicle_operations`, prévia e aplicação atômica em `chronicles/operations.ts`; idempotência depois das travas em ordem de id, recusa de alvos duplicados, de outra crônica e de versões vencidas; reversão de operação ou lote, incluindo `from_absent` nos eventos comuns e nos custos de rolagem. Não se reverte uma operação inteira se algum lote dela já foi desfeito. O histórico informa `operationId` e `reversible`; matriz e job de Postgres incluem as rotas novas.
+- **Etapa 12:** seleção de até 20 personagens na Mesa; dano e cura com tipos e alvos do template, stepper, prévia por ficha e reconfirmação do 409. A chave é mantida após resposta perdida. Desfazer no toast usa a reversão do servidor; no histórico, só o narrador vê a ação nos lotes reversíveis. Operações e reversões ficam desabilitadas sem rede. O mesmo fluxo cobre o PV do fixture de D&D.
+- **Etapa 13 → v3.1:** `recoveries`, os efeitos de recuperação e as novas versões dos três templates ficam para uma entrega própria, com as regras conferidas no livro antes de publicar. Dano, cura, reversão, jornada do §1 e critérios de aceite do 5.4 não dependem dela. A migração reserva `kind: 'recovery'`; a API atual só aceita dano, cura e reversão.
+- **Etapa 14:** jornada com três sessões e páginas já abertas para provar as recusas de trava e remoção; fluxo nativo `07-storyteller-table`; DBML e checklist de segurança atualizados. O Maestro ainda precisa de um dev build em aparelho ou emulador; os testes locais não substituem o CI remoto.
+
+Validação local: 755 testes do core e 571 do app, com as metas de cobertura; 909 da API (908 na suíte com cobertura e mais o caso de reversão do custo de rolagem); 21 do banco; 89 do UI; 12 testes de concorrência nos cinco arquivos de Postgres real; build, typecheck, Biome, tipos regenerados pelo Kysely e verificação de nomes de sistema. As quatro jornadas passaram juntas no Chromium. A execução no WebKit está em validação num contêiner: o host não tem as bibliotecas necessárias para iniciar esse navegador.
 
 ---
 

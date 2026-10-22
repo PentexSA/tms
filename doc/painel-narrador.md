@@ -436,13 +436,15 @@ Três versões, no molde da v0, v1 e v2: cada uma fecha numa jornada E2E que pro
 
 ### v3: Mesa administrável (autorização e concorrência)
 
-| # | Entrega | Módulos |
-|---|---|---|
-| 0 | Pré-requisitos | §3.1, §3.2, §3.3 |
-| 1 | Estados, `classifyChange`, política de escrita, concluir a criação, `chronicle_audit` | 5.1 |
-| 2 | Arquivar, remover jogador, sair; a crônica "Você saiu" para o ex-membro | 5.2 (sem transferência) |
-| 3 | Mesa com alertas | 5.3 |
-| 4 | Ações em grupo com reversão | 5.4 |
+| # | Entrega | Módulos | Estado em 22/10/2026 |
+|---|---|---|---|
+| 0 | Pré-requisitos | §3.1, §3.2, §3.3 | Implementada |
+| 1 | Estados, `classifyChange`, política de escrita, concluir a criação, `chronicle_audit` | 5.1 | Implementada |
+| 2 | Arquivar, remover jogador, sair; a crônica "Você saiu" para o ex-membro | 5.2 (sem transferência) | Implementada |
+| 3 | Mesa com alertas | 5.3 | Implementada |
+| 4 | Ações em grupo com reversão | 5.4 | Dano, cura e reversão implementados; recuperações por período na v3.1 |
+
+Implementação e evidências em `plano-v3.md`. A prévia devolve rótulos das mudanças e versões, sem os eventos crus; o servidor reconstrói os lotes dentro da transação. A recusa `advance` em `active` usa `NEEDS_XP_APPROVAL`; estados sem escrita usam `SHEET_NOT_EDITABLE`. A recuperação por período segue a linha de corte da Etapa 13: não há chave `recoveries` publicada nesta versão.
 
 A ordem 1 → 2 importa: o arquivamento e o bloqueio de escrita existem antes de alguém ser removido. A entrega 3 só depende da 0 e pode andar em paralelo.
 

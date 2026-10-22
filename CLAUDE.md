@@ -117,11 +117,11 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 
 #### Key Features
 
-- **@tms/sheet-core**: ~660 tests (Bun), incluindo property tests (fast-check)
-- **@tms/api**: ~330 tests (Bun) em PGLite, com a matriz de AuthZ de todas as rotas
-- **@tms/db**: ~19 tests (Bun): migrations sobem e descem
+- **@tms/sheet-core**: 755 tests (Bun), incluindo property tests (fast-check)
+- **@tms/api**: 909 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas; testes de concorrência em Postgres separados
+- **@tms/db**: 21 tests (Bun): migrations sobem e descem
 - **@tms/ui**: ~89 tests (Jest)
-- **frontend**: ~520 tests (Jest + React Native Testing Library)
+- **frontend**: 571 tests (Jest + React Native Testing Library)
 - Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
 #### E2E (Playwright, Chromium e WebKit)
@@ -133,7 +133,7 @@ npx pnpm build && npx pnpm -C e2e build:web
 E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C e2e test:e2e
 ```
 
-`journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), e `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1). O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
+`journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1), e `journey-storyteller.spec.ts`, a da v3 (doc/plano-v3.md §1): concluir, dano em grupo, desfazer, travar e remover. O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
 
 #### Concorrência em Postgres real
 
@@ -145,6 +145,7 @@ PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_events_test bun test
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_rolls_test bun test src/rolls/__tests__/rolls.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_policy_test bun test src/__tests__/policy.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_members_test bun test src/__tests__/members.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_operations_test bun test src/__tests__/operations.pg.test.ts
 ```
 
 #### Test Infrastructure
