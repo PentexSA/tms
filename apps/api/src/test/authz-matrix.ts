@@ -26,7 +26,11 @@ export interface MatrixRow {
   // Caminho do Elysia, com :id e afins (:id é a crônica ou a ficha)
   readonly route: string
   readonly expect: Readonly<Record<Actor, number>>
-  readonly body?: (s: SystemCase) => unknown
+  // O caso do sistema e a ficha da dona no cenário
+  readonly body?: (
+    s: SystemCase,
+    ids: { readonly characterId: string }
+  ) => unknown
   // A linha muda o cenário (excluir, gravar): monta um cenário por ator
   readonly mutates?: true
   // Estado da ficha antes da requisição (travar pede `active`)
@@ -102,6 +106,30 @@ export const MATRIX: readonly MatrixRow[] = [
     route: '/chronicles/:id/members/me',
     mutates: true,
     expect: { storyteller: 403, owner: 204, player: 204, ...denied },
+  },
+  // Operações em grupo (v3, Etapa 11): só o narrador. A ficha do cenário tem
+  // um lote (as Notas do Narrador): a prévia leu a versão 1
+  {
+    method: 'POST',
+    route: '/chronicles/:id/operations/preview',
+    body: (_, { characterId }) => ({
+      kind: 'damage',
+      amount: 1,
+      targets: [{ characterId }],
+    }),
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/operations',
+    body: (_, { characterId }) => ({
+      clientOperationId: crypto.randomUUID(),
+      kind: 'damage',
+      amount: 1,
+      targets: [{ characterId, sheetVersion: 1 }],
+    }),
+    mutates: true,
+    expect: { storyteller: 201, owner: 403, player: 403, ...denied },
   },
   {
     // A Mesa é do narrador; para jogador a rota não existe (fail secure)

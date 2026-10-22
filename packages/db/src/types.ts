@@ -31,11 +31,13 @@ export interface CharacterBatches {
   created_at: Generated<Timestamp>
   created_by: string | null
   id: Generated<string>
+  operation_id: string | null
   sheet_version: number
 }
 
 export interface CharacterEvents {
   batch_id: string
+  from_absent: Generated<boolean>
   from_value: Json | null
   id: Generated<string>
   path: string
@@ -104,6 +106,17 @@ export interface ChronicleMembers {
   user_id: string
 }
 
+export interface ChronicleOperations {
+  chronicle_id: string
+  client_operation_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  kind: string
+  reverts_batch_id: string | null
+  reverts_operation_id: string | null
+}
+
 export interface Chronicles {
   created_at: Generated<Timestamp | null>
   id: Generated<string>
@@ -159,6 +172,7 @@ export interface DB {
   chronicle_audit: ChronicleAudit
   chronicle_invites: ChronicleInvites
   chronicle_members: ChronicleMembers
+  chronicle_operations: ChronicleOperations
   chronicles: Chronicles
   game_systems: GameSystems
   refresh_tokens: RefreshTokens

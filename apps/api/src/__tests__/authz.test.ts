@@ -102,7 +102,13 @@ async function request(
     // Remover: o outro jogador
     .replace(':userId', sc.users.player.id)
   const user = actor === 'anonymous' ? null : sc.users[actor]
-  return as(sc.ctx, user, row.method, path, row.body?.(s))
+  return as(
+    sc.ctx,
+    user,
+    row.method,
+    path,
+    row.body?.(s, { characterId: sc.characterId })
+  )
 }
 
 async function check(

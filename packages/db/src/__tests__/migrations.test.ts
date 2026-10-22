@@ -31,6 +31,7 @@ describe('migrations', () => {
         'chronicle_audit',
         'chronicle_invites',
         'chronicle_members',
+        'chronicle_operations',
         'chronicles',
         'game_systems',
         'refresh_tokens',
@@ -308,6 +309,101 @@ describe('migrations', () => {
       expect(
         await db.selectFrom('chronicle_audit').select('id').execute()
       ).toEqual([])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0015: operação idempotente por chave, reversão de um alvo só e no máximo uma vez', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'n', email: 'n@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const op = (values: {
+        client_operation_id?: string
+        kind?: string
+        reverts_operation_id?: string
+        reverts_batch_id?: string
+      }) =>
+        db
+          .insertInto('chronicle_operations')
+          .values({
+            chronicle_id: chronicle.id,
+            client_operation_id: crypto.randomUUID(),
+            kind: 'damage',
+            created_by: user.id,
+            ...values,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const damage = await op({})
+      const key = crypto.randomUUID()
+      await op({ client_operation_id: key })
+      // A mesma chave na mesma crônica não grava duas vezes
+      await expect(op({ client_operation_id: key })).rejects.toThrow()
+      await expect(op({ kind: 'explosion' })).rejects.toThrow()
+      await op({ kind: 'revert', reverts_operation_id: damage.id })
+      // Revertida uma vez só
+      await expect(
+        op({ kind: 'revert', reverts_operation_id: damage.id })
+      ).rejects.toThrow()
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: user.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const batch = await db
+        .insertInto('character_batches')
+        .values({
+          character_id: character.id,
+          client_batch_id: crypto.randomUUID(),
+          created_by: user.id,
+          by_role: 'storyteller',
+          sheet_version: 1,
+          operation_id: damage.id,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      // Uma reversão aponta para a operação ou para o lote, nunca os dois
+      await expect(
+        op({
+          kind: 'revert',
+          reverts_operation_id: damage.id,
+          reverts_batch_id: batch.id,
+        })
+      ).rejects.toThrow()
+      const event = await db
+        .insertInto('character_events')
+        .values({
+          batch_id: batch.id,
+          seq: 0,
+          path: 'values.blood',
+          from_value: JSON.stringify({ current: 10 }),
+          to_value: JSON.stringify({ current: 9 }),
+        })
+        .returning('from_absent')
+        .executeTakeFirstOrThrow()
+      expect(event.from_absent).toBe(false)
     } finally {
       await destroy()
     }

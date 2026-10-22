@@ -335,6 +335,8 @@ describe('GET /characters/:id/history', () => {
         byRole: string
         by: { username: string }
         sheetVersion: number
+        operationId: string | null
+        reversible: boolean
         changes: { label: string; change: string }[]
       }[]
       next: string | null
@@ -358,6 +360,9 @@ describe('GET /characters/:id/history', () => {
         by: { username: 'narradora' },
         byRole: 'storyteller',
         sheetVersion: 2,
+        // Lote comum, só de recurso e trilha: dá para desfazer
+        operationId: null,
+        reversible: true,
         changes: [{ label: 'Vitalidade', change: '+1 letal' }],
       },
       {
@@ -366,6 +371,9 @@ describe('GET /characters/:id/history', () => {
         by: { username: 'dona' },
         byRole: 'owner',
         sheetVersion: 1,
+        // Lote comum, só de recurso e trilha: dá para desfazer
+        operationId: null,
+        reversible: true,
         changes: [{ label: 'Sangue', change: '9 → 8' }],
       },
     ])

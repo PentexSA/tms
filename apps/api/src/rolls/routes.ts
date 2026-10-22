@@ -141,6 +141,7 @@ async function recordCost(
         path: e.path,
         from_value: JSON.stringify(e.from ?? null),
         to_value: JSON.stringify(e.to ?? null),
+        from_absent: (args.events[seq]?.from ?? null) === null,
       }))
     )
     .execute()

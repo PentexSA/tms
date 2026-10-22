@@ -4,6 +4,7 @@ import {
   canRead,
   classifyBatch,
   describeEvent,
+  isReversible,
   MAX_EVENTS_PER_BATCH,
   parsePath,
   type RoleName,
@@ -195,6 +196,9 @@ export function eventRoutes(
                   path: e.path,
                   from_value: hide ? null : JSON.stringify(e.from ?? null),
                   to_value: hide ? null : JSON.stringify(e.to ?? null),
+                  // O `from` cru é o valor atual (o conflito já conferiu):
+                  // null é caminho vazio, que a reversão devolve vazio
+                  from_absent: (body.events[seq]?.from ?? null) === null,
                 }
               })
             )
@@ -238,12 +242,33 @@ export function eventRoutes(
           .selectFrom('character_batches as b')
           // Left: lote de conta excluída fica no histórico, sem autor
           .leftJoin('users as u', 'u.id', 'b.created_by')
-          .select([
+          .leftJoin('chronicle_operations as o', 'o.id', 'b.operation_id')
+          .select(eb => [
             'b.id',
             'b.created_at',
             'b.by_role',
             'b.sheet_version',
+            'b.operation_id',
+            'o.kind as operationKind',
             'u.username',
+            // Já desfeito: o lote, ou a operação dele (§7, decisão 11)
+            eb
+              .exists(
+                eb
+                  .selectFrom('chronicle_operations as r')
+                  .select('r.id')
+                  .where(eb =>
+                    eb.or([
+                      eb('r.reverts_batch_id', '=', eb.ref('b.id')),
+                      eb(
+                        'r.reverts_operation_id',
+                        '=',
+                        eb.ref('b.operation_id')
+                      ),
+                    ])
+                  )
+              )
+              .as('reverted'),
           ])
           .where('b.character_id', '=', params.id)
         if (query.before) {
@@ -278,8 +303,8 @@ export function eventRoutes(
         const roles: ReadonlySet<RoleName> = access.roles
         const items = batches
           .map(b => {
-            const changes = events
-              .filter(e => e.batch_id === b.id)
+            const mine = events.filter(e => e.batch_id === b.id)
+            const changes = mine
               .filter(e => {
                 // O jogador nunca vê nem o rótulo de um campo que não lê
                 const p = parsePath(e.path)
@@ -300,6 +325,16 @@ export function eventRoutes(
               by: b.username === null ? null : { username: b.username },
               byRole: b.by_role,
               sheetVersion: b.sheet_version,
+              operationId: b.operation_id,
+              // Desfazer: sem texto no lote, não é uma reversão e não foi
+              // desfeito. O app mostra só ao narrador
+              reversible:
+                b.operationKind !== 'revert' &&
+                !b.reverted &&
+                isReversible(
+                  model,
+                  mine.map(e => ({ path: e.path, from: null, to: null }))
+                ),
               changes,
             }
           })
