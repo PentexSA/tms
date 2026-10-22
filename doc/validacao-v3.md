@@ -26,6 +26,11 @@ up/down/up, geração dos tipos Kysely, publicação dos templates em banco
 descartável, os cinco arquivos de concorrência em Postgres e os 48 testes
 Playwright em Chromium e WebKit. O resultado final fica no próprio PR.
 
+O job web usa o arquivo oficial do Ubuntu para instalar as bibliotecas dos
+navegadores. Na primeira rodada, o espelho Azure do runner repetiu downloads
+e consumiu mais de 19 minutos antes do cancelamento pela atualização do PR;
+a troca de endereço mantém os pacotes e suas assinaturas.
+
 ## Android
 
 Ambiente preparado para o teste nativo: Android Emulator com KVM, imagem

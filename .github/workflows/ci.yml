@@ -178,6 +178,21 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # O mirror Azure do runner pode ficar lento e repetir downloads até
+      # estourar o job. Mantém os mesmos pacotes e a verificação de assinaturas.
+      - name: usar o arquivo oficial do Ubuntu para as dependências web
+        run: |
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          directory = Path('/etc/apt/sources.list.d')
+          paths = [Path('/etc/apt/sources.list'), *directory.glob('*.list'), *directory.glob('*.sources')]
+          for path in paths:
+              if path.is_file():
+                  source = path.read_text()
+                  updated = source.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  if updated != source:
+                      path.write_text(updated)
+          PY
       - run: pnpm -C e2e exec playwright install --with-deps chromium webkit
       # Exporta o app web com a URL da API do E2E e confere o bundle
       - run: pnpm -C e2e build:web
