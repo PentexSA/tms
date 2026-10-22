@@ -24,6 +24,9 @@ name: Roda do Mago e desfazer
 - assertVisible:
     text: "(Paradoxo .* → .*|Sem casa livre: .* virou Paradoxo)"
 - tapOn: "Desfazer"
+# O indicador fica na ficha, fora da janela modal nativa.
+- tapOn:
+    id: "bottom-sheet-close"
 - extendedWaitUntil:
     visible:
       text: "Sincronização: Salvo"

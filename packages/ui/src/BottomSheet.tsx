@@ -79,7 +79,12 @@ export function BottomSheet({
             >
               {title}
             </Text>
-            <IconButton label="Fechar" glyph={'×'} onPress={onClose} />
+            <IconButton
+              label="Fechar"
+              glyph={'×'}
+              onPress={onClose}
+              testID="bottom-sheet-close"
+            />
           </View>
           <ScrollView keyboardShouldPersistTaps="handled">
             {children}
