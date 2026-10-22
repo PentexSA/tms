@@ -9,7 +9,7 @@ export const shortDate = (value: string | Date) => {
   return `${dd}/${mm}`
 }
 
-const hhmm = (d: Date) =>
+export const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
 /** "às 14:05" hoje; "em 12/10 às 14:05" em outro dia (última alteração). */

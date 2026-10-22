@@ -28,19 +28,24 @@ export const useCharacter = (id: string) =>
       unwrap(await api.characters({ id }).get({ fetch: { signal } })),
   })
 
+/** A consulta de uma versão de template: a Mesa pede várias de uma vez. */
+export const templateQuery = (code: string, version: string) => ({
+  queryKey: sheetKeys.template(code, version),
+  staleTime: Number.POSITIVE_INFINITY,
+  gcTime: Number.POSITIVE_INFINITY,
+  queryFn: async ({ signal }: { readonly signal: AbortSignal }) =>
+    unwrap(
+      await api.systems({ code }).template.get({
+        query: { version },
+        fetch: { signal },
+      })
+    ) as unknown,
+})
+
 export const useTemplate = (code?: string, version?: string) =>
   useQuery({
-    queryKey: sheetKeys.template(code ?? '', version ?? ''),
+    ...templateQuery(code ?? '', version ?? ''),
     enabled: Boolean(code && version),
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: Number.POSITIVE_INFINITY,
-    queryFn: async ({ signal }) =>
-      unwrap(
-        await api.systems({ code: code ?? '' }).template.get({
-          query: { version },
-          fetch: { signal },
-        })
-      ) as unknown,
   })
 
 /** O template publicado mais recente do sistema (criação de ficha). */
@@ -58,17 +63,29 @@ export const useLatestTemplate = (code?: string) =>
       ) as unknown,
   })
 
+// Um modelo por JSON de template: o mesmo objeto enquanto o cache guarda o
+// JSON (versão publicada é imutável), para quem memoiza por identidade
+const compiled = new WeakMap<object, SheetModel | null>()
+
 /** Compila sem lançar: null quando esta versão do app não entende o template. */
+export function compileSafe(json: unknown): SheetModel | null | undefined {
+  if (json === undefined) return undefined
+  const cached =
+    json && typeof json === 'object' ? compiled.get(json) : undefined
+  if (cached !== undefined) return cached
+  let model: SheetModel | null
+  try {
+    model = compileTemplate(json)
+  } catch (e) {
+    if (!(e instanceof UnsupportedTemplateError)) throw e
+    model = null
+  }
+  if (json && typeof json === 'object') compiled.set(json, model)
+  return model
+}
+
 export function useCompiled(json: unknown): SheetModel | null | undefined {
-  return useMemo(() => {
-    if (json === undefined) return undefined
-    try {
-      return compileTemplate(json)
-    } catch (e) {
-      if (e instanceof UnsupportedTemplateError) return null
-      throw e
-    }
-  }, [json])
+  return useMemo(() => compileSafe(json), [json])
 }
 
 export type CharacterData = NonNullable<ReturnType<typeof useCharacter>['data']>

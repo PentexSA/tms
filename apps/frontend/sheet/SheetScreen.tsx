@@ -17,6 +17,7 @@ import { SheetView } from './SheetView'
 import { createSheetStore } from './store/sheetStore'
 import { StatusMenuButton } from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
+import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
 
@@ -124,7 +125,15 @@ export function SheetScreen({
         }
       />
       <OfflineBanner />
-      {body}
+      {state.status === 'ready' && state.roles.includes('storyteller') ? (
+        // Vindo da Mesa, o narrador passa de uma ficha a outra deslizando
+        <SwipeArea characterId={id}>
+          <TableNav characterId={id} />
+          {body}
+        </SwipeArea>
+      ) : (
+        body
+      )}
       {state.status === 'ready' ? (
         <HistorySheet
           characterId={id}

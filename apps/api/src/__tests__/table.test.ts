@@ -7,6 +7,7 @@ import {
   createChronicle,
   createUser,
   publish,
+  setStatus,
   type TestUser,
 } from '../test/factories'
 import {
@@ -115,6 +116,38 @@ describe('GET /chronicles/:id/table', () => {
     const id = await createCharacter(ctx, owner, chronicleId)
     await as(ctx, owner, 'DELETE', `/characters/${id}`)
     expect(await (await table(storyteller)).json()).toEqual([])
+  })
+
+  // v3, Etapa 9: arquivada e fora de jogo somem; o filtro as traz
+  it('mostra creating e active; ?status= traz as outras', async () => {
+    const ids: Record<string, string> = {}
+    for (const status of ['creating', 'active', 'archived', 'dead'] as const) {
+      ids[status] = await createCharacter(ctx, owner, chronicleId, {
+        name: status,
+      })
+      await setStatus(ctx, ids[status] as string, status)
+    }
+    const names = async (query = '') =>
+      (
+        (await (
+          await as(
+            ctx,
+            storyteller,
+            'GET',
+            `/chronicles/${chronicleId}/table${query}`
+          )
+        ).json()) as { name: string; status: string }[]
+      ).map(r => r.status)
+    expect(await names()).toEqual(['creating', 'active'])
+    expect(await names('?status=archived,dead')).toEqual(['archived', 'dead'])
+    expect(await names('?status=active')).toEqual(['active'])
+    const bad = await as(
+      ctx,
+      storyteller,
+      'GET',
+      `/chronicles/${chronicleId}/table?status=pending`
+    )
+    expect(bad.status).toBe(422)
   })
 
   it('jogador e dono recebem 404: para eles a Mesa não existe', async () => {

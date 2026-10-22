@@ -162,12 +162,30 @@ export const useCreateCharacter = (id: string) => {
  * A Mesa do narrador (Etapa 19): todas as fichas da crônica numa requisição.
  * A API responde 404 para quem não narra; a tela nem pede.
  */
-export const useChronicleTable = (id: string, enabled: boolean) =>
+/** O que a Mesa mostra: em jogo (creating e active) ou fora (archived e dead). */
+export type TableScope = 'playing' | 'out'
+
+const SCOPE_STATUS: Readonly<Record<TableScope, string>> = {
+  playing: 'creating,active',
+  out: 'archived,dead',
+}
+
+export const useChronicleTable = (
+  id: string,
+  enabled: boolean,
+  scope: TableScope = 'playing'
+) =>
   useQuery({
-    queryKey: chronicleKeys.table(id),
+    queryKey: [...chronicleKeys.table(id), scope] as const,
     enabled,
     // Sem tempo real: toda volta à Mesa rebusca
     staleTime: 0,
+    // O filtro é no servidor: a resposta não leva o que a tela esconde
     queryFn: async ({ signal }) =>
-      unwrap(await api.chronicles({ id }).table.get({ fetch: { signal } })),
+      unwrap(
+        await api.chronicles({ id }).table.get({
+          query: { status: SCOPE_STATUS[scope] },
+          fetch: { signal },
+        })
+      ),
   })
