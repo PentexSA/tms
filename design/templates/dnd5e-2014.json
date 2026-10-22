@@ -693,5 +693,17 @@
       "effect": "rest.short",
       "help": "Permite gastar dados de vida para recuperar PV."
     }
+  ],
+  "recoveries": [
+    {
+      "id": "longRest",
+      "label": "Descanso longo",
+      "help": "Indisponível enquanto o efeito de descanso não estiver implementado.",
+      "effects": [
+        {
+          "effect": "rest.long"
+        }
+      ]
+    }
   ]
 }

@@ -4,7 +4,7 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.3.0",
+  "templateVersion": "1.4.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
@@ -979,6 +979,35 @@
       "effect": "health.heal",
       "params": { "field": "health", "types": ["bashing", "lethal"] },
       "help": "Cura 1 nível contusivo ou letal, letal primeiro. O agravado fica."
+    }
+  ],
+  "recoveries": [
+    {
+      "id": "newDay",
+      "label": "Novo dia",
+      "help": "Recupera 1 ponto de Força de Vontade ao acordar, até o limite permanente.",
+      "effects": [
+        {
+          "effect": "resource.gain",
+          "params": {
+            "field": "willpower",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "storyEnd",
+      "label": "Fim da história",
+      "help": "Restaura a Força de Vontade temporária até o permanente ao concluir uma história, se o narrador adotar a recuperação completa. Fúria e Gnose dependem de outras condições.",
+      "effects": [
+        {
+          "effect": "resource.restore",
+          "params": {
+            "field": "willpower"
+          }
+        }
+      ]
     }
   ]
 }

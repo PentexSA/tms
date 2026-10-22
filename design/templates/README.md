@@ -55,6 +55,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `zoneLabels` | não | objeto | Rótulo das abas por zona (`build`, `powers`, `lore`), até 14 caracteres (§4). |
 | `statusLabels` | não | objeto | Rótulo do estado `dead` da ficha (`{ "dead": "Torpor" }`), até 20 caracteres. Sem ele, "Fora de jogo". |
 | `alerts` | não | lista (até 10) | Quando uma linha da Mesa merece atenção (§6). |
+| `recoveries` | não | lista (1 a 12) | Períodos do narrador com prévia por personagem (§8). |
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |
@@ -435,10 +436,13 @@ Ações aparecem no menu ⋯ da ficha (`actions`, no topo do template) ou no she
 | `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso. No menu da ficha (`actions` do topo), não tem custo | Curar 1 nível por 1 Sangue; Regenerar (Lobisomem) |
 | `resource.spend` | `field`, `amount` | Debita `amount` do recurso (mínimo 0) | Despertar: −1 Sangue |
 | `resource.gain` | `field`, `amount` | Credita `amount` respeitando o teto | Recuperar Força de Vontade |
+| `resource.restore` | `field` | Enche o atual até o permanente, sem alterar o permanente | Fim da história |
 | `rest.long` | – | Recursos com `tempFirst` ao máximo e sem temporários; recursos com `max.field` recuperam metade; `slots` zerados; `track boxes` zeradas | Descanso longo D&D |
 | `rest.short` | – | Permite gastar dados de vida para recuperar PV | Descanso curto D&D |
 
-`schema.json` exige os parâmetros certos por efeito: `field` e `amount` para `resource.*`, `field` e `types` para `health.heal`, nenhum para `rest.*`. No protótipo, a prévia está implementada para `resource.spend` e `rest.long`, e `health.heal` funciona como ação de recurso; os demais mostram só o texto de ajuda.
+`schema.json` exige os parâmetros certos por efeito: `field` e `amount` para `resource.spend` e `resource.gain`, apenas `field` para `resource.restore`, `field` e `types` para `health.heal`, nenhum para `rest.*`. No protótipo, a prévia está implementada para `resource.spend` e `rest.long`, e `health.heal` funciona como ação de recurso; os demais mostram só o texto de ajuda.
+
+**Recuperações da Mesa.** `recoveries: [{ id, label, help, effects: [{ effect, params? }] }]` declara os períodos que o narrador aplica aos personagens selecionados, com prévia, confirmação e Desfazer. De 1 a 12 períodos, com ids únicos, e de 1 a 20 efeitos por período. Os efeitos usam a mesma lista fechada e os mesmos parâmetros das ações. O core compõe os efeitos em sequência e consolida um evento por campo. Recurso já cheio não cancela os outros efeitos; nenhuma mudança deixa o período indisponível com motivo. Efeitos sem implementação (`rest.long` e `rest.short`) ficam indisponíveis, sem aplicação parcial. As versões novas dos templates e as regras conferidas estão em [recuperacoes-v3.md](../../doc/recuperacoes-v3.md).
 
 **Multi-sistema:** "descanso" e "nova noite" são o mesmo mecanismo (lote de alterações com prévia). Um efeito de outro sistema, como "fim de sessão" do Fate (Destino volta à Recarga), é um nome novo na lista (§9).
 
@@ -459,7 +463,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `clockRules` | `clockRule` | `mage-quint-paradox` |
 | `alertRules` | `alertRule` | `track-at-level`, `resource-at-most`, `resource-below-share` |
 | `atZero` | `atZero` | `deathSaves` |
-| `effects` | `effect` | `health.heal`, `resource.spend`, `resource.gain`, `rest.long`, `rest.short` |
+| `effects` | `effect` | `health.heal`, `resource.spend`, `resource.gain`, `resource.restore`, `rest.long`, `rest.short` |
 | `rollModels` | `rollModel` | `pool-success`, `sum-vs-target`, `roll-under-percent`, `fudge`, `pbta-2d6` |
 | `dice` | `die` | `2`, `3`, `4`, `6`, `8`, `10`, `12`, `20`, `100` |
 | `diceNotation` | `diceNotation` | `1d20`, `2d6`, `1d100`, `4dF` |

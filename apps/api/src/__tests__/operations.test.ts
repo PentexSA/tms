@@ -89,6 +89,75 @@ const both = () => [
 ]
 
 describe('prévia', () => {
+  it('recuperação usa só o período do template: prévia, reenvio e reversão', async () => {
+    const request = {
+      kind: 'recovery',
+      recoveryId: 'newNight',
+      targets: both(),
+    }
+    const pre = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/operations/preview`,
+      request
+    )
+    expect(pre.status).toBe(200)
+    const preview = (await pre.json()) as {
+      characters: { ok: boolean; changes: { label: string }[] }[]
+    }
+    expect(
+      preview.characters.every(c => c.ok && c.changes[0]?.label === 'Sangue')
+    ).toBe(true)
+    const body = { ...request, clientOperationId: crypto.randomUUID() }
+    const first = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/operations`,
+      body
+    )
+    expect(first.status).toBe(201)
+    const result = (await first.json()) as { operationId: string }
+    const duplicate = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/operations`,
+      body
+    )
+    expect(await duplicate.json()).toMatchObject({ ...result, duplicate: true })
+    expect((await row(helena)).sheet_data).toMatchObject({
+      values: { blood: { current: 8 } },
+    })
+    expect(
+      (await revert({ revertsOperationId: result.operationId })).status
+    ).toBe(201)
+    expect((await row(helena)).sheet_data).toMatchObject({
+      values: { blood: { current: 9 } },
+    })
+    expect((await row(caio)).sheet_data).not.toHaveProperty('values.blood')
+  })
+
+  it('recuperação indisponível ou versão vencida recusa o grupo inteiro', async () => {
+    const post = (recoveryId: string, targets = both()) =>
+      as(ctx, storyteller, 'POST', `/chronicles/${chronicleId}/operations`, {
+        clientOperationId: crypto.randomUUID(),
+        kind: 'recovery',
+        recoveryId,
+        targets,
+      })
+    expect((await post('missing')).status).toBe(422)
+    expect((await post('storyEnd')).status).toBe(422)
+    const stale = await post(
+      'newNight',
+      both().map(t => ({ ...t, sheetVersion: 1 }))
+    )
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toHaveProperty('preview')
+    expect((await row(helena)).sheet_version).toBe(0)
+    expect((await row(caio)).sheet_version).toBe(0)
+  })
   it('por ficha, o texto da mudança e a versão lida; não grava nada', async () => {
     const res = await as(
       ctx,

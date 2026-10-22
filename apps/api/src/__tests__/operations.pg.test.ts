@@ -165,6 +165,41 @@ describe.skipIf(!URL_)('operações num Postgres real', () => {
     expect(await health(a)).toEqual({ ...unhurt, bashing: 1 })
   })
 
+  it('recuperação concorrente: mesma chave debita Sangue uma vez nas duas fichas', async () => {
+    const a = await fresh('Noite A')
+    const b = await fresh('Noite B')
+    const body = {
+      clientOperationId: crypto.randomUUID(),
+      kind: 'recovery',
+      recoveryId: 'newNight',
+      targets: [
+        { characterId: b, sheetVersion: 0 },
+        { characterId: a, sheetVersion: 0 },
+      ],
+    }
+    const sendRecovery = () =>
+      as(
+        ctx,
+        storyteller,
+        'POST',
+        `/chronicles/${chronicleId}/operations`,
+        body
+      )
+    const results = await Promise.all([sendRecovery(), sendRecovery()])
+    expect(results.map(r => r.status).sort()).toEqual([200, 201])
+    for (const id of [a, b]) {
+      const row = await ctx.db
+        .selectFrom('characters')
+        .select(['sheet_data', 'sheet_version'])
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow()
+      expect(row.sheet_version).toBe(1)
+      expect(row.sheet_data).toMatchObject({
+        values: { blood: { current: 9 } },
+      })
+    }
+  })
+
   it('mesma chave com alvos diferentes: o índice único devolve o resultado original, sem 500', async () => {
     const a = await fresh('Chave A')
     const b = await fresh('Chave B')

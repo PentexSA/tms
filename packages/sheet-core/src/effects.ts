@@ -3,6 +3,7 @@ import type {
   ClockValue,
   FieldId,
   ResourceAction,
+  ResourceValue,
   SheetData,
   StackingValue,
   TemplateAction,
@@ -44,7 +45,7 @@ const unavailable = (reason: string): ActionPlan => ({ ok: false, reason })
  * com outro efeito, em vez de mostrar um botão que nunca funciona.
  */
 export const IMPLEMENTED_EFFECTS: ReadonlySet<EffectName> = new Set<EffectName>(
-  ['resource.spend', 'resource.gain', 'health.heal']
+  ['resource.spend', 'resource.gain', 'resource.restore', 'health.heal']
 )
 
 const stored = (sheet: SheetData, id: FieldId): unknown =>
@@ -92,6 +93,24 @@ export function planAction(
   const amount = action.params?.amount ?? 1
 
   switch (action.effect) {
+    case 'resource.restore': {
+      const r = resourceOf(action.params?.field)
+      if (!r || r.permanent === null)
+        return unavailable('Recurso sem valor permanente')
+      if (r.current >= r.permanent)
+        return unavailable(`${r.field.def.label} já está no permanente`)
+      return plan(
+        model,
+        sheet,
+        [
+          event(sheet, r.id, {
+            ...((stored(sheet, r.id) ?? {}) as ResourceValue),
+            current: r.permanent,
+          }),
+        ],
+        action.label
+      )
+    }
     case 'resource.spend': {
       const r = resourceOf(action.params?.field)
       if (!r) return unavailable('Recurso inexistente')

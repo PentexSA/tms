@@ -19,7 +19,7 @@ export const REGISTRY = {
   clockRules: ['mage-quint-paradox'],
   alertRules: ['track-at-level', 'resource-at-most', 'resource-below-share'],
   atZero: ['deathSaves'],
-  effects: ['health.heal', 'resource.spend', 'resource.gain', 'rest.long', 'rest.short'],
+  effects: ['health.heal', 'resource.spend', 'resource.gain', 'resource.restore', 'rest.long', 'rest.short'],
   rollModels: ['pool-success', 'sum-vs-target', 'roll-under-percent', 'fudge', 'pbta-2d6'],
   dice: [2, 3, 4, 6, 8, 10, 12, 20, 100],
   diceNotation: ['1d20', '2d6', '1d100', '4dF'],
@@ -43,7 +43,8 @@ export const REGISTRY = {
 // Chaves permitidas (allowlist). Chave desconhecida é erro: impede atributos como "onclick"
 // ou campos que o renderizador ignoraria e algum código futuro poderia interpretar.
 const KEYS = {
-  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'alerts', 'dock', 'roll', 'actions'],
+  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'alerts',
+    'recoveries', 'dock', 'roll', 'actions'],
   fieldCommon: ['type', 'label', 'shortLabel', 'help', 'editableIn', 'specialty', 'sublabel', 'badge', 'readOnly', 'derive', 'from'],
   field: {
     rating: ['min', 'max', 'default', 'cap', 'valueLabels'],
@@ -479,6 +480,45 @@ export function validateTemplate(t, palette) {
     for (const ty of a.params.types ?? []) if (!track.types.some(x => x.id === ty)) err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
   }
   for (const a of t.actions ?? []) checkHeal(`actions.${a.id}`, a)
+  if (t.recoveries !== undefined) {
+    if (!Array.isArray(t.recoveries) || !t.recoveries.length || t.recoveries.length > 12) err('recoveries', 'de 1 a 12 períodos')
+    else {
+      const ids = new Set()
+      for (const [i, recovery] of t.recoveries.entries()) {
+        const p = `recoveries.${i}`
+        if (!isObj(recovery)) { err(p, 'precisa ser objeto'); continue }
+        keys(p, recovery, ['id', 'label', 'help', 'effects'])
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(recovery.id ?? '') || ['constructor', 'prototype', '__proto__'].includes(recovery.id) || ids.has(recovery.id)) err(`${p}.id`, 'id inválido ou repetido')
+        ids.add(recovery.id)
+        text(`${p}.label`, recovery.label)
+        text(`${p}.help`, recovery.help, 1000)
+        if (!Array.isArray(recovery.effects) || !recovery.effects.length || recovery.effects.length > 20) { err(`${p}.effects`, 'de 1 a 20 efeitos'); continue }
+        for (const [j, e] of recovery.effects.entries()) {
+          const ep = `${p}.effects.${j}`
+          if (!isObj(e)) { err(ep, 'precisa ser objeto'); continue }
+          keys(ep, e, ['effect', 'params'])
+          oneOf(`${ep}.effect`, e.effect, REGISTRY.effects, 'effect')
+          if (['rest.long', 'rest.short'].includes(e.effect)) {
+            if (e.params !== undefined) err(`${ep}.params`, 'efeito sem parâmetros')
+            continue
+          }
+          const restore = e.effect === 'resource.restore'
+          const health = e.effect === 'health.heal'
+          if (!isObj(e.params)) { err(`${ep}.params`, 'precisa ser objeto'); continue }
+          keys(`${ep}.params`, e.params, health ? ['field', 'types'] : restore ? ['field'] : ['field', 'amount'])
+          if (health) {
+            checkHeal(ep, e)
+            if (!Array.isArray(e.params.types) || !e.params.types.length || e.params.types.length > 5 || new Set(e.params.types).size !== e.params.types.length) err(`${ep}.params.types`, 'de 1 a 5 tipos distintos')
+          } else {
+            const resource = fields[e.params.field]
+            if (resource?.type !== 'resource' || resource.readOnly || resource.derive) err(`${ep}.params.field`, 'precisa apontar para um resource gravável')
+            if (restore && !resource?.permanent) err(`${ep}.params.field`, 'recurso precisa ter permanente')
+            if (!restore && (!Number.isInteger(e.params.amount) || e.params.amount < 1 || e.params.amount > 99)) err(`${ep}.params.amount`, 'precisa ser inteiro entre 1 e 99')
+          }
+        }
+      }
+    }
+  }
   for (const [fid, f] of Object.entries(fields)) {
     for (const a of f.actions ?? []) checkHeal(`fields.${fid}.actions.${a.id}`, a)
     if (f.type === 'track' && f.rule === 'boxes') for (const row of f.rows ?? []) if (row.boxValues && row.boxValues.length !== row.boxes) err(`fields.${fid}.rows.${row.id}.boxValues`, 'precisa ter um valor por caixa')

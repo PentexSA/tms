@@ -48,6 +48,7 @@ export const REGISTRY = {
     'health.heal',
     'resource.spend',
     'resource.gain',
+    'resource.restore',
     'rest.long',
     'rest.short',
   ],

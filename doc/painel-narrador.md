@@ -444,7 +444,7 @@ Três versões, no molde da v0, v1 e v2: cada uma fecha numa jornada E2E que pro
 | 3 | Mesa com alertas | 5.3 | Implementada |
 | 4 | Ações em grupo com reversão | 5.4 | Dano, cura e reversão implementados; recuperações por período na v3.1 |
 
-Implementação e evidências em `plano-v3.md`. A prévia devolve rótulos das mudanças e versões, sem os eventos crus; o servidor reconstrói os lotes dentro da transação. A recusa `advance` em `active` usa `NEEDS_XP_APPROVAL`; estados sem escrita usam `SHEET_NOT_EDITABLE`. A recuperação por período segue a linha de corte da Etapa 13: não há chave `recoveries` publicada nesta versão.
+Implementação e evidências em `plano-v3.md`. A prévia devolve rótulos das mudanças e versões, sem os eventos crus; o servidor reconstrói os lotes dentro da transação. A recusa `advance` em `active` usa `NEEDS_XP_APPROVAL`; estados sem escrita usam `SHEET_NOT_EDITABLE`. A recuperação por período também foi incluída: `recoveries`, o efeito `resource.restore` e `kind: recovery` usam a mesma prévia e reversão. As regras e versões estão em [recuperacoes-v3.md](recuperacoes-v3.md).
 
 A ordem 1 → 2 importa: o arquivamento e o bloqueio de escrita existem antes de alguém ser removido. A entrega 3 só depende da 0 e pode andar em paralelo.
 

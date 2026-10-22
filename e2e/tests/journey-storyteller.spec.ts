@@ -191,6 +191,30 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
     }
     await privateSheets()
 
+    // O período do template usa a mesma prévia, operação e reversão.
+    await page.getByRole('button', { name: 'Nova noite', exact: true }).click()
+    await expect(page.getByText(/Desconta 1 ponto de Sangue/)).toBeVisible()
+    await page.getByRole('button', { name: 'Ver prévia' }).click()
+    await expect(page.getByTestId(`operation-preview-${idA}`)).toContainText(
+      'Sangue'
+    )
+    await page.getByRole('button', { name: 'Confirmar operação' }).click()
+    await expect(page.getByText('Nova noite em 2 personagens.')).toBeVisible()
+    for (const id of [idA, idB]) {
+      const c = await apiAs<{
+        sheet: { values: { blood: { current: number } } }
+      }>(desk, storyteller, 'GET', `/characters/${id}`)
+      expect(c.sheet.values.blood.current).toBe(9)
+    }
+    await page.getByRole('button', { name: 'Desfazer', exact: true }).click()
+    await expect(page.getByText('Alteração desfeita.')).toBeVisible()
+    for (const id of [idA, idB]) {
+      const c = await apiAs<{
+        sheet: { values: { blood?: { current: number } } }
+      }>(desk, storyteller, 'GET', `/characters/${id}`)
+      expect(c.sheet.values.blood?.current ?? 10).toBe(10)
+    }
+
     // 4. Uma ficha já aberta recebe o motivo da trava, inclusive em /rolls.
     await a.goto(`/characters/${idA}`)
     const rollPage = await contextA.newPage()

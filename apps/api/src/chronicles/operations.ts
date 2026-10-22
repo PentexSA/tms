@@ -9,6 +9,7 @@ import {
   invertBatch,
   parsePath,
   planGroupDamage,
+  planRecovery,
   type SheetData,
   type SheetEvent,
   type SheetModel,
@@ -39,7 +40,29 @@ import { modelFor } from '../sheets/models'
 const notFound = () => new ApiError(404, 'não encontrado')
 export const MAX_TARGETS = 20
 
-type Kind = 'damage' | 'heal'
+type Kind = 'damage' | 'heal' | 'recovery'
+type Operation =
+  | Omit<GroupDamage, 'field'>
+  | { readonly kind: 'recovery'; readonly recoveryId: string }
+
+function readOperation(body: {
+  kind: string
+  amount?: number
+  type?: string
+  recoveryId?: string
+}): Operation {
+  if (body.kind === 'recovery') {
+    if (!body.recoveryId)
+      throw new ApiError(422, 'escolha o período de recuperação')
+    return { kind: 'recovery', recoveryId: body.recoveryId }
+  }
+  if (body.amount === undefined) throw new ApiError(422, 'diga a quantidade')
+  return {
+    kind: body.kind as 'damage' | 'heal',
+    amount: body.amount,
+    ...(body.type && { type: body.type }),
+  }
+}
 
 interface Locked {
   readonly id: string
@@ -115,7 +138,7 @@ interface Planned {
 const planAll = (
   locked: ReadonlyMap<string, Locked>,
   targets: readonly { readonly characterId: string; readonly field?: string }[],
-  op: Omit<GroupDamage, 'field'>
+  op: Operation
 ): Planned[] =>
   targets.map(target => {
     const c = locked.get(target.characterId) as Locked
@@ -123,10 +146,13 @@ const planAll = (
       characterId: c.id,
       name: c.name,
       sheetVersion: c.sheetVersion,
-      plan: planGroupDamage(c.model, c.sheet, {
-        ...op,
-        ...(target.field && { field: target.field }),
-      }),
+      plan:
+        op.kind === 'recovery'
+          ? planRecovery(c.model, c.sheet, op.recoveryId)
+          : planGroupDamage(c.model, c.sheet, {
+              ...op,
+              ...(target.field && { field: target.field }),
+            }),
     }
   })
 
@@ -398,11 +424,7 @@ export function operationRoutes(
           )
           return {
             characters: previewOut(
-              planAll(locked, body.targets, {
-                kind: body.kind,
-                amount: body.amount,
-                ...(body.type && { type: body.type }),
-              })
+              planAll(locked, body.targets, readOperation(body))
             ),
           }
         })
@@ -410,8 +432,13 @@ export function operationRoutes(
       {
         params: idParams,
         body: t.Object({
-          kind: t.Union([t.Literal('damage'), t.Literal('heal')]),
-          amount: t.Integer({ minimum: 1, maximum: 50 }),
+          kind: t.Union([
+            t.Literal('damage'),
+            t.Literal('heal'),
+            t.Literal('recovery'),
+          ]),
+          amount: t.Optional(t.Integer({ minimum: 1, maximum: 50 })),
+          recoveryId: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
           type: t.Optional(t.String({ minLength: 1, maxLength: 40 })),
           targets: t.Array(target, { minItems: 1, maxItems: MAX_TARGETS }),
         }),
@@ -515,8 +542,8 @@ export function operationRoutes(
           }
 
           const targets = body.targets ?? []
-          if (!targets.length || body.amount === undefined)
-            throw new ApiError(422, 'diga as fichas e a quantidade')
+          if (!targets.length) throw new ApiError(422, 'diga as fichas')
+          const operation = readOperation(body)
           return db.transaction().execute(async trx => {
             const locked = await lockCharacters(
               db,
@@ -527,11 +554,7 @@ export function operationRoutes(
             // Depois das travas: o reenvio simultâneo espera o primeiro gravar
             const done = await findOperation(trx, params.id, key)
             if (done) return stored(trx, done.id)
-            const planned = planAll(locked, targets, {
-              kind: body.kind as Kind,
-              amount: body.amount as number,
-              ...(body.type && { type: body.type }),
-            })
+            const planned = planAll(locked, targets, operation)
             if (
               targets.some(
                 x => locked.get(x.characterId)?.sheetVersion !== x.sheetVersion
@@ -579,9 +602,11 @@ export function operationRoutes(
           kind: t.Union([
             t.Literal('damage'),
             t.Literal('heal'),
+            t.Literal('recovery'),
             t.Literal('revert'),
           ]),
           amount: t.Optional(t.Integer({ minimum: 1, maximum: 50 })),
+          recoveryId: t.Optional(t.String({ minLength: 1, maxLength: 64 })),
           type: t.Optional(t.String({ minLength: 1, maxLength: 40 })),
           targets: t.Optional(
             t.Array(

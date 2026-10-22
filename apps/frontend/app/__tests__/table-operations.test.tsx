@@ -128,6 +128,38 @@ it('dois personagens, 2 letais: um pedido; atualiza a Mesa e desfaz pelo toast',
   )
 })
 
+it('Nova noite vem do template, apresenta a ajuda, confirma e permite Desfazer', async () => {
+  await render()
+  await screen.findByRole('button', { name: /^Helena Varga,/ })
+  fireEvent.press(
+    screen.getByRole('button', { name: 'Selecionar personagens' })
+  )
+  fireEvent.press(
+    screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+  )
+  fireEvent.press(screen.getByRole('button', { name: 'Nova noite' }))
+  expect(screen.getByText(/Desconta 1 ponto de Sangue/)).toBeTruthy()
+  expect(screen.queryByLabelText('Quantidade')).toBeNull()
+  fireEvent.press(screen.getByRole('button', { name: 'Ver prévia' }))
+  await screen.findByTestId('operation-preview-a')
+  expect(calls.chronicle.operationPreview).toHaveBeenLastCalledWith({
+    kind: 'recovery',
+    recoveryId: 'newNight',
+    targets: [{ characterId: 'a' }],
+  })
+  fireEvent.press(screen.getByRole('button', { name: 'Confirmar operação' }))
+  await screen.findByText('Nova noite em 1 personagem.')
+  expect(calls.chronicle.operationPost).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      kind: 'recovery',
+      recoveryId: 'newNight',
+      targets: [{ characterId: 'a', sheetVersion: 2 }],
+    })
+  )
+  fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
+  await screen.findByText('Alteração desfeita.')
+})
+
 it('409: apresenta a nova prévia e pede outra confirmação com as versões novas', async () => {
   calls.chronicle.operationPost.mockResolvedValueOnce({
     data: null,

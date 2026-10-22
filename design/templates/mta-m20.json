@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.3.0",
+  "templateVersion": "1.4.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
@@ -864,5 +864,34 @@
       }
     ]
   },
-  "actions": []
+  "actions": [],
+  "recoveries": [
+    {
+      "id": "newDay",
+      "label": "Novo dia",
+      "help": "Recupera 1 ponto de Força de Vontade após um sono reparador. Selecione apenas quem conseguiu descansar.",
+      "effects": [
+        {
+          "effect": "resource.gain",
+          "params": {
+            "field": "willpower",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "storyEnd",
+      "label": "Fim da história",
+      "help": "Restaura a Força de Vontade temporária até o permanente após uma história bem-sucedida. Se o resultado exigir recuperação parcial, ajuste a ficha manualmente.",
+      "effects": [
+        {
+          "effect": "resource.restore",
+          "params": {
+            "field": "willpower"
+          }
+        }
+      ]
+    }
+  ]
 }

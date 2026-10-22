@@ -1,4 +1,4 @@
-import { damageTargets } from '@tms/sheet-core'
+import { damageTargets, type TemplateRecovery } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
@@ -14,8 +14,8 @@ import { StyleSheet, View } from 'react-native'
 import { messageOf, statusOf } from '../../lib/errors'
 import { useOnline } from '../../lib/network'
 import {
-  type DamageRequest,
   type OperationPreview,
+  type PreviewRequest,
   previewOperation,
   useRunOperation,
 } from '../../lib/queries/operations'
@@ -27,11 +27,13 @@ export function OperationSheet({
   chronicleId,
   items,
   kind,
+  recovery,
   onClose,
 }: {
   readonly chronicleId: string
   readonly items: readonly TableItem[]
-  readonly kind: 'damage' | 'heal'
+  readonly kind: 'damage' | 'heal' | 'recovery'
+  readonly recovery?: TemplateRecovery
   readonly onClose: () => void
 }) {
   const online = useOnline()
@@ -82,15 +84,22 @@ export function OperationSheet({
     ).values(),
   ]
   const selectedType = types.some(t => t.id === type) ? type : types[0]?.id
-  const body: DamageRequest = {
-    kind,
-    amount,
-    ...(selectedType && { type: selectedType }),
-    targets: targets.map(t => ({
-      characterId: t.item.row.id,
-      ...(t.field && { field: t.field }),
-    })),
-  }
+  const body: PreviewRequest =
+    kind === 'recovery' && recovery
+      ? {
+          kind,
+          recoveryId: recovery.id,
+          targets: items.map(i => ({ characterId: i.row.id })),
+        }
+      : {
+          kind: kind === 'heal' ? 'heal' : 'damage',
+          amount,
+          ...(selectedType && { type: selectedType }),
+          targets: targets.map(t => ({
+            characterId: t.item.row.id,
+            ...(t.field && { field: t.field }),
+          })),
+        }
   const busy = loading || run.isPending
   const clear = () => {
     setPreview(null)
@@ -126,7 +135,7 @@ export function OperationSheet({
       })
       onClose()
       toast.show({
-        message: `${kind === 'damage' ? 'Dano aplicado' : 'Cura aplicada'} em ${items.length} ${items.length === 1 ? 'personagem' : 'personagens'}.`,
+        message: `${kind === 'recovery' ? recovery?.label : kind === 'damage' ? 'Dano aplicado' : 'Cura aplicada'} em ${items.length} ${items.length === 1 ? 'personagem' : 'personagens'}.`,
         action: {
           label: 'Desfazer',
           onPress: () => {
@@ -152,7 +161,13 @@ export function OperationSheet({
   return (
     <BottomSheet
       visible
-      title={kind === 'damage' ? 'Aplicar dano em grupo' : 'Curar em grupo'}
+      title={
+        kind === 'recovery'
+          ? (recovery?.label ?? 'Recuperar em grupo')
+          : kind === 'damage'
+            ? 'Aplicar dano em grupo'
+            : 'Curar em grupo'
+      }
       onClose={() => {
         if (!busy) onClose()
       }}
@@ -176,67 +191,73 @@ export function OperationSheet({
           {items.length} {items.length === 1 ? 'personagem' : 'personagens'} ·
           confira cada ficha antes de confirmar.
         </Text>
-        <Stepper
-          label="Quantidade"
-          value={amount}
-          min={1}
-          max={50}
-          size="sheet"
-          testID="operation-amount"
-          disabled={busy}
-          onChange={v => {
-            setAmount(v)
-            clear()
-          }}
-        />
-        {targets
-          .filter(t => t.available.length > 1)
-          .map(t => (
-            <View key={t.item.row.id} style={styles.content}>
-              <Text variant="fieldLabel">
-                Onde aplicar em {t.item.row.name}
-              </Text>
+        {kind === 'recovery' ? (
+          <Text color="inkMuted">{recovery?.help}</Text>
+        ) : (
+          <>
+            <Stepper
+              label="Quantidade"
+              value={amount}
+              min={1}
+              max={50}
+              size="sheet"
+              testID="operation-amount"
+              disabled={busy}
+              onChange={v => {
+                setAmount(v)
+                clear()
+              }}
+            />
+            {targets
+              .filter(t => t.available.length > 1)
+              .map(t => (
+                <View key={t.item.row.id} style={styles.content}>
+                  <Text variant="fieldLabel">
+                    Onde aplicar em {t.item.row.name}
+                  </Text>
+                  <View style={styles.chips}>
+                    {t.available.map(f => (
+                      <Chip
+                        key={f.id}
+                        label={f.def.label}
+                        selected={t.field === f.id}
+                        onPress={
+                          busy
+                            ? undefined
+                            : () => {
+                                setFields(old => ({
+                                  ...old,
+                                  [t.item.row.id]: f.id,
+                                }))
+                                clear()
+                              }
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            {types.length ? (
               <View style={styles.chips}>
-                {t.available.map(f => (
+                {types.map(t => (
                   <Chip
-                    key={f.id}
-                    label={f.def.label}
-                    selected={t.field === f.id}
+                    key={t.id}
+                    label={t.label}
+                    selected={selectedType === t.id}
                     onPress={
                       busy
                         ? undefined
                         : () => {
-                            setFields(old => ({
-                              ...old,
-                              [t.item.row.id]: f.id,
-                            }))
+                            setType(t.id)
                             clear()
                           }
                     }
                   />
                 ))}
               </View>
-            </View>
-          ))}
-        {types.length ? (
-          <View style={styles.chips}>
-            {types.map(t => (
-              <Chip
-                key={t.id}
-                label={t.label}
-                selected={selectedType === t.id}
-                onPress={
-                  busy
-                    ? undefined
-                    : () => {
-                        setType(t.id)
-                        clear()
-                      }
-                }
-              />
-            ))}
-          </View>
-        ) : null}
+            ) : null}
+          </>
+        )}
         {!online ? (
           <Text color="inkMuted">
             Conecte-se para aplicar uma operação em grupo.

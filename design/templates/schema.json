@@ -129,6 +129,15 @@
       "uniqueItems": true
     },
     "roll": { "$ref": "#/$defs/roll" },
+    "recoveries": {
+      "description": "Períodos aplicados pelo narrador, com prévia por ficha e Desfazer.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recovery"
+      },
+      "minItems": 1,
+      "maxItems": 12
+    },
     "actions": {
       "description": "Ações nomeadas da ficha (menu ⋯), como descanso longo ou despertar. Sempre com prévia antes de aplicar.",
       "type": "array",
@@ -288,6 +297,7 @@
         "health.heal",
         "resource.spend",
         "resource.gain",
+        "resource.restore",
         "rest.long",
         "rest.short"
       ]
@@ -1966,46 +1976,130 @@
       "minProperties": 1
     },
     "effectParamsRules": {
-      "description": "Parâmetros exigidos por efeito: resource.spend e resource.gain pedem field e amount; health.heal pede field e types; rest.long e rest.short não têm parâmetros.",
+      "description": "Parâmetros exigidos por efeito: resource.spend e resource.gain pedem field e amount; health.heal pede field e types; rest.long e rest.short não têm parâmetros. resource.restore exige apenas field, um recurso com permanente.",
       "allOf": [
         {
           "if": {
             "properties": {
-              "effect": { "enum": ["resource.spend", "resource.gain"] }
+              "effect": {
+                "enum": [
+                  "resource.spend",
+                  "resource.gain"
+                ]
+              }
             },
-            "required": ["effect"]
+            "required": [
+              "effect"
+            ]
           },
           "then": {
-            "required": ["params"],
+            "required": [
+              "params"
+            ],
             "properties": {
               "params": {
-                "required": ["field", "amount"],
-                "not": { "required": ["types"] }
+                "required": [
+                  "field",
+                  "amount"
+                ],
+                "not": {
+                  "required": [
+                    "types"
+                  ]
+                }
               }
             }
           }
         },
         {
           "if": {
-            "properties": { "effect": { "const": "health.heal" } },
-            "required": ["effect"]
+            "properties": {
+              "effect": {
+                "const": "health.heal"
+              }
+            },
+            "required": [
+              "effect"
+            ]
           },
           "then": {
-            "required": ["params"],
+            "required": [
+              "params"
+            ],
             "properties": {
               "params": {
-                "required": ["field", "types"],
-                "not": { "required": ["amount"] }
+                "required": [
+                  "field",
+                  "types"
+                ],
+                "not": {
+                  "required": [
+                    "amount"
+                  ]
+                }
               }
             }
           }
         },
         {
           "if": {
-            "properties": { "effect": { "enum": ["rest.long", "rest.short"] } },
-            "required": ["effect"]
+            "properties": {
+              "effect": {
+                "enum": [
+                  "rest.long",
+                  "rest.short"
+                ]
+              }
+            },
+            "required": [
+              "effect"
+            ]
           },
-          "then": { "not": { "required": ["params"] } }
+          "then": {
+            "not": {
+              "required": [
+                "params"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "resource.restore"
+              }
+            },
+            "required": [
+              "effect"
+            ]
+          },
+          "then": {
+            "required": [
+              "params"
+            ],
+            "properties": {
+              "params": {
+                "required": [
+                  "field"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "amount"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "types"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -2022,6 +2116,55 @@
       },
       "additionalProperties": false,
       "allOf": [{ "$ref": "#/$defs/effectParamsRules" }]
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "help",
+        "effects"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "help": {
+          "$ref": "#/$defs/helpText"
+        },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/recoveryEffect"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recoveryEffect": {
+      "type": "object",
+      "required": [
+        "effect"
+      ],
+      "properties": {
+        "effect": {
+          "$ref": "#/$defs/effect"
+        },
+        "params": {
+          "$ref": "#/$defs/actionParams"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "$ref": "#/$defs/effectParamsRules"
+        }
+      ]
     },
     "resourceAction": {
       "description": "Ação com custo no próprio recurso (ex.: Curar 1 nível de dano por 1 Sangue).",

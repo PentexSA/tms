@@ -61,6 +61,7 @@ const KEYS = {
     'zoneLabels',
     'statusLabels',
     'alerts',
+    'recoveries',
     'dock',
     'roll',
     'actions',
@@ -901,6 +902,71 @@ function check(
         err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
   }
   for (const a of asArray(t.actions).map(rec)) checkHeal(`actions.${a?.id}`, a)
+  if (t.recoveries !== undefined) {
+    const recoveries = objs('recoveries', t.recoveries)
+    if (!recoveries.length || recoveries.length > 12)
+      err('recoveries', 'de 1 a 12 períodos')
+    const ids = new Set<unknown>()
+    for (const [i, recovery] of recoveries.entries()) {
+      const p = `recoveries.${i}`
+      keys(p, recovery, ['id', 'label', 'help', 'effects'])
+      if (!isId(recovery.id) || ids.has(recovery.id))
+        err(`${p}.id`, 'id inválido ou repetido')
+      ids.add(recovery.id)
+      text(`${p}.label`, recovery.label)
+      text(`${p}.help`, recovery.help, 1000)
+      const effects = objs(`${p}.effects`, recovery.effects)
+      if (!effects.length || effects.length > 20)
+        err(`${p}.effects`, 'de 1 a 20 efeitos')
+      for (const [j, e] of effects.entries()) {
+        const ep = `${p}.effects.${j}`
+        keys(ep, e, ['effect', 'params'])
+        oneOf(`${ep}.effect`, e.effect, REGISTRY.effects, 'effect')
+        if (e.effect === 'rest.long' || e.effect === 'rest.short') {
+          if (e.params !== undefined)
+            err(`${ep}.params`, 'efeito sem parâmetros')
+          continue
+        }
+        const params = rec(e.params)
+        const restore = e.effect === 'resource.restore'
+        const health = e.effect === 'health.heal'
+        keys(
+          `${ep}.params`,
+          params,
+          health
+            ? ['field', 'types']
+            : restore
+              ? ['field']
+              : ['field', 'amount']
+        )
+        if (health) {
+          checkHeal(ep, e)
+          const types = list(`${ep}.params.types`, params?.types)
+          if (
+            !types.length ||
+            types.length > 5 ||
+            new Set(types).size !== types.length
+          )
+            err(`${ep}.params.types`, 'de 1 a 5 tipos distintos')
+        } else {
+          const resource = field(params?.field)
+          if (
+            resource?.type !== 'resource' ||
+            resource.readOnly ||
+            resource.derive
+          )
+            err(
+              `${ep}.params.field`,
+              'precisa apontar para um resource gravável'
+            )
+          if (restore && !resource?.permanent)
+            err(`${ep}.params.field`, 'recurso precisa ter permanente')
+          if (!restore && !isIntIn(params?.amount, 1, 99))
+            err(`${ep}.params.amount`, 'precisa ser inteiro entre 1 e 99')
+        }
+      }
+    }
+  }
   for (const [fid, raw] of Object.entries(fields)) {
     const f = rec(raw)
     if (!f) continue

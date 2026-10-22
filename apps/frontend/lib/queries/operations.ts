@@ -18,6 +18,14 @@ export interface DamageRequest {
   readonly targets: readonly OperationTarget[]
 }
 
+export interface RecoveryRequest {
+  readonly kind: 'recovery'
+  readonly recoveryId: string
+  readonly targets: readonly OperationTarget[]
+}
+
+export type PreviewRequest = DamageRequest | RecoveryRequest
+
 export interface OperationPreview {
   readonly characterId: string
   readonly name: string
@@ -30,7 +38,7 @@ export interface OperationPreview {
   }[]
 }
 
-export const previewOperation = async (id: string, body: DamageRequest) =>
+export const previewOperation = async (id: string, body: PreviewRequest) =>
   unwrap(
     await api.chronicles({ id }).operations.preview.post({
       ...body,
@@ -40,7 +48,8 @@ export const previewOperation = async (id: string, body: DamageRequest) =>
 
 export interface OperationRequest {
   readonly clientOperationId: string
-  readonly kind: 'damage' | 'heal' | 'revert'
+  readonly kind: 'damage' | 'heal' | 'recovery' | 'revert'
+  readonly recoveryId?: string
   readonly amount?: number
   readonly type?: string
   readonly targets?: readonly (OperationTarget & {

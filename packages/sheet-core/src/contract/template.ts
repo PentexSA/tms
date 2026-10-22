@@ -184,6 +184,18 @@ export interface TemplateAction {
   readonly help?: string
 }
 
+export interface RecoveryEffect {
+  readonly effect: EffectName
+  readonly params?: ActionParams
+}
+
+export interface TemplateRecovery {
+  readonly id: string
+  readonly label: string
+  readonly help: string
+  readonly effects: readonly RecoveryEffect[]
+}
+
 export type TabZone = 'build' | 'powers' | 'lore'
 
 export interface Template {
@@ -210,4 +222,5 @@ export interface Template {
   readonly dock: readonly FieldId[]
   readonly roll: Roll
   readonly actions?: readonly TemplateAction[]
+  readonly recoveries?: readonly TemplateRecovery[]
 }

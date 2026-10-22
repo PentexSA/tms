@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { type SheetModel } from '@tms/sheet-core'
+import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
 import { Button, Chip, Skeleton, Tabs, Text, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -120,7 +120,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [operation, setOperation] = useState<{
-    kind: 'damage' | 'heal'
+    kind: 'damage' | 'heal' | 'recovery'
+    recovery?: TemplateRecovery
     items: readonly TableItem[]
   } | null>(null)
   const select = useCallback(
@@ -216,6 +217,29 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 disabled={!online || !chosen.length}
                 onPress={() => setOperation({ kind: 'heal', items: chosen })}
               />
+              {(chosen[0]?.model?.template.recoveries ?? [])
+                .filter(r =>
+                  chosen.every(i =>
+                    i.model?.template.recoveries?.some(
+                      other => other.id === r.id
+                    )
+                  )
+                )
+                .map(recovery => (
+                  <Button
+                    key={recovery.id}
+                    title={recovery.label}
+                    variant="secondary"
+                    disabled={!online}
+                    onPress={() =>
+                      setOperation({
+                        kind: 'recovery',
+                        recovery,
+                        items: chosen,
+                      })
+                    }
+                  />
+                ))}
             </View>
             {!online ? (
               <Text color="inkMuted">
@@ -261,6 +285,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           chronicleId={chronicleId}
           items={operation.items}
           kind={operation.kind}
+          recovery={operation.recovery}
           onClose={() => setOperation(null)}
         />
       ) : null}
