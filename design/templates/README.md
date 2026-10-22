@@ -73,6 +73,8 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 
 `editableIn` diz em quais modos o campo muda: `play` (modo Jogo) e `edit` (modo Evoluir). Padrão: `text` e `longText` em ambos; os demais só em Evoluir. Recursos de jogo declaram `["play"]`. O modo é UX: o servidor valida cada escrita (§11).
 
+O `editableIn` também classifica cada mudança para a política de escrita (doc/plano-v3.md, Etapa 4). Em `rating`, `number`, `percent`, `mark`, `tags` e `list`, o que muda com `["play"]` é **jogo** (a Inspiração e o Ouro do D&D, as Condições, a quantidade do inventário); sem ele, é **evolução** (Atributo, Posto, nível), que depois da criação só o narrador grava. Na dúvida, evolução. Declare `["play"]` onde o jogo gasta ou marca o valor; o permanente de um `resource` e o `value` de um item de lista são sempre evolução.
+
 | `type` | `display` | Valor em `sheet_data.values` | Componente | WoD | D&D 5e | CoC 7e | Fate |
 |---|---|---|---|---|---|---|---|
 | `rating` | – | inteiro `min..max` (até 10) | `RatingDots` | Atributos, Habilidades, Esferas, Posto | Inspiração (0–1) | – | – |

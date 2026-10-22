@@ -457,6 +457,7 @@
       "type": "list",
       "label": "Inventário",
       "itemLabel": "Item",
+      "editableIn": ["play"],
       "searchable": true,
       "density": "compact",
       "item": {
@@ -471,6 +472,7 @@
       "type": "number",
       "label": "Peças de ouro",
       "shortLabel": "PO",
+      "editableIn": ["play"],
       "min": 0,
       "max": 999999,
       "allowInput": true

@@ -37,9 +37,13 @@ Mais os critérios de aceite do 5.1 e do 5.4 da proposta, que viram testes nas e
 
 O que fica fora está no §8.
 
-## Estado da v3 (21/10/2026)
+## Estado da v3 (22/10/2026)
 
-Nenhuma etapa começou. A Etapa 1 depende do PR #30, que está aberto com o CI vermelho em `0ec7546` (§2).
+Marco A pronto (etapas 1 a 3) e a Etapa 4 feita, no branch `feat/v3-mesa`:
+
+- **Etapa 4:** `classify.ts` (`classifyChange`, `classifyBatch`, um classificador por tipo num mapa que quebra o build se faltar um) e `policy.ts` (`writePolicy`, os estados da v3) no `@tms/sheet-core`; o Ouro e o inventário do fixture de D&D com `editableIn: ["play"]`. Os códigos de recusa seguem a decisão 18 (§7).
+
+Próxima: Etapa 5.
 
 ---
 
@@ -220,7 +224,7 @@ A detecção de conflito não muda: ela continua no `applyBatch`, com o `from` *
 
 - `classifyBatch(model, before, events)`: aplica os eventos numa cópia, resolve as duas fichas, classifica cada campo cujo valor efetivo mudou e devolve as partes com classe e caminho (`values.willpower#permanent`), mais a classe mais restrita (`advance` > `edit` > `play`). Uma mudança num campo que o lote não citou (a FdV pela tribo) vem com o caminho do campo afetado; o 403 traz esses caminhos e os do lote, para o app marcar o que foi recusado.
 - O fixture de D&D ganha `editableIn: ["play"]` no Ouro e no inventário (§7, decisão 16).
-- A tabela da política, pura, sem banco (§7, decisão 1): `writePolicy({ owner, storyteller, member }, status, locked, classes)` devolve `ok` ou o código de recusa (`SHEET_LOCKED`, `SHEET_NOT_EDITABLE`, `NEEDS_XP_APPROVAL`, `NOT_MEMBER`). Os estados da v3 são `creating`, `active`, `archived` e `dead`; `pending` chega na v4.
+- A tabela da política, pura, sem banco (§7, decisão 1): `writePolicy({ owner, storyteller, member }, status, locked, classes)` devolve `ok` ou o código de recusa (`SHEET_LOCKED`, `SHEET_NOT_EDITABLE`, `NEEDS_XP_APPROVAL`, `NOT_MEMBER`; §7, decisão 18). Os estados da v3 são `creating`, `active`, `archived` e `dead`; `pending` chega na v4.
 
 **Testes.**
 
@@ -277,7 +281,7 @@ G · depende de: 3, 4 · 5.1 da proposta
   - o dono sobe um `rating` em `creating` e não em `active`;
   - o dono não rola com custo numa ficha travada, e rola sem custo;
   - o ex-membro lê a ficha arquivada e recebe 403 em `/events` e em `/rolls` (o ex-membro chega de verdade na Etapa 7; aqui, o vínculo apagado direto no banco);
-  - um lote de Evoluir criado em `creating` e enviado depois da conclusão é recusado com `SHEET_NOT_EDITABLE`, e a ficha não muda;
+  - um lote de Evoluir criado em `creating` e enviado depois da conclusão é recusado com `NEEDS_XP_APPROVAL` (§7, decisão 18), e a ficha não muda; um lote qualquer do dono numa ficha arquivada, com `SHEET_NOT_EDITABLE`;
   - um gasto de FdV enviado depois da trava é recusado com `SHEET_LOCKED`;
   - concluir duas vezes dá 409, e só há uma linha no `chronicle_audit`;
   - o narrador escreve em todos os estados;
@@ -298,10 +302,10 @@ M · depende de: 5
 
 - `rejectionMessage` recebe o corpo e troca o 403 genérico por uma frase por código:
   - `SHEET_LOCKED`: "O narrador travou a ficha. A alteração foi desfeita.";
-  - `SHEET_NOT_EDITABLE`: "A criação foi concluída: só o narrador muda isto agora. A alteração foi desfeita.";
+  - `SHEET_NOT_EDITABLE`: "A ficha está arquivada ou fora de jogo: só o narrador muda isto agora. A alteração foi desfeita.";
   - `NEEDS_XP_APPROVAL`: "Depois da criação, subir um traço passa pelo narrador. A alteração foi desfeita.";
   - `NOT_MEMBER`: "Você saiu desta crônica: a ficha é só leitura. A alteração foi desfeita.";
-  - sem código, a frase de hoje.
+  - sem código, ou com `FORBIDDEN`, a frase de hoje.
 - A rolagem (`useDice`) usa as mesmas frases. Sem rede, a rolagem com custo continua no aparelho e o custo vai pela fila; a recusa chega pelo mesmo caminho.
 - A ficha usa `writePolicy` só para desabilitar o que o servidor vai recusar, com o motivo no lugar: em `active`, os steppers de `rating` em Evoluir ficam desabilitados ("Peça ao narrador"), e texto e especialização continuam editáveis; travada, o Jogo fica em Leitura com um aviso. O servidor continua a autoridade.
 - Narrador, no menu ⋯ da ficha: "Concluir criação" (em `creating`), "Travar" e "Destravar" (em `active`), "Arquivar", "Marcar como" o rótulo de `dead` do template, e "Reativar". Arquivar e `dead` pedem confirmação.
@@ -608,6 +612,7 @@ Nenhuma reabre o §10 da proposta. São lacunas achadas ao conferir o código.
 | 15 | O que o app oferece ao ex-membro: esconder a edição ou deixar tentar? O passo 5 da jornada pede a recusa com o motivo na tela | O app abre a ficha do ex-membro em Leitura, sem controles de edição. A recusa com o motivo aparece quando a página estava aberta antes da remoção (sem tempo real, é o caso comum), e é isso que a jornada prova | 7 |
 | 16 | Na dúvida, `advance` (Etapa 4): um número que o jogo gasta sem `editableIn: ["play"]` vira evolução. No fixture de D&D, o Ouro (`number`) e a quantidade do inventário (`meta.qty` de `list`) deixariam de mudar em `active` | O template declara `editableIn: ["play"]` onde o jogo gasta, como já faz com a Inspiração e as Condições. A Etapa 4 marca o Ouro e o inventário no fixture. Os três templates do produto não têm caso assim (conferido: nenhum `rating`, `number` ou `list` deles muda em Jogo) | 4 |
 | 17 | A tabela do 5.1 põe a especialização em `edit`, mas ela muda a rolagem (`tenCountsDouble`), como a proficiência do D&D, que a Etapa 4 põe em `advance` | Seguir a proposta na v3: especialização é `edit`. A diferença fica registrada, e a v4 decide com os custos de XP se ela passa a ser `advance` | 4 |
+| 18 | Os critérios do 5.1 recusam o lote de Evoluir depois da conclusão com `SHEET_NOT_EDITABLE`, mas a Etapa 5 recusa a troca de tribo em `active` (o mesmo `advance`) com `NEEDS_XP_APPROVAL`, e a proposta não diz o código de `archived` e `dead` | `advance` em `active` é sempre `NEEDS_XP_APPROVAL`, o caminho do pedido de XP da v4; `SHEET_NOT_EDITABLE` é o estado sem escrita do dono (`archived`, `dead` e, na v4, `pending`). Mais `FORBIDDEN`, a rede de segurança para quem não tem papel na ficha (o servidor já devolve 404 antes) | 4 |
 
 ---
 

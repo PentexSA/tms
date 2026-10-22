@@ -3,6 +3,7 @@
 // (Expo) usam o mesmo código: no servidor ele é a autoridade; no cliente,
 // conveniência.
 
+export * from './classify'
 export * from './compile'
 export type * from './contract'
 export { DERIVE, isDeriveName } from './derive'
@@ -16,6 +17,7 @@ export * from './modes'
 export { PALETTE } from './palette'
 export * from './parse'
 export * from './permissions'
+export * from './policy'
 export * from './random'
 export * from './registry'
 export * from './resolve'

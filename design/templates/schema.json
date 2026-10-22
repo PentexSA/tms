@@ -427,7 +427,7 @@
         },
         "help": { "$ref": "#/$defs/helpText" },
         "editableIn": {
-          "description": "Modos em que o campo pode ser alterado. Padrão: text/longText em play e edit; demais só em edit (Evoluir). Recursos de jogo declaram [play]. É UX, não controle de acesso: o servidor valida cada escrita.",
+          "description": "Modos em que o campo pode ser alterado. Padrão: text/longText em play e edit; demais só em edit (Evoluir). Recursos de jogo declaram [play]. O modo é UX (o servidor valida cada escrita), mas o editableIn também classifica a mudança: em rating, number, percent, mark, tags e list, o que tem [play] é jogo; sem ele, evolução (README §3).",
           "type": "array",
           "items": { "$ref": "#/$defs/mode" },
           "minItems": 1,
