@@ -185,13 +185,14 @@ jobs:
           sudo python3 - <<'PY'
           from pathlib import Path
           directory = Path('/etc/apt/sources.list.d')
-          paths = [Path('/etc/apt/sources.list'), *directory.glob('*.list'), *directory.glob('*.sources')]
+          paths = [Path('/etc/apt/sources.list'), *directory.glob('*.list'), *directory.glob('*.sources'), *Path('/etc/apt').glob('apt-mirrors*.txt')]
           for path in paths:
               if path.is_file():
                   source = path.read_text()
-                  updated = source.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  updated = source.replace('azure.archive.ubuntu.com', 'archive.ubuntu.com')
                   if updated != source:
                       path.write_text(updated)
+                      print(f'Espelho atualizado: {path}')
           PY
       - run: pnpm -C e2e exec playwright install --with-deps chromium webkit
       # Exporta o app web com a URL da API do E2E e confere o bundle

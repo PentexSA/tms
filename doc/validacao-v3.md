@@ -29,7 +29,7 @@ Playwright em Chromium e WebKit. O resultado final fica no próprio PR.
 O job web usa o arquivo oficial do Ubuntu para instalar as bibliotecas dos
 navegadores. Na primeira rodada, o espelho Azure do runner repetiu downloads
 e consumiu mais de 19 minutos antes do cancelamento pela atualização do PR;
-a troca de endereço mantém os pacotes e suas assinaturas.
+a troca de endereço mantém os pacotes e suas assinaturas, inclusive nos arquivos `apt-mirrors*.txt` usados pelo runner.
 
 ## Android
 
