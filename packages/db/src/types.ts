@@ -32,6 +32,7 @@ export interface CharacterBatches {
   created_by: string | null
   id: Generated<string>
   operation_id: string | null
+  session_id: string | null
   sheet_version: number
 }
 
@@ -58,14 +59,17 @@ export interface CharacterEvents {
 export interface CharacterRolls {
   batch_id: string | null
   by_role: string
-  character_id: string
+  character_id: string | null
+  chronicle_id: string
   client_roll_id: string
   created_at: Generated<Timestamp>
   created_by: string | null
+  hidden: Generated<boolean>
   id: Generated<string>
   label: string
   manual: Generated<boolean>
   request: Json
+  request_hash: string | null
   result: Json
 }
 
@@ -81,8 +85,11 @@ export interface Characters {
   creation_revision: Generated<number>
   deleted_at: Timestamp | null
   id: Generated<string>
+  kind: Generated<string>
   locked_at: Timestamp | null
   name: string
+  portrait_url: string | null
+  presentation_revision: Generated<number>
   sheet_data: Json
   sheet_version: Generated<number>
   status: Generated<string>
@@ -90,6 +97,8 @@ export interface Characters {
   template_version: string
   updated_at: Generated<Timestamp | null>
   user_id: string
+  visibility: Generated<string>
+  visibility_revision: Generated<number>
 }
 
 export interface ChronicleAudit {
@@ -101,6 +110,16 @@ export interface ChronicleAudit {
   payload: Generated<Json>
   target_character_id: string | null
   target_user_id: string | null
+}
+
+export interface ChronicleCommands {
+  chronicle_id: string
+  client_command_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  kind: string
+  request_hash: string
+  result: Json
 }
 
 export interface ChronicleInvites {
@@ -131,6 +150,7 @@ export interface ChronicleOperations {
   request_hash: string | null
   reverts_batch_id: string | null
   reverts_operation_id: string | null
+  session_id: string | null
 }
 
 export interface Chronicles {
@@ -138,11 +158,42 @@ export interface Chronicles {
   created_at: Generated<Timestamp | null>
   creation_defaults: Generated<Json>
   creation_settings_revision: Generated<number>
+  description: Generated<string>
   id: Generated<string>
+  image_url: string | null
   name: string
+  options: Generated<Json>
+  settings_revision: Generated<number>
   storyteller_id: string
   system_id: string
   updated_at: Generated<Timestamp | null>
+}
+
+export interface ChronicleSessions {
+  chronicle_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  private_notes: Generated<string>
+  public_summary: Generated<string>
+  revision: Generated<number>
+  session_date: Timestamp
+  title: string
+  updated_at: Generated<Timestamp>
+}
+
+export interface ChronicleTransfers {
+  chronicle_id: string
+  client_command_id: string
+  decided_at: Timestamp | null
+  decision_key: string | null
+  expires_at: Timestamp
+  id: Generated<string>
+  recipient_id: string
+  request_hash: string
+  requested_at: Generated<Timestamp>
+  requested_by: string | null
+  status: Generated<string>
 }
 
 export interface GameSystems {
@@ -227,9 +278,12 @@ export interface DB {
   character_rolls: CharacterRolls
   characters: Characters
   chronicle_audit: ChronicleAudit
+  chronicle_commands: ChronicleCommands
   chronicle_invites: ChronicleInvites
   chronicle_members: ChronicleMembers
   chronicle_operations: ChronicleOperations
+  chronicle_sessions: ChronicleSessions
+  chronicle_transfers: ChronicleTransfers
   chronicles: Chronicles
   game_systems: GameSystems
   refresh_tokens: RefreshTokens
