@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { RoleName, SheetMode } from '@tms/sheet-core'
+import { type RoleName, type SheetMode, xpLedgerFields } from '@tms/sheet-core'
 import { AppBar, Button, EmptyState, Screen, Skeleton, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -20,6 +20,7 @@ import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
+import { ExperienceSheet } from './xp/ExperienceSheet'
 
 export function SheetScreen({
   id,
@@ -33,6 +34,7 @@ export function SheetScreen({
   const queryClient = useQueryClient()
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
+  const [xp, setXp] = useState(false)
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -113,6 +115,15 @@ export function SheetScreen({
                 locked={state.character.lockedAt !== null}
               />
             ) : null}
+            {state.status === 'ready' && xpLedgerFields(state.model).length ? (
+              <Button
+                title="Experiência"
+                variant="ghost"
+                testID="xp-open"
+                accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
+                onPress={() => setXp(true)}
+              />
+            ) : null}
             {state.status === 'ready' ? (
               <Button
                 title="Histórico"
@@ -134,6 +145,22 @@ export function SheetScreen({
       ) : (
         body
       )}
+      {state.status === 'ready' && xp ? (
+        <ExperienceSheet
+          characterId={id}
+          chronicleId={state.character.chronicle.id}
+          model={state.model}
+          sheet={state.sheet}
+          roles={state.roles}
+          lifecycle={{
+            status: state.character.status,
+            locked: state.character.lockedAt !== null,
+            member: state.character.member,
+          }}
+          visible={xp}
+          onClose={() => setXp(false)}
+        />
+      ) : null}
       {state.status === 'ready' ? (
         <HistorySheet
           characterId={id}

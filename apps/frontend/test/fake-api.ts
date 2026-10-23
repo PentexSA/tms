@@ -23,6 +23,9 @@ export function createFakeApi() {
     // Membros (v3, Etapa 7): remover e sair
     memberDelete: jest.fn(),
     leaveDelete: jest.fn(),
+    // XP (v4, Etapa 8): concessão e pedidos pendentes da crônica
+    xpPost: jest.fn(),
+    xpRequestsGet: jest.fn(async (..._args: unknown[]) => ok({ items: [] })),
   }
   const calls = {
     characterGet: jest.fn(),
@@ -42,6 +45,14 @@ export function createFakeApi() {
     acceptPost: jest.fn(),
     meDelete: jest.fn(),
     healthGet: jest.fn(),
+    // XP (v4, Etapa 8): extrato, pedidos, ajuste e decisões
+    xpGet: jest.fn(async (..._args: unknown[]) =>
+      ok({ supported: true, balance: null, items: [], next: null })
+    ),
+    xpRequestsGet: jest.fn(async (..._args: unknown[]) => ok({ items: [] })),
+    xpRequestPost: jest.fn(),
+    xpAdjustPost: jest.fn(),
+    xpDecisionPost: jest.fn(),
     chronicle,
     chronicleIds: [] as string[],
   }
@@ -69,6 +80,26 @@ export function createFakeApi() {
         post: (...a: unknown[]) => calls.lockPost(id, ...a),
         delete: (...a: unknown[]) => calls.lockDelete(id, ...a),
       },
+      xp: { get: (...a: unknown[]) => calls.xpGet(id, ...a) },
+      'xp-adjustments': {
+        post: (...a: unknown[]) => calls.xpAdjustPost(id, ...a),
+      },
+      'xp-requests': Object.assign(
+        ({ requestId }: { requestId: string }) =>
+          Object.fromEntries(
+            (['approve', 'reject', 'cancel'] as const).map(action => [
+              action,
+              {
+                post: (...a: unknown[]) =>
+                  calls.xpDecisionPost(id, requestId, action, ...a),
+              },
+            ])
+          ),
+        {
+          get: (...a: unknown[]) => calls.xpRequestsGet(id, ...a),
+          post: (...a: unknown[]) => calls.xpRequestPost(id, ...a),
+        }
+      ),
     }),
     chronicles: Object.assign(
       ({ id }: { id: string }) => {
@@ -81,6 +112,10 @@ export function createFakeApi() {
             post: (...a: unknown[]) => chronicle.charactersPost(...a),
           },
           table: { get: (...a: unknown[]) => chronicle.tableGet(...a) },
+          xp: { post: (...a: unknown[]) => chronicle.xpPost(id, ...a) },
+          'xp-requests': {
+            get: (...a: unknown[]) => chronicle.xpRequestsGet(id, ...a),
+          },
           operations: {
             preview: {
               post: (...a: unknown[]) => chronicle.operationPreview(...a),

@@ -13,6 +13,7 @@ import {
   useChronicleTable,
 } from '../../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../../lib/queries/focus'
+import { useChronicleXpRequests } from '../../lib/queries/xp'
 import { useTableOrder } from '../../lib/tableOrder'
 import { compileSafe, templateQuery } from '../../sheet/data'
 import { OperationSheet } from './OperationSheet'
@@ -24,6 +25,7 @@ import {
   type TableRowData,
   type TableSort,
 } from './tableItems'
+import { GrantXpSheet, grantable, XpRequestsSheet } from './XpSheets'
 
 // A Mesa do narrador (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9;
 // design/telas/mesa.html): uma linha por personagem com o dock e os alertas
@@ -124,6 +126,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     recovery?: TemplateRecovery
     items: readonly TableItem[]
   } | null>(null)
+  const [xpSheet, setXpSheet] = useState<'grant' | 'requests' | null>(null)
+  const xpRequests = useChronicleXpRequests(chronicleId)
   const select = useCallback(
     (id: string) =>
       setSelected(old => {
@@ -194,6 +198,14 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           />
         </View>
         <UpdatedAt at={table.dataUpdatedAt} />
+        {xpRequests.data?.length ? (
+          <Button
+            title={`Pedidos de XP (${xpRequests.data.length})`}
+            variant="secondary"
+            testID="table-xp-requests"
+            onPress={() => setXpSheet('requests')}
+          />
+        ) : null}
         <Button
           title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
           variant="secondary"
@@ -216,6 +228,13 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 variant="secondary"
                 disabled={!online || !chosen.length}
                 onPress={() => setOperation({ kind: 'heal', items: chosen })}
+              />
+              <Button
+                title="Conceder XP"
+                variant="secondary"
+                testID="table-xp-grant"
+                disabled={!online || !grantable(chosen)}
+                onPress={() => setXpSheet('grant')}
               />
               {(chosen[0]?.model?.template.recoveries ?? [])
                 .filter(r =>
@@ -280,6 +299,19 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           />
         ))
       )}
+      {xpSheet === 'grant' ? (
+        <GrantXpSheet
+          chronicleId={chronicleId}
+          items={chosen}
+          onClose={() => setXpSheet(null)}
+        />
+      ) : null}
+      {xpSheet === 'requests' ? (
+        <XpRequestsSheet
+          chronicleId={chronicleId}
+          onClose={() => setXpSheet(null)}
+        />
+      ) : null}
       {operation ? (
         <OperationSheet
           chronicleId={chronicleId}
