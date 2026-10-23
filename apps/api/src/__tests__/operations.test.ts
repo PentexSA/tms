@@ -89,6 +89,58 @@ const both = () => [
 ]
 
 describe('prévia', () => {
+  it('a sessão faz parte da intenção idempotente da operação', async () => {
+    const sessions = await ctx.db
+      .insertInto('chronicle_sessions')
+      .values([
+        {
+          chronicle_id: chronicleId,
+          session_date: '2026-10-20',
+          title: 'Primeira',
+          created_by: storyteller.id,
+        },
+        {
+          chronicle_id: chronicleId,
+          session_date: '2026-10-21',
+          title: 'Segunda',
+          created_by: storyteller.id,
+        },
+      ])
+      .returning('id')
+      .execute()
+    const key = crypto.randomUUID()
+    const body = {
+      clientOperationId: key,
+      kind: 'damage',
+      type: 'lethal',
+      amount: 2,
+      targets: both(),
+      sessionId: sessions[0]?.id,
+    }
+    expect(
+      (
+        await as(
+          ctx,
+          storyteller,
+          'POST',
+          `/chronicles/${chronicleId}/operations`,
+          body
+        )
+      ).status
+    ).toBe(201)
+    const conflict = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/operations`,
+      { ...body, sessionId: sessions[1]?.id }
+    )
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toMatchObject({
+      code: 'IDEMPOTENCY_CONFLICT',
+    })
+  })
+
   it('recuperação usa só o período do template: prévia, reenvio e reversão', async () => {
     const request = {
       kind: 'recovery',
@@ -461,5 +513,46 @@ describe('reverter', () => {
       (await revert({ revertsOperationId: op, revertsBatchId: batch.id }))
         .status
     ).toBe(422)
+  })
+})
+
+describe('NPC na operação em grupo (v5)', () => {
+  it('o NPC oculto leva dano com as fichas e a reversão o devolve', async () => {
+    const npc = await createCharacter(ctx, storyteller, chronicleId, {
+      name: 'Capanga',
+      health: unhurt,
+    })
+    await ctx.db
+      .updateTable('characters')
+      .set({ kind: 'npc', visibility: 'hidden' })
+      .where('id', '=', npc)
+      .execute()
+    await setStatus(ctx, npc, 'active')
+    const targets = await Promise.all(
+      [helena, npc].map(async id => ({
+        characterId: id,
+        sheetVersion: (await row(id)).sheet_version,
+      }))
+    )
+    const res = await lethal(targets)
+    expect(res.status).toBe(201)
+    const { operationId } = (await res.json()) as { operationId: string }
+    for (const id of [helena, npc])
+      expect((await row(id)).sheet_data).toMatchObject({
+        values: { health: { lethal: 2 } },
+      })
+    expect((await revert({ revertsOperationId: operationId })).status).toBe(201)
+    for (const id of [helena, npc])
+      expect((await row(id)).sheet_data).toMatchObject({
+        values: { health: unhurt },
+      })
+    // A operação não abre o NPC oculto para a jogadora
+    const listed = await as(
+      ctx,
+      player,
+      'GET',
+      `/chronicles/${chronicleId}/characters`
+    )
+    expect(JSON.stringify(await listed.json())).not.toContain('Capanga')
   })
 })

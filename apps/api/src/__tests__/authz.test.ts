@@ -1,5 +1,8 @@
 /// <reference types="bun-types" />
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import type { DB } from '@tms/db'
+import { createPGliteTestDb } from '@tms/db/testing'
+import type { Kysely } from 'kysely'
 import {
   type Actor,
   MATRIX,
@@ -18,6 +21,7 @@ import {
 } from '../test/factories'
 import {
   createTestContext,
+  createTestContextOn,
   destroyTestDb,
   type TestContext,
 } from '../test/helpers'
@@ -31,6 +35,11 @@ import {
 // nos três sistemas do produto (doc/plano-v3.md, Etapa 3). O cenário é
 // montado uma vez por sistema; a linha que muda o estado (excluir, gravar)
 // monta o dela, por ator.
+//
+// Todos os cenários dividem um PGLite: cada um tem usuários, crônicas e fichas
+// próprios, e app e relógio novos (rate limit zerado). Um PGLite por cenário
+// passava de 1.000 instâncias e ~2 GB de memória. Dividir o banco também
+// endurece a matriz: o segredo de um cenário não pode aparecer em outro.
 
 // Marca única nas Notas do Narrador: nenhuma resposta a quem não é narrador
 // pode trazê-la, nem o 200 da dona nem o 404 do outro jogador.
@@ -41,14 +50,25 @@ interface Scenario {
   readonly users: Record<Exclude<Actor, 'anonymous'>, TestUser>
   readonly chronicleId: string
   readonly characterId: string
+  readonly npcId: string
   readonly inviteId: string
   readonly requestId: string
+  readonly sessionId: string
+  readonly transferId: string
 }
 
+let matrixDb: { db: Kysely<DB>; destroy: () => Promise<void> } | null = null
+const published = new Set<string>()
+let scenarios = 0
+
 async function scenario(s: SystemCase): Promise<Scenario> {
-  await destroyTestDb()
-  const ctx = await createTestContext()
-  await publish(ctx, s.system)
+  matrixDb ??= await createPGliteTestDb()
+  const ctx = createTestContextOn(matrixDb.db)
+  if (!published.has(s.system)) {
+    await publish(ctx, s.system)
+    published.add(s.system)
+  }
+  const n = ++scenarios
   const users = {} as Scenario['users']
   for (const actor of [
     'storyteller',
@@ -58,12 +78,20 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     'otherStoryteller',
     'stranger',
   ] as const)
-    users[actor] = await createUser(ctx, actor.toLowerCase())
+    users[actor] = await createUser(ctx, `${actor.toLowerCase()}${n}`)
   const chronicleId = await createChronicle(ctx, users.storyteller, s.system)
   await addMember(ctx, chronicleId, users.owner)
   await addMember(ctx, chronicleId, users.player)
   await createChronicle(ctx, users.otherStoryteller, s.system, 'Outra')
   const characterId = await createCharacter(ctx, users.owner, chronicleId)
+  const npcId = await createCharacter(ctx, users.storyteller, chronicleId, {
+    name: 'NPC oculto',
+  })
+  await ctx.db
+    .updateTable('characters')
+    .set({ kind: 'npc', visibility: 'hidden' })
+    .where('id', '=', npcId)
+    .execute()
   // O ex-membro: tem ficha na crônica e não tem mais o vínculo
   await createCharacter(ctx, users.former, chronicleId, { name: 'Antiga' })
   const notes = await as(
@@ -100,13 +128,40 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     })
     .returning('id')
     .executeTakeFirstOrThrow()
+  const session = await ctx.db
+    .insertInto('chronicle_sessions')
+    .values({
+      chronicle_id: chronicleId,
+      session_date: '2026-10-23',
+      title: 'Sessão da matriz',
+      public_summary: 'Resumo público',
+      private_notes: 'nota-privada-da-matriz',
+      created_by: users.storyteller.id,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow()
+  const transfer = await ctx.db
+    .insertInto('chronicle_transfers')
+    .values({
+      chronicle_id: chronicleId,
+      requested_by: users.storyteller.id,
+      recipient_id: users.player.id,
+      client_command_id: crypto.randomUUID(),
+      request_hash: 'matrix',
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow()
   return {
     ctx,
     users,
     chronicleId,
     characterId,
+    npcId,
     inviteId: invite.id,
     requestId: request.id,
+    sessionId: session.id,
+    transferId: transfer.id,
   }
 }
 
@@ -117,12 +172,16 @@ async function request(
   actor: Actor
 ) {
   const id = row.route.startsWith('/characters')
-    ? sc.characterId
+    ? row.target === 'npc'
+      ? sc.npcId
+      : sc.characterId
     : sc.chronicleId
   const path = row.route
     .replace(':id', id)
     .replace(':inviteId', sc.inviteId)
     .replace(':requestId', sc.requestId)
+    .replace(':sessionId', sc.sessionId)
+    .replace(':transferId', sc.transferId)
     // Remover: o outro jogador
     .replace(':userId', sc.users.player.id)
   const user = actor === 'anonymous' ? null : sc.users[actor]
@@ -131,7 +190,10 @@ async function request(
     user,
     row.method,
     path,
-    row.body?.(s, { characterId: sc.characterId })
+    row.body?.(s, {
+      characterId: sc.characterId,
+      playerId: sc.users.player.id,
+    })
   )
 }
 
@@ -142,6 +204,11 @@ async function check(
   actor: Actor,
   status: number
 ) {
+  if (row.method === 'POST' && row.route === '/chronicles/:id/transfer')
+    await sc.ctx.db
+      .deleteFrom('chronicle_transfers')
+      .where('id', '=', sc.transferId)
+      .execute()
   if (row.sheet)
     await setStatus(
       sc.ctx,
@@ -160,6 +227,8 @@ async function check(
 }
 
 afterAll(async () => {
+  await matrixDb?.destroy()
+  matrixDb = null
   await destroyTestDb()
 })
 

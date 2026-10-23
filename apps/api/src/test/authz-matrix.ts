@@ -29,8 +29,12 @@ export interface MatrixRow {
   // O caso do sistema e a ficha da dona no cenário
   readonly body?: (
     s: SystemCase,
-    ids: { readonly characterId: string }
+    ids: {
+      readonly characterId: string
+      readonly playerId: string
+    }
   ) => unknown
+  readonly target?: 'character' | 'npc'
   // A linha muda o cenário (excluir, gravar): monta um cenário por ator
   readonly mutates?: true
   // Estado da ficha antes da requisição (travar pede `active`; aprovar e
@@ -254,6 +258,153 @@ export const MATRIX: readonly MatrixRow[] = [
     method: 'GET',
     route: '/characters/:id/rolls',
     expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  // Bastidores v5: diário público; todos os comandos e dados privados ficam
+  // exclusivos da narradora. O ex-membro não recebe nem o diário público.
+  {
+    method: 'GET',
+    route: '/chronicles/:id/sessions',
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/sessions',
+    body: () => ({
+      clientCommandId: crypto.randomUUID(),
+      date: '2026-10-23',
+      title: 'Sessão da matriz',
+      summary: 'Resumo público',
+      privateNotes: 'Nota privada',
+    }),
+    mutates: true,
+    expect: { storyteller: 201, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/sessions/:sessionId',
+    expect: { storyteller: 200, owner: 200, player: 200, ...denied },
+  },
+  {
+    method: 'PATCH',
+    route: '/chronicles/:id/sessions/:sessionId',
+    body: () => ({
+      clientCommandId: crypto.randomUUID(),
+      revision: 0,
+      date: '2026-10-23',
+      title: 'Sessão revista',
+      summary: 'Resumo público',
+      privateNotes: 'Nota privada revista',
+    }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'PATCH',
+    route: '/chronicles/:id',
+    body: () => ({
+      clientCommandId: crypto.randomUUID(),
+      revision: 0,
+      name: 'Crônica da Liberdade',
+      description: 'Descrição pública',
+    }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/transfer',
+    body: (_, ids) => ({
+      clientCommandId: crypto.randomUUID(),
+      recipientId: ids.playerId,
+    }),
+    mutates: true,
+    expect: { storyteller: 201, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/transfer',
+    expect: {
+      storyteller: 200,
+      owner: 404,
+      player: 200,
+      ...denied,
+    },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/transfer/:transferId/accept',
+    body: () => ({ clientCommandId: crypto.randomUUID() }),
+    mutates: true,
+    expect: {
+      storyteller: 404,
+      owner: 404,
+      player: 200,
+      ...denied,
+    },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/transfer/:transferId/reject',
+    body: () => ({ clientCommandId: crypto.randomUUID() }),
+    mutates: true,
+    expect: {
+      storyteller: 404,
+      owner: 404,
+      player: 200,
+      ...denied,
+    },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/transfer/:transferId/cancel',
+    body: () => ({ clientCommandId: crypto.randomUUID() }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/history',
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/visibility',
+    target: 'npc',
+    body: () => ({
+      clientCommandId: crypto.randomUUID(),
+      visibility: 'identity',
+      revision: 0,
+    }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
+    method: 'PATCH',
+    route: '/characters/:id/presentation',
+    target: 'npc',
+    body: () => ({
+      clientCommandId: crypto.randomUUID(),
+      portraitUrl: 'https://example.test/npc.png',
+      revision: 0,
+    }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/chronicles/:id/rolls',
+    body: () => ({
+      clientRollId: crypto.randomUUID(),
+      dice: 3,
+      difficulty: 6,
+      label: 'Parada livre',
+    }),
+    expect: { storyteller: 201, owner: 404, player: 404, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/rolls',
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
   },
   // Extrato de XP (v4, Etapa 6): o narrador concede e ajusta; dono e
   // narrador leem. Os WoD mapeiam o extrato, sem preço de traço

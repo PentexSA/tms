@@ -168,6 +168,12 @@ describe('GET /chronicles/:id', () => {
     expect(body).toEqual({
       id: chronicleId,
       name: 'Crônica da Liberdade',
+      description: '',
+      imageUrl: null,
+      options: {},
+      optionCatalog: [],
+      settingsRevision: 0,
+      lastSession: null,
       system: {
         code: 'vtm-v20',
         name: 'Vampiro: A Máscara — Edição de 20º Aniversário',
