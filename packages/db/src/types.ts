@@ -35,6 +35,16 @@ export interface CharacterBatches {
   sheet_version: number
 }
 
+export interface CharacterCommands {
+  character_id: string
+  client_command_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  kind: string
+  request_hash: string
+  result: Json
+}
+
 export interface CharacterEvents {
   batch_id: string
   from_absent: Generated<boolean>
@@ -60,10 +70,15 @@ export interface CharacterRolls {
 }
 
 export interface Characters {
+  activated_at: Timestamp | null
+  approved_at: Timestamp | null
+  approved_by: string | null
   chronicle_id: string
   created_at: Generated<Timestamp | null>
+  creation: Generated<Json>
   creation_completed_at: Timestamp | null
   creation_completed_by: string | null
+  creation_revision: Generated<number>
   deleted_at: Timestamp | null
   id: Generated<string>
   locked_at: Timestamp | null
@@ -118,7 +133,10 @@ export interface ChronicleOperations {
 }
 
 export interface Chronicles {
+  character_approval: Generated<boolean>
   created_at: Generated<Timestamp | null>
+  creation_defaults: Generated<Json>
+  creation_settings_revision: Generated<number>
   id: Generated<string>
   name: string
   storyteller_id: string
@@ -166,6 +184,7 @@ export interface Users {
 
 export interface DB {
   character_batches: CharacterBatches
+  character_commands: CharacterCommands
   character_events: CharacterEvents
   character_rolls: CharacterRolls
   characters: Characters
