@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
 import { Emblem, isEmblem } from './Emblem'
 import { Text } from './Text'
 import { useTheme } from './theme'
@@ -19,10 +19,11 @@ export interface AvatarProps {
   // Símbolo da criatura (identity.emblem do template) no lugar das
   // iniciais; nome desconhecido ou ausente volta às iniciais.
   readonly emblem?: string | null
+  readonly imageUrl?: string | null
 }
 
 /** Símbolo ou iniciais na cor do accent do contexto. Decorativo: o nome está ao lado. */
-export function Avatar({ name, size = 'sm', emblem }: AvatarProps) {
+export function Avatar({ name, size = 'sm', emblem, imageUrl }: AvatarProps) {
   const { accent } = useTheme()
   const d = size === 'lg' ? tokens.size.avatarLg : tokens.size.avatarSm
   return (
@@ -34,7 +35,13 @@ export function Avatar({ name, size = 'sm', emblem }: AvatarProps) {
         { width: d, height: d, backgroundColor: accent.fill },
       ]}
     >
-      {isEmblem(emblem) ? (
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          accessibilityLabel={`Retrato de ${name}`}
+          style={{ width: d, height: d, borderRadius: tokens.radius.pill }}
+        />
+      ) : isEmblem(emblem) ? (
         <Emblem
           name={emblem}
           size={Math.round(d * 0.62)}

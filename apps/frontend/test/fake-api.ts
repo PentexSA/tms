@@ -28,6 +28,22 @@ export function createFakeApi() {
     xpRequestsGet: jest.fn(async (..._args: unknown[]) => ok({ items: [] })),
     // Criação por pontos (v4, Etapa 5): configuração por crônica
     creationSettingsPatch: jest.fn(),
+    // Bastidores (v5): apresentação, sessões, transferência e auditoria
+    patch: jest.fn(),
+    sessionsGet: jest.fn(
+      async (..._args: unknown[]): Promise<unknown> => ok({ items: [] })
+    ),
+    sessionsPost: jest.fn(),
+    sessionPatch: jest.fn(),
+    transferGet: jest.fn(
+      async (..._args: unknown[]): Promise<unknown> => fail(404)
+    ),
+    transferPost: jest.fn(),
+    transferDecision: jest.fn(),
+    historyGet: jest.fn(
+      async (..._args: unknown[]): Promise<unknown> =>
+        ok({ items: [], nextCursor: null })
+    ),
   }
   const calls = {
     characterGet: jest.fn(),
@@ -120,6 +136,34 @@ export function createFakeApi() {
         return {
           get: (...a: unknown[]) => chronicle.get(...a),
           delete: (...a: unknown[]) => chronicle.delete(id, ...a),
+          patch: (...a: unknown[]) => chronicle.patch(id, ...a),
+          sessions: Object.assign(
+            ({ sessionId }: { sessionId: string }) => ({
+              patch: (...a: unknown[]) =>
+                chronicle.sessionPatch(id, sessionId, ...a),
+            }),
+            {
+              get: (...a: unknown[]) => chronicle.sessionsGet(id, ...a),
+              post: (...a: unknown[]) => chronicle.sessionsPost(id, ...a),
+            }
+          ),
+          transfer: Object.assign(
+            ({ transferId }: { transferId: string }) =>
+              Object.fromEntries(
+                (['accept', 'reject', 'cancel'] as const).map(action => [
+                  action,
+                  {
+                    post: (...a: unknown[]) =>
+                      chronicle.transferDecision(id, transferId, action, ...a),
+                  },
+                ])
+              ),
+            {
+              get: (...a: unknown[]) => chronicle.transferGet(id, ...a),
+              post: (...a: unknown[]) => chronicle.transferPost(id, ...a),
+            }
+          ),
+          history: { get: (...a: unknown[]) => chronicle.historyGet(id, ...a) },
           characters: {
             get: (...a: unknown[]) => chronicle.charactersGet(...a),
             post: (...a: unknown[]) => chronicle.charactersPost(...a),

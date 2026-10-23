@@ -16,14 +16,35 @@ import { messageOf } from '../../lib/errors'
 import { useChronicleCharacters } from '../../lib/queries/chronicles'
 import { useCompiled, useTemplate } from '../../sheet/data'
 
-interface Row {
+interface PublicIdentity {
+  readonly name: string
+  readonly chip: string
+  readonly subtitle: string | null
+  readonly portraitUrl: string | null
+}
+
+interface FullRow {
+  readonly projection?: 'full'
   readonly id: string
   readonly name: string
   readonly mine: boolean
   readonly owner: { readonly username: string }
   readonly templateVersion: string
   readonly values: Record<string, unknown>
+  readonly kind?: 'pc' | 'npc'
+  readonly visibility?: 'hidden' | 'identity' | 'full'
+  readonly identity?: PublicIdentity
 }
+
+interface IdentityRow {
+  readonly projection: 'identity'
+  readonly id: string
+  readonly kind: 'npc'
+  readonly visibility: 'identity' | 'full'
+  readonly identity: PublicIdentity
+}
+
+type Row = FullRow | IdentityRow
 
 // Uma linha por ficha, com o selo e o resumo calculados pelo core a partir
 // da prévia que a API manda (identidade e dock, sem campo restrito).
@@ -35,19 +56,50 @@ function CharacterRow({
   readonly systemCode: string
 }) {
   const router = useRouter()
-  const template = useTemplate(systemCode, row.templateVersion)
+  const partial = row.projection === 'identity'
+  const template = useTemplate(
+    systemCode,
+    partial ? undefined : row.templateVersion
+  )
   const model = useCompiled(template.data)
-  const identity = model
-    ? identityOf(resolve(model, { values: row.values } as SheetData))
-    : null
-  const owner = row.mine ? 'Sua ficha' : `de ${row.owner.username}`
+  const identity = partial
+    ? row.identity
+    : (row.identity ??
+      (model
+        ? identityOf(resolve(model, { values: row.values } as SheetData))
+        : null))
+  const owner = partial
+    ? 'NPC revelado'
+    : row.mine
+      ? 'Sua ficha'
+      : `de ${row.owner.username}`
+  const name = partial ? row.identity.name : row.name
   return (
-    <ThemeProvider accent={identity?.accent ?? 'accent-neutral'}>
+    <ThemeProvider
+      accent={
+        identity && 'accent' in identity ? identity.accent : 'accent-neutral'
+      }
+    >
       <ListItem
-        title={row.name}
-        subtitle={identity ? identity.summary : undefined}
+        title={name}
+        subtitle={
+          identity
+            ? 'summary' in identity
+              ? identity.summary
+              : (identity.subtitle ?? undefined)
+            : undefined
+        }
         meta={identity?.chip ? `${identity.chip} · ${owner}` : owner}
-        leading={<Avatar name={row.name} />}
+        leading={
+          <Avatar
+            name={name}
+            imageUrl={
+              identity && 'portraitUrl' in identity
+                ? identity.portraitUrl
+                : undefined
+            }
+          />
+        }
         onPress={() => router.push(`/characters/${row.id}`)}
       />
     </ThemeProvider>
@@ -71,12 +123,29 @@ export function CharacterList({
   const router = useRouter()
   const characters = useChronicleCharacters(chronicleId)
   const rows = (characters.data ?? []) as Row[]
-  const shown = narrating ? rows : rows.filter(r => r.mine)
+  const pcs = rows.filter(
+    (row): row is FullRow =>
+      row.projection !== 'identity' && (row.kind ?? 'pc') === 'pc'
+  )
+  const npcs = rows.filter(row =>
+    row.projection === 'identity' ? true : row.kind === 'npc'
+  )
+  const shown = narrating ? pcs : pcs.filter(r => r.mine)
   const create = (
     <Button
       title="Nova ficha"
       variant="secondary"
       onPress={() => router.push(`/chronicles/${chronicleId}/new-character`)}
+    />
+  )
+  const createNpc = (
+    <Button
+      title="Criar NPC"
+      variant="secondary"
+      accessibilityHint="Cria um personagem do narrador, oculto por padrão"
+      onPress={() =>
+        router.push(`/chronicles/${chronicleId}/new-character?kind=npc`)
+      }
     />
   )
   return (
@@ -103,6 +172,25 @@ export function CharacterList({
         shown.map(row => (
           <CharacterRow key={row.id} row={row} systemCode={systemCode} />
         ))
+      )}
+      {(narrating || npcs.length > 0) && (
+        <>
+          <View style={styles.header}>
+            <SectionHeader
+              title="NPCs"
+              right={narrating ? createNpc : undefined}
+            />
+          </View>
+          {npcs.length === 0 ? (
+            <Text color="inkMuted" style={styles.text}>
+              Nenhum NPC ainda.
+            </Text>
+          ) : (
+            npcs.map(row => (
+              <CharacterRow key={row.id} row={row} systemCode={systemCode} />
+            ))
+          )}
+        </>
       )}
     </View>
   )

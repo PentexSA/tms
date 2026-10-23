@@ -227,7 +227,8 @@ describe('para o jogador a Mesa não existe', () => {
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(await screen.findByText('Narrador: ana')).toBeTruthy()
     expect(screen.queryByRole('tab', { name: 'Mesa' })).toBeNull()
-    expect(screen.queryByLabelText('Visão da crônica')).toBeNull()
+    // A v5 oferece o Diário público ao jogador, mas não a Mesa administrativa.
+    expect(screen.getByLabelText('Visão da crônica')).toBeTruthy()
     expect(
       screen.getByText('Você ainda não tem ficha nesta crônica.')
     ).toBeTruthy()

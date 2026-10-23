@@ -21,11 +21,43 @@ export const sheetKeys = {
     ['templates', code, version] as const,
 }
 
+const normalizeCharacter = (value: unknown) => {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !('projection' in value) &&
+    'sheet' in value
+  )
+    return {
+      ...value,
+      projection: 'full' as const,
+      kind: 'pc' as const,
+      visibility: 'hidden' as const,
+      visibilityRevision: 0,
+      presentationRevision: 0,
+      identity: {
+        name:
+          'name' in value && typeof value.name === 'string'
+            ? value.name
+            : 'Personagem',
+      },
+    }
+  return value
+}
+
 export const useCharacter = (id: string) =>
   useQuery({
     queryKey: sheetKeys.character(id),
     queryFn: async ({ signal }) =>
-      unwrap(await api.characters({ id }).get({ fetch: { signal } })),
+      normalizeCharacter(
+        unwrap(await api.characters({ id }).get({ fetch: { signal } }))
+      ) as Awaited<ReturnType<typeof api.characters>> extends never
+        ? never
+        : NonNullable<
+            Awaited<
+              ReturnType<ReturnType<typeof api.characters>['get']>
+            >['data']
+          >,
   })
 
 /** A consulta de uma versão de template: a Mesa pede várias de uma vez. */
@@ -89,6 +121,15 @@ export function useCompiled(json: unknown): SheetModel | null | undefined {
 }
 
 export type CharacterData = NonNullable<ReturnType<typeof useCharacter>['data']>
+type IdentityCharacterData = Extract<CharacterData, { projection: 'identity' }>
+type FullCharacterData = Extract<CharacterData, { projection: 'full' }>
+type EditableCharacterData = FullCharacterData & {
+  readonly creation: object
+  readonly sheetVersion: number
+  readonly member: boolean
+  readonly owner: { readonly username: string }
+  readonly name: string
+}
 
 export type SheetState =
   | { readonly status: 'loading' }
@@ -100,31 +141,42 @@ export type SheetState =
   | { readonly status: 'unsupported' }
   | { readonly status: 'invalid' }
   | {
+      readonly status: 'identity'
+      readonly character: IdentityCharacterData
+    }
+  | {
+      readonly status: 'viewer'
+      readonly model: SheetModel
+      readonly sheet: SheetData
+      readonly roles: readonly RoleName[]
+      readonly character: FullCharacterData
+    }
+  | {
       readonly status: 'ready'
       readonly model: SheetModel
       readonly sheet: SheetData
       readonly roles: readonly RoleName[]
-      readonly character: CharacterData
+      readonly character: EditableCharacterData
     }
 
 export function useSheetData(id: string): SheetState {
   const character = useCharacter(id)
-  const template = useTemplate(
-    character.data?.systemCode,
-    character.data?.templateVersion
-  )
+  const full =
+    character.data?.projection === 'full' ? character.data : undefined
+  const template = useTemplate(full?.systemCode, full?.templateVersion)
   const compiled = useCompiled(template.data)
   const parsed = useMemo(
-    () =>
-      compiled && character.data
-        ? parseSheet(compiled, character.data.sheet)
-        : undefined,
-    [compiled, character.data]
+    () => (compiled && full ? parseSheet(compiled, full.sheet) : undefined),
+    [compiled, full]
   )
 
   // Com a ficha em mãos (cache, disco), um refetch que falha não tira a
   // ficha da tela: offline, ela continua jogável; a fila sincroniza depois
-  if (character.isError && !character.data)
+  const cachedViewer =
+    character.data?.projection === 'identity' ||
+    (character.data?.projection === 'full' &&
+      character.data.roles.includes('viewer'))
+  if (character.isError && (!character.data || cachedViewer))
     return {
       status: 'error',
       error: character.error,
@@ -136,14 +188,24 @@ export function useSheetData(id: string): SheetState {
       error: template.error,
       retry: () => template.refetch(),
     }
+  if (character.data?.projection === 'identity')
+    return { status: 'identity', character: character.data }
   if (compiled === null) return { status: 'unsupported' }
-  if (!character.data || !compiled || !parsed) return { status: 'loading' }
+  if (!full || !compiled || !parsed) return { status: 'loading' }
   if (!parsed.ok) return { status: 'invalid' }
+  if (full.roles.includes('viewer'))
+    return {
+      status: 'viewer',
+      model: compiled,
+      sheet: parsed.value,
+      roles: full.roles as readonly RoleName[],
+      character: full,
+    }
   return {
     status: 'ready',
     model: compiled,
     sheet: parsed.value,
-    roles: character.data.roles as RoleName[],
-    character: character.data,
+    roles: full.roles as RoleName[],
+    character: full as EditableCharacterData,
   }
 }

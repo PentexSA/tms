@@ -94,6 +94,21 @@ export function DiceSheet({
       }
     >
       <View style={styles.body}>
+        {dice.storyteller ? (
+          <View style={styles.secret}>
+            <Chip
+              label="Rolagem oculta"
+              selected={dice.hidden}
+              onPress={() => dice.setHidden(!dice.hidden)}
+            />
+            {dice.hidden && plan.ok && plan.events.length ? (
+              <Text variant="caption" color="inkMuted">
+                O custo ainda altera a ficha, mas esta rolagem e seu lote não
+                aparecem no histórico do jogador.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         {dice.presets.length ? (
           <View
             role="group"
@@ -339,6 +354,7 @@ function Toggle({
 
 const styles = StyleSheet.create({
   body: { gap: tokens.space[3], paddingBottom: tokens.space[4] },
+  secret: { gap: tokens.space[2], alignItems: 'flex-start' },
   picker: { gap: tokens.space[2], paddingLeft: tokens.space[3] },
   pool: { gap: tokens.space[1] },
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
