@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
+import { CreationSettings } from '../../../../components/chronicles/CreationSettings'
 import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
 import {
@@ -100,6 +101,14 @@ export default function ChronicleScreen() {
               : `Narrador: ${c.storyteller.username}`}
           </Text>
         </View>
+
+        {narrating && c.creation ? (
+          <CreationSettings
+            chronicleId={c.id}
+            systemCode={c.system.code}
+            creation={c.creation}
+          />
+        ) : null}
 
         {narrating ? (
           <Tabs

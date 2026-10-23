@@ -136,6 +136,15 @@ const order = () =>
     .map(r => String(r.props.testID).replace('table-row-', ''))
 
 describe('Mesa com alertas', () => {
+  it('inclui fichas aguardando aprovação no recorte em jogo', async () => {
+    await openTable()
+    expect(calls.chronicle.tableGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: { status: 'creating,pending,active' },
+      })
+    )
+  })
+
   it('Incapacitado vira selo e entra no nome acessível; sem alerta, nada', async () => {
     await openTable()
     expect(

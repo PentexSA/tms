@@ -4,6 +4,7 @@ import { chronicleKeys } from '../../lib/queries/chronicles'
 import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
 import type { SheetStore, SheetSync } from '../store/sheetStore'
+import { ledgerMessage } from '../xp/messages'
 import type { Outbox, QueuedBatch } from './outbox'
 import { createSender, type PostOutcome, type Sender } from './sender'
 
@@ -84,8 +85,15 @@ export function rejectionMessage(
   label: string,
   status: number,
   draft = false,
-  body: unknown = null
+  body: unknown = null,
+  storyteller = false
 ): string {
+  // As projeções do extrato não se gravam por evento (v4, §3.6)
+  if (
+    status === 403 &&
+    (body as { code?: unknown } | null)?.code === 'XP_MANAGED_BY_LEDGER'
+  )
+    return `${ledgerMessage(storyteller)} A alteração foi desfeita.`
   const why = status === 403 ? refusalReason(refusalCodeOf(body)) : null
   if (why) return `${why} A alteração foi desfeita.`
   if (status === 403)
@@ -179,7 +187,15 @@ export function createSync(deps: SyncDeps): Sync {
             batch.clientBatchId,
             status === 422 ? issuesOf(body) : undefined
           )
-        notify(rejectionMessage(batch.label, status, batch.draft, body))
+        notify(
+          rejectionMessage(
+            batch.label,
+            status,
+            batch.draft,
+            body,
+            stores.get(characterId)?.getState().roles.includes('storyteller')
+          )
+        )
         // A recusa da política diz que o estado mudou (travada, concluída):
         // a ficha rebuscada mostra o motivo no lugar
         if (status === 404 || refusalCodeOf(body)) void refetch(characterId)

@@ -2,10 +2,14 @@ import type { DB } from '@tms/db'
 import {
   applyBatch,
   canRead,
+  checkCreationBatch,
   classifyBatch,
+  creationInputOf,
   describeEvent,
   isReversible,
+  ledgerPaths,
   MAX_EVENTS_PER_BATCH,
+  parseCharacterCreation,
   parsePath,
   type RoleName,
   type SheetEvent,
@@ -18,9 +22,11 @@ import type { Kysely } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
 import { characterAccess } from '../authz'
+import { isLedgerKind } from '../chronicles/operations'
 import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
+import { creationRefusal } from './creation'
 import { modelFor } from './models'
 import { lockCharacter, refusal, writeAccess } from './policy'
 
@@ -94,6 +100,29 @@ export function eventRoutes(
               sheet: stripRestricted(model, current, roles),
             }
 
+          // As projeções do extrato não se gravam por evento, nem pelo
+          // narrador (§3.5). Estado, trava e vínculo vêm antes: quem não
+          // escreve na ficha recebe o motivo do estado
+          const ledger = ledgerPaths(model, body.events)
+          if (ledger.length) {
+            const verdict = writePolicy(
+              await writeAccess(trx, roles, character.chronicleId, me),
+              character.status,
+              character.lockedAt !== null,
+              []
+            )
+            if (!verdict.ok)
+              throw refusal(verdict, {
+                model,
+                roles,
+                paths: body.events.map(e => e.path),
+              })
+            throw new ApiError(403, 'o XP passa pelo extrato', {
+              code: 'XP_MANAGED_BY_LEDGER',
+              paths: ledger,
+            })
+          }
+
           const result = applyBatch(
             model,
             current,
@@ -148,6 +177,26 @@ export function eventRoutes(
               paths: body.events.map(e => e.path),
               parts: classes.parts,
             })
+
+          // Avaliação parcial da criação por pontos (doc/plano-v4.md §3.1):
+          // falta de básicos passa; bônus acima do saldo, teto ou avanço sem
+          // prioridade, não. Vale para dono e narrador (§2.3, 21), com os
+          // metadados de agora, lidos com a ficha travada
+          if (
+            character.status === 'creating' ||
+            character.status === 'pending'
+          ) {
+            const worse = checkCreationBatch(
+              model,
+              current,
+              result.sheet,
+              creationInputOf(
+                model,
+                parseCharacterCreation(model, character.creation)
+              )
+            )
+            if (worse) throw creationRefusal(model, roles, worse)
+          }
 
           const sheetVersion = character.sheetVersion + 1
           const nameField = model.template.identity.name
@@ -330,6 +379,7 @@ export function eventRoutes(
               // desfeito. O app mostra só ao narrador
               reversible:
                 b.operationKind !== 'revert' &&
+                !isLedgerKind(b.operationKind) &&
                 !b.reverted &&
                 isReversible(
                   model,

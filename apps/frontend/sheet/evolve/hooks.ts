@@ -6,6 +6,7 @@ import {
   isEditableIn,
   type SheetMode,
   type SheetModel,
+  xpLedgerFields,
 } from '@tms/sheet-core'
 import { useCallback } from 'react'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
@@ -24,7 +25,12 @@ export function canEditIn(
 ): boolean {
   const field = model.fields.get(id)
   return Boolean(
-    field && isEditableIn(field, mode) && canWrite(model, id, roles)
+    field &&
+      isEditableIn(field, mode) &&
+      canWrite(model, id, roles) &&
+      // As projeções do extrato mudam pelos comandos de XP, nunca pelo
+      // editor, nem para o narrador (v4, §3.5): "Experiência" no topo
+      !xpLedgerFields(model).includes(id)
   )
 }
 
@@ -33,8 +39,12 @@ export function canEditSomething(
   model: SheetModel,
   roles: ReadonlySet<string>
 ): boolean {
+  const ledger = xpLedgerFields(model)
   return [...model.fields.keys()].some(
-    id => !model.fields.get(id)?.readOnly && canWrite(model, id, roles)
+    id =>
+      !model.fields.get(id)?.readOnly &&
+      !ledger.includes(id) &&
+      canWrite(model, id, roles)
   )
 }
 

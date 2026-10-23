@@ -1,6 +1,11 @@
 import {
   type ApplyFailure,
   applyBatch,
+  type CreationCheck,
+  type CreationInput,
+  type CreationRefusal,
+  checkCreation,
+  checkCreationBatch,
   type FieldId,
   type Issue,
   invert,
@@ -52,7 +57,9 @@ export interface SheetConflict {
   readonly paths: readonly string[]
 }
 
-export type CommitFailure = ApplyFailure | 'limit' | 'readonly'
+// `creation`: a avaliação parcial da criação por pontos recusou o lote
+// (doc/plano-v4.md §3.1); ele nem entra na fila
+export type CommitFailure = ApplyFailure | 'limit' | 'readonly' | 'creation'
 
 export type CommitResult =
   | { readonly ok: true; readonly batch: QueuedBatch }
@@ -77,6 +84,9 @@ export interface SheetStoreInit {
   // Sem sync, a ficha é só de leitura (prévia, testes de renderização).
   readonly sync?: SheetSync
   readonly uuid?: () => string
+  // A conta da criação por pontos, quando ela vale (creating/pending, modo
+  // por pontos): os contadores e a avaliação parcial antes de enfileirar
+  readonly creation?: CreationInput | null
 }
 
 export interface SheetState {
@@ -95,6 +105,11 @@ export interface SheetState {
   readonly conflict: SheetConflict | null
   // O que o servidor recusou (422), por campo: o editor mostra a mensagem.
   readonly fieldIssues: ReadonlyMap<FieldId, string>
+  readonly creation: CreationInput | null
+  // A conta do que a tela mostra (com o rascunho), ou null sem criação
+  readonly check: CreationCheck | null
+  // A última recusa da avaliação parcial, para a tela explicar por grupo
+  readonly creationRefusal: CreationRefusal | null
 }
 
 export interface SheetActions {
@@ -135,6 +150,8 @@ export interface SheetActions {
   draftEvents(): SheetEvent[]
   saveDraft(label: string): CommitResult | null
   discardDraft(): void
+  /** A conta da criação mudou (escolhas, orçamento, estado). */
+  setCreation(creation: CreationInput | null): void
 }
 
 export type SheetStore = StoreApi<SheetState & SheetActions>
@@ -246,14 +263,23 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
     return again.ok ? again.sheet : values
   }
 
-  type Derived = Pick<SheetState, 'values' | 'resolved' | 'entries'>
+  type Derived = Pick<SheetState, 'values' | 'resolved' | 'entries' | 'check'>
   const derive = (
     state: Pick<SheetState, 'snapshot' | 'pending' | 'draft'> &
-      Partial<Pick<SheetState, 'entries'>>,
+      Partial<Pick<SheetState, 'entries' | 'creation'>>,
     values = applyAll(state.snapshot, state.pending)
   ): Derived => {
-    const resolved = resolve(model, shown(values, state.draft))
-    return { values, resolved, entries: share(state.entries, resolved) }
+    const display = shown(values, state.draft)
+    const resolved = resolve(model, display)
+    return {
+      values,
+      resolved,
+      entries: share(state.entries, resolved),
+      // O rascunho pode mostrar o excesso enquanto é corrigido (§3.1)
+      check: state.creation
+        ? checkCreation(model, display, state.creation)
+        : null,
+    }
   }
 
   return createStore<SheetState & SheetActions>()((set, get) => {
@@ -272,6 +298,24 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       if (!sync) return failure('readonly', 'ficha só de leitura')
       const r = applyBatch(model, s.values, { events }, roles)
       if (!r.ok) return { ok: false, kind: r.kind, issues: r.issues }
+      // A mesma avaliação parcial do servidor, antes de enfileirar: o lote
+      // que estoura a conta não sai do aparelho
+      const refused = s.creation
+        ? checkCreationBatch(model, s.values, r.sheet, s.creation)
+        : null
+      if (refused) {
+        set({ creationRefusal: refused })
+        return {
+          ok: false,
+          kind: 'creation',
+          issues: refused.problems.flatMap(p =>
+            (p.paths.length ? p.paths : ['']).map(path => ({
+              path: path.split('#')[0] ?? '',
+              message: p.code,
+            }))
+          ),
+        }
+      }
       const batch: QueuedBatch = {
         clientBatchId: uuid(),
         events: events.map(e => ({ path: e.path, from: e.from, to: e.to })),
@@ -289,7 +333,12 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         options?.undoable === false
           ? s.undoStack
           : [...s.undoStack, batch].slice(-MAX_UNDO)
-      set({ pending, undoStack, ...derive({ ...s, pending }, r.sheet) })
+      set({
+        pending,
+        undoStack,
+        creationRefusal: null,
+        ...derive({ ...s, pending }, r.sheet),
+      })
       sync.enqueue(characterId, batch)
       return { ok: true, batch }
     }
@@ -349,7 +398,14 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       snapshot: init.sheet,
       sheetVersion: init.sheetVersion,
       pending: [],
-      ...derive({ snapshot: init.sheet, pending: [], draft: null }),
+      ...derive({
+        snapshot: init.sheet,
+        pending: [],
+        draft: null,
+        creation: init.creation ?? null,
+      }),
+      creation: init.creation ?? null,
+      creationRefusal: null,
       mode: init.mode ?? 'read',
       draft: null,
       undoStack: [],
@@ -428,7 +484,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           pending,
           undoStack,
           draft,
-          mode: back ? 'evolve' : s.mode,
+          mode: back ? (s.creation ? 'create' : 'evolve') : s.mode,
           fieldIssues: marked?.size ? marked : s.fieldIssues,
           ...derive({ ...s, pending, draft }),
         })
@@ -512,7 +568,17 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         set({
           draft: null,
           fieldIssues: NO_ISSUES,
+          creationRefusal: null,
           ...derive({ ...s, draft: null }, s.values),
+        })
+      },
+
+      setCreation(creation) {
+        const s = get()
+        set({
+          creation,
+          creationRefusal: null,
+          ...derive({ ...s, creation }, s.values),
         })
       },
     }

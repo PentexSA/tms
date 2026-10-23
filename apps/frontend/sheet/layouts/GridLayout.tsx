@@ -1,7 +1,8 @@
-import type { CompiledGroup } from '@tms/sheet-core'
+import { type CompiledGroup, isDraftMode } from '@tms/sheet-core'
 import { SectionHeader, Text, tokens, useLayout } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
+import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
@@ -19,9 +20,9 @@ export function GridLayout({ section }: LayoutProps) {
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
   // Abas só no Editar: em Jogo e Leitura a grade cabe inteira
-  const tabs = useGroupTabs(section, groups, { enabled: mode === 'evolve' })
+  const tabs = useGroupTabs(section, groups, { enabled: isDraftMode(mode) })
   const columns =
-    !tabs.bar && !stacked && !(mode === 'evolve' && breakpoint === 'compact')
+    !tabs.bar && !stacked && !(isDraftMode(mode) && breakpoint === 'compact')
 
   if (!columns)
     return (
@@ -32,7 +33,11 @@ export function GridLayout({ section }: LayoutProps) {
             {/* Com abas, o título do grupo é a própria aba */}
             {g.title && !tabs.bar ? (
               <View style={styles.title}>
-                <SectionHeader title={g.title} level="group" />
+                <SectionHeader
+                  title={g.title}
+                  level="group"
+                  right={<CreationCounter fieldIds={g.fieldIds} />}
+                />
               </View>
             ) : null}
             {g.fieldIds.map(id => (

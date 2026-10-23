@@ -246,6 +246,9 @@ export function chronicleRoutes(
             'g.name as systemName',
             'st.id as storytellerId',
             'st.username as storyteller',
+            'c.character_approval',
+            'c.creation_defaults',
+            'c.creation_settings_revision',
           ])
           .where('c.id', '=', params.id)
           .executeTakeFirstOrThrow()
@@ -267,6 +270,13 @@ export function chronicleRoutes(
           .execute()
         return {
           ...head,
+          // Configuração da criação (v4): o narrador ajusta; o jogador vê se
+          // a ficha nova passa por aprovação e o orçamento padrão
+          creation: {
+            approval: c.character_approval,
+            defaults: c.creation_defaults,
+            revision: c.creation_settings_revision,
+          },
           // O rótulo da crônica para o app; o papel na ficha é outro
           role:
             role === 'storyteller'

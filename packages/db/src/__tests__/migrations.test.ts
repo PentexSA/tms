@@ -25,6 +25,7 @@ describe('migrations', () => {
         order by table_name`.execute(db)
       expect(rows.map(r => r.table_name)).toEqual([
         'character_batches',
+        'character_commands',
         'character_events',
         'character_rolls',
         'characters',
@@ -37,6 +38,8 @@ describe('migrations', () => {
         'refresh_tokens',
         'trait_templates',
         'users',
+        'xp_entries',
+        'xp_requests',
       ])
     } finally {
       await destroy()
@@ -254,11 +257,11 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       expect(character).toMatchObject({ status: 'creating', locked_at: null })
 
-      // `pending` chega na v4: até lá, o banco recusa
+      // Estado fora da lista: o banco recusa
       await expect(
         db
           .updateTable('characters')
-          .set({ status: 'pending' })
+          .set({ status: 'zumbi' })
           .where('id', '=', character.id)
           .execute()
       ).rejects.toThrow()
@@ -404,6 +407,148 @@ describe('migrations', () => {
         .returning('from_absent')
         .executeTakeFirstOrThrow()
       expect(event.from_absent).toBe(false)
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0016–0018: criação, extrato e um pedido pendente por traço', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'n', email: 'n@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning([
+          'id',
+          'character_approval',
+          'creation_defaults',
+          'creation_settings_revision',
+        ])
+        .executeTakeFirstOrThrow()
+      // Aprovação desligada por padrão
+      expect(chronicle).toMatchObject({
+        character_approval: false,
+        creation_defaults: {},
+        creation_settings_revision: 0,
+      })
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: user.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning(['id', 'creation', 'creation_revision', 'activated_at'])
+        .executeTakeFirstOrThrow()
+      expect(character).toMatchObject({
+        creation: {},
+        creation_revision: 0,
+        activated_at: null,
+      })
+      await db
+        .updateTable('characters')
+        .set({ status: 'pending', approved_by: user.id })
+        .where('id', '=', character.id)
+        .execute()
+      const command = () =>
+        db
+          .insertInto('character_commands')
+          .values({
+            character_id: character.id,
+            client_command_id: '00000000-0000-4000-8000-000000000001',
+            kind: 'creation.complete',
+            request_hash: 'h',
+            result: JSON.stringify({ status: 'pending' }),
+            created_by: user.id,
+          })
+          .execute()
+      await command()
+      // A mesma chave na mesma ficha não grava duas vezes
+      await expect(command()).rejects.toThrow()
+
+      // As operações de XP entram na lista de tipos
+      await db
+        .insertInto('chronicle_operations')
+        .values({
+          chronicle_id: chronicle.id,
+          client_operation_id: crypto.randomUUID(),
+          kind: 'xp-grant',
+          request_hash: 'h',
+        })
+        .execute()
+      const entry = (values: {
+        kind: string
+        total_delta?: number
+        spent_delta?: number
+        reverses_entry_id?: string
+      }) =>
+        db
+          .insertInto('xp_entries')
+          .values({ character_id: character.id, ...values })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const grant = await entry({ kind: 'grant', total_delta: 5 })
+      await expect(entry({ kind: 'grant', total_delta: -1 })).rejects.toThrow()
+      await expect(entry({ kind: 'adjust', total_delta: 0 })).rejects.toThrow()
+      await expect(entry({ kind: 'spend', spent_delta: 0 })).rejects.toThrow()
+      await expect(
+        entry({ kind: 'spend', spent_delta: 1, total_delta: 1 })
+      ).rejects.toThrow()
+      // Estorno: só um ajuste negativo aponta a concessão
+      await entry({
+        kind: 'adjust',
+        total_delta: -2,
+        reverses_entry_id: grant.id,
+      })
+      await expect(
+        entry({ kind: 'adjust', total_delta: 2, reverses_entry_id: grant.id })
+      ).rejects.toThrow()
+
+      const request = (values: { status?: string; to_value?: number } = {}) =>
+        db
+          .insertInto('xp_requests')
+          .values({
+            character_id: character.id,
+            client_request_id: crypto.randomUUID(),
+            target_field: 'dexterity',
+            target_key: 'dexterity',
+            from_value: 2,
+            to_value: 3,
+            cost: 8,
+            ...values,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      await request()
+      // Um pendente por traço; decididos não contam
+      await expect(request()).rejects.toThrow()
+      await request({ status: 'rejected' })
+      await expect(
+        request({ status: 'approved', to_value: 4 })
+      ).rejects.toThrow()
+      await expect(request({ status: 'lost' })).rejects.toThrow()
+
+      // A ficha sai: extrato e pedidos vão junto, mesmo com estorno apontando
+      await db.deleteFrom('characters').execute()
+      expect(await db.selectFrom('xp_entries').select('id').execute()).toEqual(
+        []
+      )
+      expect(await db.selectFrom('xp_requests').select('id').execute()).toEqual(
+        []
+      )
     } finally {
       await destroy()
     }

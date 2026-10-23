@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'bun:test'
 import { compileTemplate } from '../compile'
 import type { SheetData } from '../contract'
-import { isEditableIn, type SheetMode } from '../modes'
+import { isDraftMode, isEditableIn, type SheetMode } from '../modes'
 import {
   canRead,
   canReadSection,
@@ -156,16 +156,23 @@ describe('isEditableIn (UX, não é controle de acesso)', () => {
     ['blood', 'evolve', true],
     ['strength', 'play', false],
     ['strength', 'evolve', true],
+    ['strength', 'create', true],
     ['notes', 'play', true],
     ['notes', 'evolve', true],
   ] as const)('%s em %s → %p', (id, mode: SheetMode, expected) => {
     expect(isEditableIn(field(id), mode)).toBe(expected)
   })
 
+  it('isDraftMode: Evoluir e a criação usam rascunho', () => {
+    expect(
+      ['read', 'play', 'evolve', 'create'].map(m => isDraftMode(m as SheetMode))
+    ).toEqual([false, false, true, true])
+  })
+
   it('derivado não é editável em modo nenhum', () => {
     const dnd = compileTemplate(templates['dnd5e-2014'])
     const initiative = dnd.fields.get('initiative')
-    for (const mode of ['read', 'play', 'evolve'] as const)
+    for (const mode of ['read', 'play', 'evolve', 'create'] as const)
       expect(initiative && isEditableIn(initiative, mode)).toBe(false)
   })
 })

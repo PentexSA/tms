@@ -33,8 +33,12 @@ export interface MatrixRow {
   ) => unknown
   // A linha muda o cenário (excluir, gravar): monta um cenário por ator
   readonly mutates?: true
-  // Estado da ficha antes da requisição (travar pede `active`)
-  readonly sheet?: { readonly status: 'active'; readonly locked?: true }
+  // Estado da ficha antes da requisição (travar pede `active`; aprovar e
+  // devolver pedem `pending`)
+  readonly sheet?: {
+    readonly status: 'active' | 'pending'
+    readonly locked?: true
+  }
 }
 
 // O ex-membro responde como quem não tem vínculo, salvo onde a linha diz
@@ -178,6 +182,37 @@ export const MATRIX: readonly MatrixRow[] = [
     mutates: true,
     expect: { storyteller: 200, owner: 403, player: 404, ...denied },
   },
+  // Criação e aprovação (v4, Etapa 4). Os templates do produto ainda não têm
+  // `creation` (Etapa 2b): a criação é livre, e só o narrador conclui
+  {
+    method: 'PATCH',
+    route: '/characters/:id/creation',
+    body: () => ({ revision: 0, choices: {} }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/approve',
+    sheet: { status: 'pending' },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/return',
+    body: () => ({ reason: 'Refaça os Antecedentes' }),
+    sheet: { status: 'pending' },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'PATCH',
+    route: '/chronicles/:id/creation-settings',
+    body: () => ({ revision: 0, approval: true }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
+  },
   {
     method: 'POST',
     route: '/characters/:id/status',
@@ -219,6 +254,79 @@ export const MATRIX: readonly MatrixRow[] = [
     method: 'GET',
     route: '/characters/:id/rolls',
     expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  // Extrato de XP (v4, Etapa 6): o narrador concede e ajusta; dono e
+  // narrador leem. Os WoD mapeiam o extrato, sem preço de traço
+  {
+    method: 'POST',
+    route: '/chronicles/:id/xp',
+    body: (_, { characterId }) => ({
+      clientOperationId: crypto.randomUUID(),
+      amount: 3,
+      reason: 'Sessão 1',
+      targets: [{ characterId }],
+    }),
+    mutates: true,
+    expect: { storyteller: 201, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/xp-adjustments',
+    body: () => ({
+      clientOperationId: crypto.randomUUID(),
+      delta: 2,
+      reason: 'Correção',
+    }),
+    mutates: true,
+    expect: { storyteller: 201, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/characters/:id/xp',
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  // Pedidos (v4, Etapa 7): o dono pede e cancela, o narrador decide. O
+  // cenário tem um pedido pendente; sem preço no WoD, pedir dá 422 e
+  // aprovar marca o pedido desatualizado (409)
+  {
+    method: 'POST',
+    route: '/characters/:id/xp-requests',
+    body: s => ({ clientRequestId: crypto.randomUUID(), field: s.ratingField }),
+    sheet: { status: 'active' },
+    mutates: true,
+    expect: { storyteller: 403, owner: 422, player: 404, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/characters/:id/xp-requests',
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  {
+    method: 'GET',
+    route: '/chronicles/:id/xp-requests',
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/xp-requests/:requestId/approve',
+    body: () => ({ decisionKey: crypto.randomUUID() }),
+    sheet: { status: 'active' },
+    mutates: true,
+    expect: { storyteller: 409, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/xp-requests/:requestId/reject',
+    body: () => ({ decisionKey: crypto.randomUUID(), reason: 'Ainda não' }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/xp-requests/:requestId/cancel',
+    body: () => ({ decisionKey: crypto.randomUUID() }),
+    mutates: true,
+    expect: { storyteller: 403, owner: 200, player: 404, ...denied },
   },
 ]
 

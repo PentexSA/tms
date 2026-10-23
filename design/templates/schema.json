@@ -138,6 +138,8 @@
       "minItems": 1,
       "maxItems": 12
     },
+    "creation": { "$ref": "#/$defs/creation" },
+    "costs": { "$ref": "#/$defs/costs" },
     "actions": {
       "description": "Ações nomeadas da ficha (menu ⋯), como descanso longo ou despertar. Sempre com prévia antes de aplicar.",
       "type": "array",
@@ -2116,6 +2118,190 @@
       },
       "additionalProperties": false,
       "allOf": [{ "$ref": "#/$defs/effectParamsRules" }]
+    },
+    "budgetRule": {
+      "description": "Regras de orçamento da criação (REGISTRY.budgetRules).",
+      "enum": ["priority-budget", "fixed-budget", "item-count", "point-buy"]
+    },
+    "capRule": {
+      "description": "Tetos da criação (REGISTRY.capRules): creation-cap limita só os pontos básicos; hard-cap vale também para os bônus.",
+      "enum": ["creation-cap", "hard-cap"]
+    },
+    "costRule": {
+      "description": "Regras de preço (REGISTRY.costRules): flat e per-current em XP; flat, item-meta e credit em pontos de bônus.",
+      "enum": ["flat", "per-current", "item-meta", "credit"]
+    },
+    "points": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "accountingCondition": {
+      "description": "Comparação declarativa com um choice da ficha, nunca expressão. in: a opção escolhida está na lista; equalsTarget: a opção é o id do campo-alvo; itemIn: o item-alvo tem um destes nomes do catálogo.",
+      "type": "object",
+      "required": ["field"],
+      "properties": {
+        "field": { "$ref": "#/$defs/fieldRef" },
+        "in": { "type": "array", "items": { "$ref": "#/$defs/id" }, "minItems": 1, "maxItems": 50, "uniqueItems": true },
+        "equalsTarget": { "const": true },
+        "itemIn": { "type": "array", "items": { "$ref": "#/$defs/safeText", "maxLength": 80 }, "minItems": 1, "maxItems": 200, "uniqueItems": true }
+      },
+      "anyOf": [{ "required": ["in"] }, { "required": ["equalsTarget"] }],
+      "additionalProperties": false
+    },
+    "budgetGroup": {
+      "type": "object",
+      "required": ["id", "label", "targets"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label", "maxLength": 40 },
+        "targets": { "$ref": "#/$defs/fieldRefs" }
+      },
+      "additionalProperties": false
+    },
+    "creationBudget": {
+      "description": "Um orçamento da criação. Cada campo entra em no máximo um grupo; validateTemplate checa o preço de bônus uniforme por grupo e a faixa da tabela de point-buy.",
+      "type": "object",
+      "required": ["id", "label", "rule"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label", "maxLength": 40 },
+        "rule": { "$ref": "#/$defs/budgetRule" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "id": true, "label": true,
+            "rule": { "const": "priority-budget" },
+            "budgets": { "type": "array", "items": { "$ref": "#/$defs/points" }, "minItems": 2, "maxItems": 5 },
+            "groups": { "type": "array", "items": { "$ref": "#/$defs/budgetGroup" }, "minItems": 2, "maxItems": 5 }
+          },
+          "required": ["budgets", "groups"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "id": true, "label": true,
+            "rule": { "enum": ["fixed-budget", "item-count"] },
+            "budget": { "$ref": "#/$defs/points" },
+            "targets": { "$ref": "#/$defs/fieldRefs" }
+          },
+          "required": ["budget", "targets"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "id": true, "label": true,
+            "rule": { "const": "point-buy" },
+            "budget": { "$ref": "#/$defs/points" },
+            "base": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+            "table": { "type": "array", "items": { "$ref": "#/$defs/points" }, "minItems": 2, "maxItems": 30 },
+            "targets": { "$ref": "#/$defs/fieldRefs" }
+          },
+          "required": ["budget", "base", "table", "targets"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "creation": {
+      "description": "Criação por pontos (design/templates/README.md §14). O jogador grava só as escolhas (prioridades); básicos e bônus são calculados pelo core (checkCreation).",
+      "type": "object",
+      "required": ["budgets"],
+      "properties": {
+        "freebies": { "$ref": "#/$defs/points" },
+        "budgets": { "type": "array", "items": { "$ref": "#/$defs/creationBudget" }, "minItems": 1, "maxItems": 20 },
+        "caps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["rule", "targets", "max"],
+            "properties": {
+              "rule": { "$ref": "#/$defs/capRule" },
+              "targets": { "$ref": "#/$defs/fieldRefs" },
+              "max": {
+                "oneOf": [
+                  { "$ref": "#/$defs/points" },
+                  { "type": "object", "required": ["field"], "properties": { "field": { "$ref": "#/$defs/fieldRef" } }, "additionalProperties": false }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "baselines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["targets", "value"],
+            "properties": {
+              "targets": { "$ref": "#/$defs/fieldRefs" },
+              "value": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+              "locked": { "const": true },
+              "when": { "$ref": "#/$defs/accountingCondition" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "untracked": { "type": "array", "items": { "$ref": "#/$defs/fieldRef" }, "minItems": 1, "maxItems": 200, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "freebieCost": {
+      "type": "object",
+      "required": ["id", "rule", "targets"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "rule": { "enum": ["flat", "item-meta", "credit"] },
+        "targets": { "$ref": "#/$defs/fieldRefs" },
+        "cost": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "meta": { "$ref": "#/$defs/id" },
+        "max": { "$ref": "#/$defs/points" }
+      },
+      "additionalProperties": false
+    },
+    "xpWhen": {
+      "type": "object",
+      "required": ["if"],
+      "properties": {
+        "if": { "$ref": "#/$defs/accountingCondition" },
+        "cost": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "factor": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "new": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "unavailable": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "xpCost": {
+      "type": "object",
+      "required": ["id", "rule", "targets"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "rule": { "enum": ["flat", "per-current"] },
+        "targets": { "$ref": "#/$defs/fieldRefs" },
+        "cost": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "factor": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "new": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "when": { "type": "array", "items": { "$ref": "#/$defs/xpWhen" }, "minItems": 1, "maxItems": 50 }
+      },
+      "additionalProperties": false
+    },
+    "costs": {
+      "description": "Preços em pontos de bônus (freebie) e em XP (xp). Preço ausente nunca vale zero: o core responde indisponível (costOf).",
+      "type": "object",
+      "properties": {
+        "freebie": { "type": "array", "items": { "$ref": "#/$defs/freebieCost" }, "minItems": 1, "maxItems": 50 },
+        "xp": {
+          "type": "object",
+          "required": ["total", "spent"],
+          "properties": {
+            "total": { "$ref": "#/$defs/fieldRef" },
+            "spent": { "$ref": "#/$defs/fieldRef" },
+            "rules": { "type": "array", "items": { "$ref": "#/$defs/xpCost" }, "minItems": 1, "maxItems": 100 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "recovery": {
       "type": "object",

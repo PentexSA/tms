@@ -99,9 +99,9 @@ Prioridade: **P0** resolve dor que já aparece na mesa hoje; **P1** fecha o cicl
 
 `creating` → `pending` → `active` → `archived` | `dead`, mais a trava `locked_at`, que vale só em `active`.
 
-- `pending` só existe com a aprovação de ficha ligada na crônica (decisão 2), e chega na v4, com essa configuração.
+- `pending` nasce da submissão do dono com aprovação de ficha ligada (decisão 2) e chega na v4. Desligar a opção não ativa pendentes anteriores; eles aguardam decisão explícita. Conclusão pelo narrador já inclui aprovação e vai direto para `active` (§10.1).
 - O rótulo de `dead` vem do template ("Torpor", "Morto", "Desaparecido").
-- A Mesa mostra `creating` (marcada "Em criação", para o narrador concluir) e `active`. `archived` e `dead` somem dela, com filtro para ver.
+- A Mesa mostra `creating` (marcada "Em criação", para o narrador concluir) e `active`. Na v4, `pending` também fica acessível, com filtro e indicação de aprovação pendente. `archived` e `dead` somem da vista principal, com filtro para ver.
 
 #### Classificar cada mudança, não cada campo
 
@@ -128,26 +128,41 @@ Um evento que muda temporário e permanente juntos tem as duas classes, e vale a
 | `archived` / `dead` | nada | tudo (inclusive voltar para `active`) |
 | ex-membro (dono sem vínculo) | nada, em qualquer estado | – |
 
+**Precisão da v4 (§10.1).** “Narrador: tudo” mantém sua autoridade administrativa, mas `xpTotal` e `xpSpent` são projeções contábeis: nenhum papel as grava diretamente por `/events`. O narrador concede, corrige por ajuste/estorno e aprova gastos pelos comandos de 5.6. As operações continuam sujeitas à validação do motor e às invariantes do extrato.
+
 - O lote é atômico: um evento recusado recusa o lote inteiro, com 403 e o `path` recusado.
 - A rolagem com custo passa pela política antes de rolar: ficha travada não rola gastando FdV. Rolagem sem custo continua livre em `active`, mesmo travada, porque não muda a ficha (decisão 10).
 - O `characterAccess` passa a devolver `owner` só para leitura quando o dono não é mais membro.
 - **A política vale no momento em que o lote chega**, com o estado e a trava atuais, nunca com os de quando o lote foi criado. Um lote de Evoluir gravado offline em `creating` que chega depois da conclusão, ou um gasto de FdV que chega depois da trava, é recusado.
 - **A recusa diz o motivo.** O 403 traz um código (`SHEET_LOCKED`, `SHEET_NOT_EDITABLE`, `NEEDS_XP_APPROVAL`, `NOT_MEMBER`), e o app troca o genérico "Sem permissão" do `rejectionMessage` (`sheet/sync/sync.ts`) por uma frase por código ("O narrador travou a ficha. A alteração foi desfeita."). A fila já tira o lote recusado e desfaz a mudança; isso não muda.
 
+**Recusas planejadas da v4:**
+
+| Caso | HTTP / código | Mensagem-base |
+|---|---|---|
+| Dono escreve ou rola em `pending`, com ou sem custo | 403 `SHEET_NOT_EDITABLE`, `reason: pending` | “A ficha aguarda aprovação do narrador.” Na rolagem: “A rolagem não foi feita.” |
+| Qualquer papel escreve projeções de XP por `/events` em estado editável | 403 `XP_MANAGED_BY_LEDGER` | Dono: “O narrador concede o XP. Para evoluir, envie um pedido.” Narrador: “Use Conceder XP, Ajustar XP ou a aprovação do pedido.” |
+| Criação excede bônus ou limite obrigatório | 422 `CREATION_BUDGET_EXCEEDED` | “O gasto excede o orçamento ou um limite de criação. Redistribua os pontos.” |
+| Falta prioridade necessária ao avanço | 422 `CREATION_PRIORITIES_REQUIRED` | “Escolha as prioridades deste grupo antes de distribuir os pontos.” |
+| Conclusão com básicos faltantes | 422 `CREATION_INCOMPLETE` | “Distribua os pontos básicos restantes antes de concluir.” |
+
+Estado/trava e ex-membro têm precedência sobre regras contábeis específicas. Em ficha editável, a proteção das projeções precede a classificação genérica `advance`. A recusa de lote acrescenta “A alteração foi desfeita.” e não deve descrever `pending` como arquivamento. A exceção de rolagem livre é para `active` travada; não libera rolagem do dono em `pending`. Códigos adicionais de pedidos de XP estão no [plano v4, §3.6](plano-v4.md#36-códigos-de-recusa-e-mensagens).
+
 #### Concluir a criação
 
 É uma operação do servidor, não uma troca de modo no app: `POST /characters/:id/creation/complete`.
 
 - Numa transação: trava a ficha (`FOR UPDATE`), exige `creating`, muda o estado, grava `creation_completed_at` e `creation_completed_by` em `characters` e uma linha no `chronicle_audit`.
-- A partir do commit, todo lote é avaliado como `active`, inclusive os que já estavam na fila offline do jogador.
-- Concluir de novo dá 409 "criação já concluída".
-- **Na v3** só o narrador conclui, sem orçamento: `creating` funciona como "criação livre". **Na v4** o dono também conclui, e a operação roda antes o `checkCreation` (5.5) e manda para `pending` quando a aprovação está ligada.
+- A partir do commit, todo lote é avaliado com o novo estado (`active` ou `pending` na v4), inclusive os que já estavam na fila offline do jogador.
+- Concluir de novo como nova intenção dá 409 "criação já concluída". Na v4, reenvio com a mesma chave/intenção recupera o resultado, sem nova auditoria.
+- **Na v3** só o narrador conclui, sem orçamento: `creating` funciona como "criação livre". **Na v4** o dono também conclui por pontos, depois de `checkCreation`: vai para `pending` com aprovação ligada ou `active` com ela desligada. O narrador conclui e aprova na mesma transação, ativando diretamente, inclusive na criação livre; a ação é “Concluir e aprovar” (§10.1).
+- O narrador pode aprovar `pending → active` após revalidar ou devolver `pending → creating` para correção, com motivo e auditoria. Essa devolução é uma exceção nova e restrita; não reabre fichas já ativas.
 
 #### Mudar estado e travar
 
 Ações do narrador, cada uma numa transação com a ficha travada e uma linha no `chronicle_audit`:
 
-- `POST /characters/:id/status` com o estado novo (`active`, `archived`, `dead`). Voltar para `creating` não existe;
+- `POST /characters/:id/status` com o estado novo (`active`, `archived`, `dead`). Não retorna para `creating`. Na v4 há apenas a exceção `pending → creating` pelo comando próprio de devolução; a rota de status não pode pular contabilização/aprovação, inclusive por `creating → archived → active`;
 - `POST /characters/:id/lock` e `DELETE /characters/:id/lock`, só em `active`.
 
 #### Registro administrativo
@@ -162,11 +177,12 @@ Exige: core (`classifyChange`), API (`canWrite` nas rotas de escrita, incluindo 
 - o dono sobe um `rating` em `creating` e não em `active`;
 - o dono não rola com custo numa ficha travada, e rola sem custo;
 - o ex-membro lê a ficha arquivada e recebe 403 em `/events` e em `/rolls`;
-- um lote de Evoluir criado em `creating` e enviado depois da conclusão é recusado com `SHEET_NOT_EDITABLE`, e a ficha não muda;
+- um lote de Evoluir criado em `creating` e enviado depois da conclusão é recusado com `NEEDS_XP_APPROVAL` em `active` ou `SHEET_NOT_EDITABLE` em `pending`, e a ficha não muda;
 - um gasto de FdV enviado depois da trava é recusado com `SHEET_LOCKED`;
 - concluir e um lote de Evoluir chegando ao mesmo tempo, no Postgres de verdade: ou o lote entra antes e a conclusão vê o valor novo, ou é recusado; nunca entra depois;
 - concluir duas vezes dá 409, e só há uma linha no `chronicle_audit`;
 - o narrador escreve em todos os estados;
+- na v4, projeções de XP não são gravadas por `/events` por nenhum papel; o narrador usa os comandos contábeis, sem perder a capacidade de conceder/corrigir XP;
 - cada ação administrativa gera exatamente uma linha em `chronicle_audit`.
 
 ### 5.2 Jogadores e convites (P0)
@@ -268,6 +284,12 @@ Uma Habilidade em 4 pode ser legítima (3 básicos e 1 de bônus) ou não. Em ve
 - **Reembolso** sai de graça: baixar um ponto recalcula tudo, e o bônus volta.
 - **Por que dá para calcular:** a regra acima só é exata se o preço do bônus é o mesmo para todo traço de um grupo (Atributo 5, Habilidade 2, Disciplina 7 no V20). O `compileTemplate` recusa um template em que não seja. Se um sistema futuro tiver preço de bônus variável dentro de um grupo, aí sim será preciso gravar a origem dos pontos, numa versão nova do contrato.
 
+**Fechamento e validação parcial da v4 (§10.1).** Básicos e point-buy fecham exatamente; bônus são limite máximo, salvo regra expressa do template. Sobra de bônus permitida não vira XP. Pontos acima do orçamento básico são financiados por bônus: esse excesso isolado não é erro. “Estourado” significa bônus insuficientes, custo cumulativo de point-buy acima do orçamento ou limite obrigatório violado.
+
+Em `/events`, salvar prioridades ou ajustar orçamento por pontos, o mesmo motor avalia o resultado atômico: aceita básicos ainda faltantes, mas recusa excesso de bônus/limites com 422 por grupo. Prioridade necessária ainda ausente recusa o avanço dependente; identidade e grupos independentes continuam editáveis. Uma redistribuição pode reduzir e aumentar campos no mesmo lote. O rascunho local pode mostrar excesso para correção, mas não é salvo/enfileirado assim. A fila offline aplica a mesma avaliação parcial; o servidor revalida com as escolhas atuais. Conclusão exige os básicos exatos. O narrador ajusta orçamento/autoriza livre explicitamente, sem bypass silencioso da conta por papel.
+
+Baseline também pode ser condicional. Um caso a conferir no V20 é Aparência inicial 0 e proibição de aumento para Nosferatu: o default geral 1 não pode produzir cobrança, crédito ou compra indevida. A forma genérica é provada com fixture sintética antes da consulta; a regra real depende de fonte/página.
+
 #### O contrato no template
 
 Duas chaves, com regras de lista fechada (`REGISTRY.creationRules` e `REGISTRY.costRules`):
@@ -296,16 +318,23 @@ Exige: core (`checkCreation`, `costOf`), templates (`creation`, `costs.freebie`)
 
 - property tests: o custo nunca é negativo; subir e descer o mesmo ponto devolve o saldo; a ordem em que os pontos foram distribuídos não muda o resultado; o `checkCreation` do cliente e o do servidor dão o mesmo resultado para a mesma ficha;
 - Habilidade em 4 com 1 ponto de bônus passa; com 13 básicos já gastos e sem bônus, não passa;
-- concluir com orçamento sobrando ou estourado dá 422 com o problema por grupo;
+- concluir com básicos sobrando ou com bônus/point-buy estourados dá 422 com o problema por grupo; excesso de básicos integralmente pago com bônus passa; sobra permitida de bônus não recusa;
+- salvar rascunho com básicos faltantes passa; salvar lote com bônus acima do saldo ou limite obrigatório violado dá 422 sem aplicação parcial;
 - o mesmo código passa no fixture de D&D com point-buy de 27 pontos.
 
 ### 5.6 Experiência (P1)
 
 **Decidido (decisão 3):** o narrador concede o XP e aprova cada gasto. O jogador vê o saldo e pede para gastar; nunca edita o XP direto.
 
-- **Conceder XP** a um ou vários personagens, com motivo ("Sessão 12"). É uma operação de 5.4: idempotente e atômica.
-- **Pedido de gasto:** o jogador pede "Destreza 2 → 3"; o custo vem da tabela `xp` e aparece antes de enviar. Pode cancelar enquanto estiver pendente. Só um pedido pendente por traço.
+- **Conceder XP** a um ou vários personagens, com motivo ("Sessão 12"). Segue o contrato de idempotência e atomicidade de 5.4 (chave por operação inteira, tudo ou nada, fichas travadas em ordem de `id`), sem prévia nem `sheetVersion` esperada: somar crédito não depende do estado da ficha nem da ordem. Vale para qualquer ficha não excluída, em qualquer estado; o gasto continua só em `active` (§10.1).
+- **Pedido de gasto:** o jogador pede "Destreza 2 → 3"; o custo vem da tabela `xp` e aparece antes de enviar. O servidor confere saldo no envio; insuficiência dá 409 `XP_INSUFFICIENT_BALANCE` sem criar pedido. Pode cancelar enquanto pendente e com vínculo atual. Só um pedido pendente por traço; pedidos não reservam XP. Cada pedido sobe um nível só. Com a ficha travada, o dono não pede, mas pode cancelar; o narrador continua decidindo os pendentes (§10.1).
 - **Extrato** por personagem: entradas e gastos, visível ao dono e ao narrador.
+
+#### Correção de concessão e projeções contábeis
+
+Definição nova da v4 (§10.1): todos os papéis, inclusive narrador, são impedidos de gravar `xpTotal`/`xpSpent` por `/events`. A seção continua com leitura dono/narrador e escrita do narrador para operações autorizadas, mas a rota genérica não é um canal contábil. O editor encaminha o narrador a “Ajustar XP”.
+
+O narrador corrige uma concessão por `POST /characters/:id/xp-adjustments`: delta inteiro não zero sobre o total concedido, motivo obrigatório, referência à entrada no estorno e chave idempotente. O registro original permanece; ajuste, projeção, lote e auditoria são atômicos sob trava da ficha. Não exceder a parcela estornável da concessão nem violar `xpTotal ≥ xpSpent ≥ 0`. Crédito já consumido pode impedir o estorno: retornar 409 sem efeito, com o limite atual, sem desfazer evolução silenciosamente. `xpSpent` muda junto das aprovações. A reversão genérica não desfaz lotes contábeis; o ajuste/estorno próprio permanece disponível.
 
 #### Aprovação
 
@@ -313,20 +342,28 @@ Numa transação:
 
 1. trava o pedido (`FOR UPDATE`) e depois a ficha, sempre nessa ordem;
 2. o pedido precisa estar `pending`; senão, 409 "já decidido". Isso impede a aprovação dupla;
-3. o valor atual do traço precisa ser o `from` do pedido; senão, o pedido vira `stale` e a resposta é 409. O jogador pede de novo;
-4. recalcula o custo com a ficha atual e confere `xpAvailable ≥ custo`; senão, 409 com o saldo;
+3. com ficha/vínculo disponíveis, o valor atual do traço precisa ser o `from`, e preço/elegibilidade relevantes precisam continuar válidos; senão, o pedido vira `stale` e a resposta é 409 `XP_REQUEST_STALE`. O jogador pede de novo. Mudança irrelevante de contexto ou temporário não o invalida só por mudar a versão;
+4. recalcula o custo com a ficha atual e confere `xpAvailable ≥ custo`; senão, 409 `XP_INSUFFICIENT_BALANCE` com o saldo, sem débito, mantendo o pedido pendente. Isso cobre saldo consumido depois do envio, que também fez sua conferência;
 5. aplica o traço e soma `xpSpent` num lote só, grava o `batch_id` no pedido, marca `approved` e registra em `chronicle_audit`.
 
-Recusar também trava o pedido e exige `pending`.
+Recusar também trava o pedido e exige `pending`, e grava um motivo limitado no pedido, legível pelo dono e pelo narrador.
 
-Exige: `costs.xp` nos templates; `permissions: { "read": ["owner", "storyteller"], "write": ["storyteller"] }` na seção `experience`, que hoje deixa o dono gravar `xpTotal` e `xpSpent`; tabela `xp_requests` (`pending`, `approved`, `rejected`, `cancelled`, `stale`, com o lote resultante); `POST /chronicles/:id/xp`, `POST /characters/:id/xp-requests`, aprovar, recusar e cancelar. Migração.
+Persistir `stale` e sua auditoria antes de produzir o 409: lançar erro que faça rollback da transação não cumpre o contrato.
+
+Arquivar, marcar `dead` ou remover o dono não muda automaticamente seus pedidos: permanecem `pending`, com indicação de suspensão derivada do estado/vínculo. Tentativa de aprovação retorna 409 `XP_TARGET_UNAVAILABLE`, sem débito ou decisão. O narrador pode recusar; o dono que continua membro pode cancelar sem alterar a ficha; ex-membro só lê. `GET` nunca marca `stale` nem decide pedido. Ao restabelecer estado e vínculo por fluxos autorizados, uma nova aprovação revalida alvo, preço, elegibilidade e saldo. Não adquirir trava de pedido depois da ficha na remoção/arquivamento.
+
+Template sem `costs.xp` não oferece pedido de evolução; `costOf` retorna indisponível (`XP_COST_UNAVAILABLE`), nunca zero por ausência de regra. Preservar campos de experiência se existirem. D&D, CoC e Fate atuais não têm esses campos: não inventar uma seção/saldo. Além do fallback, provar concessão/ajuste/pedidos com cópia sintética de D&D configurada apenas para teste, sem impor regras reais de avanço por nível.
+
+Exige: `costs.xp` nos templates; `permissions: { "read": ["owner", "storyteller"], "write": ["storyteller"] }` na seção `experience`, que hoje deixa o dono gravar `xpTotal` e `xpSpent`; proteção de projeções para todos em `/events`; extrato e ajustes; tabela `xp_requests` (`pending`, `approved`, `rejected`, `cancelled`, `stale`, com o lote resultante); `POST /chronicles/:id/xp`, `POST /characters/:id/xp-adjustments`, `POST /characters/:id/xp-requests`, aprovar, recusar e cancelar. Migração.
 
 **Critérios de aceite:**
 
 - duas aprovações simultâneas do mesmo pedido (Postgres de verdade): uma aplica, a outra dá 409;
-- aprovar depois de o narrador ter mudado o traço à mão dá `stale`;
-- aprovar sem saldo dá 409 e nada muda;
-- o dono gravando `xpTotal` ou `xpSpent` por `/events` dá 403.
+- aprovar depois de o narrador ter mudado o traço ou alterado o preço/elegibilidade relevantes dá `stale` persistido, sem débito;
+- enviar pedido sem saldo dá 409 e não cria pedido; aprovar pedido cujo saldo foi consumido depois dá 409, sem débito e mantendo `pending`;
+- qualquer papel gravando `xpTotal` ou `xpSpent` por `/events` em estado editável recebe 403 `XP_MANAGED_BY_LEDGER`; o narrador pode corrigir uma concessão por ajuste/estorno auditado sem quebrar o extrato;
+- arquivar/remover suspende a aprovação sem decidir o pedido; ler não muda o banco;
+- concessão, ajuste e pedidos passam em fixture sintético de outra família; sem custos, o motor/interface indicam indisponibilidade.
 
 ### 5.7 NPCs e antagonistas (P1)
 
@@ -469,9 +506,9 @@ A ordem 1 → 2 importa: o arquivamento e o bloqueio de escrita existem antes de
 | 8 | Configurações da crônica: orçamento de criação, "criação livre" e aprovação opcional (com o estado `pending`) | 5.5, 5.1 |
 | 9 | Experiência: `costs.xp`, concessão, pedidos e aprovação | 5.6 |
 
-A entrega 6 depende de conferir o livro, fora do código; a 5 não, e começa antes.
+A entrega 6 depende de conferir o livro, fora do código; a 5 não, e começa antes. No [plano v4](plano-v4.md), a Etapa 2a prepara estrutura/permissões/identidades sem livro, e a 2b insere valores e relações verificados. Banco/API/interface das etapas 3–8 avançam com fixtures sintéticas, dependendo de 1/2a, sem esperar 2b. A jornada real e o fechamento exigem 2b; dados sintéticos não se tornam tabelas WoD.
 
-**Jornada E2E (`journey-creation.spec.ts`):** o jogador escolhe as prioridades, distribui pontos básicos e de bônus com o contador, não consegue concluir com pontos sobrando e conclui quando fecha; com a aprovação ligada, a ficha espera o narrador. O narrador concede XP à mesa; o jogador pede "Destreza 2 → 3", vê o custo, e o narrador aprova; um segundo pedido sem saldo é recusado.
+**Jornada E2E (`journey-creation.spec.ts`):** o jogador escolhe as prioridades, distribui pontos básicos e de bônus com o contador, não consegue concluir com básicos sobrando e conclui quando fecha; com a aprovação ligada, a ficha espera o narrador. O narrador concede XP à mesa; o jogador pede "Destreza 2 → 3", vê o custo, e o narrador aprova; um segundo pedido sem saldo é recusado no envio. Cenários complementares cobrem saldo consumido entre envio/aprovação, correção de concessão, devolução de ficha e conclusão/aprovação conjunta pelo narrador.
 
 ### v5: Bastidores (privacidade)
 
@@ -514,6 +551,26 @@ Tempo real (WebSocket), chat, mapa e tokens, música, calendário de sessões co
 | 10 | A rolagem sem custo continua livre na ficha travada? | Sim, porque não muda a ficha (5.1) |
 | – | Quem vê as fichas da crônica? | O jogador vê só as dele; o narrador vê todas (§3.2) |
 
-Nenhuma decisão em aberto.
+As decisões originais acima permanecem fechadas. A revisão de planejamento da v4 acrescentou definições explícitas no §10.1; elas não constavam das decisões de 21/10 e ainda precisam ser implementadas e validadas.
 
-Pendente, não é decisão: conferir no livro as tabelas de criação e de custo (`freebie` e `xp`) dos três sistemas antes de escrever os templates.
+Pendente, não é decisão: conferir no livro as tabelas de criação e de custo (`freebie` e `xp`) dos três sistemas antes de preencher seus valores e relações como regras válidas (Etapa 2b). Estrutura, permissões e testes sintéticos da Etapa 2a não dependem dessa consulta.
+
+### 10.1 Definições de planejamento da v4 (23/10/2026)
+
+Estas são definições novas adotadas no roteiro após a revisão de [plano-v4.md](plano-v4.md), e não alegações de decisão anterior do usuário ou de comportamento já implementado. Detalhes, códigos e critérios de teste constam do plano.
+
+| # | Assunto | Definição de planejamento |
+|---|---|---|
+| 11 | Devolução para correção | Narrador pode devolver `pending → creating` por comando próprio auditado; exceção restrita à aprovação pendente, sem retorno de ativa ou liberação pela rota genérica de status |
+| 12 | Narrador concluindo | Concluir e aprovar são uma ação transacional que ativa diretamente, mesmo com aprovação ligada, incluindo criação livre |
+| 13 | Saldo no pedido | Conferir saldo no envio e novamente na aprovação; sem saldo no envio não cria pedido; sem reserva, insuficiência posterior mantém o pedido pendente sem débito |
+| 14 | Correção de XP | Projeções fechadas em `/events` para todos os papéis; narrador concede/corrige por comandos contábeis, com ajuste/estorno auditado, idempotente, sem apagar entradas ou produzir saldo negativo |
+| 15 | Desligar aprovação | Pendentes anteriores continuam pendentes até decisão explícita; fichas ativas não são reabertas |
+| 16 | Dentro do orçamento | Salvamento parcial permite falta de básicos, mas recusa bônus/limites excedidos; excesso básico financiável por bônus não é erro; só a conclusão exige gasto básico exato |
+| 17 | Pedido desatualizado | Além de alteração no traço, mudança no preço ou elegibilidade relevantes torna `stale`; temporário/contexto irrelevante não invalida o pedido |
+| 18 | Pedido de ficha indisponível | Arquivar/marcar dead/remover não decide automaticamente o pedido; fica pendente com aprovação suspensa; GET sem efeitos e revisão obrigatória ao voltar a aprovar |
+| 19 | Níveis por pedido | Um nível por pedido (ou o primeiro ponto de um traço novo); para avançar mais, novo pedido depois da aprovação |
+| 20 | Pedido em ficha travada | O dono não cria pedido (`SHEET_LOCKED`) e pode cancelar os pendentes; o narrador aprova ou recusa normalmente |
+| 21 | Narrador e a conta da criação | Edições do narrador em `creating`/`pending` passam pela conta; para exceder, ele ajusta o orçamento da ficha (também em `pending`) ou autoriza criação livre; aprovar roda `checkCreation` e dá 422 se não fechar |
+| 22 | Motivos visíveis | Motivos da devolução e da recusa de pedido são legíveis pelo dono e pelo narrador, guardados fora do `chronicle_audit` (que continua só do narrador) |
+| 23 | Concessão por estado | Concessão e ajuste de XP valem para qualquer ficha não excluída, em qualquer estado e com ou sem trava; o gasto por pedido continua só em `active` |

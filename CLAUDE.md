@@ -117,7 +117,7 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 
 #### Key Features
 
-- **@tms/sheet-core**: 773 tests (Bun), incluindo property tests (fast-check)
+- **@tms/sheet-core**: 919 tests (Bun), incluindo property tests (fast-check) e a contabilização da v4
 - **@tms/api**: 912 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas; testes de concorrência em Postgres separados
 - **@tms/db**: 21 tests (Bun): migrations sobem e descem
 - **@tms/ui**: 91 tests (Jest)

@@ -25,6 +25,9 @@ Table chronicles {
   storyteller_id uuid [not null, ref: > users.id]
   system_id uuid [not null, ref: > game_systems.id]
   name text [not null]
+  character_approval boolean [not null, default: false, note: 'Aprovação de ficha nova (v4); desligada por padrão']
+  creation_defaults jsonb [not null, default: '{}', note: 'Camada de configuração da criação (orçamentos, modo) copiada para a ficha nova']
+  creation_settings_revision integer [not null, default: 0]
   created_at timestamp
   updated_at timestamp
 }
@@ -38,10 +41,15 @@ Table characters {
   sheet_data jsonb
   template_version text [not null]
   sheet_version integer [not null, default: 0]
-  status text [not null, default: 'creating', note: 'creating | active | archived | dead']
+  status text [not null, default: 'creating', note: 'creating | pending | active | archived | dead']
   locked_at timestamptz
-  creation_completed_at timestamptz
+  creation_completed_at timestamptz [note: 'Conclusão da conta (a submissão, quando vai para pending)']
   creation_completed_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  creation jsonb [not null, default: '{}', note: 'Escolhas (prioridades), camada de configuração da ficha e motivo da última devolução; só dono e narrador leem']
+  creation_revision integer [not null, default: 0]
+  approved_at timestamptz [note: 'Decisão do narrador que ativou a ficha']
+  approved_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  activated_at timestamptz [note: 'Primeira ativação pela criação: só com ela a rota de estado volta para active']
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp
@@ -100,6 +108,19 @@ Table chronicle_audit {
   target_user_id uuid [ref: > users.id, note: 'ON DELETE SET NULL']
   payload jsonb [not null, note: 'Mínimo necessário, sem conteúdo de notas']
   created_at timestamptz [not null]
+}
+
+Table character_commands {
+  character_id uuid [not null, ref: > characters.id, note: 'ON DELETE CASCADE']
+  client_command_id uuid [not null]
+  kind text [not null, note: 'creation.complete | creation.approve | creation.return | creation.update']
+  request_hash text [not null, note: 'sha256 do pedido: mesma chave com outro pedido dá 409']
+  result jsonb [not null]
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at timestamptz [not null]
+  indexes {
+    (character_id, client_command_id) [pk]
+  }
 }
 
 Table chronicle_operations {

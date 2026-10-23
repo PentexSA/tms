@@ -1,0 +1,808 @@
+{
+  "schema": 1,
+  "system": "acct-teste",
+  "name": "Contabilização (teste)",
+  "family": "teste",
+  "edition": "Teste",
+  "templateVersion": "0.1.0",
+  "locale": "pt-BR",
+  "skin": "wod",
+  "license": "Fixture de teste, com números fictícios.",
+  "identity": {
+    "name": "name",
+    "chip": "lineage"
+  },
+  "accent": {
+    "from": null,
+    "map": {},
+    "fallback": "accent-neutral"
+  },
+  "fields": {
+    "name": {
+      "type": "text",
+      "label": "Nome",
+      "maxLength": 80
+    },
+    "lineage": {
+      "type": "choice",
+      "label": "Linhagem",
+      "options": [
+        {
+          "id": "a",
+          "label": "A"
+        },
+        {
+          "id": "b",
+          "label": "B"
+        },
+        {
+          "id": "c",
+          "label": "C"
+        }
+      ]
+    },
+    "affinity": {
+      "type": "choice",
+      "label": "Afinidade",
+      "options": [
+        {
+          "id": "sphereA",
+          "label": "Esfera A"
+        },
+        {
+          "id": "sphereB",
+          "label": "Esfera B"
+        }
+      ]
+    },
+    "form": {
+      "type": "state",
+      "label": "Forma",
+      "options": [
+        {
+          "id": "normal",
+          "label": "Normal"
+        },
+        {
+          "id": "strong",
+          "label": "Forte",
+          "modifiers": [
+            {
+              "field": "str",
+              "op": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "str": {
+      "type": "rating",
+      "label": "Força",
+      "max": 5,
+      "min": 1
+    },
+    "dex": {
+      "type": "rating",
+      "label": "Destreza",
+      "max": 5,
+      "min": 1
+    },
+    "sta": {
+      "type": "rating",
+      "label": "Vigor",
+      "max": 5,
+      "min": 1
+    },
+    "cha": {
+      "type": "rating",
+      "label": "Carisma",
+      "max": 5,
+      "min": 1
+    },
+    "man": {
+      "type": "rating",
+      "label": "Manipulação",
+      "max": 5,
+      "min": 1
+    },
+    "app": {
+      "type": "rating",
+      "label": "Aparência",
+      "max": 5,
+      "min": 0,
+      "default": {
+        "from": "lineage",
+        "map": {
+          "a": 1,
+          "b": 1
+        }
+      }
+    },
+    "per": {
+      "type": "rating",
+      "label": "Percepção",
+      "max": 5,
+      "min": 1
+    },
+    "int": {
+      "type": "rating",
+      "label": "Inteligência",
+      "max": 5,
+      "min": 1
+    },
+    "wit": {
+      "type": "rating",
+      "label": "Raciocínio",
+      "max": 5,
+      "min": 1
+    },
+    "alert": {
+      "type": "rating",
+      "label": "Prontidão",
+      "max": 5
+    },
+    "brawl": {
+      "type": "rating",
+      "label": "Briga",
+      "max": 5
+    },
+    "lore": {
+      "type": "rating",
+      "label": "Saber",
+      "max": 5
+    },
+    "occult": {
+      "type": "rating",
+      "label": "Ocultismo",
+      "max": 5
+    },
+    "powers": {
+      "type": "list",
+      "label": "Poderes",
+      "itemLabel": "Poder",
+      "item": {
+        "value": {
+          "type": "rating",
+          "min": 0,
+          "max": 5
+        }
+      },
+      "catalog": [
+        "Força Bruta",
+        "Velocidade",
+        "Visão"
+      ]
+    },
+    "gifts": {
+      "type": "list",
+      "label": "Dons",
+      "itemLabel": "Dom",
+      "item": {
+        "notes": true
+      }
+    },
+    "con": {
+      "type": "rating",
+      "label": "Consciência",
+      "max": 5,
+      "min": 1
+    },
+    "ctl": {
+      "type": "rating",
+      "label": "Autocontrole",
+      "max": 5,
+      "min": 1
+    },
+    "morality": {
+      "type": "rating",
+      "label": "Moral",
+      "min": 0,
+      "max": 10,
+      "default": {
+        "derive": "sum",
+        "from": [
+          "con",
+          "ctl"
+        ]
+      }
+    },
+    "will": {
+      "type": "resource",
+      "label": "Vontade",
+      "permanent": {
+        "min": 1,
+        "max": 10,
+        "default": {
+          "derive": "sum",
+          "from": [
+            "con"
+          ]
+        }
+      },
+      "editableIn": [
+        "play"
+      ]
+    },
+    "arete": {
+      "type": "rating",
+      "label": "Arete",
+      "min": 1,
+      "max": 10
+    },
+    "sphereA": {
+      "type": "rating",
+      "label": "Esfera A",
+      "max": 5,
+      "cap": {
+        "field": "arete",
+        "label": "Arete"
+      }
+    },
+    "sphereB": {
+      "type": "rating",
+      "label": "Esfera B",
+      "max": 5,
+      "cap": {
+        "field": "arete",
+        "label": "Arete"
+      }
+    },
+    "merits": {
+      "type": "list",
+      "label": "Qualidades",
+      "itemLabel": "Qualidade",
+      "item": {
+        "meta": [
+          {
+            "id": "cost",
+            "type": "number",
+            "label": "Custo",
+            "min": 1,
+            "max": 7
+          }
+        ]
+      }
+    },
+    "flaws": {
+      "type": "list",
+      "label": "Defeitos",
+      "itemLabel": "Defeito",
+      "item": {
+        "meta": [
+          {
+            "id": "bonus",
+            "type": "number",
+            "label": "Bônus",
+            "min": 1,
+            "max": 7
+          }
+        ]
+      }
+    },
+    "xpTotal": {
+      "type": "number",
+      "label": "XP total",
+      "min": 0,
+      "max": 9999
+    },
+    "xpSpent": {
+      "type": "number",
+      "label": "XP gasto",
+      "min": 0,
+      "max": 9999
+    },
+    "xpAvailable": {
+      "type": "number",
+      "label": "XP disponível",
+      "readOnly": true,
+      "derive": "difference",
+      "from": [
+        "xpTotal",
+        "xpSpent"
+      ]
+    },
+    "notes": {
+      "type": "longText",
+      "label": "Notas",
+      "maxLength": 4000
+    }
+  },
+  "sections": [
+    {
+      "id": "play",
+      "zone": "play",
+      "title": "Em jogo",
+      "layout": "fields",
+      "fields": [
+        "will",
+        "form"
+      ]
+    },
+    {
+      "id": "attributes",
+      "zone": "build",
+      "title": "Atributos",
+      "layout": "grid",
+      "groups": [
+        {
+          "id": "phys",
+          "title": "Físicos",
+          "fields": [
+            "str",
+            "dex",
+            "sta"
+          ]
+        },
+        {
+          "id": "soc",
+          "title": "Sociais",
+          "fields": [
+            "cha",
+            "man",
+            "app"
+          ]
+        },
+        {
+          "id": "men",
+          "title": "Mentais",
+          "fields": [
+            "per",
+            "int",
+            "wit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "abilities",
+      "zone": "build",
+      "title": "Habilidades",
+      "layout": "list",
+      "fields": [
+        "alert",
+        "brawl",
+        "lore",
+        "occult"
+      ]
+    },
+    {
+      "id": "advantages",
+      "zone": "powers",
+      "title": "Vantagens",
+      "layout": "list",
+      "fields": [
+        "powers",
+        "gifts",
+        "con",
+        "ctl",
+        "morality",
+        "arete",
+        "sphereA",
+        "sphereB",
+        "merits",
+        "flaws"
+      ]
+    },
+    {
+      "id": "experience",
+      "zone": "powers",
+      "title": "Experiência",
+      "layout": "list",
+      "fields": [
+        "xpTotal",
+        "xpSpent",
+        "xpAvailable"
+      ]
+    },
+    {
+      "id": "about",
+      "zone": "lore",
+      "title": "Sobre",
+      "layout": "text",
+      "fields": [
+        "notes"
+      ]
+    }
+  ],
+  "dock": [
+    "will"
+  ],
+  "roll": {
+    "model": "pool-success",
+    "label": "Parada",
+    "difficulty": {
+      "default": 6,
+      "min": 2,
+      "max": 10
+    },
+    "slots": [
+      {
+        "id": "attr",
+        "label": "Atributo",
+        "from": [
+          "attributes"
+        ]
+      }
+    ]
+  },
+  "creation": {
+    "freebies": 10,
+    "budgets": [
+      {
+        "id": "attributes",
+        "label": "Atributos",
+        "rule": "priority-budget",
+        "budgets": [
+          5,
+          3,
+          2
+        ],
+        "groups": [
+          {
+            "id": "phys",
+            "label": "Físicos",
+            "targets": [
+              "str",
+              "dex",
+              "sta"
+            ]
+          },
+          {
+            "id": "soc",
+            "label": "Sociais",
+            "targets": [
+              "cha",
+              "man",
+              "app"
+            ]
+          },
+          {
+            "id": "men",
+            "label": "Mentais",
+            "targets": [
+              "per",
+              "int",
+              "wit"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "abilities",
+        "label": "Habilidades",
+        "rule": "priority-budget",
+        "budgets": [
+          5,
+          3
+        ],
+        "groups": [
+          {
+            "id": "talents",
+            "label": "Talentos",
+            "targets": [
+              "alert",
+              "brawl"
+            ]
+          },
+          {
+            "id": "knowledges",
+            "label": "Conhecimentos",
+            "targets": [
+              "lore",
+              "occult"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "powers",
+        "label": "Poderes",
+        "rule": "fixed-budget",
+        "budget": 3,
+        "targets": [
+          "powers"
+        ]
+      },
+      {
+        "id": "gifts",
+        "label": "Dons",
+        "rule": "item-count",
+        "budget": 2,
+        "targets": [
+          "gifts"
+        ]
+      },
+      {
+        "id": "virtues",
+        "label": "Virtudes",
+        "rule": "fixed-budget",
+        "budget": 4,
+        "targets": [
+          "con",
+          "ctl"
+        ]
+      }
+    ],
+    "caps": [
+      {
+        "rule": "creation-cap",
+        "targets": [
+          "alert",
+          "brawl",
+          "lore",
+          "occult"
+        ],
+        "max": 3
+      },
+      {
+        "rule": "hard-cap",
+        "targets": [
+          "arete"
+        ],
+        "max": 3
+      },
+      {
+        "rule": "hard-cap",
+        "targets": [
+          "sphereA",
+          "sphereB"
+        ],
+        "max": {
+          "field": "arete"
+        }
+      }
+    ],
+    "baselines": [
+      {
+        "targets": [
+          "app"
+        ],
+        "value": 0,
+        "locked": true,
+        "when": {
+          "field": "lineage",
+          "in": [
+            "c"
+          ]
+        }
+      }
+    ]
+  },
+  "costs": {
+    "freebie": [
+      {
+        "id": "attribute",
+        "rule": "flat",
+        "cost": 5,
+        "targets": [
+          "str",
+          "dex",
+          "sta",
+          "cha",
+          "man",
+          "app",
+          "per",
+          "int",
+          "wit"
+        ]
+      },
+      {
+        "id": "ability",
+        "rule": "flat",
+        "cost": 2,
+        "targets": [
+          "alert",
+          "brawl",
+          "lore",
+          "occult"
+        ]
+      },
+      {
+        "id": "power",
+        "rule": "flat",
+        "cost": 7,
+        "targets": [
+          "powers"
+        ]
+      },
+      {
+        "id": "gift",
+        "rule": "flat",
+        "cost": 6,
+        "targets": [
+          "gifts"
+        ]
+      },
+      {
+        "id": "virtue",
+        "rule": "flat",
+        "cost": 2,
+        "targets": [
+          "con",
+          "ctl"
+        ]
+      },
+      {
+        "id": "morality",
+        "rule": "flat",
+        "cost": 2,
+        "targets": [
+          "morality"
+        ]
+      },
+      {
+        "id": "will",
+        "rule": "flat",
+        "cost": 1,
+        "targets": [
+          "will"
+        ]
+      },
+      {
+        "id": "arete",
+        "rule": "flat",
+        "cost": 4,
+        "targets": [
+          "arete"
+        ]
+      },
+      {
+        "id": "spheres",
+        "rule": "flat",
+        "cost": 3,
+        "targets": [
+          "sphereA",
+          "sphereB"
+        ]
+      },
+      {
+        "id": "merits",
+        "rule": "item-meta",
+        "meta": "cost",
+        "targets": [
+          "merits"
+        ]
+      },
+      {
+        "id": "flaws",
+        "rule": "credit",
+        "meta": "bonus",
+        "max": 3,
+        "targets": [
+          "flaws"
+        ]
+      }
+    ],
+    "xp": {
+      "total": "xpTotal",
+      "spent": "xpSpent",
+      "rules": [
+        {
+          "id": "attribute",
+          "rule": "per-current",
+          "factor": 4,
+          "targets": [
+            "str",
+            "dex",
+            "sta",
+            "cha",
+            "man",
+            "per",
+            "int",
+            "wit"
+          ]
+        },
+        {
+          "id": "appearance",
+          "rule": "per-current",
+          "factor": 4,
+          "new": 4,
+          "targets": [
+            "app"
+          ],
+          "when": [
+            {
+              "if": {
+                "field": "lineage",
+                "in": [
+                  "c"
+                ]
+              },
+              "unavailable": true
+            }
+          ]
+        },
+        {
+          "id": "ability",
+          "rule": "per-current",
+          "factor": 2,
+          "new": 3,
+          "targets": [
+            "alert",
+            "brawl",
+            "lore",
+            "occult"
+          ]
+        },
+        {
+          "id": "power",
+          "rule": "per-current",
+          "factor": 7,
+          "new": 10,
+          "targets": [
+            "powers"
+          ],
+          "when": [
+            {
+              "if": {
+                "field": "lineage",
+                "in": [
+                  "a"
+                ],
+                "itemIn": [
+                  "Força Bruta",
+                  "Velocidade"
+                ]
+              },
+              "factor": 5,
+              "new": 8
+            }
+          ]
+        },
+        {
+          "id": "virtue",
+          "rule": "per-current",
+          "factor": 2,
+          "targets": [
+            "con",
+            "ctl"
+          ]
+        },
+        {
+          "id": "morality",
+          "rule": "per-current",
+          "factor": 2,
+          "targets": [
+            "morality"
+          ]
+        },
+        {
+          "id": "will",
+          "rule": "per-current",
+          "factor": 1,
+          "targets": [
+            "will"
+          ]
+        },
+        {
+          "id": "arete",
+          "rule": "per-current",
+          "factor": 8,
+          "targets": [
+            "arete"
+          ]
+        },
+        {
+          "id": "spheres",
+          "rule": "per-current",
+          "factor": 8,
+          "new": 10,
+          "targets": [
+            "sphereA",
+            "sphereB"
+          ],
+          "when": [
+            {
+              "if": {
+                "field": "affinity",
+                "equalsTarget": true
+              },
+              "factor": 7
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

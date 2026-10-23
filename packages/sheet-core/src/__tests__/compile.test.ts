@@ -39,8 +39,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.5.0')
-    expect(model.version).toBe('1.5.0')
+    expect(model.key).toBe('vtm-v20@1.6.0')
+    expect(model.version).toBe('1.6.0')
     expect(model.skin).toBe('wod')
   })
 
@@ -235,9 +235,9 @@ describe('compileTemplate: o Lobisomem (W20, v2)', () => {
 
 describe('os campos da ficha de papel nos três sistemas', () => {
   it.each([
-    ['vtm-v20', '1.5.0'],
-    ['mta-m20', '1.4.0'],
-    ['wta-w20', '1.4.0'],
+    ['vtm-v20', '1.6.0'],
+    ['mta-m20', '1.5.0'],
+    ['wta-w20', '1.5.0'],
   ])('%s %s: Qualidades e Defeitos com custo de 1 a 10', (system, version) => {
     const t = templates[system] as Json
     expect(t.templateVersion).toBe(version)

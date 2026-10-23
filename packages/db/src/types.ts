@@ -35,6 +35,16 @@ export interface CharacterBatches {
   sheet_version: number
 }
 
+export interface CharacterCommands {
+  character_id: string
+  client_command_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  kind: string
+  request_hash: string
+  result: Json
+}
+
 export interface CharacterEvents {
   batch_id: string
   from_absent: Generated<boolean>
@@ -60,10 +70,15 @@ export interface CharacterRolls {
 }
 
 export interface Characters {
+  activated_at: Timestamp | null
+  approved_at: Timestamp | null
+  approved_by: string | null
   chronicle_id: string
   created_at: Generated<Timestamp | null>
+  creation: Generated<Json>
   creation_completed_at: Timestamp | null
   creation_completed_by: string | null
+  creation_revision: Generated<number>
   deleted_at: Timestamp | null
   id: Generated<string>
   locked_at: Timestamp | null
@@ -113,12 +128,16 @@ export interface ChronicleOperations {
   created_by: string | null
   id: Generated<string>
   kind: string
+  request_hash: string | null
   reverts_batch_id: string | null
   reverts_operation_id: string | null
 }
 
 export interface Chronicles {
+  character_approval: Generated<boolean>
   created_at: Generated<Timestamp | null>
+  creation_defaults: Generated<Json>
+  creation_settings_revision: Generated<number>
   id: Generated<string>
   name: string
   storyteller_id: string
@@ -164,8 +183,46 @@ export interface Users {
   username: string
 }
 
+export interface XpEntries {
+  batch_id: string | null
+  character_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  kind: string
+  operation_id: string | null
+  reason: string | null
+  request_id: string | null
+  reverses_entry_id: string | null
+  spent_delta: Generated<number>
+  total_delta: Generated<number>
+}
+
+export interface XpRequests {
+  batch_id: string | null
+  character_id: string
+  client_request_id: string
+  context: Generated<Json>
+  cost: number
+  decided_at: Timestamp | null
+  decided_by: string | null
+  decision_key: string | null
+  from_value: number
+  id: Generated<string>
+  reason: string | null
+  requested_at: Generated<Timestamp>
+  requested_by: string | null
+  status: Generated<string>
+  target_field: string
+  target_item: string | null
+  target_key: string
+  target_name: string | null
+  to_value: number
+}
+
 export interface DB {
   character_batches: CharacterBatches
+  character_commands: CharacterCommands
   character_events: CharacterEvents
   character_rolls: CharacterRolls
   characters: Characters
@@ -178,4 +235,6 @@ export interface DB {
   refresh_tokens: RefreshTokens
   trait_templates: TraitTemplates
   users: Users
+  xp_entries: XpEntries
+  xp_requests: XpRequests
 }

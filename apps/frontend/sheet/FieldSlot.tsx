@@ -1,4 +1,4 @@
-import type { FieldId } from '@tms/sheet-core'
+import { type FieldId, isDraftMode } from '@tms/sheet-core'
 import { memo } from 'react'
 import { useFieldEntry, useSheet } from './context'
 import { canEditIn } from './evolve/hooks'
@@ -22,7 +22,7 @@ export const FieldSlot = memo(function FieldSlot({
   if (!entry) return null
   const { type } = entry.resolved
   const editing =
-    mode === 'evolve' &&
+    isDraftMode(mode) &&
     canEditIn(model, roles, id, mode) &&
     hasView(model.skin, type, 'editor')
   const View = resolveView(model.skin, type, editing ? 'editor' : variant)

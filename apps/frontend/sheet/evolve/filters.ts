@@ -1,9 +1,10 @@
-import type {
-  CompiledSection,
-  FilterRule,
-  ResolvedField,
-  ResolvedSheet,
-  SheetMode,
+import {
+  type CompiledSection,
+  type FilterRule,
+  isDraftMode,
+  type ResolvedField,
+  type ResolvedSheet,
+  type SheetMode,
 } from '@tms/sheet-core'
 import { fold } from './text'
 
@@ -41,7 +42,7 @@ export const filterActive = (
   section: CompiledSection,
   mode: SheetMode,
   on: boolean
-): boolean => Boolean(section.def.filter) && mode !== 'evolve' && on
+): boolean => Boolean(section.def.filter) && !isDraftMode(mode) && on
 
 /** Os campos visíveis da seção, na ordem do template. */
 export function visibleFields(

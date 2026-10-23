@@ -14,9 +14,12 @@ import { securityHeaders } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 import { type AppOptions, resolveOptions } from './options'
 import { rollRoutes } from './rolls/routes'
+import { creationRoutes } from './sheets/creation'
 import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
 import { statusRoutes } from './sheets/status'
+import { ledgerRoutes } from './xp/ledger'
+import { requestRoutes } from './xp/requests'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -72,9 +75,12 @@ export const createApp = (
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
       .use(statusRoutes(db, options, guard))
+      .use(creationRoutes(db, options, guard))
       .use(tableRoutes(db, guard))
       .use(operationRoutes(db, options, guard))
       .use(rollRoutes(db, options, guard))
+      .use(ledgerRoutes(db, options, guard))
+      .use(requestRoutes(db, options, guard))
   )
 }
 

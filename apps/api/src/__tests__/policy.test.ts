@@ -397,7 +397,7 @@ describe('ações do narrador', () => {
         action: 'character.creation.complete',
         actor_id: storyteller.id,
         target_user_id: owner.id,
-        payload: {},
+        payload: { mode: 'free', approved: true },
       },
     ])
     const row = await ctx.db
@@ -436,7 +436,7 @@ describe('ações do narrador', () => {
     })
     expect((await post(id, '/status', { status: 'dead' })).status).toBe(200)
     expect((await auditOf(id)).map(r => [r.action, r.payload])).toEqual([
-      ['character.creation.complete', {}],
+      ['character.creation.complete', { mode: 'free', approved: true }],
       ['character.lock', {}],
       ['character.unlock', {}],
       ['character.lock', {}],
@@ -465,10 +465,12 @@ describe('ações do narrador', () => {
     expect(await auditOf(id)).toHaveLength(1)
   })
 
-  it('voltar para creating, ou um estado que não existe, é 422', async () => {
+  it('pending ou um estado que não existe é 422; ativa não volta para creating', async () => {
     const id = await sheet('vtm-v20', { state: 'active' })
-    for (const status of ['creating', 'pending', 'ativo'])
+    for (const status of ['pending', 'ativo'])
       expect((await post(id, '/status', { status })).status).toBe(422)
+    // Já ativada: a criação não reabre (doc/plano-v4.md §3.4)
+    expect((await post(id, '/status', { status: 'creating' })).status).toBe(409)
     expect(await auditOf(id)).toEqual([])
   })
 

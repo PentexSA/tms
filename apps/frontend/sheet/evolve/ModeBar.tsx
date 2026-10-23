@@ -4,6 +4,7 @@ import {
   describeBatch,
   describeEvent,
   inactiveChanges,
+  isDraftMode,
   type SheetEvent,
   type SheetMode,
 } from '@tms/sheet-core'
@@ -19,6 +20,8 @@ import {
 import { useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
+import { useCreation } from '../creation/CreationContext'
+import { REFUSAL_TEXT } from '../creation/creation'
 import { useDraftCount } from './hooks'
 
 // Modos da ficha (DS: ModeBar). O modo é UX: o que cada um libera vem de
@@ -30,12 +33,16 @@ export const MODE_LABELS: Readonly<Record<SheetMode, string>> = {
   read: 'Leitura',
   play: 'Jogo',
   evolve: 'Editar',
+  create: 'Criação',
 }
 
 // O dono não tem Leitura: Jogo já mostra a ficha inteira. Quem escreve sem
 // ser dono (o narrador) começa em Leitura e precisa do botão para voltar
 const OWNER_MODES: readonly SheetMode[] = ['play', 'evolve']
 const OTHER_MODES: readonly SheetMode[] = ['read', 'play', 'evolve']
+// Na criação por pontos, o Editar vira Criação: o mesmo rascunho, com a conta
+const OWNER_CREATE: readonly SheetMode[] = ['play', 'create']
+const OTHER_CREATE: readonly SheetMode[] = ['read', 'play', 'create']
 
 export const changesLabel = (n: number): string =>
   n === 1 ? '1 alteração' : `${n} alterações`
@@ -46,7 +53,17 @@ export function ModeBar({
   readonly modes?: readonly SheetMode[]
 }) {
   const { model, mode, roles } = useSheet()
-  const modes = only ?? (roles.has('owner') ? OWNER_MODES : OTHER_MODES)
+  const creating = useCreation()?.active === true
+  const owner = roles.has('owner')
+  const modes =
+    only ??
+    (creating
+      ? owner
+        ? OWNER_CREATE
+        : OTHER_CREATE
+      : owner
+        ? OWNER_MODES
+        : OTHER_MODES)
   const store = useSheetStore()
   const toast = useToast()
   const count = useDraftCount()
@@ -59,15 +76,15 @@ export function ModeBar({
   const [error, setError] = useState<string | null>(null)
   // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
   const back = (m: SheetMode): SheetMode =>
-    m !== 'evolve' && modes.includes(m) ? m : (modes[0] ?? 'read')
+    !isDraftMode(m) && modes.includes(m) ? m : (modes[0] ?? 'read')
   const returnTo = useRef<SheetMode>(back(mode))
 
   const switchTo = (next: SheetMode) => {
     const s = store.getState()
-    if (next === 'evolve') {
-      returnTo.current = s.mode === 'evolve' ? returnTo.current : back(s.mode)
+    if (isDraftMode(next)) {
+      returnTo.current = isDraftMode(s.mode) ? returnTo.current : back(s.mode)
       s.startDraft()
-    } else if (s.mode === 'evolve') s.discardDraft()
+    } else if (isDraftMode(s.mode)) s.discardDraft()
     s.setMode(next)
     AccessibilityInfo.announceForAccessibility(`Modo ${MODE_LABELS[next]}`)
   }
@@ -76,18 +93,24 @@ export function ModeBar({
     const s = store.getState()
     if (next === s.mode) return
     // Sair de Evoluir com alterações passa pelo resumo: salvar ou descartar
-    if (s.mode === 'evolve' && s.draft?.size) {
-      setError(null)
-      const events = s.draftEvents()
-      const after = applyBatch(model, s.values, { events }, roles)
-      setSummary({
-        next,
-        events,
-        inactive: after.ok ? inactiveChanges(model, s.values, after.sheet) : [],
-      })
+    if (isDraftMode(s.mode) && s.draft?.size) {
+      review(next)
       return
     }
     switchTo(next)
+  }
+
+  // O resumo antes de salvar; `next` é o modo depois (na criação, ela mesma)
+  const review = (next: SheetMode) => {
+    const s = store.getState()
+    setError(null)
+    const events = s.draftEvents()
+    const after = applyBatch(model, s.values, { events }, roles)
+    setSummary({
+      next,
+      events,
+      inactive: after.ok ? inactiveChanges(model, s.values, after.sheet) : [],
+    })
   }
 
   const save = () => {
@@ -95,10 +118,13 @@ export function ModeBar({
     const label = describeBatch(model, summary.events)
     const result = store.getState().saveDraft(label)
     if (result && !result.ok) {
+      const refused = store.getState().creationRefusal
       setError(
         result.kind === 'conflict'
           ? 'Alguém mudou um destes campos enquanto você editava. Confira os valores e salve de novo.'
-          : (result.issues[0]?.message ?? 'Não foi possível salvar.')
+          : result.kind === 'creation' && refused
+            ? REFUSAL_TEXT[refused.code]
+            : (result.issues[0]?.message ?? 'Não foi possível salvar.')
       )
       return
     }
@@ -131,6 +157,14 @@ export function ModeBar({
       <ModeSwitch modes={modes} mode={mode} onChange={go} />
       {mode === 'evolve' ? (
         <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
+      ) : mode === 'create' ? (
+        // Salvar o rascunho não conclui a criação: "Concluir" fica no painel
+        <EvolveBar
+          count={count}
+          label="Criação"
+          finish="Salvar alterações"
+          onFinish={() => (count ? review('create') : undefined)}
+        />
       ) : null}
       <SummarySheet
         visible={summary !== null}
@@ -191,14 +225,18 @@ function ModeSwitch({
 function EvolveBar({
   count,
   onFinish,
+  label = 'Editar',
+  finish = 'Concluir',
 }: {
   readonly count: number
   readonly onFinish: () => void
+  readonly label?: string
+  readonly finish?: string
 }) {
   const { colors } = useTheme()
   return (
     <View
-      accessibilityLabel="Modo Editar"
+      accessibilityLabel={`Modo ${label}`}
       style={[
         styles.bar,
         {
@@ -208,9 +246,14 @@ function EvolveBar({
       ]}
     >
       <Text variant="caption" aria-live="polite" style={styles.flex}>
-        {`Editando · ${changesLabel(count)}`}
+        {`${label === 'Editar' ? 'Editando' : label} · ${changesLabel(count)}`}
       </Text>
-      <Button title="Concluir" variant="secondary" onPress={onFinish} />
+      <Button
+        title={finish}
+        variant="secondary"
+        disabled={label !== 'Editar' && count === 0}
+        onPress={onFinish}
+      />
     </View>
   )
 }
