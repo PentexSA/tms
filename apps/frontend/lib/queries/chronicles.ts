@@ -146,12 +146,86 @@ export const useChronicleCharacters = (id: string) =>
 export const useCreateCharacter = (id: string) => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (values: Record<string, unknown>) =>
-      unwrap(await api.chronicles({ id }).characters.post({ values })),
+    mutationFn: async (
+      input:
+        | Record<string, unknown>
+        | {
+            readonly values: Record<string, unknown>
+            readonly kind: 'npc'
+            readonly clientCommandId: string
+          }
+    ) => {
+      const npc =
+        'values' in input &&
+        input.kind === 'npc' &&
+        typeof input.clientCommandId === 'string'
+      const body = npc
+        ? {
+            values: input.values as Record<string, unknown>,
+            kind: 'npc' as const,
+            clientCommandId: input.clientCommandId as string,
+          }
+        : { values: input as Record<string, unknown> }
+      return unwrap(await api.chronicles({ id }).characters.post(body))
+    },
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({
           queryKey: chronicleKeys.characters(id),
+        }),
+        queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
+      ]),
+  })
+}
+
+export const useSetNpcVisibility = (
+  chronicleId: string,
+  characterId: string
+) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      readonly visibility: 'hidden' | 'identity' | 'full'
+      readonly revision: number
+      readonly clientCommandId: string
+    }) =>
+      unwrap(await api.characters({ id: characterId }).visibility.post(input)),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['characters', characterId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.characters(chronicleId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.all,
+        }),
+      ]),
+  })
+}
+
+export const useSetNpcPresentation = (
+  chronicleId: string,
+  characterId: string
+) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      readonly portraitUrl: string | null
+      readonly revision: number
+      readonly clientCommandId: string
+    }) =>
+      unwrap(
+        await api.characters({ id: characterId }).presentation.patch(input)
+      ),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['characters', characterId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.characters(chronicleId),
         }),
         queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
       ]),

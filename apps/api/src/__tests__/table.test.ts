@@ -27,6 +27,8 @@ let chronicleId: string
 interface TableRow {
   id: string
   name: string
+  kind: 'pc' | 'npc'
+  visibility: 'hidden' | 'identity' | 'full'
   owner: { id: string; username: string }
   systemCode: string
   templateVersion: string
@@ -71,6 +73,8 @@ describe('GET /chronicles/:id/table', () => {
     expect(rows[0]).toEqual({
       id: helena,
       name: 'Helena Varga',
+      kind: 'pc',
+      visibility: 'hidden',
       owner: { id: owner.id, username: 'dona' },
       systemCode: 'vtm-v20',
       templateVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),

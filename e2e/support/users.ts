@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { BrowserContext } from '@playwright/test'
+import type { APIResponse, BrowserContext } from '@playwright/test'
 import { API_URL, WEB_URL } from '../env'
 
 // Cadastro direto na API, com o cookie do refresh no contexto do navegador:
@@ -36,21 +36,32 @@ export async function signUp(context: BrowserContext, prefix: string) {
 export async function apiAs<T>(
   context: BrowserContext,
   user: { accessToken: string; ip?: string },
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   data?: unknown
 ): Promise<T> {
-  const res = await context.request.fetch(`${API_URL}${path}`, {
+  const res = await rawAs(context, user, method, path, data)
+  if (!res.ok())
+    throw new Error(`${method} ${path}: ${res.status()} ${await res.text()}`)
+  return (await res.json()) as T
+}
+
+/** Chamada autenticada que deixa o teste inspecionar erros e respostas 204. */
+export function rawAs(
+  context: BrowserContext,
+  user: { accessToken: string; ip?: string },
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  data?: unknown
+): Promise<APIResponse> {
+  return context.request.fetch(`${API_URL}${path}`, {
     method,
-    data,
+    ...(data === undefined ? {} : { data }),
     headers: {
       authorization: `Bearer ${user.accessToken}`,
       ...(user.ip ? { 'x-forwarded-for': user.ip } : {}),
     },
   })
-  if (!res.ok())
-    throw new Error(`${method} ${path}: ${res.status()} ${await res.text()}`)
-  return (await res.json()) as T
 }
 
 /**

@@ -54,6 +54,114 @@ const character = (sheet = example('helena').sheet) =>
     sheet,
   })
 
+// NPC revelado (v5): a projeção pública e a de leitura do viewer
+// Folga para o hook de push, que roda as suítes em paralelo
+const WAIT = { timeout: 5000 }
+const NPC = '00000000-0000-4000-8000-00000000c009'
+const identity = {
+  name: 'Oráculo',
+  chip: 'Tremere',
+  subtitle: null,
+  portraitUrl: null,
+}
+const npcIdentity = () =>
+  ok({
+    projection: 'identity',
+    id: NPC,
+    kind: 'npc',
+    visibility: 'identity',
+    identity,
+  })
+const npcFull = () =>
+  ok({
+    projection: 'full',
+    id: NPC,
+    kind: 'npc',
+    visibility: 'full',
+    identity,
+    chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+    systemCode: 'vtm-v20',
+    templateVersion: '1.0.0',
+    roles: ['viewer'],
+    status: 'active',
+    lockedAt: null,
+    sheet: example('helena').sheet,
+  })
+
+describe('SheetScreen: redução da visibilidade de um NPC', () => {
+  it('ficha → identidade → oculto: cada revalidação troca a projeção e o 404 limpa o cache', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcFull())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={NPC} />,
+      await signedIn()
+    )
+    expect(
+      await screen.findByText('Leitura', { exact: true }, WAIT)
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Destreza, 2 de 5')).toBeTruthy()
+
+    calls.characterGet.mockResolvedValueOnce(npcIdentity())
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
+    )
+    expect(
+      await screen.findByText(
+        'O narrador revelou apenas a identidade.',
+        {},
+        WAIT
+      )
+    ).toBeTruthy()
+    // A projeção menor substitui a anterior: nada da ficha fica na tela
+    expect(screen.queryByLabelText('Destreza, 2 de 5')).toBeNull()
+
+    calls.characterGet.mockResolvedValueOnce(fail(404, 'não encontrado'))
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
+    )
+    expect(
+      await screen.findByRole(
+        'header',
+        { name: 'Você não tem acesso a esta ficha' },
+        WAIT
+      )
+    ).toBeTruthy()
+    await waitFor(
+      () =>
+        expect(queryClient.getQueryData(['characters', NPC])).toBeUndefined(),
+      WAIT
+    )
+    expect(screen.queryByText('Oráculo')).toBeNull()
+  })
+
+  it('sem rede, a ficha do viewer em cache não volta à tela', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcFull())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={NPC} />,
+      await signedIn()
+    )
+    expect(
+      await screen.findByLabelText('Destreza, 2 de 5', {}, WAIT)
+    ).toBeTruthy()
+    calls.characterGet.mockRejectedValueOnce(
+      new TypeError('Network request failed')
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
+    )
+    // O erro aparece no lugar da ficha: a cópia do viewer não fica na tela
+    expect(
+      await screen.findByRole(
+        'header',
+        { name: 'Não foi possível carregar a ficha' },
+        WAIT
+      )
+    ).toBeTruthy()
+    expect(screen.queryByLabelText('Destreza, 2 de 5')).toBeNull()
+  })
+})
+
 describe('SheetScreen', () => {
   it('carrega a ficha e o template da versão dela', async () => {
     calls.characterGet.mockResolvedValue(character())

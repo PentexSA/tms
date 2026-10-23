@@ -12,6 +12,7 @@ import {
   manualResult,
   outcomeText,
   type PoolPlan,
+  planFreePool,
   planPool,
   poolOptions,
   poolPresets,
@@ -668,6 +669,46 @@ describe('atalhos (roll.presets)', () => {
 })
 
 describe('multi-sistema', () => {
+  it('parada livre reutiliza o executor declarado, sem ficha, custo ou boosts', () => {
+    const plan = ok(
+      planFreePool(vtm, {
+        dice: 4,
+        difficulty: 7,
+        specialty: true,
+        label: 'Presságio',
+      })
+    )
+    expect(plan).toMatchObject({
+      dice: 4,
+      difficulty: 7,
+      specialty: true,
+      label: 'Presságio',
+      penalty: 0,
+      auto: 0,
+      events: [],
+      modifiers: [
+        { label: 'Especialização', change: 'máximo conta 2 sucessos' },
+      ],
+    })
+    expect(rollPool(plan, faces(7, 10, 1, 2))).toMatchObject({ total: 2 })
+  })
+
+  it('parada livre valida limites e não inventa executor para outro modelo', () => {
+    expect(
+      planFreePool(vtm, { dice: 0, difficulty: 6, label: 'X' })
+    ).toMatchObject({
+      ok: false,
+      kind: 'invalid',
+    })
+    expect(
+      planFreePool(compileTemplate(templates['dnd5e-2014']), {
+        dice: 3,
+        difficulty: 6,
+        label: 'X',
+      })
+    ).toMatchObject({ ok: false, kind: 'unsupported' })
+  })
+
   it('Mago (M20) usa a mesma parada sem código de Mago', () => {
     const c = character('tomas')
     const mta = compileTemplate(templates['mta-m20'])

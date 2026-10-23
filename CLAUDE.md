@@ -117,11 +117,11 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 
 #### Key Features
 
-- **@tms/sheet-core**: 919 tests (Bun), incluindo property tests (fast-check) e a contabilização da v4
-- **@tms/api**: 912 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas; testes de concorrência em Postgres separados
-- **@tms/db**: 21 tests (Bun): migrations sobem e descem
+- **@tms/sheet-core**: 946 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
+- **@tms/api**: 1565 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
+- **@tms/db**: 23 tests (Bun): migrations sobem e descem
 - **@tms/ui**: 91 tests (Jest)
-- **frontend**: 574 tests (Jest + React Native Testing Library)
+- **frontend**: 612 tests (Jest + React Native Testing Library)
 - Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
 #### E2E (Playwright, Chromium e WebKit)
@@ -133,7 +133,7 @@ npx pnpm build && npx pnpm -C e2e build:web
 E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C e2e test:e2e
 ```
 
-`journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1), e `journey-storyteller.spec.ts`, a da v3 (doc/plano-v3.md §1): concluir, dano em grupo, Nova noite, desfazer, travar e remover. O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
+`journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1), e `journey-storyteller.spec.ts`, a da v3 (doc/plano-v3.md §1): concluir, dano em grupo, Nova noite, desfazer, travar e remover, e `journey-backstage.spec.ts`, a da v5 (doc/plano-v5.md §1): NPC oculto, revelação, rolagem oculta, parada livre, sessão, auditoria e transferência. O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
 
 #### Concorrência em Postgres real
 
@@ -146,12 +146,14 @@ PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_rolls_test bun test 
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_policy_test bun test src/__tests__/policy.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_members_test bun test src/__tests__/members.pg.test.ts
 PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_operations_test bun test src/__tests__/operations.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_xp_test bun test src/__tests__/xp.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_backstage_test bun test src/__tests__/backstage.pg.test.ts
 ```
 
 #### Test Infrastructure
 
 - **Bun Test Runner**: Backend packages use native Bun for ~70% faster execution
-- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry)
+- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry). Each instance holds ~180 MB of WASM until released: `destroy()` drops it even if a test file keeps the `db` referenced, and the AuthZ matrix shares one PGLite across scenarios (`createTestContextOn`), each isolated by its own users/chronicles
 - **Jest**: Frontend packages use Jest for React Native/Expo compatibility
 - **@tms/bun-test-config**: Shared Bun test utilities and helpers
 

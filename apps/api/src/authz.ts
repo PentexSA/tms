@@ -54,12 +54,15 @@ export async function chronicleAccess(
 
 export interface CharacterAccess {
   readonly roles: Roles
+  readonly projection: 'full' | 'identity'
   readonly character: {
     readonly id: string
     readonly userId: string
     readonly chronicleId: string
     readonly systemId: string
     readonly templateVersion: string
+    readonly kind: 'pc' | 'npc'
+    readonly visibility: 'hidden' | 'identity' | 'full'
   }
 }
 
@@ -75,30 +78,52 @@ export async function characterAccess(
   const row = await db
     .selectFrom('characters as ch')
     .innerJoin('chronicles as c', 'c.id', 'ch.chronicle_id')
+    .leftJoin('chronicle_members as m', join =>
+      join
+        .onRef('m.chronicle_id', '=', 'ch.chronicle_id')
+        .on('m.user_id', '=', userId)
+    )
     .select([
       'ch.id',
       'ch.user_id',
       'ch.chronicle_id',
       'ch.system_id',
       'ch.template_version',
+      'ch.kind',
+      'ch.visibility',
       'c.storyteller_id',
+      'm.user_id as member_id',
     ])
     .where('ch.id', '=', characterId)
     .where('ch.deleted_at', 'is', null)
     .executeTakeFirst()
   if (!row) return null
   const roles = new Set<RoleName>()
-  if (row.user_id === userId) roles.add('owner')
-  if (row.storyteller_id === userId) roles.add('storyteller')
+  let projection: CharacterAccess['projection'] = 'full'
+  if (row.kind === 'npc') {
+    // Posse isolada nunca autoriza NPC: ela acompanha o narrador atual apenas
+    // para preservar o registro quando a narração é transferida.
+    if (row.storyteller_id === userId) roles.add('storyteller')
+    else if (row.member_id && row.visibility !== 'hidden') {
+      roles.add('viewer')
+      projection = row.visibility === 'full' ? 'full' : 'identity'
+    }
+  } else {
+    if (row.user_id === userId) roles.add('owner')
+    if (row.storyteller_id === userId) roles.add('storyteller')
+  }
   if (roles.size === 0) return null
   return {
     roles,
+    projection,
     character: {
       id: row.id,
       userId: row.user_id,
       chronicleId: row.chronicle_id,
       systemId: row.system_id,
       templateVersion: row.template_version,
+      kind: row.kind as 'pc' | 'npc',
+      visibility: row.visibility as 'hidden' | 'identity' | 'full',
     },
   }
 }

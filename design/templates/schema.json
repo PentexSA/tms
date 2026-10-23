@@ -140,6 +140,12 @@
     },
     "creation": { "$ref": "#/$defs/creation" },
     "costs": { "$ref": "#/$defs/costs" },
+    "options": {
+      "description": "Catálogo fechado de regras da casa oferecidas por este template.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/chronicleOption" },
+      "maxItems": 30
+    },
     "actions": {
       "description": "Ações nomeadas da ficha (menu ⋯), como descanso longo ou despertar. Sempre com prévia antes de aplicar.",
       "type": "array",
@@ -351,8 +357,8 @@
       "enum": ["play", "edit"]
     },
     "role": {
-      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica. Outro jogador da crônica não tem papel na ficha (não lê nem escreve).",
-      "enum": ["owner", "storyteller"]
+      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica; viewer = membro com leitura pública de NPC revelado. Viewer nunca escreve.",
+      "enum": ["owner", "storyteller", "viewer"]
     },
     "defaultAction": {
       "description": "REGISTRY.defaultActions: ação do toque longo no dock.",
@@ -2302,6 +2308,59 @@
         }
       },
       "additionalProperties": false
+    },
+    "chronicleOption": {
+      "type": "object",
+      "required": ["id", "label", "effect", "type", "default"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label" },
+        "help": { "$ref": "#/$defs/helpText" },
+        "effect": { "enum": ["flag", "choice", "bounded-number"] },
+        "type": { "enum": ["boolean", "enum", "integer"] },
+        "default": {},
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/label" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "min": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+        "max": { "type": "integer", "minimum": -1000, "maximum": 1000 }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "boolean" } } },
+          "then": { "properties": { "default": { "type": "boolean" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "enum" } } },
+          "then": {
+            "required": ["values"],
+            "properties": { "default": { "type": "string" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "integer" } } },
+          "then": {
+            "required": ["min", "max"],
+            "properties": { "default": { "type": "integer" } }
+          }
+        }
+      ]
+    },
+    "optionEffect": {
+      "enum": ["flag", "choice", "bounded-number"]
     },
     "recovery": {
       "type": "object",

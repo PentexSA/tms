@@ -514,11 +514,13 @@ A entrega 6 depende de conferir o livro, fora do código; a 5 não, e começa an
 
 | # | Entrega | Módulos |
 |---|---|---|
-| 10 | NPCs e o papel `viewer` | 5.7 |
-| 11 | Rolagens da mesa, oculta e parada livre | 5.8 |
-| 12 | Transferência, sessões, configurações restantes, auditoria consolidada (P2) | 5.2, 5.9–5.11 |
+| 10 | NPCs e o papel `viewer` | 5.7 — entregue na v5 ([validação](validacao-v5.md)) |
+| 11 | Rolagens da mesa, oculta e parada livre | 5.8 — entregue na v5 ([validação](validacao-v5.md)) |
+| 12 | Transferência, sessões, configurações restantes, auditoria consolidada (P2) | 5.2, 5.9–5.11 — entregue na v5 ([validação](validacao-v5.md)) |
 
 A entrega 12 é a que se corta primeiro: vira backlog sem quebrar nada.
+
+O roteiro passo a passo está no [plano v5](plano-v5.md), com contratos de privacidade, dependências, testes e critérios de aceite. Ele separa o núcleo obrigatório (entregas 10–11) do marco P2 (entrega 12); adiar P2 exige registrar o backlog, sem declarar o painel integralmente concluído.
 
 **Jornada E2E (`journey-backstage.spec.ts`):** o narrador cria um NPC oculto, rola escondido por ele e por uma parada livre, e revela só a identidade; o jogador vê o nome e nada do `dock`, e o teste confere que o NPC oculto não aparece em nenhuma resposta nem contagem.
 

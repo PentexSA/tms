@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   applyBatch,
@@ -6,6 +7,7 @@ import {
   type PoolPlan,
   type PoolResult,
   parsePath,
+  planFreePool,
   planPool,
   poolRollOf,
   rollPolicy,
@@ -19,11 +21,12 @@ import { Elysia, t } from 'elysia'
 import type { Kysely, Transaction } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { characterAccess } from '../authz'
+import { characterAccess, chronicleAccess } from '../authz'
+import { isUniqueViolation } from '../chronicles/operations'
 import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
-import { modelFor } from '../sheets/models'
+import { latestTemplate, modelFor } from '../sheets/models'
 import { lockCharacter, refusal, writeAccess } from '../sheets/policy'
 
 // Rolagem de dados no servidor (doc/plano-v0.md, Etapa 21). O cliente manda só
@@ -47,6 +50,9 @@ type Row = {
   result: unknown
   // Null: a conta de quem rolou foi excluída (migration 0013)
   username: string | null
+  hidden: boolean
+  character_id: string | null
+  character_name: string | null
 }
 
 interface StoredRequest {
@@ -74,6 +80,14 @@ const rollOut = (row: Row) => {
     at: row.created_at,
     by: row.username === null ? null : { username: row.username },
     byRole: row.by_role,
+    hidden: row.hidden,
+    origin:
+      row.character_id === null
+        ? ({ kind: 'free' } as const)
+        : ({
+            kind: 'character' as const,
+            character: { id: row.character_id, name: row.character_name },
+          } as const),
     label: row.label,
     manual: row.manual,
     difficulty: request.difficulty,
@@ -87,6 +101,39 @@ const rollOut = (row: Row) => {
     outcome: result.outcome,
     text: result.text,
     modifiers: result.modifiers,
+  }
+}
+
+const rollHash = (request: unknown) =>
+  createHash('sha256').update(JSON.stringify(request)).digest('hex')
+
+const idempotencyConflict = () =>
+  new ApiError(
+    409,
+    'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
+    { code: 'IDEMPOTENCY_CONFLICT' }
+  )
+
+const encodeCursor = (at: Date | string, id: string) =>
+  Buffer.from(JSON.stringify([new Date(at).toISOString(), id])).toString(
+    'base64url'
+  )
+
+const decodeCursor = (value: string | undefined): [Date, string] | null => {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString())
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length !== 2 ||
+      typeof parsed[0] !== 'string' ||
+      typeof parsed[1] !== 'string'
+    )
+      return null
+    const at = new Date(parsed[0])
+    return Number.isNaN(at.getTime()) ? null : [at, parsed[1]]
+  } catch {
+    return null
   }
 }
 
@@ -158,6 +205,7 @@ export function rollRoutes(
       .selectFrom('character_rolls as r')
       // Left: rolagem de conta excluída continua na lista, sem autor
       .leftJoin('users as u', 'u.id', 'r.created_by')
+      .leftJoin('characters as ch', 'ch.id', 'r.character_id')
       .select([
         'r.id',
         'r.created_at',
@@ -167,6 +215,9 @@ export function rollRoutes(
         'r.request',
         'r.result',
         'u.username',
+        'r.hidden',
+        'r.character_id',
+        'ch.name as character_name',
       ])
 
   return new Elysia()
@@ -176,11 +227,16 @@ export function rollRoutes(
       async ({ params, body, userId, set }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         const roles = access.roles
         // Rolar gasta recurso e entra no histórico: só quem escreve na ficha
         if (!roles.has('owner') && !roles.has('storyteller'))
           throw new ApiError(403, 'só o dono da ficha e o narrador rolam')
+        const hidden = body.hidden === true
+        if (hidden && !roles.has('storyteller'))
+          throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+            code: 'STORYTELLER_REQUIRED',
+          })
         for (const key of [`user:${me}`, `character:${params.id}`]) {
           const d = options.limits.rolls.hit(key)
           if (!d.allowed) {
@@ -202,124 +258,172 @@ export function rollRoutes(
           })
         const byRole = roles.has('owner') ? 'owner' : 'storyteller'
 
-        return db.transaction().execute(async trx => {
-          const character = await lockCharacter(trx, params.id)
-          const current = character.sheet
-
-          // Reenvio: a mesma rolagem não rola de novo nem cobra duas vezes
-          const done = await selectRoll(trx)
-            .where('r.character_id', '=', params.id)
-            .where('r.client_roll_id', '=', body.clientRollId)
-            .executeTakeFirst()
-          if (done)
-            return {
-              duplicate: true,
-              roll: rollOut(done),
-              sheetVersion: character.sheetVersion,
-              sheet: stripRestricted(model, current, roles),
+        try {
+          return await db.transaction().execute(async trx => {
+            const character = await lockCharacter(trx, params.id)
+            const current = character.sheet
+            const currentAccess = await writeAccess(
+              trx,
+              roles,
+              character.chronicleId,
+              me
+            )
+            // O papel foi obtido antes da transação apenas para uma recusa
+            // rápida. Sob a trava da crônica ele precisa continuar válido antes
+            // até de recuperar uma resposta idempotente.
+            if (roles.has('storyteller') && !currentAccess.storyteller)
+              throw notFound()
+            if (roles.has('owner') && !currentAccess.member) {
+              const denied = rollPolicy(
+                currentAccess,
+                character.status,
+                character.lockedAt !== null,
+                []
+              )
+              if (!denied.ok) throw refusal(denied, { model, roles, paths: [] })
             }
 
-          const request: StoredRequest = {
-            slots: body.slots,
-            difficulty: body.difficulty,
-            specialty: body.specialty ?? false,
-            boosts: body.boosts ?? [],
-            ...(body.preset ? { preset: body.preset } : {}),
-          }
-          const plan = planPool(model, current, request, roles)
-          if (!plan.ok) throw planFailure(plan)
-          // O custo classificado sobre a ficha travada: o primeiro gasto de FdV
-          // (do padrão ao valor gravado) também passa por aqui
-          const cost = plan.events.length
-            ? classifyBatch(model, current, plan.events).parts
-            : null
-          const verdict = rollPolicy(
-            await writeAccess(trx, roles, character.chronicleId, me),
-            character.status,
-            character.lockedAt !== null,
-            cost?.map(p => p.kind) ?? null
-          )
-          if (!verdict.ok)
-            throw refusal(verdict, {
-              model,
-              roles,
-              paths: plan.events.map(e => e.path),
-              parts: cost ?? [],
-            })
-          const result = body.manual
-            ? manualResult(
-                body.manual.successes,
-                body.manual.botch ?? false,
-                plan.auto
-              )
-            : rollPool(plan, options.random)
-          if (!result)
-            throw new ApiError(422, 'resultado manual inválido', {
-              kind: 'invalid',
-            })
-
-          let sheet = current
-          let sheetVersion = character.sheetVersion
-          let batchId: string | null = null
-          if (plan.events.length) {
-            const applied = applyBatch(model, current, plan, roles)
-            if (!applied.ok)
-              throw new ApiError(422, 'não foi possível pagar o custo', {
-                kind: 'cost',
-                issues: applied.issues
-                  .filter(i => parsePath(i.path))
-                  .map(i => ({ path: i.path, message: i.message })),
-              })
-            sheet = applied.sheet
-            sheetVersion += 1
-            batchId = await recordCost(trx, {
+            const request: StoredRequest = {
+              slots: body.slots,
+              difficulty: body.difficulty,
+              specialty: body.specialty ?? false,
+              boosts: body.boosts ?? [],
+              ...(body.preset ? { preset: body.preset } : {}),
+            }
+            const intent = {
+              kind: 'character',
               characterId: params.id,
-              userId: me,
-              byRole,
-              model,
-              before: current,
-              sheet,
-              sheetVersion,
-              events: plan.events,
-              now: options.now(),
-            })
-          }
+              request,
+              hidden,
+              manual: body.manual ?? null,
+            }
+            const hash = rollHash(intent)
 
-          const stored: StoredResult = {
-            ...result,
-            dice: plan.dice,
-            die: plan.die,
-            penalty: plan.penalty,
-            specialty: plan.specialty,
-            modifiers: plan.modifiers,
-          }
-          const inserted = await trx
-            .insertInto('character_rolls')
-            .values({
-              character_id: params.id,
-              client_roll_id: body.clientRollId,
-              created_by: me,
-              by_role: byRole,
-              manual: Boolean(body.manual),
-              label: plan.label,
-              request: JSON.stringify(request),
-              result: JSON.stringify(stored),
-              batch_id: batchId,
-              created_at: options.now(),
-            })
-            .returning('id')
-            .executeTakeFirstOrThrow()
-          const row = await selectRoll(trx)
-            .where('r.id', '=', inserted.id)
-            .executeTakeFirstOrThrow()
-          set.status = 201
-          return {
-            duplicate: false,
-            roll: rollOut(row),
-            sheetVersion,
-            sheet: stripRestricted(model, sheet, roles),
-          }
-        })
+            // Reenvio: a mesma rolagem não rola de novo nem cobra duas vezes
+            const done = await selectRoll(trx)
+              .select(['r.request_hash', 'r.created_by'])
+              .where('r.chronicle_id', '=', character.chronicleId)
+              .where('r.client_roll_id', '=', body.clientRollId)
+              .executeTakeFirst()
+            if (done) {
+              if (
+                done.character_id !== params.id ||
+                done.created_by !== me ||
+                done.request_hash !== hash
+              )
+                throw idempotencyConflict()
+              return {
+                duplicate: true,
+                roll: rollOut(done),
+                sheetVersion: character.sheetVersion,
+                sheet: stripRestricted(model, current, roles),
+              }
+            }
+            const plan = planPool(model, current, request, roles)
+            if (!plan.ok) throw planFailure(plan)
+            // O custo classificado sobre a ficha travada: o primeiro gasto de FdV
+            // (do padrão ao valor gravado) também passa por aqui
+            const cost = plan.events.length
+              ? classifyBatch(model, current, plan.events).parts
+              : null
+            const verdict = rollPolicy(
+              currentAccess,
+              character.status,
+              character.lockedAt !== null,
+              cost?.map(p => p.kind) ?? null
+            )
+            if (!verdict.ok)
+              throw refusal(verdict, {
+                model,
+                roles,
+                paths: plan.events.map(e => e.path),
+                parts: cost ?? [],
+              })
+            const result = body.manual
+              ? manualResult(
+                  body.manual.successes,
+                  body.manual.botch ?? false,
+                  plan.auto
+                )
+              : rollPool(plan, options.random)
+            if (!result)
+              throw new ApiError(422, 'resultado manual inválido', {
+                kind: 'invalid',
+              })
+
+            let sheet = current
+            let sheetVersion = character.sheetVersion
+            let batchId: string | null = null
+            if (plan.events.length) {
+              const applied = applyBatch(model, current, plan, roles)
+              if (!applied.ok)
+                throw new ApiError(422, 'não foi possível pagar o custo', {
+                  kind: 'cost',
+                  issues: applied.issues
+                    .filter(i => parsePath(i.path))
+                    .map(i => ({ path: i.path, message: i.message })),
+                })
+              sheet = applied.sheet
+              sheetVersion += 1
+              batchId = await recordCost(trx, {
+                characterId: params.id,
+                userId: me,
+                byRole,
+                model,
+                before: current,
+                sheet,
+                sheetVersion,
+                events: plan.events,
+                now: options.now(),
+              })
+            }
+
+            const stored: StoredResult = {
+              ...result,
+              dice: plan.dice,
+              die: plan.die,
+              penalty: plan.penalty,
+              specialty: plan.specialty,
+              modifiers: plan.modifiers,
+            }
+            const inserted = await trx
+              .insertInto('character_rolls')
+              .values({
+                character_id: params.id,
+                chronicle_id: character.chronicleId,
+                client_roll_id: body.clientRollId,
+                created_by: me,
+                by_role: byRole,
+                manual: Boolean(body.manual),
+                label: plan.label,
+                request: JSON.stringify(request),
+                result: JSON.stringify(stored),
+                batch_id: batchId,
+                hidden,
+                request_hash: hash,
+                created_at: options.now(),
+              })
+              .returning('id')
+              .executeTakeFirstOrThrow()
+            const row = await selectRoll(trx)
+              .where('r.id', '=', inserted.id)
+              .executeTakeFirstOrThrow()
+            set.status = 201
+            return {
+              duplicate: false,
+              roll: rollOut(row),
+              sheetVersion,
+              sheet: stripRestricted(model, sheet, roles),
+            }
+          })
+        } catch (error) {
+          // Duas fichas diferentes podem disputar a chave da crônica sem
+          // disputar a mesma trava de ficha. A constraint decide a vencedora;
+          // a outra intenção recebe conflito controlado, nunca um 500.
+          if (isUniqueViolation(error, 'character_rolls_chronicle_client_key'))
+            throw idempotencyConflict()
+          throw error
+        }
       },
       {
         params: idParams,
@@ -347,6 +451,7 @@ export function rollRoutes(
               botch: t.Optional(t.Boolean()),
             })
           ),
+          hidden: t.Optional(t.Boolean()),
         }),
       }
     )
@@ -355,9 +460,11 @@ export function rollRoutes(
       async ({ params, query, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
-        const rows = await selectRoll(db)
-          .where('r.character_id', '=', params.id)
+        if (!access || access.roles.has('viewer')) throw notFound()
+        let q = selectRoll(db).where('r.character_id', '=', params.id)
+        if (!access.roles.has('storyteller'))
+          q = q.where('r.hidden', '=', false)
+        const rows = await q
           .orderBy('r.created_at', 'desc')
           .orderBy('r.id', 'desc')
           .limit(query.limit ?? 20)
@@ -368,6 +475,176 @@ export function rollRoutes(
         params: idParams,
         query: t.Object({
           limit: t.Optional(t.Numeric({ minimum: 1, maximum: 50 })),
+        }),
+      }
+    )
+    .post(
+      '/chronicles/:id/rolls',
+      async ({ params, body, userId, set }) => {
+        const me = requireUser(userId)
+        if ((await chronicleAccess(db, me, params.id)) !== 'storyteller')
+          throw notFound()
+        for (const key of [`user:${me}`, `chronicle:${params.id}`]) {
+          const decision = options.limits.rolls.hit(key)
+          if (!decision.allowed) {
+            set.headers['retry-after'] = String(decision.retryAfterSeconds)
+            throw new ApiError(
+              429,
+              'muitas rolagens seguidas; tente de novo em instantes'
+            )
+          }
+        }
+        return db.transaction().execute(async trx => {
+          const chronicle = await trx
+            .selectFrom('chronicles')
+            .select(['storyteller_id', 'system_id'])
+            .where('id', '=', params.id)
+            .forUpdate()
+            .executeTakeFirst()
+          if (!chronicle || chronicle.storyteller_id !== me) throw notFound()
+          const template = await latestTemplate(trx, chronicle.system_id)
+          if (!template)
+            throw new ApiError(422, 'sistema sem template publicado')
+          const model = await modelFor(
+            trx,
+            chronicle.system_id,
+            template.version
+          )
+          const request = {
+            dice: body.dice,
+            difficulty: body.difficulty,
+            specialty: body.specialty ?? false,
+            label: body.label.trim(),
+          }
+          const hidden = body.hidden ?? true
+          const intent = { kind: 'free', request, hidden }
+          const hash = rollHash(intent)
+          const done = await selectRoll(trx)
+            .select(['r.request_hash', 'r.created_by'])
+            .where('r.chronicle_id', '=', params.id)
+            .where('r.client_roll_id', '=', body.clientRollId)
+            .executeTakeFirst()
+          if (done) {
+            if (
+              done.character_id !== null ||
+              done.created_by !== me ||
+              done.request_hash !== hash
+            )
+              throw idempotencyConflict()
+            return { duplicate: true, roll: rollOut(done) }
+          }
+          const plan = planFreePool(model, request)
+          if (!plan.ok) {
+            if (plan.kind === 'unsupported')
+              throw new ApiError(
+                422,
+                'Este sistema ainda não oferece parada livre.',
+                { code: 'ROLL_UNSUPPORTED' }
+              )
+            throw planFailure(plan)
+          }
+          const result = rollPool(plan, options.random)
+          const stored: StoredResult = {
+            ...result,
+            dice: plan.dice,
+            die: plan.die,
+            penalty: 0,
+            specialty: plan.specialty,
+            modifiers: plan.modifiers,
+          }
+          const inserted = await trx
+            .insertInto('character_rolls')
+            .values({
+              chronicle_id: params.id,
+              character_id: null,
+              client_roll_id: body.clientRollId,
+              created_by: me,
+              by_role: 'storyteller',
+              manual: false,
+              label: plan.label,
+              request: JSON.stringify(request),
+              result: JSON.stringify(stored),
+              batch_id: null,
+              hidden,
+              request_hash: hash,
+              created_at: options.now(),
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+          const row = await selectRoll(trx)
+            .where('r.id', '=', inserted.id)
+            .executeTakeFirstOrThrow()
+          set.status = 201
+          return { duplicate: false, roll: rollOut(row) }
+        })
+      },
+      {
+        params: idParams,
+        body: t.Object({
+          clientRollId: uuid,
+          dice: t.Integer({ minimum: 1, maximum: 50 }),
+          difficulty: t.Integer({ minimum: 1, maximum: 100 }),
+          specialty: t.Optional(t.Boolean()),
+          label: t.String({ minLength: 1, maxLength: 120 }),
+          hidden: t.Optional(t.Boolean()),
+        }),
+      }
+    )
+    .get(
+      '/chronicles/:id/rolls',
+      async ({ params, query, userId }) => {
+        const me = requireUser(userId)
+        if ((await chronicleAccess(db, me, params.id)) !== 'storyteller')
+          throw notFound()
+        const cursor = decodeCursor(query.cursor)
+        if (query.cursor && !cursor) throw new ApiError(422, 'cursor inválido')
+        if (query.characterId) {
+          const character = await db
+            .selectFrom('characters')
+            .select('id')
+            .where('id', '=', query.characterId)
+            .where('chronicle_id', '=', params.id)
+            .executeTakeFirst()
+          if (!character) throw notFound()
+        }
+        const limit = query.limit ?? 20
+        let q = selectRoll(db).where('r.chronicle_id', '=', params.id)
+        if (query.characterId)
+          q = q.where('r.character_id', '=', query.characterId)
+        if (query.hidden === 'true') q = q.where('r.hidden', '=', true)
+        if (query.hidden === 'false') q = q.where('r.hidden', '=', false)
+        if (cursor)
+          q = q.where(eb =>
+            eb.or([
+              eb('r.created_at', '<', cursor[0]),
+              eb.and([
+                eb('r.created_at', '=', cursor[0]),
+                eb('r.id', '<', cursor[1]),
+              ]),
+            ])
+          )
+        const rows = await q
+          .orderBy('r.created_at', 'desc')
+          .orderBy('r.id', 'desc')
+          .limit(limit + 1)
+          .execute()
+        const page = rows.slice(0, limit)
+        const last = page.at(-1)
+        return {
+          items: page.map(rollOut),
+          nextCursor:
+            rows.length > limit && last
+              ? encodeCursor(last.created_at, last.id)
+              : null,
+        }
+      },
+      {
+        params: idParams,
+        query: t.Object({
+          limit: t.Optional(t.Numeric({ minimum: 1, maximum: 50 })),
+          cursor: t.Optional(t.String({ maxLength: 500 })),
+          characterId: t.Optional(uuid),
+          hidden: t.Optional(t.Union([t.Literal('true'), t.Literal('false')])),
         }),
       }
     )

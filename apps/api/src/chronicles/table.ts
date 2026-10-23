@@ -68,6 +68,8 @@ export function tableRoutes(
           'ch.updated_at',
           'ch.status',
           'ch.locked_at',
+          'ch.kind',
+          'ch.visibility',
           'u.username',
           'g.code as systemCode',
         ])
@@ -82,6 +84,8 @@ export function tableRoutes(
         out.push({
           id: r.id,
           name: r.name,
+          kind: r.kind,
+          visibility: r.visibility,
           owner: { id: r.user_id, username: r.username },
           systemCode: r.systemCode,
           templateVersion: r.template_version,

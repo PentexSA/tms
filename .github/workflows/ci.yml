@@ -149,6 +149,13 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_xp_test
           NODE_ENV: test
         run: pnpm -C apps/api exec bun test src/__tests__/xp.pg.test.ts
+      # V5: idempotência por crônica, revisões e troca de autoridade usam
+      # conexões independentes; PGLite não demonstra essas disputas.
+      - name: bastidores e transferência concorrentes
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_backstage_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/backstage.pg.test.ts
 
   e2e:
     name: E2E web (Playwright, Chromium e WebKit)

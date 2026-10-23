@@ -30,9 +30,12 @@ describe('migrations', () => {
         'character_rolls',
         'characters',
         'chronicle_audit',
+        'chronicle_commands',
         'chronicle_invites',
         'chronicle_members',
         'chronicle_operations',
+        'chronicle_sessions',
+        'chronicle_transfers',
         'chronicles',
         'game_systems',
         'refresh_tokens',
@@ -89,6 +92,7 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       const roll = {
         character_id: character.id,
+        chronicle_id: chronicle.id,
         client_roll_id: crypto.randomUUID(),
         created_by: user.id,
         by_role: 'owner',
@@ -172,6 +176,7 @@ describe('migrations', () => {
         .insertInto('character_rolls')
         .values({
           character_id: character.id,
+          chronicle_id: chronicle.id,
           client_roll_id: crypto.randomUUID(),
           created_by: other.id,
           by_role: 'storyteller',
@@ -563,6 +568,60 @@ describe('migrations', () => {
       const up = await migrator.migrateToLatest()
       expect(up.error).toBeUndefined()
       expect(up.results?.length).toBe(files.length)
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0019 diagnostica colisão histórica da chave de rolagem por crônica', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect(
+        (await migrator.migrateTo('0018_xp_requests')).error
+      ).toBeUndefined()
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'u', email: 'u@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const characters = await db
+        .insertInto('characters')
+        .values(
+          ['a', 'b'].map(name => ({
+            name,
+            chronicle_id: chronicle.id,
+            system_id: system.id,
+            user_id: user.id,
+            template_version: '1.0.0',
+            sheet_data: JSON.stringify({ values: { name } }),
+          }))
+        )
+        .returning('id')
+        .execute()
+      const key = crypto.randomUUID()
+      for (const character of characters)
+        await sql`
+          insert into character_rolls
+            (character_id, client_roll_id, created_by, by_role, label, request, result)
+          values
+            (${character.id}, ${key}, ${user.id}, 'owner', 'Teste', '{}'::jsonb, '{}'::jsonb)
+        `.execute(db)
+      const result = await migrator.migrateToLatest()
+      expect(result.error).toBeDefined()
+      expect(String(result.error)).toContain(
+        'client_roll_id histórico colide dentro da mesma crônica'
+      )
     } finally {
       await destroy()
     }

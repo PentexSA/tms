@@ -200,7 +200,7 @@ describe.skipIf(!URL_)('operações num Postgres real', () => {
     }
   })
 
-  it('mesma chave com alvos diferentes: o índice único devolve o resultado original, sem 500', async () => {
+  it('mesma chave com alvos diferentes: uma aplica e a intenção divergente recebe 409', async () => {
     const a = await fresh('Chave A')
     const b = await fresh('Chave B')
     const key = crypto.randomUUID()
@@ -208,13 +208,11 @@ describe.skipIf(!URL_)('operações num Postgres real', () => {
       send([{ characterId: a, sheetVersion: 0 }], key),
       send([{ characterId: b, sheetVersion: 0 }], key),
     ])
-    expect(results.map(r => r.status).sort()).toEqual([200, 201])
-    const [one, two] = (await Promise.all(results.map(r => r.json()))) as {
-      operationId: string
-      characters: unknown[]
-    }[]
-    expect(one?.operationId).toBe(two?.operationId as string)
-    expect(one?.characters).toEqual(two?.characters as unknown[])
+    expect(results.map(r => r.status).sort()).toEqual([201, 409])
+    const conflict = results.find(response => response.status === 409)
+    expect(await conflict?.json()).toMatchObject({
+      code: 'IDEMPOTENCY_CONFLICT',
+    })
     const h = await Promise.all([health(a), health(b)])
     expect(h.map(v => v.bashing).sort()).toEqual([0, 1])
   })

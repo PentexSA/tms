@@ -63,7 +63,7 @@ export function eventRoutes(
         )
           throw new ApiError(413, 'lote grande demais')
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         for (const key of [`user:${me}`, `character:${params.id}`]) {
           const d = options.limits.events.hit(key)
           if (!d.allowed) {
@@ -280,7 +280,7 @@ export function eventRoutes(
       async ({ params, query, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         const model = await modelFor(
           db,
           access.character.systemId,
@@ -320,6 +320,21 @@ export function eventRoutes(
               .as('reverted'),
           ])
           .where('b.character_id', '=', params.id)
+        // O custo de uma rolagem oculta altera o estado atual, mas o lote que
+        // explica a ação não aparece ao dono. O filtro acontece antes do
+        // cursor/limite para não vazar nem criar páginas vazias.
+        if (!access.roles.has('storyteller'))
+          q = q.where(eb =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom('character_rolls as secret_roll')
+                  .select('secret_roll.id')
+                  .whereRef('secret_roll.batch_id', '=', 'b.id')
+                  .where('secret_roll.hidden', '=', true)
+              )
+            )
+          )
         if (query.before) {
           const [at, id] = query.before.split('_')
           const when = new Date(at ?? '')

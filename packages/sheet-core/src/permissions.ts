@@ -7,15 +7,15 @@ import { REGISTRY, type RoleName } from './registry'
 // conjunto vazio não lê nada, e campo citado por várias seções obedece à mais
 // restrita.
 //
-// Papéis na ficha: `owner` (dono) e `storyteller` (narrador da crônica). Outro
-// jogador da crônica não tem papel: não lê nem escreve a ficha (doc/plano-v3.md,
-// Etapa 2). Quem chama resolve os papéis no banco, nunca a partir do cliente;
-// o narrador pode ser também o dono.
+// Papéis na ficha: `owner` (dono), `storyteller` (narrador da crônica) e
+// `viewer` (membro que recebeu a projeção completa de um NPC). Quem chama
+// resolve os papéis no banco, nunca a partir do cliente. Viewer só lê seções
+// públicas: mesmo uma seção sem permissions nunca fica gravável para ele.
 
 export type Roles = Iterable<RoleName | string>
 
-// Sem `permissions`: dono e narrador leem e escrevem.
-const DEFAULT_ACCESS: readonly RoleName[] = ['owner', 'storyteller']
+const DEFAULT_READ: readonly RoleName[] = ['owner', 'storyteller', 'viewer']
+const DEFAULT_WRITE: readonly RoleName[] = ['owner', 'storyteller']
 
 const known = (roles: Roles): Set<RoleName> => {
   const out = new Set<RoleName>()
@@ -36,7 +36,7 @@ export function canReadSection(
   const section = model.sections.get(sectionId)
   const mine = known(roles)
   if (!section || mine.size === 0) return false
-  return allows(section.def.permissions?.read ?? DEFAULT_ACCESS, mine)
+  return allows(section.def.permissions?.read ?? DEFAULT_READ, mine)
 }
 
 export function canRead(
@@ -47,7 +47,7 @@ export function canRead(
   const field = model.fields.get(fieldId)
   const mine = known(roles)
   if (!field || mine.size === 0) return false
-  if (field.sectionIds.length === 0) return allows(DEFAULT_ACCESS, mine)
+  if (field.sectionIds.length === 0) return allows(DEFAULT_READ, mine)
   return field.sectionIds.every(s => canReadSection(model, s, mine))
 }
 
@@ -59,10 +59,10 @@ export function canWrite(
   const field = model.fields.get(fieldId)
   const mine = known(roles)
   if (!field || field.readOnly || !canRead(model, fieldId, mine)) return false
-  if (field.sectionIds.length === 0) return allows(DEFAULT_ACCESS, mine)
+  if (field.sectionIds.length === 0) return allows(DEFAULT_WRITE, mine)
   return field.sectionIds.every(id => {
     const write = model.sections.get(id)?.def.permissions?.write
-    return allows(write ?? DEFAULT_ACCESS, mine)
+    return allows(write ?? DEFAULT_WRITE, mine)
   })
 }
 

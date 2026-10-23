@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
-
+import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
 import { CreationSettings } from '../../../../components/chronicles/CreationSettings'
 import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
@@ -39,7 +39,7 @@ export default function ChronicleScreen() {
   const [inviting, setInviting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [view, setView] = useState<'sheets' | 'table'>('sheets')
+  const [view, setView] = useState<'sheets' | 'table' | 'backstage'>('sheets')
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
   if (chronicle.isPending)
@@ -79,7 +79,7 @@ export default function ChronicleScreen() {
   // Mesa, convites nem membros
   const former = c.role === 'former'
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
-  const showing = narrating ? view : 'sheets'
+  const showing = former ? 'sheets' : view
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
@@ -110,13 +110,21 @@ export default function ChronicleScreen() {
           />
         ) : null}
 
-        {narrating ? (
+        {!former ? (
           <Tabs
             accessibilityLabel="Visão da crônica"
-            items={[
-              { id: 'sheets', label: 'Fichas' },
-              { id: 'table', label: 'Mesa' },
-            ]}
+            items={
+              narrating
+                ? [
+                    { id: 'sheets', label: 'Fichas' },
+                    { id: 'table', label: 'Mesa' },
+                    { id: 'backstage', label: 'Bastidores' },
+                  ]
+                : [
+                    { id: 'sheets', label: 'Fichas' },
+                    { id: 'backstage', label: 'Diário' },
+                  ]
+            }
             selected={showing}
             onSelect={id => setView(id as typeof view)}
           />
@@ -124,6 +132,8 @@ export default function ChronicleScreen() {
 
         {showing === 'table' ? (
           <TableView chronicleId={c.id} />
+        ) : showing === 'backstage' ? (
+          <CampaignBackstage chronicle={c} narrating={narrating} />
         ) : (
           <SheetsPanel
             chronicle={c}
@@ -207,9 +217,9 @@ function SheetsPanel({
   // As fichas de cada membro, na lista do narrador (a API manda todas a ele)
   const characters = useChronicleCharacters(c.id)
   const sheetsOf = (userId: string) =>
-    (characters.data ?? [])
-      .filter(ch => ch.owner.id === userId)
-      .map(ch => ch.name)
+    (characters.data ?? []).flatMap(ch =>
+      'owner' in ch && ch.owner?.id === userId && 'name' in ch ? [ch.name] : []
+    )
   if (former)
     return (
       <CharacterList

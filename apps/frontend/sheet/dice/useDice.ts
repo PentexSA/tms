@@ -15,7 +15,7 @@ import {
 } from '@tms/sheet-core'
 import { useToast } from '@tms/ui'
 import { getRandomValues, randomUUID } from 'expo-crypto'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo } from 'react-native'
 import { useStore } from 'zustand'
 
@@ -83,6 +83,12 @@ export function useDice(
   const [rolls, setRolls] = useState<readonly SessionRoll[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hidden, setHidden] = useState(false)
+  const pendingKey = useRef<string | null>(null)
+  const storyteller = roles.includes('storyteller')
+  const changedIntent = useCallback(() => {
+    pendingKey.current = null
+  }, [])
 
   const options = useMemo(
     () =>
@@ -162,15 +168,17 @@ export function useDice(
       setError(null)
       try {
         const res = await api.characters({ id: characterId }).rolls.post({
-          clientRollId: uuid(),
+          clientRollId: (pendingKey.current ??= uuid()),
           slots,
           difficulty,
           specialty,
           boosts: [...boosts],
           ...(preset ? { preset } : {}),
           ...(manual ? { manual } : {}),
+          ...(storyteller ? { hidden } : {}),
         })
         if (res.error) {
+          pendingKey.current = null
           // Recusa da política (travada, arquivada): o motivo, e a ficha
           // rebuscada mostra o estado novo
           const code =
@@ -189,6 +197,7 @@ export function useDice(
           } else setError(messageOf(res.error, 'Não foi possível rolar.'))
           return
         }
+        pendingKey.current = null
         const { roll: r, sheet, sheetVersion } = res.data
         // O custo (FdV) foi pago no servidor: a ficha nova entra no store e
         // no cache
@@ -217,8 +226,15 @@ export function useDice(
           announcement: `${r.label}: ${describePool(result)}`,
         })
       } catch {
+        if (hidden && storyteller) {
+          setError(
+            'Não foi possível confirmar a rolagem oculta. Reconecte e reenvie; a mesma chave será preservada.'
+          )
+          return
+        }
         // Sem rede: rola no aparelho
         local(plan, manual)
+        pendingKey.current = null
       } finally {
         setBusy(false)
       }
@@ -237,6 +253,8 @@ export function useDice(
       queryClient,
       toast,
       record,
+      hidden,
+      storyteller,
       local,
     ]
   )
@@ -250,6 +268,7 @@ export function useDice(
     preset: active,
     // Ligar um atalho põe as opções dele nos slots; tocar de novo desliga
     togglePreset: (id: string) => {
+      changedIntent()
       const next = presets.find(p => p.id === id && p.available)
       if (!next || preset === id) {
         setPreset(null)
@@ -264,6 +283,7 @@ export function useDice(
       }))
     },
     choose: (slot: string, key: string | null) => {
+      changedIntent()
       if (active && Object.hasOwn(active.slots, slot)) setPreset(null)
       setSlots(s => {
         const next = { ...s }
@@ -273,15 +293,29 @@ export function useDice(
       })
     },
     difficulty,
-    setDifficulty,
+    setDifficulty: (value: number) => {
+      changedIntent()
+      setDifficulty(value)
+    },
     specialty,
-    setSpecialty,
+    setSpecialty: (value: boolean) => {
+      changedIntent()
+      setSpecialty(value)
+    },
     boosts,
-    toggleBoost: (id: string) =>
-      setBoosts(b => (b.includes(id) ? b.filter(x => x !== id) : [...b, id])),
+    toggleBoost: (id: string) => {
+      changedIntent()
+      setBoosts(b => (b.includes(id) ? b.filter(x => x !== id) : [...b, id]))
+    },
     rolls,
     busy,
     error,
+    hidden,
+    setHidden: (value: boolean) => {
+      changedIntent()
+      setHidden(value)
+    },
+    storyteller,
     rollInApp: () => submit(),
     rolledByHand: (entry: ManualEntry) => submit(entry),
   }

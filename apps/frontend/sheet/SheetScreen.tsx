@@ -6,12 +6,27 @@ import {
   type SheetMode,
   xpLedgerFields,
 } from '@tms/sheet-core'
-import { AppBar, Button, EmptyState, Screen, Skeleton, tokens } from '@tms/ui'
+import {
+  AppBar,
+  Avatar,
+  Button,
+  EmptyState,
+  Screen,
+  Skeleton,
+  Text,
+  TextField,
+  tokens,
+} from '@tms/ui'
+import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf, statusOf } from '../lib/errors'
+import {
+  useSetNpcPresentation,
+  useSetNpcVisibility,
+} from '../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../lib/queries/focus'
 import { SheetProvider } from './context'
 import { CreationContext } from './creation/CreationContext'
@@ -55,14 +70,26 @@ export function SheetScreen({
       { cancelRefetch: false }
     )
   )
-  const chronicle = state.status === 'ready' ? state.character.chronicle : null
+  useEffect(() => {
+    if (state.status === 'error' && statusOf(state.error) === 404)
+      queryClient.removeQueries({ queryKey: sheetKeys.character(id) })
+  }, [id, queryClient, state])
+  const chronicle =
+    state.status === 'ready' || state.status === 'viewer'
+      ? state.character.chronicle
+      : null
   const back = chronicle
     ? {
         label: chronicle.name,
         onPress: () => router.replace(`/chronicles/${chronicle.id}`),
       }
     : { label: 'Crônicas', onPress: () => router.replace('/') }
-  const title = state.status === 'ready' ? state.character.name : 'Ficha'
+  const title =
+    state.status === 'ready'
+      ? state.character.name
+      : state.status === 'identity' || state.status === 'viewer'
+        ? state.character.identity.name
+        : 'Ficha'
 
   let body: React.JSX.Element
   switch (state.status) {
@@ -83,6 +110,28 @@ export function SheetScreen({
           title="Não foi possível abrir a ficha"
           message="Os dados desta ficha não passaram na validação do sistema."
         />
+      )
+      break
+    case 'identity':
+      body = <IdentityProjection character={state.character} />
+      break
+    case 'viewer':
+      body = (
+        <View>
+          <View style={styles.readNotice}>
+            <Text variant="fieldLabel">Leitura</Text>
+            <Text color="inkMuted">
+              Esta ficha foi revelada pelo narrador. Notas e ações privadas não
+              fazem parte desta projeção.
+            </Text>
+          </View>
+          <SheetView
+            model={state.model}
+            sheet={state.sheet}
+            roles={state.roles}
+            mode="read"
+          />
+        </View>
       )
       break
     case 'error':
@@ -301,18 +350,172 @@ function LiveSheet({
     [id, state.character.chronicle.id, status, info, active]
   )
   return (
-    <LifecycleContext.Provider value={lifecycle}>
-      <CreationContext.Provider value={creationValue}>
-        <SheetProvider store={store}>
-          <StorytellerBar ownerName={state.character.owner.username} />
-        </SheetProvider>
-        <SheetView store={store} editable />
-        <LeaveGuard store={store} />
-      </CreationContext.Provider>
-    </LifecycleContext.Provider>
+    <>
+      <NpcVisibilityBar state={state} />
+      <LifecycleContext.Provider value={lifecycle}>
+        <CreationContext.Provider value={creationValue}>
+          <SheetProvider store={store}>
+            <StorytellerBar ownerName={state.character.owner.username} />
+          </SheetProvider>
+          <SheetView store={store} editable />
+          <LeaveGuard store={store} />
+        </CreationContext.Provider>
+      </LifecycleContext.Provider>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+  readNotice: {
+    gap: tokens.space[1],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingVertical: tokens.space[3],
+  },
+  identity: {
+    alignItems: 'center',
+    gap: tokens.space[3],
+    padding: tokens.space[8],
+  },
 })
+
+function IdentityProjection({
+  character,
+}: {
+  readonly character: Extract<
+    import('./data').CharacterData,
+    { projection: 'identity' }
+  >
+}) {
+  return (
+    <View style={styles.identity} accessibilityRole="summary">
+      <Avatar
+        name={character.identity.name}
+        imageUrl={character.identity.portraitUrl}
+        size="lg"
+      />
+      <Text variant="displaySm">{character.identity.name}</Text>
+      {character.identity.subtitle ? (
+        <Text>{character.identity.subtitle}</Text>
+      ) : null}
+      {character.identity.chip ? (
+        <Text color="inkMuted">{character.identity.chip}</Text>
+      ) : null}
+      <Text color="inkMuted">O narrador revelou apenas a identidade.</Text>
+    </View>
+  )
+}
+
+function NpcVisibilityBar({
+  state,
+}: {
+  readonly state: Extract<SheetState, { status: 'ready' }>
+}) {
+  const character = state.character
+  const change = useSetNpcVisibility(character.chronicle.id, character.id)
+  const presentation = useSetNpcPresentation(
+    character.chronicle.id,
+    character.id
+  )
+  const [portraitUrl, setPortraitUrl] = useState(
+    character.identity.portraitUrl ?? ''
+  )
+  const visibilityCommand = useRef<{
+    visibility: 'hidden' | 'identity' | 'full'
+    key: string
+  } | null>(null)
+  const presentationKey = useRef<string | null>(null)
+  useEffect(() => {
+    setPortraitUrl(character.identity.portraitUrl ?? '')
+  }, [character.identity.portraitUrl])
+  if (character.kind !== 'npc' || !state.roles.includes('storyteller'))
+    return null
+  const choices = [
+    { id: 'hidden' as const, label: 'Oculto' },
+    { id: 'identity' as const, label: 'Identidade' },
+    { id: 'full' as const, label: 'Ficha' },
+  ]
+  return (
+    <View style={styles.readNotice} accessibilityRole="radiogroup">
+      <Text variant="fieldLabel">Visibilidade do NPC</Text>
+      <Text color="inkMuted">
+        Identidade publica nome, selo, subtítulo e retrato. Ficha abre uma cópia
+        somente leitura, sem notas do narrador.
+      </Text>
+      <View style={styles.actions}>
+        {choices.map(choice => (
+          <Button
+            key={choice.id}
+            title={choice.label}
+            variant={
+              character.visibility === choice.id ? 'primary' : 'secondary'
+            }
+            disabled={change.isPending || character.visibility === choice.id}
+            onPress={() => {
+              const pending =
+                visibilityCommand.current?.visibility === choice.id
+                  ? visibilityCommand.current
+                  : { visibility: choice.id, key: randomUUID() }
+              visibilityCommand.current = pending
+              change.mutate(
+                {
+                  visibility: choice.id,
+                  revision: character.visibilityRevision,
+                  clientCommandId: pending.key,
+                },
+                {
+                  onSuccess: () => {
+                    visibilityCommand.current = null
+                  },
+                  onError: error => {
+                    if (statusOf(error)) visibilityCommand.current = null
+                  },
+                }
+              )
+            }}
+          />
+        ))}
+      </View>
+      {change.isError ? (
+        <Text color="danger">{messageOf(change.error)}</Text>
+      ) : null}
+      <TextField
+        label="Retrato HTTPS"
+        value={portraitUrl}
+        autoCapitalize="none"
+        autoCorrect={false}
+        maxLength={2048}
+        hint="O retrato é incluído quando a identidade do NPC é revelada."
+        onChangeText={value => {
+          presentationKey.current = null
+          setPortraitUrl(value)
+        }}
+      />
+      <Button
+        title={presentationKey.current ? 'Reenviar retrato' : 'Salvar retrato'}
+        variant="secondary"
+        busy={presentation.isPending}
+        onPress={() =>
+          presentation.mutate(
+            {
+              clientCommandId: (presentationKey.current ??= randomUUID()),
+              revision: character.presentationRevision,
+              portraitUrl: portraitUrl.trim() || null,
+            },
+            {
+              onSuccess: () => {
+                presentationKey.current = null
+              },
+              onError: error => {
+                if (statusOf(error)) presentationKey.current = null
+              },
+            }
+          )
+        }
+      />
+      {presentation.isError ? (
+        <Text color="danger">{messageOf(presentation.error)}</Text>
+      ) : null}
+    </View>
+  )
+}

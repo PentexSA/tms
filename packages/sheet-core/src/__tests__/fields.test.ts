@@ -9,7 +9,7 @@ import {
   short,
   stored,
 } from '../fields'
-import { identityOf, UNNAMED } from '../identity'
+import { identityOf, publicIdentityOf, UNNAMED } from '../identity'
 import { REGISTRY } from '../registry'
 import { type ResolvedRating, resolve } from '../resolve'
 import { validateSheet } from '../validate'
@@ -337,6 +337,47 @@ group('plain e identidade', () => {
     expect(id.accent).toBe(
       compileTemplate(templates['vtm-v20']).template.accent.fallback
     )
+  })
+
+  it('a identidade pública tem só nome, selo, subtítulo e retrato', () => {
+    for (const id of ['helena', 'lia', 'iara', 'joana']) {
+      const sheet = sheetOf(id)
+      const full = identityOf(sheet)
+      const pub = publicIdentityOf(sheet)
+      expect(Object.keys(pub).sort()).toEqual(
+        ['chip', 'name', 'portraitUrl', 'subtitle'].sort()
+      )
+      expect(pub).toEqual({
+        name: full.name,
+        chip: full.chip,
+        subtitle: full.subtitle,
+        portraitUrl: null,
+      })
+    }
+    expect(
+      publicIdentityOf(sheetOf('iara'), 'https://example.com/iara.png')
+    ).toMatchObject({
+      subtitle: 'Canta-Tempestade',
+      portraitUrl: 'https://example.com/iara.png',
+    })
+  })
+
+  it('resumo e voz não alteram a identidade pública', () => {
+    const { identity } = templates['vtm-v20'] as {
+      identity: { voice: string; summary: string[] }
+    }
+    const before = publicIdentityOf(sheetOf('helena'))
+    const changed = Object.fromEntries(
+      [identity.voice, ...identity.summary]
+        .filter(
+          field => typeof character('helena').sheet.values[field] === 'string'
+        )
+        .map(field => [field, 'SENTINELA-PRIVADA'])
+    )
+    expect(Object.keys(changed).length).toBeGreaterThan(0)
+    const after = publicIdentityOf(sheetOf('helena', changed))
+    expect(after).toEqual(before)
+    expect(JSON.stringify(after)).not.toContain('SENTINELA-PRIVADA')
   })
 
   it('plain de lista e de tags', () => {

@@ -1,5 +1,7 @@
 import { AppBar, EmptyState, Screen, Skeleton, Text, tokens } from '@tms/ui'
+import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useRef } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -24,12 +26,14 @@ const issuesOf = (error: unknown): ServerIssue[] => {
 }
 
 export default function NewCharacterScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>()
   const router = useRouter()
   const chronicle = useChronicle(id)
   const template = useLatestTemplate(chronicle.data?.system.code)
   const model = useCompiled(template.data)
   const create = useCreateCharacter(id)
+  const commandId = useRef<string | null>(null)
+  const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
     onPress: () => router.back(),
@@ -58,8 +62,9 @@ export default function NewCharacterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text color="inkMuted">
-          Comece pela identidade. Atributos, habilidades e poderes você monta
-          depois, na ficha.
+          {npc
+            ? 'O NPC nasce oculto e em criação livre. Só você o vê até escolher o que revelar.'
+            : 'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'}
         </Text>
         <CharacterForm
           model={model}
@@ -71,14 +76,25 @@ export default function NewCharacterScreen() {
           }
           serverIssues={issuesOf(create.error)}
           onSubmit={values =>
-            create.mutate(values, {
-              // A ficha nova abre no rascunho: na Criação, quando o sistema
-              // tem criação por pontos; senão, em Evoluir
-              onSuccess: c =>
-                router.replace(
-                  `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
-                ),
-            })
+            create.mutate(
+              npc
+                ? {
+                    values,
+                    kind: 'npc',
+                    clientCommandId: (commandId.current ??= randomUUID()),
+                  }
+                : values,
+              {
+                // A ficha nova abre no rascunho: na Criação, quando o sistema
+                // tem criação por pontos; senão, em Evoluir
+                onSuccess: c => {
+                  commandId.current = null
+                  router.replace(
+                    `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
+                  )
+                },
+              }
+            )
           }
         />
       </ScrollView>
@@ -86,7 +102,7 @@ export default function NewCharacterScreen() {
 
   return (
     <Screen>
-      <AppBar title="Nova ficha" back={back} />
+      <AppBar title={npc ? 'Novo NPC' : 'Nova ficha'} back={back} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

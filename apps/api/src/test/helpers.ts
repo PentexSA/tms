@@ -49,6 +49,18 @@ export async function createTestContext(
   // Banco novo a cada teste, com todas as migrations de @tms/db
   const { db, destroy } = await createPGliteTestDb()
   testDbCleanup = destroy
+  return createTestContextOn(db, overrides)
+}
+
+/**
+ * App + relógio falso novos sobre um banco que o chamador já tem (e destrói).
+ * Para suítes que montam muitos cenários isolados por dados no mesmo banco,
+ * sem subir um PGLite por cenário.
+ */
+export function createTestContextOn(
+  db: Kysely<DB>,
+  overrides: Partial<AppOptions> = {}
+): TestContext {
   const clock = fakeClock()
   const secret = new Uint8Array(32)
   crypto.getRandomValues(secret)

@@ -68,6 +68,10 @@ function open(pglite: PGlite) {
       } catch {
         // já fechado
       }
+    // Fechado, o PGLite ainda segura o módulo WASM (~180 MB). Quem guardou o
+    // db (o ctx de um arquivo de teste, vivo até o fim do bun test) seguraria
+    // essa memória: soltar aqui mantém a suíte num processo só sem acumular.
+    Object.assign(pglite, { mod: undefined, fs: undefined })
   }
   return { db, destroy }
 }

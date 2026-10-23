@@ -92,6 +92,21 @@ describe('validateTemplate: fail secure', () => {
     })
   })
 
+  it('identidade pública não pode derivar de uma seção restrita', () => {
+    const t = vtm()
+    fieldsOf(t).publicChip = {
+      type: 'derived',
+      label: 'Selo público',
+      derive: 'sum',
+      from: 'storytellerNotes',
+    }
+    ;(t.identity as Json).chip = 'publicChip'
+    expect(validateTemplate(t, palette)).toContainEqual({
+      path: 'identity.chip',
+      message: 'campo ou dependência de seção com leitura restrita',
+    })
+  })
+
   it('nunca lança exceção, mesmo com valores de tipos trocados em todo lugar', () => {
     const t = vtm()
     for (const f of Object.values(fieldsOf(t))) {

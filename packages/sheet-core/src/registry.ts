@@ -68,7 +68,7 @@ export const REGISTRY = {
   layouts: ['grid', 'groups', 'list', 'pyramid', 'fields', 'facts', 'text'],
   filterRules: ['invested', 'proficient', 'aboveBase'],
   modes: ['play', 'edit'],
-  roles: ['owner', 'storyteller'],
+  roles: ['owner', 'storyteller', 'viewer'],
   defaultActions: ['spend1', 'gain1', 'damage1', 'use1'],
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
@@ -80,6 +80,7 @@ export const REGISTRY = {
   budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
   capRules: ['creation-cap', 'hard-cap'],
   costRules: ['flat', 'per-current', 'item-meta', 'credit'],
+  optionEffects: ['flag', 'choice', 'bounded-number'],
 } as const
 
 export type Registry = typeof REGISTRY
@@ -114,6 +115,7 @@ export type SlotReset = Registry['slotResets'][number]
 export type BudgetRule = Registry['budgetRules'][number]
 export type CapRule = Registry['capRules'][number]
 export type CostRule = Registry['costRules'][number]
+export type OptionEffect = Registry['optionEffects'][number]
 
 // Confere se um valor desconhecido (vindo do banco ou do cliente) está na lista.
 export function isOneOf<T extends readonly unknown[]>(

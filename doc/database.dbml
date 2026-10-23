@@ -28,6 +28,10 @@ Table chronicles {
   character_approval boolean [not null, default: false, note: 'Aprovação de ficha nova (v4); desligada por padrão']
   creation_defaults jsonb [not null, default: '{}', note: 'Camada de configuração da criação (orçamentos, modo) copiada para a ficha nova']
   creation_settings_revision integer [not null, default: 0]
+  description text [not null, default: '']
+  image_url text [note: 'Somente URL HTTPS aceita pela API']
+  options jsonb [not null, default: '{}', note: 'Valores do catálogo fechado do template']
+  settings_revision integer [not null, default: 0]
   created_at timestamp
   updated_at timestamp
 }
@@ -38,6 +42,11 @@ Table characters {
   chronicle_id uuid [not null, ref: > chronicles.id]
   system_id uuid [not null, ref: > game_systems.id]
   name text [not null]
+  kind text [not null, default: 'pc', note: 'pc | npc; não há conversão']
+  visibility text [not null, default: 'hidden', note: 'hidden | identity | full; PC permanece hidden']
+  visibility_revision integer [not null, default: 0]
+  presentation_revision integer [not null, default: 0]
+  portrait_url text [note: 'Somente URL HTTPS aceita pela API']
   sheet_data jsonb
   template_version text [not null]
   sheet_version integer [not null, default: 0]
@@ -84,6 +93,7 @@ Table character_batches {
   sheet_version integer [not null]
   created_at timestamptz [not null]
   operation_id uuid [ref: > chronicle_operations.id, note: 'ON DELETE SET NULL']
+  session_id uuid [ref: > chronicle_sessions.id, note: 'ON DELETE SET NULL']
   indexes {
     (character_id, client_batch_id) [unique]
   }
@@ -132,7 +142,77 @@ Table chronicle_operations {
   created_at timestamptz [not null]
   reverts_operation_id uuid [unique, ref: > chronicle_operations.id, note: 'ON DELETE SET NULL; nunca junto com reverts_batch_id']
   reverts_batch_id uuid [unique, ref: > character_batches.id, note: 'ON DELETE SET NULL']
+  request_hash text [note: 'Hash canônico da intenção, incluindo session_id']
+  session_id uuid [ref: > chronicle_sessions.id, note: 'ON DELETE SET NULL']
   indexes {
     (chronicle_id, client_operation_id) [unique]
+  }
+}
+
+Table character_rolls {
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  character_id uuid [ref: > characters.id, note: 'NULL para parada livre; ON DELETE CASCADE']
+  client_roll_id uuid [not null]
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  by_role text [not null]
+  manual boolean [not null, default: false]
+  label text [not null]
+  request jsonb [not null]
+  result jsonb [not null]
+  batch_id uuid [ref: > character_batches.id, note: 'Custo; ON DELETE SET NULL']
+  hidden boolean [not null, default: false]
+  request_hash text [note: 'Hash canônico da intenção e autoria']
+  created_at timestamptz [not null]
+  indexes {
+    (chronicle_id, client_roll_id) [unique]
+    (chronicle_id, created_at, id)
+  }
+}
+
+Table chronicle_commands {
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  client_command_id uuid [not null]
+  kind text [not null]
+  request_hash text [not null]
+  result jsonb [not null]
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at timestamptz [not null]
+  indexes {
+    (chronicle_id, client_command_id) [pk]
+  }
+}
+
+Table chronicle_sessions {
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  session_date date [not null]
+  title text [not null]
+  public_summary text [not null, default: '']
+  private_notes text [not null, default: '', note: 'Nunca entra no DTO público nem na auditoria']
+  revision integer [not null, default: 0]
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  indexes {
+    (chronicle_id, session_date, id)
+  }
+}
+
+Table chronicle_transfers {
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  requested_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  recipient_id uuid [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  status text [not null, default: 'pending', note: 'pending | accepted | rejected | cancelled | expired']
+  client_command_id uuid [not null]
+  request_hash text [not null]
+  decision_key uuid
+  requested_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  decided_at timestamptz
+  indexes {
+    chronicle_id [unique, note: 'Parcial: somente status = pending']
+    (chronicle_id, client_command_id) [unique]
   }
 }

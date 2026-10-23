@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
 import { Button, Chip, Skeleton, Tabs, Text, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
@@ -13,10 +13,12 @@ import {
   useChronicleTable,
 } from '../../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../../lib/queries/focus'
+import { rollKeys } from '../../lib/queries/rolls'
 import { useChronicleXpRequests } from '../../lib/queries/xp'
 import { useTableOrder } from '../../lib/tableOrder'
 import { compileSafe, templateQuery } from '../../sheet/data'
 import { OperationSheet } from './OperationSheet'
+import { RollFeed } from './RollFeed'
 import { TableRow } from './TableRow'
 import {
   arrange,
@@ -113,6 +115,7 @@ function UpdatedAt({ at }: { readonly at: number }) {
 }
 
 export function TableView({ chronicleId }: { readonly chronicleId: string }) {
+  const queryClient = useQueryClient()
   const router = useRouter()
   const remember = useTableOrder(s => s.remember)
   const [scope, setScope] = useState<TableScope>('playing')
@@ -139,7 +142,10 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     []
   )
   const table = useChronicleTable(chronicleId, true, scope)
-  useRefetchOnFocus(() => table.refetch({ cancelRefetch: false }))
+  useRefetchOnFocus(() => {
+    void queryClient.invalidateQueries({ queryKey: rollKeys.feed(chronicleId) })
+    return table.refetch({ cancelRefetch: false })
+  })
   const rows = (table.data ?? []) as TableRowData[]
   const items = useItems(rows)
   const chosen = useMemo(
@@ -321,6 +327,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           onClose={() => setOperation(null)}
         />
       ) : null}
+      <RollFeed chronicleId={chronicleId} />
     </View>
   )
 }

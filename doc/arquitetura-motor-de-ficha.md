@@ -414,19 +414,25 @@ O WatermelonDB é ótimo para muitos registros relacionais com consulta local. A
 | `GET /characters/:id` | ficha | AuthZ por crônica; remove seções com `read` restrito |
 | `POST /characters/:id/events` | aplica um lote | AuthZ; escrita por seção; idempotência; rate limit; limite de corpo e de eventos por lote |
 | `GET /chronicles/:id/characters` | mesa: lista com os campos do `dock` | AuthZ; só narrador e membros; mesmas remoções |
+| `POST/GET /chronicles/:id/rolls` | parada livre e feed | só narrador; resultado no servidor; chave por crônica |
+| `GET/POST/PATCH /chronicles/:id/sessions` | diário público e notas privadas | membro lê projeção pública; narrador administra |
+| `POST/GET /chronicles/:id/transfer` | transferência com aceite | narrador propõe; destinatário membro decide |
+| `GET /chronicles/:id/history` | auditoria consolidada | só narrador |
 
 **Sem rota de escrita de template no MVP.** Como só o dono publica (§2), a publicação é um script (`pnpm templates:publish <arquivo>`). Ele roda `schema.json` + `validateTemplate` e grava em `game_systems` e `trait_templates`. Rota que não existe não pode ser atacada. Se um dia houver painel de admin, a rota nasce com RBAC no servidor e passa pelo mesmo pipeline.
 
 ### 8.2 O pipeline de um lote no servidor
 
 1. **Sessão:** JWT com algoritmo fixado e `exp`, `aud` e `iss` validados.
-2. **Papel:** o servidor resolve ficha → crônica → papel (`owner`, `storyteller`, `player`) no banco. Ele nunca aceita papel, `ownerId` ou `by` vindos do cliente. Sem regra que permita, nega.
+2. **Papel:** o servidor resolve ficha → crônica → papel (`owner`, `storyteller` ou `viewer`) no banco. `viewer` existe somente para NPC revelado e nunca escreve; membro não recebe papel em PC alheio. O servidor nunca aceita papel, `ownerId` ou `by` vindos do cliente.
 3. **Limites:** rate limit por usuário e por ficha, tamanho do corpo e número de eventos por lote.
 4. **Idempotência:** se `(character_id, client_batch_id)` já foi aplicado, responde 200 com a versão atual, sem reaplicar.
 5. **Concorrência:** carrega a ficha com trava de linha (`SELECT ... FOR UPDATE`) e confere os `from`. Se algum divergir, responde 409 com o valor atual.
 6. **Regra:** roda o `applyBatch` do core (permissão de escrita da seção, tipo, faixas, rejeição de `readOnly`) e o `validateSheet` sobre a ficha resultante.
 7. **Grava** a ficha, a versão e o histórico na mesma transação, com `by` e `at` do servidor.
 8. **Erros** voltam com o caminho do campo e uma mensagem genérica, sem stack trace. Exceção do validador vira 400.
+
+Escritas que dependem da autoridade do narrador travam primeiro a crônica e releem o narrador/vínculo; transferência usa trava exclusiva. Depois seguem a ordem já existente: pedidos/vínculos necessários e fichas em ordem de id. A mesma chave só recupera resultado quando ator e hash canônico da intenção coincidem.
 
 ### 8.3 Mudanças mínimas no banco
 

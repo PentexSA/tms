@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   canWrite,
   type Issue,
   parseCharacterCreation,
+  publicIdentityOf,
   type RoleName,
+  resolve,
   type SheetData,
   stripRestricted,
   validateCreationConfig,
@@ -44,6 +47,26 @@ const fieldsOf = (issues: readonly Issue[]) =>
 
 const invalid = (issues: readonly Issue[]) =>
   new ApiError(422, 'ficha inválida', { issues: fieldsOf(issues) })
+
+const commandHash = (kind: string, request: unknown) =>
+  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
+
+const validHttpsUrl = (value: string | null | undefined) => {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
+const idempotencyConflict = () =>
+  new ApiError(
+    409,
+    'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
+    { code: 'IDEMPOTENCY_CONFLICT' }
+  )
 
 export function sheetRoutes(
   db: Kysely<DB>,
@@ -108,9 +131,20 @@ export function sheetRoutes(
         if (role === null) throw notFound()
         // O ex-membro sabe que a crônica existe: o motivo vai para a tela
         if (role === 'former') throw notMember()
+        const kind = body.kind ?? 'pc'
+        if (kind === 'npc' && role !== 'storyteller')
+          throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+            code: 'STORYTELLER_REQUIRED',
+          })
+        if (kind === 'npc' && !body.clientCommandId)
+          throw new ApiError(422, 'informe a chave deste comando')
+        const portraitUrl = validHttpsUrl(body.portraitUrl)
+        if (body.portraitUrl && !portraitUrl)
+          throw new ApiError(422, 'use uma URL HTTPS para o retrato')
+
         const chronicle = await db
           .selectFrom('chronicles')
-          .select(['system_id', 'creation_defaults'])
+          .select(['system_id', 'creation_defaults', 'storyteller_id'])
           .where('id', '=', params.id)
           .executeTakeFirstOrThrow()
         const template = await latestTemplate(db, chronicle.system_id)
@@ -119,8 +153,10 @@ export function sheetRoutes(
 
         // Na criação entram só os campos de identidade que o dono pode
         // escrever; o resto nasce vazio e vale o padrão do tipo.
+        const createRole: readonly RoleName[] =
+          kind === 'npc' ? ['storyteller'] : ['owner']
         const allowed = model.identityFields.filter(id =>
-          canWrite(model, id, ['owner'])
+          canWrite(model, id, createRole)
         )
         const extra = Object.keys(body.values).filter(k => !allowed.includes(k))
         if (extra.length)
@@ -151,20 +187,59 @@ export function sheetRoutes(
         // da crônica depois só vale para fichas novas (doc/plano-v4.md §3.4)
         const defaults = chronicle.creation_defaults
         const creation =
-          model.template.creation &&
-          defaults &&
-          typeof defaults === 'object' &&
-          Object.keys(defaults).length &&
-          !validateCreationConfig(model, defaults).length
-            ? { config: defaults }
-            : {}
+          kind === 'npc'
+            ? { config: { mode: 'free' } }
+            : model.template.creation &&
+                defaults &&
+                typeof defaults === 'object' &&
+                Object.keys(defaults).length &&
+                !validateCreationConfig(model, defaults).length
+              ? { config: defaults }
+              : {}
 
         // Protocolo de trava da Etapa 7 (doc/plano-v3.md): o membro trava o
         // vínculo antes de criar. Uma remoção ao mesmo tempo ou termina antes
         // (e aqui não há mais vínculo) ou espera e arquiva a ficha nova. O
         // limite é contado com o vínculo travado: duas criações no limite não
         // passam juntas. O narrador não tem vínculo para travar
+        const request = {
+          kind,
+          values: body.values,
+          portraitUrl,
+        }
         const row = await db.transaction().execute(async trx => {
+          // Toda criação começa pela crônica. Isso serializa limite,
+          // transferência e replay do comando sem adquirir outra trava antes.
+          const current = await trx
+            .selectFrom('chronicles')
+            .select('storyteller_id')
+            .where('id', '=', params.id)
+            .forUpdate()
+            .executeTakeFirst()
+          if (!current) throw notFound()
+          if (kind === 'npc' && current.storyteller_id !== me)
+            throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+              code: 'STORYTELLER_REQUIRED',
+            })
+
+          if (kind === 'npc' && body.clientCommandId) {
+            const done = await trx
+              .selectFrom('chronicle_commands')
+              .select(['kind', 'request_hash', 'result', 'created_by'])
+              .where('chronicle_id', '=', params.id)
+              .where('client_command_id', '=', body.clientCommandId)
+              .executeTakeFirst()
+            if (done) {
+              if (
+                done.kind !== 'character.create-npc' ||
+                done.created_by !== me ||
+                done.request_hash !==
+                  commandHash('character.create-npc', request)
+              )
+                throw idempotencyConflict()
+              return { ...(done.result as { id: string }), duplicate: true }
+            }
+          }
           if (role === 'member') {
             const link = await trx
               .selectFrom('chronicle_members')
@@ -181,10 +256,11 @@ export function sheetRoutes(
             .where('chronicle_id', '=', params.id)
             .where('user_id', '=', me)
             .where('deleted_at', 'is', null)
+            .$if(kind === 'npc', qb => qb.where('kind', '=', 'npc'))
             .executeTakeFirstOrThrow()
           if (Number(count) >= MAX_CHARACTERS_PER_CHRONICLE)
             throw new ApiError(422, 'limite de fichas nesta crônica')
-          return trx
+          const inserted = await trx
             .insertInto('characters')
             .values({
               user_id: me,
@@ -194,16 +270,47 @@ export function sheetRoutes(
               sheet_data: JSON.stringify(sheet),
               template_version: template.version,
               creation: JSON.stringify(creation),
+              kind,
+              visibility: 'hidden',
+              portrait_url: portraitUrl,
             })
             .returning('id')
             .executeTakeFirstOrThrow()
+          if (kind === 'npc' && body.clientCommandId) {
+            await trx
+              .insertInto('chronicle_commands')
+              .values({
+                chronicle_id: params.id,
+                client_command_id: body.clientCommandId,
+                kind: 'character.create-npc',
+                request_hash: commandHash('character.create-npc', request),
+                result: JSON.stringify({ id: inserted.id }),
+                created_by: me,
+              })
+              .execute()
+            await audit(trx, {
+              chronicleId: params.id,
+              actorId: me,
+              action: 'character.create-npc',
+              characterId: inserted.id,
+              userId: me,
+              payload: { visibility: 'hidden' },
+              at: new Date(),
+            })
+          }
+          return { id: inserted.id, duplicate: false }
         })
-        set.status = 201
-        return { id: row.id }
+        set.status = row.duplicate ? 200 : 201
+        return row
       },
       {
         params: idParams,
         body: t.Object({
+          kind: t.Optional(t.Union([t.Literal('pc'), t.Literal('npc')])),
+          clientCommandId: t.Optional(
+            t.String({ format: 'uuid', maxLength: 36 })
+          ),
+          portraitUrl: t.Optional(t.String({ maxLength: 2048 })),
           values: t.Record(t.String({ maxLength: 64 }), t.Unknown(), {
             maxProperties: 50,
           }),
@@ -227,12 +334,27 @@ export function sheetRoutes(
             'ch.template_version',
             'ch.sheet_data',
             'ch.updated_at',
+            'ch.kind',
+            'ch.visibility',
+            'ch.portrait_url',
             'u.username',
           ])
           .where('ch.chronicle_id', '=', params.id)
           .where('ch.deleted_at', 'is', null)
-        // O jogador só recebe as fichas dele; o narrador, todas
-        if (role !== 'storyteller') q = q.where('ch.user_id', '=', me)
+        // Membro recebe os próprios PCs e somente a identidade de NPCs
+        // revelados. Ex-membro nunca recebe NPC, mesmo que já tenha sido dono.
+        if (role === 'member')
+          q = q.where(eb =>
+            eb.or([
+              eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
+              eb.and([
+                eb('ch.kind', '=', 'npc'),
+                eb('ch.visibility', 'in', ['identity', 'full']),
+              ]),
+            ])
+          )
+        else if (role === 'former')
+          q = q.where('ch.kind', '=', 'pc').where('ch.user_id', '=', me)
         const rows = await q.orderBy('ch.created_at').execute()
         const out = []
         for (const r of rows) {
@@ -262,9 +384,27 @@ export function sheetRoutes(
             r.sheet_data as unknown as SheetData,
             mine
           )
+          const publicIdentity = publicIdentityOf(
+            resolve(model, r.sheet_data as unknown as SheetData),
+            r.portrait_url
+          )
+          if (r.kind === 'npc' && role !== 'storyteller') {
+            out.push({
+              projection: 'identity' as const,
+              id: r.id,
+              kind: 'npc' as const,
+              visibility: r.visibility,
+              identity: publicIdentity,
+            })
+            continue
+          }
           out.push({
+            projection: 'full' as const,
             id: r.id,
             name: r.name,
+            kind: r.kind,
+            visibility: r.visibility,
+            identity: publicIdentity,
             owner: { id: r.user_id, username: r.username },
             mine: r.user_id === me,
             templateVersion: r.template_version,
@@ -303,6 +443,11 @@ export function sheetRoutes(
             'ch.creation_completed_at',
             'ch.approved_at',
             'ch.activated_at',
+            'ch.kind',
+            'ch.visibility',
+            'ch.visibility_revision',
+            'ch.presentation_revision',
+            'ch.portrait_url',
             'c.character_approval',
             'c.id as chronicleId',
             'c.name as chronicleName',
@@ -317,14 +462,54 @@ export function sheetRoutes(
           access.character.systemId,
           access.character.templateVersion
         )
+        const publicIdentity = publicIdentityOf(
+          resolve(model, row.sheet_data as unknown as SheetData),
+          row.portrait_url
+        )
+        if (access.projection === 'identity')
+          return {
+            projection: 'identity' as const,
+            id: row.id,
+            kind: 'npc' as const,
+            visibility: 'identity' as const,
+            identity: publicIdentity,
+          }
+
+        // Viewer recebe um envelope de leitura separado. Em especial, não
+        // recebe dono, criação, vínculo, versões administrativas ou datas.
+        if (access.roles.has('viewer'))
+          return {
+            projection: 'full' as const,
+            id: row.id,
+            kind: 'npc' as const,
+            visibility: 'full' as const,
+            identity: publicIdentity,
+            chronicle: { id: row.chronicleId, name: row.chronicleName },
+            systemCode: row.systemCode,
+            templateVersion: row.template_version,
+            roles: ['viewer'] as const,
+            status: row.status,
+            lockedAt: row.locked_at,
+            sheet: stripRestricted(
+              model,
+              row.sheet_data as unknown as SheetData,
+              access.roles
+            ),
+          }
         // A pessoa é membro ou narrador da crônica agora: o app calcula a
         // mesma política do servidor (o ex-membro só lê)
         const member =
           (await chronicleAccess(db, me, access.character.chronicleId)) !==
           'former'
         return {
+          projection: 'full' as const,
           id: row.id,
           name: row.name,
+          kind: row.kind,
+          visibility: row.visibility,
+          visibilityRevision: row.visibility_revision,
+          presentationRevision: row.presentation_revision,
+          identity: publicIdentity,
           chronicle: { id: row.chronicleId, name: row.chronicleName },
           owner: { id: row.ownerId, username: row.owner },
           systemCode: row.systemCode,
@@ -357,12 +542,193 @@ export function sheetRoutes(
       },
       { params: idParams }
     )
+    .post(
+      '/characters/:id/visibility',
+      async ({ params, body, userId }) => {
+        const me = requireUser(userId)
+        return db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const chronicle = await trx
+            .selectFrom('chronicles')
+            .select('storyteller_id')
+            .where('id', '=', row.chronicleId)
+            .executeTakeFirstOrThrow()
+          if (chronicle.storyteller_id !== me) {
+            if (row.kind === 'npc' || row.userId !== me) throw notFound()
+            throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+              code: 'STORYTELLER_REQUIRED',
+            })
+          }
+          if (row.kind !== 'npc')
+            throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+              code: 'STORYTELLER_REQUIRED',
+            })
+          const intent = {
+            characterId: params.id,
+            visibility: body.visibility,
+            revision: body.revision,
+          }
+          const hash = commandHash('character.visibility', intent)
+          const done = await trx
+            .selectFrom('chronicle_commands')
+            .select(['kind', 'request_hash', 'result', 'created_by'])
+            .where('chronicle_id', '=', row.chronicleId)
+            .where('client_command_id', '=', body.clientCommandId)
+            .executeTakeFirst()
+          if (done) {
+            if (
+              done.kind !== 'character.visibility' ||
+              done.request_hash !== hash ||
+              done.created_by !== me
+            )
+              throw idempotencyConflict()
+            return { ...(done.result as object), duplicate: true }
+          }
+          if (row.visibilityRevision !== body.revision)
+            throw new ApiError(
+              409,
+              'Os dados mudaram. Atualize para continuar.',
+              {
+                code: 'REVISION_CONFLICT',
+                revision: row.visibilityRevision,
+              }
+            )
+          const revision = row.visibilityRevision + 1
+          await trx
+            .updateTable('characters')
+            .set({
+              visibility: body.visibility,
+              visibility_revision: revision,
+              updated_at: new Date(),
+            })
+            .where('id', '=', params.id)
+            .execute()
+          const result = { visibility: body.visibility, revision }
+          await trx
+            .insertInto('chronicle_commands')
+            .values({
+              chronicle_id: row.chronicleId,
+              client_command_id: body.clientCommandId,
+              kind: 'character.visibility',
+              request_hash: hash,
+              result: JSON.stringify(result),
+              created_by: me,
+            })
+            .execute()
+          await audit(trx, {
+            chronicleId: row.chronicleId,
+            actorId: me,
+            action: 'character.visibility',
+            characterId: params.id,
+            payload: { from: row.visibility, to: body.visibility },
+            at: new Date(),
+          })
+          return { ...result, duplicate: false }
+        })
+      },
+      {
+        params: idParams,
+        body: t.Object({
+          clientCommandId: t.String({ format: 'uuid' }),
+          visibility: t.Union([
+            t.Literal('hidden'),
+            t.Literal('identity'),
+            t.Literal('full'),
+          ]),
+          revision: t.Integer({ minimum: 0 }),
+        }),
+      }
+    )
+    .patch(
+      '/characters/:id/presentation',
+      async ({ params, body, userId }) => {
+        const me = requireUser(userId)
+        const portraitUrl = validHttpsUrl(body.portraitUrl)
+        if (body.portraitUrl && !portraitUrl)
+          throw new ApiError(422, 'use uma URL HTTPS para o retrato')
+        return db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const chronicle = await trx
+            .selectFrom('chronicles')
+            .select('storyteller_id')
+            .where('id', '=', row.chronicleId)
+            .executeTakeFirstOrThrow()
+          if (chronicle.storyteller_id !== me) {
+            if (row.kind === 'npc' || row.userId !== me) throw notFound()
+            throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+              code: 'STORYTELLER_REQUIRED',
+            })
+          }
+          if (row.kind !== 'npc')
+            throw new ApiError(403, 'Só o narrador pode fazer isso.', {
+              code: 'STORYTELLER_REQUIRED',
+            })
+          const intent = {
+            characterId: params.id,
+            portraitUrl,
+            revision: body.revision,
+          }
+          const hash = commandHash('character.presentation', intent)
+          const done = await trx
+            .selectFrom('chronicle_commands')
+            .select(['kind', 'request_hash', 'result', 'created_by'])
+            .where('chronicle_id', '=', row.chronicleId)
+            .where('client_command_id', '=', body.clientCommandId)
+            .executeTakeFirst()
+          if (done) {
+            if (
+              done.kind !== 'character.presentation' ||
+              done.request_hash !== hash ||
+              done.created_by !== me
+            )
+              throw idempotencyConflict()
+            return { ...(done.result as object), duplicate: true }
+          }
+          if (row.presentationRevision !== body.revision)
+            throw new ApiError(
+              409,
+              'Os dados mudaram. Atualize para continuar.',
+              {
+                code: 'REVISION_CONFLICT',
+                revision: row.presentationRevision,
+              }
+            )
+          const revision = row.presentationRevision + 1
+          await trx
+            .updateTable('characters')
+            .set({ portrait_url: portraitUrl, presentation_revision: revision })
+            .where('id', '=', params.id)
+            .execute()
+          const result = { portraitUrl, revision }
+          await trx
+            .insertInto('chronicle_commands')
+            .values({
+              chronicle_id: row.chronicleId,
+              client_command_id: body.clientCommandId,
+              kind: 'character.presentation',
+              request_hash: hash,
+              result: JSON.stringify(result),
+              created_by: me,
+            })
+            .execute()
+          return { ...result, duplicate: false }
+        })
+      },
+      {
+        params: idParams,
+        body: t.Object({
+          clientCommandId: t.String({ format: 'uuid' }),
+          revision: t.Integer({ minimum: 0 }),
+          portraitUrl: t.Union([t.String({ maxLength: 2048 }), t.Null()]),
+        }),
+      }
+    )
     .delete(
       '/characters/:id',
       async ({ params, userId, set }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         const model = await modelFor(
           db,
           access.character.systemId,

@@ -40,6 +40,10 @@ export interface LockedCharacter {
   readonly creation: unknown
   readonly creationRevision: number
   readonly activatedAt: Date | null
+  readonly kind: 'pc' | 'npc'
+  readonly visibility: 'hidden' | 'identity' | 'full'
+  readonly visibilityRevision: number
+  readonly presentationRevision: number
 }
 
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -52,6 +56,23 @@ export async function lockCharacter(
   trx: Transaction<DB>,
   id: string
 ): Promise<LockedCharacter> {
+  // Descobrir a crônica não concede acesso nem mantém uma decisão: a linha é
+  // relida depois. A trava compartilhada da crônica vem sempre antes da trava
+  // exclusiva da ficha, para serializar comandos com transferência/exclusão
+  // de narração sem inverter a ordem global de travas.
+  const located = await trx
+    .selectFrom('characters')
+    .select('chronicle_id')
+    .where('id', '=', id)
+    .executeTakeFirst()
+  if (!located) throw notFound()
+  const chronicle = await trx
+    .selectFrom('chronicles')
+    .select('id')
+    .where('id', '=', located.chronicle_id)
+    .forShare()
+    .executeTakeFirst()
+  if (!chronicle) throw notFound()
   const row = await trx
     .selectFrom('characters')
     .select([
@@ -66,8 +87,13 @@ export async function lockCharacter(
       'creation',
       'creation_revision',
       'activated_at',
+      'kind',
+      'visibility',
+      'visibility_revision',
+      'presentation_revision',
     ])
     .where('id', '=', id)
+    .where('chronicle_id', '=', located.chronicle_id)
     .forUpdate()
     .executeTakeFirstOrThrow()
   if (row.deleted_at !== null) throw notFound()
@@ -82,6 +108,10 @@ export async function lockCharacter(
     creation: row.creation,
     creationRevision: row.creation_revision,
     activatedAt: date(row.activated_at),
+    kind: row.kind as 'pc' | 'npc',
+    visibility: row.visibility as 'hidden' | 'identity' | 'full',
+    visibilityRevision: row.visibility_revision,
+    presentationRevision: row.presentation_revision,
   }
 }
 
@@ -97,7 +127,13 @@ export async function writeAccess(
   userId: string
 ): Promise<WriteAccess> {
   const owner = roles.has('owner')
-  const storyteller = roles.has('storyteller')
+  const current = await trx
+    .selectFrom('chronicles')
+    .select('storyteller_id')
+    .where('id', '=', chronicleId)
+    .executeTakeFirst()
+  const storyteller =
+    roles.has('storyteller') && current?.storyteller_id === userId
   const member =
     storyteller ||
     (owner &&
