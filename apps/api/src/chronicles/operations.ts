@@ -37,7 +37,7 @@ import { modelFor } from '../sheets/models'
 // - cada lote passa pelo applyBatch e pela política; uma ficha recusada, ou
 //   de outra crônica, recusa a operação inteira.
 
-const notFound = () => new ApiError(404, 'não encontrado')
+export const notFound = () => new ApiError(404, 'não encontrado')
 export const MAX_TARGETS = 20
 
 type Kind = 'damage' | 'heal' | 'recovery'
@@ -64,7 +64,7 @@ function readOperation(body: {
   }
 }
 
-interface Locked {
+export interface Locked {
   readonly id: string
   readonly name: string
   readonly sheet: SheetData
@@ -82,7 +82,7 @@ const contentFree = (model: SheetModel, path: string) => {
 }
 
 /** Trava as fichas em ordem de id. Outra crônica, excluída ou ausente: 404. */
-async function lockCharacters(
+export async function lockCharacters(
   db: Kysely<DB>,
   trx: Transaction<DB>,
   chronicleId: string,
@@ -169,7 +169,7 @@ const previewOut = (planned: readonly Planned[]) =>
   }))
 
 /** Grava um lote de uma ficha da operação, com o histórico. */
-async function writeBatch(
+export async function writeBatch(
   trx: Transaction<DB>,
   args: {
     readonly character: Locked
@@ -313,7 +313,7 @@ async function stored(trx: Kysely<DB> | Transaction<DB>, operationId: string) {
   }
 }
 
-const findOperation = (
+export const findOperation = (
   trx: Kysely<DB> | Transaction<DB>,
   chronicleId: string,
   clientOperationId: string
@@ -324,6 +324,19 @@ const findOperation = (
     .where('chronicle_id', '=', chronicleId)
     .where('client_operation_id', '=', clientOperationId)
     .executeTakeFirst()
+
+/**
+ * Lote contábil (concessão, ajuste ou gasto de XP): a reversão genérica não o
+ * desfaz, para o extrato nunca ficar contradito. O narrador corrige pelo
+ * ajuste/estorno (doc/plano-v4.md §3.5).
+ */
+export const isLedgerKind = (kind: string | null | undefined): boolean =>
+  typeof kind === 'string' && kind.startsWith('xp-')
+
+const ledgerNotReversible = () =>
+  new ApiError(422, 'lote do extrato de XP: corrija com Ajustar XP', {
+    code: 'XP_LEDGER_NOT_REVERSIBLE',
+  })
 
 /** Os lotes que a reversão desfaz, com o histórico de cada um. */
 async function revertTargets(
@@ -347,12 +360,15 @@ async function revertTargets(
     if (!op) throw notFound()
     if (op.kind === 'revert')
       throw new ApiError(422, 'uma reversão não se desfaz: aplique de novo')
+    if (isLedgerKind(op.kind)) throw ledgerNotReversible()
     q = q.where('b.operation_id', '=', target.operationId)
   } else q = q.where('b.id', '=', target.batchId as string)
   const batches = await q.orderBy('b.character_id').execute()
   if (!batches.length) throw notFound()
   if (batches.some(b => b.operationKind === 'revert'))
     throw new ApiError(422, 'uma reversão não se desfaz: aplique de novo')
+  if (batches.some(b => isLedgerKind(b.operationKind)))
+    throw ledgerNotReversible()
   return batches
 }
 
@@ -381,7 +397,7 @@ const alreadyReverted = async (
   return hit !== undefined
 }
 
-const isUniqueViolation = (e: unknown, constraint: string) => {
+export const isUniqueViolation = (e: unknown, constraint: string) => {
   const err = e as { code?: unknown; constraint?: unknown; message?: unknown }
   return (
     err?.code === '23505' &&

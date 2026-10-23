@@ -42,6 +42,7 @@ interface Scenario {
   readonly chronicleId: string
   readonly characterId: string
   readonly inviteId: string
+  readonly requestId: string
 }
 
 async function scenario(s: SystemCase): Promise<Scenario> {
@@ -84,7 +85,29 @@ async function scenario(s: SystemCase): Promise<Scenario> {
       `/chronicles/${chronicleId}/invites`
     )
   ).json()) as { id: string }
-  return { ctx, users, chronicleId, characterId, inviteId: invite.id }
+  // Um pedido de XP pendente da dona (direto no banco: o WoD não tem preço)
+  const request = await ctx.db
+    .insertInto('xp_requests')
+    .values({
+      character_id: characterId,
+      client_request_id: crypto.randomUUID(),
+      target_field: s.ratingField,
+      target_key: s.ratingField,
+      from_value: 1,
+      to_value: 2,
+      cost: 4,
+      requested_by: users.owner.id,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow()
+  return {
+    ctx,
+    users,
+    chronicleId,
+    characterId,
+    inviteId: invite.id,
+    requestId: request.id,
+  }
 }
 
 async function request(
@@ -99,6 +122,7 @@ async function request(
   const path = row.route
     .replace(':id', id)
     .replace(':inviteId', sc.inviteId)
+    .replace(':requestId', sc.requestId)
     // Remover: o outro jogador
     .replace(':userId', sc.users.player.id)
   const user = actor === 'anonymous' ? null : sc.users[actor]

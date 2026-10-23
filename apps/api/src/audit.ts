@@ -14,6 +14,13 @@ export type AuditAction =
   | 'character.delete'
   | 'member.remove'
   | 'member.leave'
+  // Extrato e pedidos de XP (doc/plano-v4.md, Etapas 6 e 7)
+  | 'xp.grant'
+  | 'xp.adjust'
+  | 'xp.request.create'
+  | 'xp.request.approve'
+  | 'xp.request.reject'
+  | 'xp.request.stale'
 
 export async function audit(
   trx: Transaction<DB>,

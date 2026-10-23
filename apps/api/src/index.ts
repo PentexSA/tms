@@ -17,6 +17,8 @@ import { rollRoutes } from './rolls/routes'
 import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
 import { statusRoutes } from './sheets/status'
+import { ledgerRoutes } from './xp/ledger'
+import { requestRoutes } from './xp/requests'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -75,6 +77,8 @@ export const createApp = (
       .use(tableRoutes(db, guard))
       .use(operationRoutes(db, options, guard))
       .use(rollRoutes(db, options, guard))
+      .use(ledgerRoutes(db, options, guard))
+      .use(requestRoutes(db, options, guard))
   )
 }
 

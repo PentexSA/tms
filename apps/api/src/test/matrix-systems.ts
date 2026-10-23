@@ -21,6 +21,8 @@ export interface SystemCase {
   readonly slots: Readonly<Record<string, string>>
   /** O campo de texto de uma seção que só o narrador lê. */
   readonly notesField: string
+  /** Um traço (`rating`) da zona de construção: o alvo de um pedido de XP. */
+  readonly ratingField: string
 }
 
 export function systemCase(system: string): SystemCase {
@@ -43,12 +45,16 @@ export function systemCase(system: string): SystemCase {
       const t = model.fields.get(id)?.def.type
       return t === 'text' || t === 'longText'
     })
-  if (!textField || !slot || !option || !notesField)
+  const ratingField = [...model.fields.values()].find(
+    f => f.type === 'rating' && f.zone === 'build'
+  )?.id
+  if (!textField || !slot || !option || !notesField || !ratingField)
     throw new Error(`${system}: o template não tem o que a matriz precisa`)
   return {
     system,
     textField,
     slots: { [slot.id]: option.key },
     notesField,
+    ratingField,
   }
 }
