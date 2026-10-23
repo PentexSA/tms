@@ -1,4 +1,4 @@
-import { type CompiledGroup, jsonEqual } from '@tms/sheet-core'
+import { type CompiledGroup, isDraftMode, jsonEqual } from '@tms/sheet-core'
 import {
   Button,
   Pressable,
@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
+import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
 import { ChipFlow } from './ChipFlow'
@@ -50,12 +51,12 @@ export function GroupsLayout({ section }: LayoutProps) {
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
   const total = section.fieldIds.length
-  const showFilter = Boolean(filter) && mode !== 'evolve'
+  const showFilter = Boolean(filter) && !isDraftMode(mode)
   const searching = search.trim() !== ''
   // Abas no Editar e, fora dele, quando a seção mostra tudo em linhas
   // (filtro desligado); com o filtro ligado, os chips cabem inteiros
   const tabs = useGroupTabs(section, groups, {
-    enabled: mode === 'evolve' || !filtered,
+    enabled: isDraftMode(mode) || !filtered,
     all: searching,
   })
   // O título do grupo some quando a aba já diz qual é
@@ -96,7 +97,11 @@ export function GroupsLayout({ section }: LayoutProps) {
           <View key={g.id}>
             {g.title && titled ? (
               <View style={styles.title}>
-                <SectionHeader title={g.title} level="group" />
+                <SectionHeader
+                  title={g.title}
+                  level="group"
+                  right={<CreationCounter fieldIds={g.fieldIds} />}
+                />
               </View>
             ) : null}
             {ids.length && filtered && ids.every(id => !isList(id)) ? (

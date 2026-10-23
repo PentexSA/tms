@@ -1,5 +1,6 @@
 import { SectionHeader, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
 import type { LayoutProps } from './types'
 
@@ -20,7 +21,11 @@ export function ListLayout({ section }: LayoutProps) {
       {section.groups.map(g => (
         <View key={g.id}>
           <View style={styles.group}>
-            <SectionHeader title={g.title} level="group" />
+            <SectionHeader
+              title={g.title}
+              level="group"
+              right={<CreationCounter fieldIds={g.fieldIds} />}
+            />
           </View>
           {g.fieldIds.map(id => (
             <FieldSlot key={id} id={id} variant="row" />

@@ -1,4 +1,4 @@
-import type { FieldId, SheetMode } from '@tms/sheet-core'
+import { type FieldId, isDraftMode, type SheetMode } from '@tms/sheet-core'
 import { createContext, useContext } from 'react'
 
 // O pedido de abrir um sheet, separado do host (FieldSheet.tsx) para as views
@@ -26,6 +26,6 @@ export const useFieldSheet = (): FieldSheetApi | null =>
  */
 export function useOpenField(id: FieldId): (() => void) | null {
   const api = useFieldSheet()
-  if (!api || api.mode === 'evolve') return null
+  if (!api || isDraftMode(api.mode)) return null
   return () => api.open({ kind: 'field', id })
 }

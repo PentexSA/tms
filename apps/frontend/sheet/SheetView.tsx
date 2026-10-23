@@ -15,6 +15,7 @@ import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
+import { CreationPanel, CreationStatusPanel } from './creation/CreationPanel'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBar } from './evolve/ModeBar'
@@ -133,6 +134,8 @@ function SheetBody({
             >
               <ConflictBanner />
               {editable ? <PolicyBanner /> : null}
+              {editable ? <CreationStatusPanel /> : null}
+              {editable && mode === 'create' ? <CreationPanel /> : null}
               {mode === 'play' ? (
                 <View style={styles.toolbar}>
                   {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}

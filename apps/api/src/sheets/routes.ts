@@ -302,6 +302,7 @@ export function sheetRoutes(
             'ch.creation_revision',
             'ch.creation_completed_at',
             'ch.approved_at',
+            'ch.activated_at',
             'c.character_approval',
             'c.id as chronicleId',
             'c.name as chronicleName',
@@ -342,6 +343,8 @@ export function sheetRoutes(
             approval: row.character_approval,
             completedAt: row.creation_completed_at,
             approvedAt: row.approved_at,
+            // Já passou pela conclusão: volta a active pela rota de estado
+            activatedAt: row.activated_at,
           },
           member,
           updatedAt: row.updated_at,

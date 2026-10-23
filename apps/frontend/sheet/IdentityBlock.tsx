@@ -1,4 +1,4 @@
-import { identityOf, jsonEqual } from '@tms/sheet-core'
+import { identityOf, isDraftMode, jsonEqual } from '@tms/sheet-core'
 import { Avatar, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from './context'
@@ -16,17 +16,17 @@ export function IdentityBlock() {
   const sections = model.zones.find(z => z.id === 'identity')?.sections ?? []
   // Em Evoluir, o nome, o selo e o resumo que não estão em seção nenhuma
   // (Nome, Clã e Geração no Vampiro; Classe e Nível no D&D) ganham editor
-  const loose =
-    mode === 'evolve'
-      ? model.identityFields.filter(
-          f => model.fields.get(f)?.sectionIds.length === 0
-        )
-      : []
+  const loose = isDraftMode(mode)
+    ? model.identityFields.filter(
+        f => model.fields.get(f)?.sectionIds.length === 0
+      )
+    : []
   // Com colunas no template, o Editar mostra o cabeçalho como na ficha
   // impressa (Nome | Natureza, Comportamento, Conceito | Clã, Geração,
   // Senhor); tocar numa célula abre o mesmo editor da linha
-  const columns =
-    mode === 'evolve' ? (model.template.identity.columns ?? null) : null
+  const columns = isDraftMode(mode)
+    ? (model.template.identity.columns ?? null)
+    : null
   const inColumns = new Set(columns?.flat())
   const rest = columns
     ? [...loose, ...sections.flatMap(s => s.fieldIds)].filter(

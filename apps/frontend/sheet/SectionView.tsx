@@ -2,6 +2,7 @@ import { type CompiledSection, canReadSection } from '@tms/sheet-core'
 import { SectionHeader, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from './context'
+import { CreationCounter } from './creation/CreationCounter'
 import { layoutFor } from './layouts'
 
 /**
@@ -22,7 +23,10 @@ export function SectionView({
     <View style={styles.section} testID={`section-${section.id}`}>
       {hideTitle ? null : (
         <View style={styles.title}>
-          <SectionHeader title={section.def.title} />
+          <SectionHeader
+            title={section.def.title}
+            right={<CreationCounter fieldIds={section.fieldIds} />}
+          />
         </View>
       )}
       <Layout section={section} />

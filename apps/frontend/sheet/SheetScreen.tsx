@@ -1,5 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { RoleName, SheetMode } from '@tms/sheet-core'
+import {
+  isDraftMode,
+  jsonEqual,
+  type RoleName,
+  type SheetMode,
+} from '@tms/sheet-core'
 import { AppBar, Button, EmptyState, Screen, Skeleton, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -8,6 +13,12 @@ import { StyleSheet, View } from 'react-native'
 import { messageOf, statusOf } from '../lib/errors'
 import { useRefetchOnFocus } from '../lib/queries/focus'
 import { SheetProvider } from './context'
+import { CreationContext } from './creation/CreationContext'
+import {
+  creationActive,
+  creationInfoOf,
+  creationInputOf,
+} from './creation/creation'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
@@ -26,7 +37,8 @@ export function SheetScreen({
   initialMode,
 }: {
   readonly id: string
-  // A ficha recém-criada abre em Evoluir (Etapa 18)
+  // A ficha recém-criada abre em Evoluir (Etapa 18), ou na Criação quando a
+  // conta por pontos vale (v4)
   readonly initialMode?: SheetMode
 }) {
   const router = useRouter()
@@ -186,14 +198,29 @@ function LiveSheet({
     [status, lockedAt, member]
   )
   const forced = policyMode(state.roles, lifecycle)
+  // A criação por pontos (doc/plano-v4.md, Etapa 5): a conta vale em
+  // creating e pending; o store recebe a entrada da conta (contadores e
+  // avaliação parcial antes de enfileirar)
+  const info = useMemo(
+    () => creationInfoOf(state.character.creation),
+    [state.character.creation]
+  )
+  const active = creationActive(info, status)
+  const inputJson =
+    active && info ? JSON.stringify(creationInputOf(info)) : null
+  const creation = useMemo(
+    () => (inputJson ? JSON.parse(inputJson) : null),
+    [inputJson]
+  )
   const [store] = useState(() => {
     // Só quem escreve algum campo começa em Evoluir (ficha recém-criada); sem
     // pedido, o modo padrão do papel
     const writer = canEditSomething(state.model, new Set(state.roles))
+    const draftMode: SheetMode = active ? 'create' : 'evolve'
     const mode: SheetMode =
-      initialMode === 'evolve'
+      initialMode && isDraftMode(initialMode)
         ? writer
-          ? 'evolve'
+          ? draftMode
           : defaultMode(state.roles)
         : (initialMode ?? defaultMode(state.roles))
     const created = createSheetStore({
@@ -204,31 +231,56 @@ function LiveSheet({
       roles: state.roles,
       mode: forced ?? mode,
       sync,
+      creation,
     })
-    if (!forced && mode === 'evolve') created.getState().startDraft()
+    if (!forced && isDraftMode(mode)) created.getState().startDraft()
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
-  // O estado mudou (o narrador travou, arquivou, reativou): o modo acompanha.
-  // Sem modo forçado, a ficha do dono volta ao Jogo
   useEffect(() => {
     const s = store.getState()
-    const next = forced ?? (s.mode === 'read' ? defaultMode(state.roles) : null)
+    if (!jsonEqual(s.creation, creation)) s.setCreation(creation)
+  }, [store, creation])
+  // O estado mudou (o narrador travou, arquivou, reativou; a criação foi
+  // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha do
+  // dono volta ao Jogo
+  useEffect(() => {
+    const s = store.getState()
+    let next = forced ?? (s.mode === 'read' ? defaultMode(state.roles) : null)
+    // A criação acabou (ou virou livre): o modo dela não vale mais
+    if (!next && s.mode === 'create' && !active) next = defaultMode(state.roles)
+    // Voltou à criação por pontos com Evoluir aberto: o rascunho continua
+    if (!next && s.mode === 'evolve' && active) {
+      s.setMode('create')
+      return
+    }
     if (!next || next === s.mode) return
-    if (s.mode === 'evolve') s.discardDraft()
+    if (isDraftMode(s.mode)) s.discardDraft()
     s.setMode(next)
-  }, [store, forced, state.roles])
+  }, [store, forced, state.roles, active])
   // Rebuscada (foco, conflito): o store confere a versão e valida
   useEffect(() => {
     store.getState().received(sheet, sheetVersion)
   }, [store, sheet, sheetVersion])
+  const creationValue = useMemo(
+    () => ({
+      characterId: id,
+      chronicleId: state.character.chronicle.id,
+      status,
+      info,
+      active,
+    }),
+    [id, state.character.chronicle.id, status, info, active]
+  )
   return (
     <LifecycleContext.Provider value={lifecycle}>
-      <SheetProvider store={store}>
-        <StorytellerBar ownerName={state.character.owner.username} />
-      </SheetProvider>
-      <SheetView store={store} editable />
-      <LeaveGuard store={store} />
+      <CreationContext.Provider value={creationValue}>
+        <SheetProvider store={store}>
+          <StorytellerBar ownerName={state.character.owner.username} />
+        </SheetProvider>
+        <SheetView store={store} editable />
+        <LeaveGuard store={store} />
+      </CreationContext.Provider>
     </LifecycleContext.Provider>
   )
 }
