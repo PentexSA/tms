@@ -7,9 +7,12 @@ import {
   type CreationProblem,
   checkCreation,
   checkCreationBatch,
+  checkCreationUpdate,
   completionRefusal,
   creationFreeze,
+  creationInputOf,
   effectiveCreationConfig,
+  parseCharacterCreation,
   validateCreationChoices,
   validateCreationConfig,
 } from '../creation'
@@ -814,5 +817,66 @@ describe('validação do contrato no template', () => {
   it('template sintético e D&D passam', () => {
     expect(() => compileTemplate(acct())).not.toThrow()
     expect(clone(templates['dnd5e-2014'])).toHaveProperty('creation')
+  })
+})
+
+describe('checkCreationUpdate (escolhas e configuração)', () => {
+  const at = (
+    values: Values,
+    config: CreationConfig,
+    choices: CreationChoices = PRIORITIES
+  ) => ({ sheet: sheet(values), input: { config, choices } })
+
+  it('cortar o orçamento abaixo do que já foi gasto é recusado', () => {
+    const tight = effectiveCreationConfig(model, { freebies: 0 })
+    expect(
+      checkCreationUpdate(model, at({ str: 4 }, points), at({ str: 4 }, tight))
+        ?.code
+    ).toBe('CREATION_BUDGET_EXCEEDED')
+    expect(checkCreationUpdate(model, at({}, points), at({}, tight))).toBeNull()
+  })
+
+  it('criação livre passa; prioridade que estoura o bônus, não', () => {
+    const over = { str: 5, dex: 5 }
+    expect(
+      checkCreationUpdate(model, at(over, points), at(over, { mode: 'free' }))
+    ).toBeNull()
+    const swap = {
+      priorities: {
+        attributes: ['men', 'soc', 'phys'],
+        abilities: ['talents', 'knowledges'],
+      },
+    }
+    expect(
+      checkCreationUpdate(model, at({}, points), at({}, points, swap))?.code
+    ).toBe('CREATION_BUDGET_EXCEEDED')
+  })
+})
+
+describe('metadados de criação da ficha', () => {
+  it('parseCharacterCreation guarda só o que tem forma', () => {
+    expect(parseCharacterCreation(model, null)).toEqual({})
+    const ok = {
+      choices: PRIORITIES,
+      config: { freebies: 3 },
+      returned: { reason: 'Refaça', at: '2026-10-23T00:00:00Z' },
+    }
+    expect(parseCharacterCreation(model, ok)).toEqual(ok)
+    expect(
+      parseCharacterCreation(model, {
+        choices: { priorities: { attributes: ['x'] } },
+        config: { mode: 'nope' },
+        returned: { reason: 1 },
+      })
+    ).toEqual({})
+  })
+
+  it('creationInputOf aplica a camada da ficha', () => {
+    expect(
+      creationInputOf(model, { config: { freebies: 3 }, choices: PRIORITIES })
+    ).toEqual({ config: { mode: 'points', freebies: 3 }, choices: PRIORITIES })
+    expect(creationInputOf(model, {})).toEqual({
+      config: { mode: 'points', freebies: 10 },
+    })
   })
 })

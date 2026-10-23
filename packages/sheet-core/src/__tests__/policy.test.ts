@@ -120,9 +120,40 @@ describe('apoio', () => {
     expect(strictest(['edit', 'advance', 'play'])).toBe('advance')
   })
 
-  it('isCharacterStatus aceita só os estados da v3', () => {
+  it('isCharacterStatus aceita só os estados conhecidos', () => {
     for (const s of CHARACTER_STATUSES) expect(isCharacterStatus(s)).toBe(true)
-    for (const s of ['pending', 'ativo', null, 1])
-      expect(isCharacterStatus(s)).toBe(false)
+    expect(isCharacterStatus('pending')).toBe(true)
+    for (const s of ['ativo', null, 1]) expect(isCharacterStatus(s)).toBe(false)
+  })
+})
+
+// doc/plano-v4.md §3.6: em `pending` o dono não grava nem rola, e a recusa
+// diz que a ficha aguarda aprovação (não "arquivada")
+describe('pending (v4)', () => {
+  it('o dono não grava nada, com o motivo', () => {
+    for (const classes of each)
+      for (const locked of [false, true])
+        expect(writePolicy(OWNER, 'pending', locked, classes)).toEqual({
+          ok: false,
+          code: 'SHEET_NOT_EDITABLE',
+          reason: 'pending',
+        })
+  })
+
+  it('o dono não rola, com ou sem custo; o narrador escreve', () => {
+    expect(rollPolicy(OWNER, 'pending', false, null)).toMatchObject({
+      reason: 'pending',
+    })
+    expect(rollPolicy(OWNER, 'pending', false, ['play'])).toMatchObject({
+      reason: 'pending',
+    })
+    expect(code(writePolicy(STORYTELLER, 'pending', false, ['advance']))).toBe(
+      'ok'
+    )
+    expect(code(writePolicy(BOTH, 'pending', false, ['advance']))).toBe('ok')
+    expect(code(writePolicy(FORMER, 'pending', false, []))).toBe('NOT_MEMBER')
+    expect(writePolicy(OWNER, 'archived', false, [])).not.toHaveProperty(
+      'reason'
+    )
   })
 })

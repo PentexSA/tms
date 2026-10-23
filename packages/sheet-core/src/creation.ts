@@ -760,9 +760,29 @@ export function checkCreationBatch(
   after: SheetData | unknown,
   input: CreationInput
 ): CreationRefusal | null {
-  const b = checkCreation(model, after, input)
+  return checkCreationUpdate(
+    model,
+    { sheet: before, input },
+    { sheet: after, input }
+  )
+}
+
+/**
+ * A mesma avaliação parcial quando mudam também as escolhas ou a
+ * configuração (salvar prioridades, ajustar o orçamento): uma configuração
+ * que deixaria a conta pior do que estava não é gravada sozinha.
+ */
+export function checkCreationUpdate(
+  model: SheetModel,
+  before: {
+    readonly sheet: SheetData | unknown
+    readonly input: CreationInput
+  },
+  after: { readonly sheet: SheetData | unknown; readonly input: CreationInput }
+): CreationRefusal | null {
+  const b = checkCreation(model, after.sheet, after.input)
   if (b.savable) return null
-  const a = checkCreation(model, before, input)
+  const a = checkCreation(model, before.sheet, before.input)
   const known = new Map<string, number>()
   for (const p of a.problems)
     if (p.severity === 'blocking') known.set(problemKey(p), p.amount ?? 0)
@@ -810,4 +830,61 @@ export function creationFreeze(
     if (value !== undefined) out[id] = value
   }
   return out
+}
+
+// Metadados de criação gravados na ficha (`characters.creation`, doc/plano-v4.md
+// §3.4): as escolhas do jogador, o ajuste do narrador (uma camada da
+// configuração, já com o padrão da crônica de quando a ficha nasceu) e o
+// motivo da última devolução. Só dono e narrador leem.
+
+export const RETURN_REASON_MAX = 500
+
+export interface CreationReturn {
+  readonly reason: string
+  readonly at: string
+}
+
+export interface CharacterCreation {
+  readonly choices?: CreationChoices
+  readonly config?: CreationConfigLayer
+  readonly returned?: CreationReturn
+}
+
+/**
+ * Leitura defensiva do que veio do banco: o que não tiver a forma esperada
+ * fica de fora (a escolha inválida vale como ausente na conta).
+ */
+export function parseCharacterCreation(
+  model: SheetModel,
+  json: unknown
+): CharacterCreation {
+  const c = rec(json)
+  if (!c) return {}
+  const out: {
+    choices?: CreationChoices
+    config?: CreationConfigLayer
+    returned?: CreationReturn
+  } = {}
+  if (
+    c.choices !== undefined &&
+    !validateCreationChoices(model, c.choices).length
+  )
+    out.choices = c.choices as CreationChoices
+  if (c.config !== undefined && !validateCreationConfig(model, c.config).length)
+    out.config = c.config as CreationConfigLayer
+  const r = rec(c.returned)
+  if (r && typeof r.reason === 'string' && typeof r.at === 'string')
+    out.returned = { reason: r.reason, at: r.at }
+  return out
+}
+
+/** A entrada da conta a partir dos metadados da ficha. */
+export function creationInputOf(
+  model: SheetModel,
+  creation: CharacterCreation
+): CreationInput {
+  return {
+    config: effectiveCreationConfig(model, creation.config),
+    ...(creation.choices && { choices: creation.choices }),
+  }
 }

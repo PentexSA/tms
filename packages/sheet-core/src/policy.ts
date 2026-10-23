@@ -6,9 +6,11 @@ import type { ChangeClass } from './classify'
 // que vai ser recusado. Outra camada que o `canWrite` (permissions.ts), que
 // decide por campo e papel e continua valendo antes desta.
 
-// Os estados da v3; `pending` chega na v4, com a aprovação de ficha.
+// `pending` (v4): o dono concluiu com a aprovação de ficha ligada e a ficha
+// espera o narrador aprovar ou devolver (doc/plano-v4.md §3.4).
 export const CHARACTER_STATUSES = [
   'creating',
+  'pending',
   'active',
   'archived',
   'dead',
@@ -38,12 +40,25 @@ export interface WriteAccess {
   readonly member: boolean
 }
 
+// Por que a ficha não aceita o dono: em `pending`, o app diz "aguarda
+// aprovação" em vez de "arquivada ou fora de jogo".
+export type RefusalReason = 'pending'
+
 export type PolicyResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly code: RefusalCode }
+  | {
+      readonly ok: false
+      readonly code: RefusalCode
+      readonly reason?: RefusalReason
+    }
 
 const OK: PolicyResult = { ok: true }
 const refuse = (code: RefusalCode): PolicyResult => ({ ok: false, code })
+const PENDING: PolicyResult = {
+  ok: false,
+  code: 'SHEET_NOT_EDITABLE',
+  reason: 'pending',
+}
 
 /**
  * Se quem tem `access` grava mudanças das `classes` numa ficha no `status`,
@@ -63,6 +78,9 @@ export function writePolicy(
   switch (status) {
     case 'creating':
       return OK
+    // Aguarda o narrador: o dono não grava nem rola, com ou sem custo
+    case 'pending':
+      return PENDING
     case 'active':
       // A trava só vale em `active`
       if (locked) return refuse('SHEET_LOCKED')
