@@ -9,7 +9,7 @@ Data: 22/10/2026. PR: [#31](https://github.com/PentexSA/tms/pull/31).
 | Build e TypeScript de todos os pacotes | Passou |
 | Biome e proibição de nomes de sistemas no código do produto | Passou |
 | Templates, personagens de exemplo, arquivos de design gerados e contraste | Passou |
-| Core, com cobertura | 772 testes passaram |
+| Core, com cobertura | 773 testes passaram |
 | API em PGLite | 912 testes passaram |
 | App, com cobertura | 574 testes passaram |
 | UI, com cobertura | 91 testes passaram |
@@ -20,6 +20,8 @@ Data: 22/10/2026. PR: [#31](https://github.com/PentexSA/tms/pull/31).
 A suíte exigida pelo hook de envio também passou sem desativar hooks. O
 WebKit local rodou em Ubuntu 22.04 pelo Docker, com o mesmo export do app;
 o host Ubuntu 20.04 não tem as bibliotecas exigidas pelo navegador.
+
+O teste de conflito por geração aleatória considera apenas mutações posteriores que passam no `applyBatch`: desfazer um recurso isoladamente pode ultrapassar um teto que outro evento do lote reduziu. O contraexemplo de CoC está coberto por um caso fixo.
 
 O CI do PR executa novamente cobertura, auditoria, design, migrations
 up/down/up, geração dos tipos Kysely, publicação dos templates em banco

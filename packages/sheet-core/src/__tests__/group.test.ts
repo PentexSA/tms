@@ -328,15 +328,51 @@ describe('propriedades', () => {
           const after = applied(m, before, events)
           // Volta um dos caminhos ao valor de antes: mudou depois do lote
           const target = events[pick % events.length] as SheetEvent
-          const later = applied(m, after, [
-            { path: target.path, from: target.to, to: target.from },
-          ])
-          const inv = invertBatch(m, later, history(m, before, events))
+          const later = applyBatch(
+            m,
+            after,
+            {
+              events: [{ path: target.path, from: target.to, to: target.from }],
+            },
+            ALL
+          )
+          // Um campo pode depender de outro caminho do lote: restaurar só
+          // PV pode exceder o teto reduzido. Só uma escrita válida chega à
+          // ficha pela API; uma tentativa recusada não produz conflito.
+          fc.pre(later.ok)
+          if (!later.ok) return
+          const inv = invertBatch(m, later.sheet, history(m, before, events))
           expect(inv).toMatchObject({ ok: false, kind: 'conflict' })
           if (!inv.ok) expect(inv.paths).toContain(target.path)
         }
       ),
       { numRuns: 300 }
     )
+  })
+
+  it('restaurar só o recurso acima do teto é recusado; uma mudança válida cria conflito', () => {
+    const m = model('coc7e')
+    const before = sheetOf('joana')
+    const events: SheetEvent[] = [
+      { path: 'values.con', from: before.values.con, to: null },
+      { path: 'values.hp', from: before.values.hp, to: null },
+    ]
+    const after = applied(m, before, events)
+    const invalid = applyBatch(
+      m,
+      after,
+      { events: [{ path: 'values.hp', from: null, to: before.values.hp }] },
+      ALL
+    )
+    expect(invalid).toMatchObject({ ok: false, kind: 'invalid' })
+    expect(invertBatch(m, after, history(m, before, events)).ok).toBe(true)
+    const later = applied(m, after, [
+      { path: 'values.hp', from: null, to: { current: 1 } },
+    ])
+    expect(invertBatch(m, later, history(m, before, events))).toEqual({
+      ok: false,
+      kind: 'conflict',
+      paths: ['values.hp'],
+    })
   })
 })
