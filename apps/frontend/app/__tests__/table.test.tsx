@@ -229,8 +229,9 @@ describe('para o jogador a Mesa não existe', () => {
     expect(screen.queryByRole('tab', { name: 'Mesa' })).toBeNull()
     // A v5 oferece o Diário público ao jogador, mas não a Mesa administrativa.
     expect(screen.getByLabelText('Visão da crônica')).toBeTruthy()
+    // A lista de fichas é outra consulta: pode chegar depois do cabeçalho
     expect(
-      screen.getByText('Você ainda não tem ficha nesta crônica.')
+      await screen.findByText('Você ainda não tem ficha nesta crônica.')
     ).toBeTruthy()
     expect(calls.chronicle.tableGet).not.toHaveBeenCalled()
   })

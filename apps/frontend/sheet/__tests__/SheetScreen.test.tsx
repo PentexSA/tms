@@ -55,6 +55,8 @@ const character = (sheet = example('helena').sheet) =>
   })
 
 // NPC revelado (v5): a projeção pública e a de leitura do viewer
+// Folga para o hook de push, que roda as suítes em paralelo
+const WAIT = { timeout: 5000 }
 const NPC = '00000000-0000-4000-8000-00000000c009'
 const identity = {
   name: 'Oráculo',
@@ -94,7 +96,9 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       <SheetScreen id={NPC} />,
       await signedIn()
     )
-    expect(await screen.findByText('Leitura', { exact: true })).toBeTruthy()
+    expect(
+      await screen.findByText('Leitura', { exact: true }, WAIT)
+    ).toBeTruthy()
     expect(screen.getByLabelText('Destreza, 2 de 5')).toBeTruthy()
 
     calls.characterGet.mockResolvedValueOnce(npcIdentity())
@@ -102,7 +106,11 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
     )
     expect(
-      await screen.findByText('O narrador revelou apenas a identidade.')
+      await screen.findByText(
+        'O narrador revelou apenas a identidade.',
+        {},
+        WAIT
+      )
     ).toBeTruthy()
     // A projeção menor substitui a anterior: nada da ficha fica na tela
     expect(screen.queryByLabelText('Destreza, 2 de 5')).toBeNull()
@@ -112,12 +120,16 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
     )
     expect(
-      await screen.findByRole('header', {
-        name: 'Você não tem acesso a esta ficha',
-      })
+      await screen.findByRole(
+        'header',
+        { name: 'Você não tem acesso a esta ficha' },
+        WAIT
+      )
     ).toBeTruthy()
-    await waitFor(() =>
-      expect(queryClient.getQueryData(['characters', NPC])).toBeUndefined()
+    await waitFor(
+      () =>
+        expect(queryClient.getQueryData(['characters', NPC])).toBeUndefined(),
+      WAIT
     )
     expect(screen.queryByText('Oráculo')).toBeNull()
   })
@@ -129,16 +141,24 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       <SheetScreen id={NPC} />,
       await signedIn()
     )
-    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    expect(
+      await screen.findByLabelText('Destreza, 2 de 5', {}, WAIT)
+    ).toBeTruthy()
     calls.characterGet.mockRejectedValueOnce(
       new TypeError('Network request failed')
     )
     await act(() =>
       queryClient.invalidateQueries({ queryKey: ['characters', NPC] })
     )
-    await waitFor(() =>
-      expect(screen.queryByLabelText('Destreza, 2 de 5')).toBeNull()
-    )
+    // O erro aparece no lugar da ficha: a cópia do viewer não fica na tela
+    expect(
+      await screen.findByRole(
+        'header',
+        { name: 'Não foi possível carregar a ficha' },
+        WAIT
+      )
+    ).toBeTruthy()
+    expect(screen.queryByLabelText('Destreza, 2 de 5')).toBeNull()
   })
 })
 
