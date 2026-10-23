@@ -54,8 +54,15 @@ interface Part {
 type Classifier<T extends FieldTypeName> = (
   field: CompiledField<FieldDefOf<T>>,
   before: ValueOf<T> | undefined,
-  after: ValueOf<T> | undefined
+  after: ValueOf<T> | undefined,
+  opts: ClassifyOptions
 ) => Part[]
+
+export interface ClassifyOptions {
+  // O nome de um item da lista é a identidade mecânica dele (o preço, a
+  // origem, a Geração): trocar o nome é evolução, não edição (v4, §3.5)
+  readonly mechanicalNames?: boolean
+}
 
 // `editableIn: ["play"]` torna jogo o que, sem ele, seria `fallback`.
 const playOr = (field: CompiledField, fallback: ChangeClass): ChangeClass =>
@@ -98,7 +105,7 @@ const hasNumber = (item: ListItem): boolean =>
   item.value !== undefined ||
   Object.values(item.meta ?? {}).some(v => typeof v === 'number')
 
-const list: Classifier<'list'> = (field, before, after) => {
+const list: Classifier<'list'> = (field, before, after, opts) => {
   const def = field.def
   const play = field.editableIn.includes('play')
   const loose = play ? 'play' : 'edit'
@@ -143,9 +150,13 @@ const list: Classifier<'list'> = (field, before, after) => {
       const kind: ChangeClass =
         k === 'specialty'
           ? 'edit'
-          : k === 'name' || k === 'text' || k === 'notes'
-            ? loose
-            : 'advance'
+          : k === 'name'
+            ? opts.mechanicalNames
+              ? 'advance'
+              : loose
+            : k === 'text' || k === 'notes'
+              ? loose
+              : 'advance'
       parts.push({ at: `${id}.${k}`, kind })
     }
   }
@@ -184,14 +195,16 @@ const CLASSIFIERS: { readonly [T in FieldTypeName]: Classifier<T> } = {
 export function classifyChange(
   field: CompiledField,
   before: SheetValue | undefined,
-  after: SheetValue | undefined
+  after: SheetValue | undefined,
+  opts: ClassifyOptions = {}
 ): ChangePart[] {
   if (jsonEqual(before, after)) return []
   const classify = CLASSIFIERS[field.type] as Classifier<FieldTypeName>
   const parts = classify(
     field as CompiledField<FieldDefOf<FieldTypeName>>,
     before,
-    after
+    after,
+    opts
   )
   const base = `values.${field.id}`
   if (!parts.length) return [{ path: base, kind: 'advance' }]
@@ -251,6 +264,27 @@ function applied(sheet: SheetData, events: readonly SheetEvent[]): SheetData {
 }
 
 /**
+ * Lista cujo nome de item decide preço ou derivado: tem catálogo (o nome é
+ * o da tabela: Disciplina, Antecedente) ou entra numa conta de XP ou da
+ * criação. Notas e texto livre continuam edição.
+ */
+export function hasMechanicalNames(model: SheetModel, id: FieldId): boolean {
+  const def = model.fields.get(id)?.def
+  if (def?.type !== 'list') return false
+  if (def.catalog?.length) return true
+  const t = model.template
+  return Boolean(
+    t.costs?.xp?.rules?.some(r => r.targets.includes(id)) ||
+      t.costs?.freebie?.some(e => e.targets.includes(id)) ||
+      t.creation?.budgets.some(b =>
+        b.rule === 'priority-budget'
+          ? b.groups.some(g => g.targets.includes(id))
+          : b.targets.includes(id)
+      )
+  )
+}
+
+/**
  * A classe de cada parte que o lote muda, comparando a ficha resolvida antes
  * e depois. Pega o que o lote não cita: trocar a tribo muda a FdV permanente
  * padrão, e a parte vem com o caminho da FdV. Campos derivados ficam de fora
@@ -269,7 +303,11 @@ export function classifyBatch(
     const ra = a.get(id)
     const rb = b.get(id)
     if (!ra || !rb) continue
-    parts.push(...classifyChange(field, stored(ra, a), stored(rb, b)))
+    parts.push(
+      ...classifyChange(field, stored(ra, a), stored(rb, b), {
+        mechanicalNames: hasMechanicalNames(model, id),
+      })
+    )
   }
   for (const id of model.fields.keys() as Iterable<FieldId>)
     if (a.specialty(id) !== b.specialty(id))
