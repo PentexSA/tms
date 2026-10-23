@@ -16,6 +16,14 @@ export interface IdentityText {
   readonly accent: string
 }
 
+/** DTO de identidade que pode atravessar a fronteira pública de um NPC. */
+export interface PublicIdentity {
+  readonly name: string
+  readonly chip: string
+  readonly subtitle: string | null
+  readonly portraitUrl: string | null
+}
+
 export const UNNAMED = 'Sem nome'
 
 export function identityOf(sheet: ResolvedSheet): IdentityText {
@@ -45,5 +53,22 @@ export function identityOf(sheet: ResolvedSheet): IdentityText {
     voice: text(identity.voice) || null,
     subtitle: text(identity.subtitle) || null,
     accent: mapped || accent.fallback || 'accent-neutral',
+  }
+}
+
+/**
+ * Projeção deliberadamente menor que IdentityText. Não inclui summary, voice
+ * ou accent e nunca inclui os valores usados para calculá-la.
+ */
+export function publicIdentityOf(
+  sheet: ResolvedSheet,
+  portraitUrl: string | null = null
+): PublicIdentity {
+  const identity = identityOf(sheet)
+  return {
+    name: identity.name,
+    chip: identity.chip,
+    subtitle: identity.subtitle,
+    portraitUrl,
   }
 }

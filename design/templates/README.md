@@ -59,6 +59,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |
+| `options` | não | lista (até 30) | Catálogo fechado de regras da casa da crônica (§2.1). |
 | `creation` | não | objeto | Criação por pontos: orçamentos, tetos e iniciais (§14). |
 | `costs` | não | objeto | Preços em pontos de bônus e em XP (§14). |
 
@@ -69,6 +70,10 @@ Todo texto exibido é **texto seguro**: sem `<`, `>`, controles C0 e C1 (U+0000 
 Não coloque `$schema` dentro do template: o topo é fechado (`additionalProperties: false`). Para ter autocompletar no editor, associe `schema.json` aos arquivos pela configuração do editor.
 
 **Multi-sistema:** nada no topo é específico de um jogo. `family` agrupa edições (V20 e V5 são sistemas diferentes da família `wod`) e `license` registra o que cada editora permite.
+
+### 2.1 Opções da crônica
+
+`options` declara controles genéricos que uma crônica pode selecionar. Cada item tem `id`, `label`, `effect` e um dos tipos `boolean`, `enum` ou `integer`; `enum` declara `values`, e `integer` declara `min`/`max`. Todo tipo exige `default`. Efeitos pertencem à lista fechada `flag`, `choice`, `bounded-number`: não há fórmula nem script livre. A API rejeita ids, propriedades e valores não declarados; template sem catálogo não oferece controles.
 
 ---
 
@@ -330,8 +335,8 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   "fields": ["storytellerNotes"], "permissions": { "read": ["storyteller"], "write": ["storyteller"] } }
 ```
 
-- Papéis: `owner` (dono da ficha) e `storyteller` (narrador da crônica). Outro jogador da crônica não tem papel na ficha: não a lê nem a escreve (o servidor responde 404).
-- Sem `permissions`: dono e narrador leem e escrevem.
+- Papéis: `owner` (dono da ficha), `storyteller` (narrador atual) e `viewer` (membro diante de um NPC com ficha revelada). Outro jogador não recebe papel para PCs alheios.
+- Sem `permissions`: dono, narrador e viewer leem; só dono e narrador escrevem. `viewer` nunca escreve e não acessa histórico, rolagens, criação ou XP.
 - `read` restrito: o **servidor** remove os campos da seção antes de responder a quem não pode ler (§11). Esconder na UI não basta. Por isso esses campos não podem aparecer em `identity` (header, cartões, mesa) nem no `dock`: `validateTemplate` rejeita.
 - `write` restrito: o servidor rejeita a escrita de quem não está na lista.
 
@@ -476,7 +481,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `layouts` | `layout` | `grid`, `groups`, `list`, `pyramid`, `fields`, `facts`, `text` |
 | `filterRules` | `filterRule` | `invested`, `proficient`, `aboveBase` |
 | `modes` | `mode` | `play`, `edit` |
-| `roles` | `role` | `owner`, `storyteller` |
+| `roles` | `role` | `owner`, `storyteller`, `viewer` |
 | `defaultActions` | `defaultAction` | `spend1`, `gain1`, `damage1`, `use1` |
 | `modifierOps` | `modifierOp` | `add`, `set` |
 | `conditionRoll` | `conditionRoll` | `advantage`, `disadvantage` |
@@ -487,6 +492,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `budgetRules` | `budgetRule` | `priority-budget`, `fixed-budget`, `item-count`, `point-buy` |
 | `capRules` | `capRule` | `creation-cap`, `hard-cap` |
 | `costRules` | `costRule` | `flat`, `per-current`, `item-meta`, `credit` |
+| `optionEffects` | `optionEffect` | `flag`, `choice`, `bounded-number` |
 
 Derivações, com assinatura:
 

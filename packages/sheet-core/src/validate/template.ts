@@ -68,6 +68,7 @@ const KEYS = {
     'actions',
     'creation',
     'costs',
+    'options',
   ],
   fieldCommon: [
     'type',
@@ -670,6 +671,64 @@ function check(
       text(`statusLabels.${s}`, label, 20)
   }
 
+  const optionIds = new Set<unknown>()
+  const options = objs('options', t.options)
+  if (options.length > 30) err('options', 'no máximo 30 opções')
+  for (const option of options) {
+    const p = `options.${option.id}`
+    keys(p, option, [
+      'id',
+      'label',
+      'help',
+      'effect',
+      'type',
+      'default',
+      'values',
+      'min',
+      'max',
+    ])
+    if (!isId(option.id) || optionIds.has(option.id))
+      err(`${p}.id`, 'id inválido ou repetido')
+    optionIds.add(option.id)
+    text(`${p}.label`, option.label, 80)
+    if (option.help != null) text(`${p}.help`, option.help, 300)
+    oneOf(`${p}.effect`, option.effect, REGISTRY.optionEffects, 'efeito')
+    oneOf(`${p}.type`, option.type, ['boolean', 'enum', 'integer'], 'tipo')
+    if (option.type === 'boolean' && typeof option.default !== 'boolean')
+      err(`${p}.default`, 'precisa ser booleano')
+    if (option.type === 'integer') {
+      num(`${p}.min`, option.min, -1000, 1000)
+      num(`${p}.max`, option.max, -1000, 1000)
+      num(`${p}.default`, option.default, -1000, 1000)
+      if (
+        typeof option.min === 'number' &&
+        typeof option.max === 'number' &&
+        option.min > option.max
+      )
+        err(p, 'faixa invertida')
+      if (
+        typeof option.default === 'number' &&
+        typeof option.min === 'number' &&
+        typeof option.max === 'number' &&
+        (option.default < option.min || option.default > option.max)
+      )
+        err(`${p}.default`, 'fora da faixa')
+    }
+    if (option.type === 'enum') {
+      const values = objs(`${p}.values`, option.values)
+      const valueIds = new Set<unknown>()
+      for (const value of values) {
+        keys(`${p}.values.${value.id}`, value, ['id', 'label'])
+        if (!isId(value.id) || valueIds.has(value.id))
+          err(`${p}.values`, 'id inválido ou repetido')
+        valueIds.add(value.id)
+        text(`${p}.values.${value.id}.label`, value.label, 80)
+      }
+      if (!valueIds.has(option.default))
+        err(`${p}.default`, 'não está no catálogo')
+    }
+  }
+
   // Alertas da Mesa (doc/plano-v3.md, Etapa 8): regra da lista fechada, o
   // tipo do campo que ela lê e só o parâmetro dela, nunca expressão.
   const alertIds = new Set<unknown>()
@@ -715,30 +774,67 @@ function check(
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não
   // pode vir de seção com leitura restrita: vazaria para quem não pode lê-la.
   const identity = rec(t.identity) ?? {}
+  const privateDependency = (
+    id: unknown,
+    seen = new Set<unknown>()
+  ): boolean => {
+    if (!has(id) || seen.has(id)) return false
+    if (restricted.has(id)) return true
+    seen.add(id)
+    const dependencies = new Set<unknown>()
+    const visit = (value: unknown, key?: string): void => {
+      if (key === 'from') {
+        for (const source of flat1(value))
+          dependencies.add(isListItemRef(source) ? source.list : source)
+      } else if (key === 'ability' && typeof value === 'string') {
+        dependencies.add(value)
+      }
+      if (Array.isArray(value)) value.forEach(item => visit(item))
+      else if (isObj(value))
+        for (const [childKey, child] of Object.entries(value))
+          visit(child, childKey)
+    }
+    visit(field(id))
+    return [...dependencies].some(dependency =>
+      privateDependency(dependency, new Set(seen))
+    )
+  }
   for (const k of ['name', 'chip', 'subtitle', 'voice']) {
     const v = identity[k]
     if (v && !has(v)) err(`identity.${k}`, `campo '${v}' não existe`)
-    if (v && restricted.has(v))
-      err(`identity.${k}`, 'campo de seção com leitura restrita')
+    if (v && privateDependency(v))
+      err(`identity.${k}`, 'campo ou dependência de seção com leitura restrita')
   }
   for (const k of list('identity.summary', identity.summary)) {
     if (!has(k)) err('identity.summary', `campo '${k}' não existe`)
-    if (restricted.has(k))
-      err('identity.summary', `campo '${k}' é de seção com leitura restrita`)
+    if (privateDependency(k))
+      err(
+        'identity.summary',
+        `campo '${k}' ou dependência é de seção com leitura restrita`
+      )
   }
   for (const [i, col] of list('identity.columns', identity.columns).entries())
     for (const k of list(`identity.columns.${i}`, col)) {
       if (!has(k)) err('identity.columns', `campo '${k}' não existe`)
-      if (restricted.has(k))
-        err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
+      if (privateDependency(k))
+        err(
+          'identity.columns',
+          `campo '${k}' ou dependência é de seção com leitura restrita`
+        )
     }
   if (identity.emblem)
     oneOf('identity.emblem', identity.emblem, REGISTRY.emblems, 'emblem')
   if (identity.chipFormat) {
     text('identity.chipFormat', identity.chipFormat, 60)
     if (typeof identity.chipFormat === 'string')
-      for (const m of identity.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g))
+      for (const m of identity.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g)) {
         if (!has(m[1])) err('identity.chipFormat', `campo '${m[1]}' não existe`)
+        else if (privateDependency(m[1]))
+          err(
+            'identity.chipFormat',
+            `campo '${m[1]}' ou dependência é de seção com leitura restrita`
+          )
+      }
   }
 
   const accent = rec(t.accent)

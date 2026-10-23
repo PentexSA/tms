@@ -32,7 +32,7 @@ const REGISTRY = {
   layouts: ['grid', 'groups', 'list', 'pyramid', 'fields', 'facts', 'text'],
   filterRules: ['invested', 'proficient', 'aboveBase'],
   modes: ['play', 'edit'],
-  roles: ['owner', 'storyteller'],
+  roles: ['owner', 'storyteller', 'viewer'],
   defaultActions: ['spend1', 'gain1', 'damage1', 'use1'],
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
@@ -44,13 +44,14 @@ const REGISTRY = {
   budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
   capRules: ['creation-cap', 'hard-cap'],
   costRules: ['flat', 'per-current', 'item-meta', 'credit'],
+  optionEffects: ['flag', 'choice', 'bounded-number'],
 }
 
 // Chaves permitidas (allowlist). Chave desconhecida é erro: impede atributos como "onclick"
 // ou campos que o renderizador ignoraria e algum código futuro poderia interpretar.
 const KEYS = {
   template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'alerts',
-    'recoveries', 'dock', 'roll', 'actions', 'creation', 'costs'],
+    'recoveries', 'dock', 'roll', 'actions', 'creation', 'costs', 'options'],
   fieldCommon: ['type', 'label', 'shortLabel', 'help', 'editableIn', 'specialty', 'sublabel', 'badge', 'readOnly', 'derive', 'from'],
   field: {
     rating: ['min', 'max', 'default', 'cap', 'valueLabels'],
@@ -781,22 +782,42 @@ function validateTemplate(t, palette) {
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não pode vir
   // de seção com leitura restrita: senão vazaria para quem não pode ler a seção.
   const id = t.identity ?? {}
+  const privateDependency = (fieldId, seen = new Set()) => {
+    if (!has(fieldId) || seen.has(fieldId)) return false
+    if (restricted.has(fieldId)) return true
+    seen.add(fieldId)
+    const dependencies = new Set()
+    const visit = (value, key) => {
+      if (key === 'from') {
+        for (const source of (Array.isArray(value) ? value.flat() : [value]))
+          dependencies.add(source && typeof source === 'object' ? source.list : source)
+      } else if (key === 'ability' && typeof value === 'string') dependencies.add(value)
+      if (Array.isArray(value)) value.forEach(item => visit(item))
+      else if (value && typeof value === 'object')
+        for (const [childKey, child] of Object.entries(value)) visit(child, childKey)
+    }
+    visit(fields[fieldId])
+    return [...dependencies].some(dependency => privateDependency(dependency, new Set(seen)))
+  }
   for (const k of ['name', 'chip', 'subtitle', 'voice']) {
     if (id[k] && !has(id[k])) err(`identity.${k}`, `campo '${id[k]}' não existe`)
-    if (id[k] && restricted.has(id[k])) err(`identity.${k}`, 'campo de seção com leitura restrita')
+    if (id[k] && privateDependency(id[k])) err(`identity.${k}`, 'campo ou dependência de seção com leitura restrita')
   }
   for (const k of id.summary ?? []) {
     if (!has(k)) err('identity.summary', `campo '${k}' não existe`)
-    if (restricted.has(k)) err('identity.summary', `campo '${k}' é de seção com leitura restrita`)
+    if (privateDependency(k)) err('identity.summary', `campo '${k}' ou dependência é de seção com leitura restrita`)
   }
   for (const k of (id.columns ?? []).flat()) {
     if (!has(k)) err('identity.columns', `campo '${k}' não existe`)
-    if (restricted.has(k)) err('identity.columns', `campo '${k}' é de seção com leitura restrita`)
+    if (privateDependency(k)) err('identity.columns', `campo '${k}' ou dependência é de seção com leitura restrita`)
   }
   if (id.emblem) oneOf('identity.emblem', id.emblem, REGISTRY.emblems, 'emblem')
   if (id.chipFormat) {
     text('identity.chipFormat', id.chipFormat, 60)
-    for (const m of id.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g)) if (!has(m[1])) err('identity.chipFormat', `campo '${m[1]}' não existe`)
+    for (const m of id.chipFormat.matchAll(/\{([a-zA-Z0-9]+)\}/g)) {
+      if (!has(m[1])) err('identity.chipFormat', `campo '${m[1]}' não existe`)
+      else if (privateDependency(m[1])) err('identity.chipFormat', `campo '${m[1]}' ou dependência é de seção com leitura restrita`)
+    }
   }
 
   if (t.accent?.from && !has(t.accent.from)) err('accent.from', `campo '${t.accent.from}' não existe`)

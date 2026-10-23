@@ -7,6 +7,7 @@ import type {
   EmblemName,
   FilterRule,
   LayoutName,
+  OptionEffect,
   RoleName,
   SkinName,
   SpecialtyRule,
@@ -199,6 +200,33 @@ export interface TemplateRecovery {
 
 export type TabZone = 'build' | 'powers' | 'lore'
 
+interface ChronicleOptionBase {
+  readonly id: string
+  readonly label: string
+  readonly help?: string
+  readonly effect: OptionEffect
+}
+
+export type ChronicleOption =
+  | (ChronicleOptionBase & {
+      readonly type: 'boolean'
+      readonly default: boolean
+    })
+  | (ChronicleOptionBase & {
+      readonly type: 'enum'
+      readonly default: string
+      readonly values: readonly {
+        readonly id: string
+        readonly label: string
+      }[]
+    })
+  | (ChronicleOptionBase & {
+      readonly type: 'integer'
+      readonly default: number
+      readonly min: number
+      readonly max: number
+    })
+
 export interface Template {
   readonly schema: 1
   readonly system: string
@@ -227,4 +255,5 @@ export interface Template {
   // Criação por pontos e preços de evolução (doc/plano-v4.md §3)
   readonly creation?: CreationDef
   readonly costs?: CostsDef
+  readonly options?: readonly ChronicleOption[]
 }

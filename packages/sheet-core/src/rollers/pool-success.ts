@@ -135,6 +135,56 @@ const fail = (kind: PoolFailure, reason: string): PoolPlan => ({
 export const poolRollOf = (model: SheetModel): PoolSuccessRoll | null =>
   model.roll.model === 'pool-success' ? model.roll : null
 
+/**
+ * Planeja uma parada sem ficha. A capacidade vem do executor do template;
+ * não há slots, penalidades, boosts ou custo que possam ser fabricados pelo
+ * cliente.
+ */
+export function planFreePool(
+  model: SheetModel,
+  request: {
+    readonly dice: number
+    readonly difficulty: number
+    readonly specialty?: boolean
+    readonly label: string
+  }
+): PoolPlan {
+  const roll = poolRollOf(model)
+  if (!roll)
+    return fail('unsupported', 'este sistema ainda não oferece parada livre')
+  if (
+    !Number.isSafeInteger(request.dice) ||
+    request.dice < 1 ||
+    request.dice > MAX_POOL_DICE ||
+    !Number.isSafeInteger(request.difficulty) ||
+    request.difficulty < roll.difficulty.min ||
+    request.difficulty > roll.difficulty.max ||
+    typeof request.label !== 'string' ||
+    request.label.trim().length < 1 ||
+    request.label.trim().length > 120
+  )
+    return fail('invalid', 'parada livre inválida')
+  const specialty =
+    request.specialty === true && roll.specialty === 'tenCountsDouble'
+  return {
+    ok: true,
+    label: request.label.trim(),
+    preset: null,
+    chosen: [],
+    dice: request.dice,
+    die: roll.die ?? 10,
+    difficulty: request.difficulty,
+    penalty: 0,
+    specialty,
+    auto: 0,
+    boosts: [],
+    modifiers: specialty
+      ? [{ label: 'Especialização', change: 'máximo conta 2 sucessos' }]
+      : [],
+    events: [],
+  }
+}
+
 function modifierText(m: Modifier): string {
   return m.op === 'set'
     ? `${m.source}: ${m.value}`

@@ -23,6 +23,7 @@ describe('matriz papel × seção', () => {
     // papéis           campo comum       notas do narrador
     [['owner'], { read: true, write: true }, { read: false, write: false }],
     [['storyteller'], { read: true, write: true }, { read: true, write: true }],
+    [['viewer'], { read: true, write: false }, { read: false, write: false }],
     [['player'], { read: false, write: false }, { read: false, write: false }],
     [
       ['owner', 'storyteller'],
@@ -45,6 +46,7 @@ describe('matriz papel × seção', () => {
   it('campo fora de seção segue a regra padrão (clã)', () => {
     expect(canRead(model, 'clan', ['owner'])).toBe(true)
     expect(canRead(model, 'clan', ['storyteller'])).toBe(true)
+    expect(canRead(model, 'clan', ['viewer'])).toBe(true)
     expect(canRead(model, 'clan', ['player'])).toBe(false)
     expect(canWrite(model, 'clan', ['player'])).toBe(false)
     expect(canWrite(model, 'clan', ['owner'])).toBe(true)
@@ -52,7 +54,7 @@ describe('matriz papel × seção', () => {
 
   it('seção sem permissions com papel desconhecido: não lê (fail secure)', () => {
     expect(canReadSection(model, 'attributes', ['player'])).toBe(false)
-    expect(canReadSection(model, 'attributes', ['viewer'])).toBe(false)
+    expect(canReadSection(model, 'attributes', ['viewer'])).toBe(true)
     expect(canRead(model, 'strength', ['admin', 'player'])).toBe(false)
   })
 

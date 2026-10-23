@@ -39,6 +39,7 @@ const SCHEMA_DEFS = {
   budgetRules: 'budgetRule',
   capRules: 'capRule',
   costRules: 'costRule',
+  optionEffects: 'optionEffect',
 } satisfies Record<keyof Registry, string>
 
 describe('REGISTRY', () => {
