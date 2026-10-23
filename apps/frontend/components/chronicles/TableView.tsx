@@ -1,174 +1,254 @@
-import {
-  describe,
-  identityOf,
-  parseSheet,
-  type SheetModel,
-} from '@tms/sheet-core'
-import {
-  Avatar,
-  Button,
-  Pressable,
-  Skeleton,
-  Text,
-  ThemeProvider,
-  tokens,
-  useTheme,
-} from '@tms/ui'
+import { useQueries } from '@tanstack/react-query'
+import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
+import { Button, Chip, Skeleton, Tabs, Text, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
-import { whenLabel } from '../../lib/format'
-import { useChronicleTable } from '../../lib/queries/chronicles'
+import { hhmm } from '../../lib/format'
+import { useOnline } from '../../lib/network'
+import {
+  type TableScope,
+  useChronicleTable,
+} from '../../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../../lib/queries/focus'
-import { SheetProvider } from '../../sheet/context'
-import { useCompiled, useTemplate } from '../../sheet/data'
-import { FieldSlot } from '../../sheet/FieldSlot'
-import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
+import { useTableOrder } from '../../lib/tableOrder'
+import { compileSafe, templateQuery } from '../../sheet/data'
+import { OperationSheet } from './OperationSheet'
+import { TableRow } from './TableRow'
+import {
+  arrange,
+  buildItem,
+  type TableItem,
+  type TableRowData,
+  type TableSort,
+} from './tableItems'
 
-// A Mesa do narrador (doc/plano-v0.md, Etapa 19; design/telas/mesa.html): uma
-// linha por personagem com os campos do dock do template, desenhados pelo
-// registry na variante `chip`. Nada aqui conhece sistema: o Vampiro mostra
-// Vitalidade, Sangue e Força de Vontade porque o template dele diz isso, e o
-// D&D mostra PV, CA e espaços de magia pelo mesmo código.
+// A Mesa do narrador (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9;
+// design/telas/mesa.html): uma linha por personagem com o dock e os alertas
+// do template. Nada aqui conhece sistema: o Vampiro mostra Vitalidade, Sangue
+// e Força de Vontade porque o template dele diz isso, e o D&D mostra PV, CA e
+// espaços de magia pelo mesmo código. Mostra as fichas em jogo; as
+// arquivadas e fora de jogo vêm pelo filtro, do servidor.
 
-export interface TableRowData {
-  readonly id: string
-  readonly name: string
-  readonly owner: { readonly id: string; readonly username: string }
-  readonly systemCode: string
-  readonly templateVersion: string
-  readonly sheetVersion: number
-  readonly updatedAt: string | Date
-  readonly sheet: unknown
-}
+export type { TableRowData } from './tableItems'
 
-/** Store só de leitura (sem fila) para desenhar o dock com o registry. */
-function useRowStore(model: SheetModel | null | undefined, row: TableRowData) {
-  return useMemo((): SheetStore | null => {
-    if (!model) return null
-    // O que vem da rede é input hostil: ficha que não valida não é desenhada
-    const parsed = parseSheet(model, row.sheet)
-    if (!parsed.ok) return null
-    return createSheetStore({
-      characterId: row.id,
-      model,
-      sheet: parsed.value,
-      sheetVersion: row.sheetVersion,
-      roles: ['storyteller'],
-    })
-  }, [model, row.id, row.sheet, row.sheetVersion])
-}
+// Fora do componente: com a mesma função, o TanStack não refaz o array
+const dataOf = (results: readonly { readonly data: unknown }[]) =>
+  results.map(r => r.data)
 
-function TableRow({ row }: { readonly row: TableRowData }) {
-  const router = useRouter()
-  const template = useTemplate(row.systemCode, row.templateVersion)
-  const model = useCompiled(template.data)
-  const store = useRowStore(model, row)
-  const state = store?.getState()
-  const identity = state ? identityOf(state.resolved) : null
-  const dock = model?.template.dock ?? []
-  const meta = `${row.owner.username} · alterada ${whenLabel(row.updatedAt)}`
-  const status =
-    model === null
-      ? 'Atualize o app para ver esta ficha.'
-      : template.isError
-        ? messageOf(template.error)
-        : model && !store
-          ? 'Ficha com dados inválidos.'
-          : null
-  // O nome acessível da linha diz o que os chips mostram (a linha é um alvo só)
-  const described = state
-    ? dock
-        .map(id => {
-          const entry = state.entries.get(id)
-          return entry ? describe(entry.resolved, entry.sheet) : null
-        })
-        .filter(Boolean)
-    : []
-  const label = [
-    [row.name, identity?.chip].filter(Boolean).join(', '),
-    ...described,
-    status,
-    meta,
-  ]
-    .filter(Boolean)
-    .join('. ')
-
-  return (
-    <ThemeProvider accent={identity?.accent ?? 'accent-neutral'}>
-      <RowBody
-        label={label}
-        onPress={() => router.push(`/characters/${row.id}`)}
-      >
-        <Avatar name={row.name} emblem={model?.template.identity.emblem} />
-        <View style={styles.text}>
-          <Text variant="fieldLabel" numberOfLines={2}>
-            {row.name}
-          </Text>
-          {identity?.chip ? (
-            <Text variant="caption" color="accent">
-              {identity.chip}
-            </Text>
-          ) : null}
-          <Text variant="caption" color="inkMuted">
-            {meta}
-          </Text>
-          {status ? (
-            <Text variant="caption" color="inkMuted">
-              {status}
-            </Text>
-          ) : null}
-          {store ? (
-            <SheetProvider store={store}>
-              <View style={styles.chips}>
-                {dock.map(id => (
-                  <FieldSlot key={id} id={id} variant="chip" />
-                ))}
-              </View>
-            </SheetProvider>
-          ) : template.isPending ? (
-            <Skeleton lines={1} label="Carregando o dock" />
-          ) : null}
-        </View>
-      </RowBody>
-    </ThemeProvider>
+/** Os modelos das versões de template das linhas, carregados de uma vez. */
+function useModels(rows: readonly TableRowData[]) {
+  const keys = useMemo(
+    () => [
+      ...new Map(
+        rows.map(r => [
+          `${r.systemCode}@${r.templateVersion}`,
+          [r.systemCode, r.templateVersion] as const,
+        ])
+      ).values(),
+    ],
+    [rows]
   )
+  // `combine` devolve o mesmo array enquanto nenhum template muda
+  const data = useQueries({
+    queries: keys.map(([code, version]) => templateQuery(code, version)),
+    combine: dataOf,
+  })
+  // O mapa só muda quando um template chega: as linhas continuam iguais
+  return useMemo(() => {
+    const out = new Map<string, SheetModel | null | undefined>()
+    keys.forEach(([code, version], i) => {
+      out.set(`${code}@${version}`, compileSafe(data[i]))
+    })
+    return out
+  }, [keys, data])
 }
 
-function RowBody({
-  label,
-  onPress,
-  children,
-}: {
-  readonly label: string
-  readonly onPress: () => void
-  readonly children: React.ReactNode
-}) {
-  const { colors } = useTheme()
+/** Os itens da Mesa, reaproveitando o de cada linha que não mudou. */
+function useItems(rows: readonly TableRowData[]): TableItem[] {
+  const models = useModels(rows)
+  const cache = useRef(new Map<string, TableItem>())
+  return useMemo(() => {
+    const next = new Map<string, TableItem>()
+    const items = rows.map(row => {
+      const model = models.get(`${row.systemCode}@${row.templateVersion}`)
+      const old = cache.current.get(row.id)
+      const item =
+        old && old.row === row && old.model === model
+          ? old
+          : buildItem(row, model)
+      next.set(row.id, item)
+      return item
+    })
+    cache.current = next
+    return items
+  }, [rows, models])
+}
+
+/** "Atualizado agora", "há 2 min": o relógio anda sozinho a cada 30 s. */
+function UpdatedAt({ at }: { readonly at: number }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [at])
+  if (!at) return null
+  const minutes = Math.floor((now - at) / 60_000)
+  const text =
+    minutes < 1
+      ? 'Atualizado agora'
+      : minutes < 60
+        ? `Atualizado há ${minutes} min`
+        : `Atualizado às ${hhmm(new Date(at))}`
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint="Abre a ficha em leitura"
-      onPress={onPress}
-      style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
-    >
-      {children}
-    </Pressable>
+    <Text variant="caption" color="inkMuted" testID="table-updated">
+      {text}
+    </Text>
   )
 }
 
 export function TableView({ chronicleId }: { readonly chronicleId: string }) {
-  const table = useChronicleTable(chronicleId, true)
+  const router = useRouter()
+  const remember = useTableOrder(s => s.remember)
+  const [scope, setScope] = useState<TableScope>('playing')
+  const [sort, setSort] = useState<TableSort>('name')
+  const [onlyAlerts, setOnlyAlerts] = useState(false)
+  const online = useOnline()
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [operation, setOperation] = useState<{
+    kind: 'damage' | 'heal' | 'recovery'
+    recovery?: TemplateRecovery
+    items: readonly TableItem[]
+  } | null>(null)
+  const select = useCallback(
+    (id: string) =>
+      setSelected(old => {
+        const next = new Set(old)
+        if (next.has(id)) next.delete(id)
+        else if (next.size < 20) next.add(id)
+        return next
+      }),
+    []
+  )
+  const table = useChronicleTable(chronicleId, true, scope)
   useRefetchOnFocus(() => table.refetch({ cancelRefetch: false }))
+  const rows = (table.data ?? []) as TableRowData[]
+  const items = useItems(rows)
+  const chosen = useMemo(
+    () => items.filter(i => selected.has(i.row.id)),
+    [items, selected]
+  )
+  const shown = useMemo(
+    () => arrange(items, { sort, onlyAlerts }),
+    [items, sort, onlyAlerts]
+  )
+  // A ordem da tela, lida ao abrir: o callback não muda com o filtro, e as
+  // linhas não redesenham por causa dele
+  const order = useRef<readonly string[]>([])
+  order.current = shown.map(i => i.row.id)
+  const open = useCallback(
+    (id: string) => {
+      remember(chronicleId, order.current)
+      router.push(`/characters/${id}`)
+    },
+    [chronicleId, remember, router]
+  )
+
   return (
     <View>
-      <Text color="inkMuted" style={styles.hint}>
-        Cada linha mostra os recursos do dock do sistema. Toque para abrir a
-        ficha em leitura; editar como narrador fica assinado no histórico.
-      </Text>
+      <View style={styles.controls}>
+        <Tabs
+          size="sm"
+          accessibilityLabel="Fichas da Mesa"
+          items={[
+            { id: 'playing', label: 'Em jogo' },
+            { id: 'out', label: 'Arquivadas e fora de jogo' },
+          ]}
+          selected={scope}
+          onSelect={id => {
+            setScope(id as TableScope)
+            setSelected(new Set())
+          }}
+        />
+        <View style={styles.chips}>
+          <Chip
+            label="Nome"
+            selected={sort === 'name'}
+            accessibilityLabel="Ordenar por nome"
+            onPress={() => setSort('name')}
+          />
+          <Chip
+            label="Última alteração"
+            selected={sort === 'updated'}
+            accessibilityLabel="Ordenar pela última alteração"
+            onPress={() => setSort('updated')}
+          />
+          <Chip
+            label="Só com alerta"
+            selected={onlyAlerts}
+            onPress={() => setOnlyAlerts(v => !v)}
+          />
+        </View>
+        <UpdatedAt at={table.dataUpdatedAt} />
+        <Button
+          title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
+          variant="secondary"
+          onPress={() => {
+            setSelecting(v => !v)
+            setSelected(new Set())
+          }}
+        />
+        {selecting ? (
+          <View style={styles.hint}>
+            <Text>{chosen.length} de 20 selecionados</Text>
+            <View style={styles.chips}>
+              <Button
+                title="Aplicar dano"
+                disabled={!online || !chosen.length}
+                onPress={() => setOperation({ kind: 'damage', items: chosen })}
+              />
+              <Button
+                title="Curar"
+                variant="secondary"
+                disabled={!online || !chosen.length}
+                onPress={() => setOperation({ kind: 'heal', items: chosen })}
+              />
+              {(chosen[0]?.model?.template.recoveries ?? [])
+                .filter(r =>
+                  chosen.every(i =>
+                    i.model?.template.recoveries?.some(
+                      other => other.id === r.id
+                    )
+                  )
+                )
+                .map(recovery => (
+                  <Button
+                    key={recovery.id}
+                    title={recovery.label}
+                    variant="secondary"
+                    disabled={!online}
+                    onPress={() =>
+                      setOperation({
+                        kind: 'recovery',
+                        recovery,
+                        items: chosen,
+                      })
+                    }
+                  />
+                ))}
+            </View>
+            {!online ? (
+              <Text color="inkMuted">
+                Conecte-se para aplicar uma operação em grupo.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
       {table.isPending ? (
         <Skeleton lines={3} label="Carregando a mesa" />
       ) : table.isError ? (
@@ -180,31 +260,46 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             onPress={() => table.refetch()}
           />
         </View>
-      ) : table.data.length === 0 ? (
+      ) : shown.length === 0 ? (
         <Text color="inkMuted" style={styles.hint}>
-          Nenhuma ficha na crônica ainda.
+          {onlyAlerts && rows.length
+            ? 'Ninguém com alerta agora.'
+            : scope === 'out'
+              ? 'Nenhuma ficha arquivada ou fora de jogo.'
+              : 'Nenhuma ficha na crônica ainda.'}
         </Text>
       ) : (
-        table.data.map(row => (
-          <TableRow key={row.id} row={row as TableRowData} />
+        shown.map(item => (
+          <TableRow
+            key={item.row.id}
+            item={item}
+            onOpen={open}
+            selecting={selecting}
+            selected={selected.has(item.row.id)}
+            onSelect={select}
+          />
         ))
       )}
+      {operation ? (
+        <OperationSheet
+          chronicleId={chronicleId}
+          items={operation.items}
+          kind={operation.kind}
+          recovery={operation.recovery}
+          onClose={() => setOperation(null)}
+        />
+      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: tokens.space[3],
-    minHeight: tokens.size.rowMin + 16,
-    paddingVertical: tokens.space[3],
+  controls: {
+    gap: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
-    borderBottomWidth: tokens.borderWidth.hair,
+    paddingVertical: tokens.space[2],
   },
-  text: { flex: 1, gap: tokens.space[1] },
-  chips: { gap: tokens.space[1], marginTop: tokens.space[1] },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
   hint: {
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[2],

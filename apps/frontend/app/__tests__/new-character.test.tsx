@@ -159,12 +159,14 @@ describe('Fichas na crônica', () => {
       ])
     )
     renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('header', { name: 'Suas fichas' })
+    ).toBeTruthy()
     const mine = await screen.findByRole('button', {
       name: 'Helena Varga, Arquivista · 8ª geração, Tremere · Sua ficha',
     })
-    expect(
-      screen.getByRole('button', { name: /^Caio, .*de beto$/ })
-    ).toBeTruthy()
+    // A API não manda a ficha de outro jogador; se mandasse, o app não mostra
+    expect(screen.queryByRole('button', { name: /^Caio, / })).toBeNull()
     fireEvent.press(mine)
     expect(router.push).toHaveBeenCalledWith('/characters/ch1')
     fireEvent.press(screen.getByRole('button', { name: 'Nova ficha' }))
@@ -177,7 +179,9 @@ describe('Fichas na crônica', () => {
     calls.chronicle.charactersGet.mockResolvedValueOnce(ok([]))
     const session = await signedIn()
     const first = renderWithSession(<ChronicleScreen />, session)
-    expect(await screen.findByText('Nenhuma ficha ainda.')).toBeTruthy()
+    expect(
+      await screen.findByText('Você ainda não tem ficha nesta crônica.')
+    ).toBeTruthy()
     first.unmount()
     calls.chronicle.charactersGet.mockResolvedValue(fail(500, 'erro interno'))
     renderWithSession(<ChronicleScreen />, session)

@@ -81,7 +81,7 @@ describe('POST /chronicles/:id/characters', () => {
       user_id: owner.id,
       chronicle_id: chronicleId,
       name: 'Helena Varga',
-      template_version: '1.3.0',
+      template_version: '1.5.0',
       sheet_version: 0,
     })
     expect(row.sheet_data).toEqual({
@@ -92,7 +92,7 @@ describe('POST /chronicles/:id/characters', () => {
 
   it('o sistema e a versão vêm da crônica, nunca do cliente', async () => {
     const t = template('vtm-v20')
-    t.templateVersion = '1.3.0'
+    t.templateVersion = '1.5.0'
     await publishTemplate(ctx.db, t)
     const res = await create({ name: 'Nova', systemCode: 'dnd5e-2014' })
     expect(res.status).toBe(422)
@@ -103,7 +103,7 @@ describe('POST /chronicles/:id/characters', () => {
       .select('template_version')
       .where('id', '=', id)
       .executeTakeFirstOrThrow()
-    expect(row.template_version).toBe('1.3.0')
+    expect(row.template_version).toBe('1.5.0')
   })
 
   it.each([
@@ -194,29 +194,33 @@ describe('GET /characters/:id', () => {
     expect(body).toMatchObject({
       name: 'Helena Varga',
       systemCode: 'vtm-v20',
-      templateVersion: '1.3.0',
+      templateVersion: '1.5.0',
       sheetVersion: 0,
       chronicle: { id: chronicleId, name: 'Crônica da Liberdade' },
       owner: { id: owner.id, username: 'dona' },
     })
   })
 
-  it.each(['dona', 'outro'])(
-    '%s nunca recebe as Notas do Narrador',
-    async who => {
-      const user = who === 'dona' ? owner : player
-      const res = await as(ctx, user, 'GET', `/characters/${id}`)
-      const text = await res.text()
-      expect(text).not.toContain('Regente vai cobrar')
-      const body = JSON.parse(text) as CharacterResponse
-      expect(Object.hasOwn(body.sheet.values, 'storytellerNotes')).toBe(false)
-      expect(Object.hasOwn(body.sheet.specialties, 'storytellerNotes')).toBe(
-        false
-      )
-      expect(body.sheet.specialties.strength).toBe('Arrombar')
-      expect(body.roles).toEqual([who === 'dona' ? 'owner' : 'player'])
-    }
-  )
+  it('a dona nunca recebe as Notas do Narrador', async () => {
+    const res = await as(ctx, owner, 'GET', `/characters/${id}`)
+    const text = await res.text()
+    expect(text).not.toContain('Regente vai cobrar')
+    const body = JSON.parse(text) as CharacterResponse
+    expect(Object.hasOwn(body.sheet.values, 'storytellerNotes')).toBe(false)
+    expect(Object.hasOwn(body.sheet.specialties, 'storytellerNotes')).toBe(
+      false
+    )
+    expect(body.sheet.specialties.strength).toBe('Arrombar')
+    expect(body.roles).toEqual(['owner'])
+  })
+
+  it('o outro jogador não recebe a ficha: 404, sem nenhum valor dela', async () => {
+    const res = await as(ctx, player, 'GET', `/characters/${id}`)
+    expect(res.status).toBe(404)
+    const text = await res.text()
+    for (const secret of ['Regente vai cobrar', 'Arrombar', 'Helena'])
+      expect(text).not.toContain(secret)
+  })
 
   it('o narrador dono da própria ficha tem os dois papéis', async () => {
     const own = await createCharacter(ctx, storyteller, chronicleId, {
@@ -240,29 +244,62 @@ describe('GET /chronicles/:id/characters', () => {
       storytellerNotes: 'segredo do narrador',
     })
     await createCharacter(ctx, player, chronicleId, { name: 'Caio' })
+    type Item = {
+      name: string
+      mine: boolean
+      owner: { username: string }
+      values: Record<string, unknown>
+    }
     const res = await as(
       ctx,
-      player,
+      owner,
       'GET',
       `/chronicles/${chronicleId}/characters`
     )
     const text = await res.text()
     expect(text).not.toContain('segredo do narrador')
     expect(text).not.toContain('nota da jogadora')
-    const list = JSON.parse(text) as {
-      name: string
-      mine: boolean
-      owner: { username: string }
-      values: Record<string, unknown>
-    }[]
+    const list = JSON.parse(text) as Item[]
     expect(list.map(c => [c.name, c.mine, c.owner.username])).toEqual([
-      ['Helena Varga', false, 'dona'],
-      ['Caio', true, 'outro'],
+      ['Helena Varga', true, 'dona'],
     ])
     expect(Object.keys(list[0]?.values ?? {}).sort()).toEqual(
       // Os Antecedentes vão junto: a Geração (no resumo) deriva deles
       ['backgrounds', 'blood', 'clan', 'concept', 'name'].sort()
     )
+    // O outro jogador recebe só a dele: nada da ficha da dona no corpo
+    const other = await as(
+      ctx,
+      player,
+      'GET',
+      `/chronicles/${chronicleId}/characters`
+    )
+    const otherText = await other.text()
+    expect(otherText).not.toContain('Helena')
+    expect((JSON.parse(otherText) as Item[]).map(c => c.name)).toEqual(['Caio'])
+    // O narrador, todas
+    const all = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/characters`)
+    ).json()) as Item[]
+    expect(all.map(c => [c.name, c.mine])).toEqual([
+      ['Helena Varga', false],
+      ['Caio', false],
+    ])
+  })
+
+  it('a contagem de fichas da crônica conta só o que quem pergunta vê', async () => {
+    await createCharacter(ctx, owner, chronicleId, { name: 'Uma' })
+    await createCharacter(ctx, owner, chronicleId, { name: 'Duas' })
+    await createCharacter(ctx, player, chronicleId, { name: 'Caio' })
+    const count = async (user: typeof owner) =>
+      (
+        (await (await as(ctx, user, 'GET', '/chronicles')).json()) as {
+          characterCount: number
+        }[]
+      )[0]?.characterCount
+    expect(await count(owner)).toBe(2)
+    expect(await count(player)).toBe(1)
+    expect(await count(storyteller)).toBe(3)
   })
 
   it('ficha excluída some da lista e da contagem da crônica', async () => {
@@ -291,7 +328,7 @@ describe('GET /systems/:code/template', () => {
   it('a versão mais recente, com ETag e revalidação', async () => {
     const res = await as(ctx, player, 'GET', '/systems/vtm-v20/template')
     expect(res.status).toBe(200)
-    expect(res.headers.get('etag')).toBe('"vtm-v20@1.3.0"')
+    expect(res.headers.get('etag')).toBe('"vtm-v20@1.5.0"')
     expect(res.headers.get('cache-control')).toBe('private, no-cache')
     expect(((await res.json()) as { system: string }).system).toBe('vtm-v20')
   })
@@ -301,12 +338,12 @@ describe('GET /systems/:code/template', () => {
       ctx,
       player,
       'GET',
-      '/systems/vtm-v20/template?version=1.3.0'
+      '/systems/vtm-v20/template?version=1.5.0'
     )
     expect(res.headers.get('cache-control')).toContain('immutable')
     const again = await ctx.app.handle(
-      new Request('http://localhost/systems/vtm-v20/template?version=1.3.0', {
-        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.3.0"' },
+      new Request('http://localhost/systems/vtm-v20/template?version=1.5.0', {
+        headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.5.0"' },
       })
     )
     expect(again.status).toBe(304)

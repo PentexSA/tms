@@ -375,10 +375,21 @@ describe('as regras da rolagem', () => {
       kind: 'cost',
       reason: 'Força de Vontade insuficiente',
     })
+    // A FdV numa seção que o dono lê e não escreve
+    const t = structuredClone(templates['vtm-v20']) as {
+      sections: { id: string; permissions?: unknown }[]
+      templateVersion: string
+    }
+    t.templateVersion = '9.9.5'
+    const play = t.sections.find(s => s.id === 'play')
+    if (play) play.permissions = { write: ['storyteller'] }
     expect(
-      planPool(vtm, helena(), { ...dexAthletics, boosts: ['willpower'] }, [
-        'player',
-      ])
+      planPool(
+        compileTemplate(t),
+        helena(),
+        { ...dexAthletics, boosts: ['willpower'] },
+        ['owner']
+      )
     ).toMatchObject({ ok: false, kind: 'cost' })
   })
 

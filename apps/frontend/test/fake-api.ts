@@ -15,9 +15,14 @@ export function createFakeApi() {
     charactersGet: jest.fn(),
     charactersPost: jest.fn(),
     tableGet: jest.fn(),
+    operationPreview: jest.fn(),
+    operationPost: jest.fn(),
     invitesGet: jest.fn(),
     invitesPost: jest.fn(),
     invitesDelete: jest.fn(),
+    // Membros (v3, Etapa 7): remover e sair
+    memberDelete: jest.fn(),
+    leaveDelete: jest.fn(),
   }
   const calls = {
     characterGet: jest.fn(),
@@ -25,6 +30,11 @@ export function createFakeApi() {
     historyGet: jest.fn(),
     rollsPost: jest.fn(),
     rollsGet: jest.fn(),
+    // Ações do narrador (v3, Etapa 6)
+    completePost: jest.fn(),
+    statusPost: jest.fn(),
+    lockPost: jest.fn(),
+    lockDelete: jest.fn(),
     templateGet: jest.fn(),
     systemsGet: jest.fn(),
     chroniclesGet: jest.fn(),
@@ -51,6 +61,14 @@ export function createFakeApi() {
         post: (...a: unknown[]) => calls.rollsPost(id, ...a),
         get: (...a: unknown[]) => calls.rollsGet(id, ...a),
       },
+      creation: {
+        complete: { post: (...a: unknown[]) => calls.completePost(id, ...a) },
+      },
+      status: { post: (...a: unknown[]) => calls.statusPost(id, ...a) },
+      lock: {
+        post: (...a: unknown[]) => calls.lockPost(id, ...a),
+        delete: (...a: unknown[]) => calls.lockDelete(id, ...a),
+      },
     }),
     chronicles: Object.assign(
       ({ id }: { id: string }) => {
@@ -63,6 +81,18 @@ export function createFakeApi() {
             post: (...a: unknown[]) => chronicle.charactersPost(...a),
           },
           table: { get: (...a: unknown[]) => chronicle.tableGet(...a) },
+          operations: {
+            preview: {
+              post: (...a: unknown[]) => chronicle.operationPreview(...a),
+            },
+            post: (...a: unknown[]) => chronicle.operationPost(...a),
+          },
+          members: Object.assign(
+            ({ userId }: { userId: string }) => ({
+              delete: (...a: unknown[]) => chronicle.memberDelete(userId, ...a),
+            }),
+            { me: { delete: (...a: unknown[]) => chronicle.leaveDelete(...a) } }
+          ),
           invites: Object.assign(
             ({ inviteId }: { inviteId: string }) => ({
               delete: () => chronicle.invitesDelete(inviteId),

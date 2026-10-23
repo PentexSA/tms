@@ -4,7 +4,7 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.2.0",
+  "templateVersion": "1.4.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
@@ -184,6 +184,7 @@
       "shortLabel": "Apa",
       "min": 0,
       "max": 5,
+      "default": 1,
       "specialty": true
     },
     "perception": {
@@ -920,6 +921,12 @@
     }
   ],
   "zoneLabels": { "powers": "Vantagens" },
+  "statusLabels": { "dead": "Morto" },
+  "alerts": [
+    { "id": "incapacitated", "label": "Incapacitado", "rule": "track-at-level", "field": "health", "level": 7 },
+    { "id": "noWillpower", "label": "Força de Vontade zerada", "rule": "resource-at-most", "field": "willpower", "value": 0 },
+    { "id": "noRage", "label": "Sem Fúria", "rule": "resource-at-most", "field": "rage", "value": 0 }
+  ],
   "dock": ["health", "rage", "form"],
   "roll": {
     "model": "pool-success",
@@ -972,6 +979,35 @@
       "effect": "health.heal",
       "params": { "field": "health", "types": ["bashing", "lethal"] },
       "help": "Cura 1 nível contusivo ou letal, letal primeiro. O agravado fica."
+    }
+  ],
+  "recoveries": [
+    {
+      "id": "newDay",
+      "label": "Novo dia",
+      "help": "Recupera 1 ponto de Força de Vontade ao acordar, até o limite permanente.",
+      "effects": [
+        {
+          "effect": "resource.gain",
+          "params": {
+            "field": "willpower",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "storyEnd",
+      "label": "Fim da história",
+      "help": "Restaura a Força de Vontade temporária até o permanente ao concluir uma história, se o narrador adotar a recuperação completa. Fúria e Gnose dependem de outras condições.",
+      "effects": [
+        {
+          "effect": "resource.restore",
+          "params": {
+            "field": "willpower"
+          }
+        }
+      ]
     }
   ]
 }

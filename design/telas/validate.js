@@ -19,8 +19,9 @@ const REGISTRY = {
   trackRules: ['wod-stacking', 'boxes'],
   resourceRules: ['tempFirst'],
   clockRules: ['mage-quint-paradox'],
+  alertRules: ['track-at-level', 'resource-at-most', 'resource-below-share'],
   atZero: ['deathSaves'],
-  effects: ['health.heal', 'resource.spend', 'resource.gain', 'rest.long', 'rest.short'],
+  effects: ['health.heal', 'resource.spend', 'resource.gain', 'resource.restore', 'rest.long', 'rest.short'],
   rollModels: ['pool-success', 'sum-vs-target', 'roll-under-percent', 'fudge', 'pbta-2d6'],
   dice: [2, 3, 4, 6, 8, 10, 12, 20, 100],
   diceNotation: ['1d20', '2d6', '1d100', '4dF'],
@@ -31,7 +32,7 @@ const REGISTRY = {
   layouts: ['grid', 'groups', 'list', 'pyramid', 'fields', 'facts', 'text'],
   filterRules: ['invested', 'proficient', 'aboveBase'],
   modes: ['play', 'edit'],
-  roles: ['owner', 'storyteller', 'player'],
+  roles: ['owner', 'storyteller'],
   defaultActions: ['spend1', 'gain1', 'damage1', 'use1'],
   modifierOps: ['add', 'set'],
   conditionRoll: ['advantage', 'disadvantage'],
@@ -44,7 +45,8 @@ const REGISTRY = {
 // Chaves permitidas (allowlist). Chave desconhecida é erro: impede atributos como "onclick"
 // ou campos que o renderizador ignoraria e algum código futuro poderia interpretar.
 const KEYS = {
-  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'dock', 'roll', 'actions'],
+  template: ['schema', 'system', 'name', 'family', 'edition', 'templateVersion', 'locale', 'skin', 'license', 'identity', 'accent', 'fields', 'markStates', 'ladders', 'sections', 'zoneLabels', 'statusLabels', 'alerts',
+    'recoveries', 'dock', 'roll', 'actions'],
   fieldCommon: ['type', 'label', 'shortLabel', 'help', 'editableIn', 'specialty', 'sublabel', 'badge', 'readOnly', 'derive', 'from'],
   field: {
     rating: ['min', 'max', 'default', 'cap', 'valueLabels'],
@@ -67,6 +69,12 @@ const KEYS = {
 }
 
 const ID = /^[a-zA-Z][a-zA-Z0-9-]*$/
+// O tipo de campo e o parâmetro de cada regra de alerta (REGISTRY.alertRules)
+const ALERT_PARAMS = {
+  'track-at-level': { type: 'track', key: 'level' },
+  'resource-at-most': { type: 'resource', key: 'value' },
+  'resource-below-share': { type: 'resource', key: 'share' },
+}
 const NUM_LIMIT = 1_000_000
 
 // Texto puro: sem < > (nunca HTML), sem controles C0/C1 (exceto tab e quebras), sem DEL,
@@ -360,6 +368,38 @@ function validateTemplate(t, palette) {
     for (const [z, label] of Object.entries(isObj(t.zoneLabels) ? t.zoneLabels : {})) text(`zoneLabels.${z}`, label, 14)
   }
 
+  // Estados da ficha (doc/painel-narrador.md §5.1): o template só nomeia o `dead` ("Torpor").
+  if (t.statusLabels != null) {
+    keys('statusLabels', t.statusLabels, ['dead'])
+    for (const [s, label] of Object.entries(isObj(t.statusLabels) ? t.statusLabels : {})) text(`statusLabels.${s}`, label, 20)
+  }
+
+  // Alertas da Mesa (doc/plano-v3.md, Etapa 8): regra da lista fechada, o tipo do campo que
+  // ela lê e só o parâmetro dela, nunca expressão.
+  const alertIds = new Set()
+  const alerts = Array.isArray(t.alerts) ? t.alerts : []
+  if (alerts.length > 10) err('alerts', 'no máximo 10 alertas')
+  for (const a of alerts) {
+    const p = `alerts.${a.id}`
+    keys(p, a, ['id', 'label', 'rule', 'field', 'level', 'value', 'share'])
+    if (typeof a.id !== 'string' || !ID.test(a.id) || alertIds.has(a.id)) err(`${p}.id`, 'id inválido ou repetido')
+    alertIds.add(a.id)
+    text(`${p}.label`, a.label, 40)
+    oneOf(`${p}.rule`, a.rule, REGISTRY.alertRules, 'regra de alerta')
+    const f = has(a.field) ? fields[a.field] : undefined
+    if (!f) err(`${p}.field`, `campo '${a.field}' não existe`)
+    const param = ALERT_PARAMS[a.rule]
+    if (!param) continue
+    if (f && f.type !== param.type) err(`${p}.field`, `a regra '${a.rule}' lê um campo ${param.type}`)
+    for (const k of ['level', 'value', 'share']) if (k !== param.key && a[k] !== undefined) err(`${p}.${k}`, 'parâmetro de outra regra')
+    if (param.key === 'level') {
+      const total = f?.rule === 'boxes' ? (f.rows ?? []).reduce((n, r) => n + (Number(r?.boxes) || 0), 0) : (f?.levels ?? []).length
+      if (!Number.isInteger(a.level) || a.level < 1 || a.level > Math.max(total, 1)) err(`${p}.level`, `precisa ser inteiro entre 1 e ${Math.max(total, 1)}`)
+    }
+    if (param.key === 'value' && (!Number.isInteger(a.value) || a.value < 0 || a.value > NUM_LIMIT)) err(`${p}.value`, `precisa ser inteiro entre 0 e ${NUM_LIMIT}`)
+    if (param.key === 'share' && !(typeof a.share === 'number' && a.share > 0 && a.share < 1)) err(`${p}.share`, 'precisa ser um número entre 0 e 1')
+  }
+
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não pode vir
   // de seção com leitura restrita: senão vazaria para quem não pode ler a seção.
   const id = t.identity ?? {}
@@ -442,6 +482,45 @@ function validateTemplate(t, palette) {
     for (const ty of a.params.types ?? []) if (!track.types.some(x => x.id === ty)) err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
   }
   for (const a of t.actions ?? []) checkHeal(`actions.${a.id}`, a)
+  if (t.recoveries !== undefined) {
+    if (!Array.isArray(t.recoveries) || !t.recoveries.length || t.recoveries.length > 12) err('recoveries', 'de 1 a 12 períodos')
+    else {
+      const ids = new Set()
+      for (const [i, recovery] of t.recoveries.entries()) {
+        const p = `recoveries.${i}`
+        if (!isObj(recovery)) { err(p, 'precisa ser objeto'); continue }
+        keys(p, recovery, ['id', 'label', 'help', 'effects'])
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(recovery.id ?? '') || ['constructor', 'prototype', '__proto__'].includes(recovery.id) || ids.has(recovery.id)) err(`${p}.id`, 'id inválido ou repetido')
+        ids.add(recovery.id)
+        text(`${p}.label`, recovery.label)
+        text(`${p}.help`, recovery.help, 1000)
+        if (!Array.isArray(recovery.effects) || !recovery.effects.length || recovery.effects.length > 20) { err(`${p}.effects`, 'de 1 a 20 efeitos'); continue }
+        for (const [j, e] of recovery.effects.entries()) {
+          const ep = `${p}.effects.${j}`
+          if (!isObj(e)) { err(ep, 'precisa ser objeto'); continue }
+          keys(ep, e, ['effect', 'params'])
+          oneOf(`${ep}.effect`, e.effect, REGISTRY.effects, 'effect')
+          if (['rest.long', 'rest.short'].includes(e.effect)) {
+            if (e.params !== undefined) err(`${ep}.params`, 'efeito sem parâmetros')
+            continue
+          }
+          const restore = e.effect === 'resource.restore'
+          const health = e.effect === 'health.heal'
+          if (!isObj(e.params)) { err(`${ep}.params`, 'precisa ser objeto'); continue }
+          keys(`${ep}.params`, e.params, health ? ['field', 'types'] : restore ? ['field'] : ['field', 'amount'])
+          if (health) {
+            checkHeal(ep, e)
+            if (!Array.isArray(e.params.types) || !e.params.types.length || e.params.types.length > 5 || new Set(e.params.types).size !== e.params.types.length) err(`${ep}.params.types`, 'de 1 a 5 tipos distintos')
+          } else {
+            const resource = fields[e.params.field]
+            if (resource?.type !== 'resource' || resource.readOnly || resource.derive) err(`${ep}.params.field`, 'precisa apontar para um resource gravável')
+            if (restore && !resource?.permanent) err(`${ep}.params.field`, 'recurso precisa ter permanente')
+            if (!restore && (!Number.isInteger(e.params.amount) || e.params.amount < 1 || e.params.amount > 99)) err(`${ep}.params.amount`, 'precisa ser inteiro entre 1 e 99')
+          }
+        }
+      }
+    }
+  }
   for (const [fid, f] of Object.entries(fields)) {
     for (const a of f.actions ?? []) checkHeal(`fields.${fid}.actions.${a.id}`, a)
     if (f.type === 'track' && f.rule === 'boxes') for (const row of f.rows ?? []) if (row.boxValues && row.boxValues.length !== row.boxes) err(`fields.${fid}.rows.${row.id}.boxValues`, 'precisa ter um valor por caixa')

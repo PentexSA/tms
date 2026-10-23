@@ -216,6 +216,14 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
   [
+    // v3: outro jogador não tem papel na ficha (doc/plano-v3.md, decisão 2)
+    'papel player, que saiu da lista',
+    t => {
+      const s = sectionsOf(t).find(x => x.permissions)
+      if (s) s.permissions = { read: ['storyteller', 'player'] }
+    },
+  ],
+  [
     'aninhamento acima de 12 níveis',
     t => {
       let deep: Json = { x: 1 }
@@ -246,6 +254,116 @@ const templateMutations: [string, (t: Json) => void][] = [
       t.zoneLabels = { build: 'x'.repeat(15) }
     },
   ],
+  // Alertas da Mesa (v3, Etapa 8): o campo de cada tipo vem do template
+  [
+    'regra de alerta fora da lista',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'expression',
+          field: firstOf(t, 'resource'),
+        },
+      ]
+    },
+  ],
+  [
+    'alerta num campo que não existe',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-at-most',
+          field: 'nope',
+          value: 0,
+        },
+      ]
+    },
+  ],
+  [
+    'track-at-level num resource',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'track-at-level',
+          field: firstOf(t, 'resource'),
+          level: 1,
+        },
+      ]
+    },
+  ],
+  [
+    'parâmetro de outra regra no alerta',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-at-most',
+          field: firstOf(t, 'resource'),
+          value: 0,
+          share: 0.5,
+        },
+      ]
+    },
+  ],
+  [
+    'nível de alerta acima da trilha',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'track-at-level',
+          field: firstOf(t, 'track'),
+          level: 99,
+        },
+      ]
+    },
+  ],
+  [
+    'fração de alerta fora de 0 a 1',
+    t => {
+      t.alerts = [
+        {
+          id: 'x',
+          label: 'X',
+          rule: 'resource-below-share',
+          field: firstOf(t, 'resource'),
+          share: 1,
+        },
+      ]
+    },
+  ],
+  [
+    'id de alerta repetido',
+    t => {
+      const alert = {
+        id: 'x',
+        label: 'X',
+        rule: 'resource-at-most',
+        field: firstOf(t, 'resource'),
+        value: 0,
+      }
+      t.alerts = [alert, { ...alert }]
+    },
+  ],
+  [
+    'rótulo de estado acima de 20 caracteres',
+    t => {
+      t.statusLabels = { dead: 'x'.repeat(21) }
+    },
+  ],
+  [
+    'rótulo de estado que não é o dead',
+    t => {
+      t.statusLabels = { archived: 'Guardada' }
+    },
+  ],
   [
     'modelo de rolagem fora da lista',
     t => {
@@ -253,6 +371,12 @@ const templateMutations: [string, (t: Json) => void][] = [
     },
   ],
 ]
+
+/** O primeiro campo do tipo no template (o alerta não cita nome de sistema). */
+function firstOf(t: Json, type: string): string {
+  const fields = t.fields as Record<string, Json>
+  return Object.keys(fields).find(id => fields[id]?.type === type) ?? 'nope'
+}
 
 const vtmOnlyMutations: [string, (t: Json) => void][] = [
   [

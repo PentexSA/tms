@@ -28,8 +28,10 @@ describe('migrations', () => {
         'character_events',
         'character_rolls',
         'characters',
+        'chronicle_audit',
         'chronicle_invites',
         'chronicle_members',
+        'chronicle_operations',
         'chronicles',
         'game_systems',
         'refresh_tokens',
@@ -204,6 +206,204 @@ describe('migrations', () => {
       expect(
         await db.selectFrom('character_rolls').select('id').execute()
       ).toEqual([])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0014: a ficha nasce em creating, o estado é uma lista fechada e o registro sobrevive a quem agiu', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = (username: string) =>
+        db
+          .insertInto('users')
+          .values({
+            username,
+            email: `${username}@x.test`,
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const storyteller = await user('narra')
+      const owner = await user('dona')
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({
+          name: 'c',
+          storyteller_id: storyteller.id,
+          system_id: system.id,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: owner.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning(['id', 'status', 'locked_at'])
+        .executeTakeFirstOrThrow()
+      expect(character).toMatchObject({ status: 'creating', locked_at: null })
+
+      // `pending` chega na v4: até lá, o banco recusa
+      await expect(
+        db
+          .updateTable('characters')
+          .set({ status: 'pending' })
+          .where('id', '=', character.id)
+          .execute()
+      ).rejects.toThrow()
+
+      await db
+        .updateTable('characters')
+        .set({
+          status: 'active',
+          creation_completed_at: new Date(),
+          creation_completed_by: storyteller.id,
+        })
+        .where('id', '=', character.id)
+        .execute()
+      await db
+        .insertInto('chronicle_audit')
+        .values({
+          chronicle_id: chronicle.id,
+          actor_id: owner.id,
+          action: 'character.delete',
+          target_character_id: character.id,
+          target_user_id: owner.id,
+        })
+        .execute()
+
+      // Quem agiu sai: a linha fica, sem autor nem alvo
+      await db.deleteFrom('users').where('id', '=', owner.id).execute()
+      expect(
+        await db
+          .selectFrom('chronicle_audit')
+          .select([
+            'actor_id',
+            'target_character_id',
+            'target_user_id',
+            'payload',
+          ])
+          .execute()
+      ).toEqual([
+        {
+          actor_id: null,
+          target_character_id: null,
+          target_user_id: null,
+          payload: {},
+        },
+      ])
+
+      // A crônica sai: o registro dela vai junto
+      await db.deleteFrom('chronicles').execute()
+      expect(
+        await db.selectFrom('chronicle_audit').select('id').execute()
+      ).toEqual([])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0015: operação idempotente por chave, reversão de um alvo só e no máximo uma vez', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'n', email: 'n@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'vtm-v20', name: 'V20' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const op = (values: {
+        client_operation_id?: string
+        kind?: string
+        reverts_operation_id?: string
+        reverts_batch_id?: string
+      }) =>
+        db
+          .insertInto('chronicle_operations')
+          .values({
+            chronicle_id: chronicle.id,
+            client_operation_id: crypto.randomUUID(),
+            kind: 'damage',
+            created_by: user.id,
+            ...values,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const damage = await op({})
+      const key = crypto.randomUUID()
+      await op({ client_operation_id: key })
+      // A mesma chave na mesma crônica não grava duas vezes
+      await expect(op({ client_operation_id: key })).rejects.toThrow()
+      await expect(op({ kind: 'explosion' })).rejects.toThrow()
+      await op({ kind: 'revert', reverts_operation_id: damage.id })
+      // Revertida uma vez só
+      await expect(
+        op({ kind: 'revert', reverts_operation_id: damage.id })
+      ).rejects.toThrow()
+      const character = await db
+        .insertInto('characters')
+        .values({
+          name: 'p',
+          chronicle_id: chronicle.id,
+          system_id: system.id,
+          user_id: user.id,
+          template_version: '1.0.0',
+          sheet_data: JSON.stringify({ values: {} }),
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const batch = await db
+        .insertInto('character_batches')
+        .values({
+          character_id: character.id,
+          client_batch_id: crypto.randomUUID(),
+          created_by: user.id,
+          by_role: 'storyteller',
+          sheet_version: 1,
+          operation_id: damage.id,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      // Uma reversão aponta para a operação ou para o lote, nunca os dois
+      await expect(
+        op({
+          kind: 'revert',
+          reverts_operation_id: damage.id,
+          reverts_batch_id: batch.id,
+        })
+      ).rejects.toThrow()
+      const event = await db
+        .insertInto('character_events')
+        .values({
+          batch_id: batch.id,
+          seq: 0,
+          path: 'values.blood',
+          from_value: JSON.stringify({ current: 10 }),
+          to_value: JSON.stringify({ current: 9 }),
+        })
+        .returning('from_absent')
+        .executeTakeFirstOrThrow()
+      expect(event.from_absent).toBe(false)
     } finally {
       await destroy()
     }

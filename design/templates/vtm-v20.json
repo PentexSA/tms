@@ -4,7 +4,7 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.3.0",
+  "templateVersion": "1.5.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
@@ -121,6 +121,7 @@
       "shortLabel": "Apa",
       "min": 0,
       "max": 5,
+      "default": 1,
       "specialty": true
     },
     "perception": {
@@ -688,6 +689,12 @@
     }
   ],
   "zoneLabels": { "powers": "Vantagens" },
+  "statusLabels": { "dead": "Torpor" },
+  "alerts": [
+    { "id": "incapacitated", "label": "Incapacitado", "rule": "track-at-level", "field": "health", "level": 7 },
+    { "id": "noWillpower", "label": "Força de Vontade zerada", "rule": "resource-at-most", "field": "willpower", "value": 0 },
+    { "id": "noBlood", "label": "Sem Sangue", "rule": "resource-at-most", "field": "blood", "value": 0 }
+  ],
   "dock": ["health", "blood", "willpower"],
   "roll": {
     "model": "pool-success",
@@ -722,6 +729,35 @@
       "effect": "resource.spend",
       "params": { "field": "blood", "amount": 1 },
       "help": "Gasta 1 ponto de Sangue para despertar. Mostra a prévia antes de aplicar."
+    }
+  ],
+  "recoveries": [
+    {
+      "id": "newNight",
+      "label": "Nova noite",
+      "help": "Desconta 1 ponto de Sangue pela nova noite. A recuperação opcional de Força de Vontade é decidida à parte pelo narrador.",
+      "effects": [
+        {
+          "effect": "resource.spend",
+          "params": {
+            "field": "blood",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "storyEnd",
+      "label": "Fim da história",
+      "help": "Restaura a Força de Vontade temporária até o permanente ao fim da história. O narrador decide se os objetivos permitem a recuperação completa.",
+      "effects": [
+        {
+          "effect": "resource.restore",
+          "params": {
+            "field": "willpower"
+          }
+        }
+      ]
     }
   ]
 }

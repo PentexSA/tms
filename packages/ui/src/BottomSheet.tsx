@@ -11,6 +11,7 @@ import { IconButton } from './IconButton'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
+import { ModalToastHost } from './Toast'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
 
@@ -78,12 +79,18 @@ export function BottomSheet({
             >
               {title}
             </Text>
-            <IconButton label="Fechar" glyph={'×'} onPress={onClose} />
+            <IconButton
+              label="Fechar"
+              glyph={'×'}
+              onPress={onClose}
+              testID="bottom-sheet-close"
+            />
           </View>
           <ScrollView keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
+          <ModalToastHost visible={visible} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

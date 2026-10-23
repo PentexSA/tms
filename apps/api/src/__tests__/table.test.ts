@@ -7,6 +7,7 @@ import {
   createChronicle,
   createUser,
   publish,
+  setStatus,
   type TestUser,
 } from '../test/factories'
 import {
@@ -30,6 +31,8 @@ interface TableRow {
   systemCode: string
   templateVersion: string
   sheetVersion: number
+  status: string
+  lockedAt: string | null
   updatedAt: string
   sheet: { values: Record<string, unknown>; specialties?: unknown }
 }
@@ -72,6 +75,8 @@ describe('GET /chronicles/:id/table', () => {
       systemCode: 'vtm-v20',
       templateVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
       sheetVersion: 0,
+      status: 'creating',
+      lockedAt: null,
       updatedAt: expect.any(String),
       sheet: {
         // O antecedente Geração entra: o máximo do Sangue no dock depende dele
@@ -111,6 +116,38 @@ describe('GET /chronicles/:id/table', () => {
     const id = await createCharacter(ctx, owner, chronicleId)
     await as(ctx, owner, 'DELETE', `/characters/${id}`)
     expect(await (await table(storyteller)).json()).toEqual([])
+  })
+
+  // v3, Etapa 9: arquivada e fora de jogo somem; o filtro as traz
+  it('mostra creating e active; ?status= traz as outras', async () => {
+    const ids: Record<string, string> = {}
+    for (const status of ['creating', 'active', 'archived', 'dead'] as const) {
+      ids[status] = await createCharacter(ctx, owner, chronicleId, {
+        name: status,
+      })
+      await setStatus(ctx, ids[status] as string, status)
+    }
+    const names = async (query = '') =>
+      (
+        (await (
+          await as(
+            ctx,
+            storyteller,
+            'GET',
+            `/chronicles/${chronicleId}/table${query}`
+          )
+        ).json()) as { name: string; status: string }[]
+      ).map(r => r.status)
+    expect(await names()).toEqual(['creating', 'active'])
+    expect(await names('?status=archived,dead')).toEqual(['archived', 'dead'])
+    expect(await names('?status=active')).toEqual(['active'])
+    const bad = await as(
+      ctx,
+      storyteller,
+      'GET',
+      `/chronicles/${chronicleId}/table?status=pending`
+    )
+    expect(bad.status).toBe(422)
   })
 
   it('jogador e dono recebem 404: para eles a Mesa não existe', async () => {

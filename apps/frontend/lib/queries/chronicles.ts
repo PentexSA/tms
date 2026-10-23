@@ -87,6 +87,39 @@ export const useDeleteChronicle = (id: string) => {
   })
 }
 
+/**
+ * Tira um jogador da crônica (só o narrador; v3, Etapa 7): as fichas dele vão
+ * para arquivadas e, por padrão, os convites ativos são revogados.
+ */
+export const useRemoveMember = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: {
+      readonly userId: string
+      readonly revokeInvites: boolean
+    }) =>
+      unwrap(
+        await api
+          .chronicles({ id })
+          .members({ userId: args.userId })
+          .delete({ revokeInvites: args.revokeInvites })
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: chronicleKeys.one(id) }),
+  })
+}
+
+/** Sair da crônica (o próprio jogador): as fichas ficam, só leitura. */
+export const useLeaveChronicle = (id: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.chronicles({ id }).members.me.delete()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
+  })
+}
+
 export const useAcceptInvite = () => {
   const queryClient = useQueryClient()
   return useMutation({
@@ -129,12 +162,30 @@ export const useCreateCharacter = (id: string) => {
  * A Mesa do narrador (Etapa 19): todas as fichas da crônica numa requisição.
  * A API responde 404 para quem não narra; a tela nem pede.
  */
-export const useChronicleTable = (id: string, enabled: boolean) =>
+/** O que a Mesa mostra: em jogo (creating e active) ou fora (archived e dead). */
+export type TableScope = 'playing' | 'out'
+
+const SCOPE_STATUS: Readonly<Record<TableScope, string>> = {
+  playing: 'creating,active',
+  out: 'archived,dead',
+}
+
+export const useChronicleTable = (
+  id: string,
+  enabled: boolean,
+  scope: TableScope = 'playing'
+) =>
   useQuery({
-    queryKey: chronicleKeys.table(id),
+    queryKey: [...chronicleKeys.table(id), scope] as const,
     enabled,
     // Sem tempo real: toda volta à Mesa rebusca
     staleTime: 0,
+    // O filtro é no servidor: a resposta não leva o que a tela esconde
     queryFn: async ({ signal }) =>
-      unwrap(await api.chronicles({ id }).table.get({ fetch: { signal } })),
+      unwrap(
+        await api.chronicles({ id }).table.get({
+          query: { status: SCOPE_STATUS[scope] },
+          fetch: { signal },
+        })
+      ),
   })

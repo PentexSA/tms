@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
 import { EditorShell } from './EditorShell'
-import { useFieldIssue, useSetDraft } from './hooks'
+import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
 
 // resource em Evoluir: o permanente (FdV do WoD), o máximo guardado (PV do
 // D&D, Sanidade inicial) e o atual. O jogo do dia a dia (gastar, recuperar)
@@ -13,6 +13,9 @@ import { useFieldIssue, useSetDraft } from './hooks'
 export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
+  // O permanente e o máximo são evolução; o atual, jogo (doc/plano-v3.md, Etapa 4)
+  const advance = useClassNote('advance')
+  const play = useClassNote('play')
   const [error, setError] = useState<string | null>(null)
   if (resolved.type !== 'resource') return null
   const r = resolved
@@ -28,6 +31,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     min: number
     max: number
     onChange: (n: number) => void
+    blocked: string | null
   }[] = []
   if (def.permanent && r.permanent !== null)
     rows.push({
@@ -43,6 +47,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
             ? { permanent: n, current: n }
             : { permanent: n }
         ),
+      blocked: advance,
     })
   const storedMax =
     def.max && typeof def.max === 'object' && 'stored' in def.max
@@ -55,6 +60,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
       max: 9999,
       onChange: n =>
         write(capped && r.current > n ? { max: n, current: n } : { max: n }),
+      blocked: advance,
     })
   rows.push({
     key: 'current',
@@ -63,10 +69,14 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     min: 0,
     max: capped ? (r.cap ?? r.shownMax ?? 9999) : 9999,
     onChange: n => write({ current: n }),
+    blocked: play,
   })
+  // A nota do que está desabilitado, uma vez só
+  const note = rows.find(row => row.blocked)?.blocked ?? null
   return (
     <EditorShell
       label={def.label}
+      sub={note}
       error={error ?? issue}
       testID={`editor-${r.id}`}
       below={
@@ -82,6 +92,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
                 min={row.min}
                 max={row.max}
                 onChange={row.onChange}
+                disabled={row.blocked !== null}
               />
             </View>
           ))}

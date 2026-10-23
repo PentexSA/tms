@@ -31,11 +31,13 @@ export interface CharacterBatches {
   created_at: Generated<Timestamp>
   created_by: string | null
   id: Generated<string>
+  operation_id: string | null
   sheet_version: number
 }
 
 export interface CharacterEvents {
   batch_id: string
+  from_absent: Generated<boolean>
   from_value: Json | null
   id: Generated<string>
   path: string
@@ -60,15 +62,30 @@ export interface CharacterRolls {
 export interface Characters {
   chronicle_id: string
   created_at: Generated<Timestamp | null>
+  creation_completed_at: Timestamp | null
+  creation_completed_by: string | null
   deleted_at: Timestamp | null
   id: Generated<string>
+  locked_at: Timestamp | null
   name: string
   sheet_data: Json
   sheet_version: Generated<number>
+  status: Generated<string>
   system_id: string
   template_version: string
   updated_at: Generated<Timestamp | null>
   user_id: string
+}
+
+export interface ChronicleAudit {
+  action: string
+  actor_id: string | null
+  chronicle_id: string
+  created_at: Generated<Timestamp>
+  id: Generated<string>
+  payload: Generated<Json>
+  target_character_id: string | null
+  target_user_id: string | null
 }
 
 export interface ChronicleInvites {
@@ -87,6 +104,17 @@ export interface ChronicleMembers {
   chronicle_id: string
   joined_at: Generated<Timestamp>
   user_id: string
+}
+
+export interface ChronicleOperations {
+  chronicle_id: string
+  client_operation_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  kind: string
+  reverts_batch_id: string | null
+  reverts_operation_id: string | null
 }
 
 export interface Chronicles {
@@ -141,8 +169,10 @@ export interface DB {
   character_events: CharacterEvents
   character_rolls: CharacterRolls
   characters: Characters
+  chronicle_audit: ChronicleAudit
   chronicle_invites: ChronicleInvites
   chronicle_members: ChronicleMembers
+  chronicle_operations: ChronicleOperations
   chronicles: Chronicles
   game_systems: GameSystems
   refresh_tokens: RefreshTokens

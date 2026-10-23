@@ -222,6 +222,16 @@ Um sistema novo é dado: nenhuma rota, migration ou dependência nova. Revisto i
 - **Cliente adulterado:** o servidor confere o id da opção e os limites da Fúria (422), não o custo da troca. A troca sem gastar Fúria é legal pelas regras (a mudança lenta), como o `wod-stacking` e a roda do Mago: um cliente adulterado só grava uma forma válida, na ficha que já pode editar.
 - **Nome de sistema no código:** `scripts/check-system-names.mjs` (CI) recusa também os ids das opções de `state` (`'crinos'`) no app, no `@tms/ui` e na API.
 
+## Revisão da v3: Mesa administrável
+
+- **Oito rotas novas:** `POST /characters/:id/creation/complete`, `POST /characters/:id/status`, `POST` e `DELETE /characters/:id/lock`, `DELETE /chronicles/:id/members/:userId`, `DELETE /chronicles/:id/members/me`, `POST /chronicles/:id/operations/preview` e `POST /chronicles/:id/operations`. A matriz `apps/api/src/__tests__/authz.test.ts` prova cada papel nos três sistemas. Remover exige narrador; sair exige o próprio membro; ações da ficha e operações exigem narrador.
+- **Ficha alheia:** outro membro recebe 404 na ficha, no histórico e nas rolagens. A lista e a contagem incluem só fichas próprias. A matriz confere o corpo, inclusive as Notas do Narrador ocultas ao dono. O teste `journey-storyteller.spec.ts` repete a leitura do outro jogador em cada fase.
+- **Ex-membro (`former`):** vê só as próprias fichas, sem lista de membros ou convites. Remoção arquiva as fichas e revoga os convites por padrão. Escrita e rolagem recebem `NOT_MEMBER`, inclusive em uma página aberta antes de remover (`members.test.ts`, `policy.test.ts` e jornada do narrador).
+- **Estado e escrita concorrentes:** estado, trava e vínculo são lidos depois do `FOR UPDATE` da ficha. A criação trava o vínculo antes de contar e criar; remoção trava vínculo e depois fichas em ordem de id. `policy.pg.test.ts` e `members.pg.test.ts` exercitam as corridas no Postgres real.
+- **Operações:** dano, cura e recuperações (`kind: recovery`) são reconstruídos no servidor a partir do template; nenhum efeito enviado pelo cliente é executado. Todas as fichas travadas em ordem de id; chave única por crônica, conferida depois das travas. Versão vencida, alvo duplicado e alvo de outra crônica recusam a operação inteira. Reversão verifica cada valor atual; texto não é reversível; lote ou operação já desfeito não é reaplicado pela reversão. `operations.test.ts` e `operations.pg.test.ts` cobrem atomicidade, idempotência, IDOR e concorrência.
+- **Registros:** `chronicle_audit` guarda ação, alvo e payload mínimo; `chronicle_operations` liga os lotes sem duplicar conteúdo. Autores excluídos ficam nulos. Não há rota de leitura consolidada da auditoria nesta versão. Texto e especializações continuam sem conteúdo no histórico.
+- **Cliente e templates:** `alerts` usa regras da lista fechada, validadas nas duas camadas; um alerta nunca revela campo sem permissão. A política do app orienta os controles; o servidor revalida cada escrita. Operações de várias fichas não entram na fila offline. `recoveries` fica na v3.1 e ainda não é aceito pelo contrato.
+
 ## Fora da v0, conhecido
 
 - Tempo real e notificações. Ver §8 do plano.

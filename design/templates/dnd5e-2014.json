@@ -457,6 +457,7 @@
       "type": "list",
       "label": "Inventário",
       "itemLabel": "Item",
+      "editableIn": ["play"],
       "searchable": true,
       "density": "compact",
       "item": {
@@ -471,6 +472,7 @@
       "type": "number",
       "label": "Peças de ouro",
       "shortLabel": "PO",
+      "editableIn": ["play"],
       "min": 0,
       "max": 999999,
       "allowInput": true
@@ -658,6 +660,10 @@
     }
   ],
   "zoneLabels": { "lore": "Itens e notas" },
+  "statusLabels": { "dead": "Morto" },
+  "alerts": [
+    { "id": "lowHp", "label": "PV abaixo da metade", "rule": "resource-below-share", "field": "hp", "share": 0.5 }
+  ],
   "dock": ["hp", "ac", "spellSlots"],
   "roll": {
     "model": "sum-vs-target",
@@ -686,6 +692,18 @@
       "label": "Descanso curto",
       "effect": "rest.short",
       "help": "Permite gastar dados de vida para recuperar PV."
+    }
+  ],
+  "recoveries": [
+    {
+      "id": "longRest",
+      "label": "Descanso longo",
+      "help": "Indisponível enquanto o efeito de descanso não estiver implementado.",
+      "effects": [
+        {
+          "effect": "rest.long"
+        }
+      ]
     }
   ]
 }

@@ -106,6 +106,20 @@
       },
       "additionalProperties": false
     },
+    "statusLabels": {
+      "description": "Opcional. Rótulo do estado 'dead' da ficha, que o narrador marca (doc/painel-narrador.md §5.1): 'Torpor', 'Morto', 'Desaparecido'. Sem ele, o app diz 'Fora de jogo'. Os outros estados têm nome fixo.",
+      "type": "object",
+      "properties": {
+        "dead": { "$ref": "#/$defs/label", "maxLength": 20 }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "description": "Opcional. Quando uma linha da Mesa merece atenção: Incapacitado, Força de Vontade zerada, PV abaixo da metade. O painel só pinta; o core calcula (alertsOf).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/alert" },
+      "maxItems": 10
+    },
     "dock": {
       "description": "De 1 a 3 campos jogáveis mostrados no dock (celular) e na mesa do narrador. O tipo precisa ser jogável (resource, track, slots, clock, state, number, list, tags, rating) e o campo não pode ser de seção com leitura restrita; validateTemplate checa.",
       "type": "array",
@@ -115,6 +129,15 @@
       "uniqueItems": true
     },
     "roll": { "$ref": "#/$defs/roll" },
+    "recoveries": {
+      "description": "Períodos aplicados pelo narrador, com prévia por ficha e Desfazer.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recovery"
+      },
+      "minItems": 1,
+      "maxItems": 12
+    },
     "actions": {
       "description": "Ações nomeadas da ficha (menu ⋯), como descanso longo ou despertar. Sempre com prévia antes de aplicar.",
       "type": "array",
@@ -248,6 +271,25 @@
       "description": "REGISTRY.clockRules",
       "enum": ["mage-quint-paradox"]
     },
+    "alertRule": {
+      "description": "REGISTRY.alertRules: quando uma linha da Mesa merece atenção. track-at-level: a trilha marcada até o nível `level`; resource-at-most: o atual de um recurso em `value` ou menos; resource-below-share: o atual abaixo da fração `share` do máximo.",
+      "enum": ["track-at-level", "resource-at-most", "resource-below-share"]
+    },
+    "alert": {
+      "description": "Um alerta da Mesa do narrador (doc/painel-narrador.md §5.3). Regra da lista fechada, nunca expressão. O tipo do campo e o parâmetro de cada regra são checados por validateTemplate.",
+      "type": "object",
+      "required": ["id", "label", "rule", "field"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/label", "maxLength": 40 },
+        "rule": { "$ref": "#/$defs/alertRule" },
+        "field": { "$ref": "#/$defs/fieldRef" },
+        "level": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "value": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "share": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 }
+      },
+      "additionalProperties": false
+    },
     "atZero": { "description": "REGISTRY.atZero", "enum": ["deathSaves"] },
     "effect": {
       "description": "REGISTRY.effects: efeitos de ações, implementados no código.",
@@ -255,6 +297,7 @@
         "health.heal",
         "resource.spend",
         "resource.gain",
+        "resource.restore",
         "rest.long",
         "rest.short"
       ]
@@ -306,8 +349,8 @@
       "enum": ["play", "edit"]
     },
     "role": {
-      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica; player = outro jogador da crônica.",
-      "enum": ["owner", "storyteller", "player"]
+      "description": "REGISTRY.roles: owner = dono da ficha; storyteller = narrador da crônica. Outro jogador da crônica não tem papel na ficha (não lê nem escreve).",
+      "enum": ["owner", "storyteller"]
     },
     "defaultAction": {
       "description": "REGISTRY.defaultActions: ação do toque longo no dock.",
@@ -427,7 +470,7 @@
         },
         "help": { "$ref": "#/$defs/helpText" },
         "editableIn": {
-          "description": "Modos em que o campo pode ser alterado. Padrão: text/longText em play e edit; demais só em edit (Evoluir). Recursos de jogo declaram [play]. É UX, não controle de acesso: o servidor valida cada escrita.",
+          "description": "Modos em que o campo pode ser alterado. Padrão: text/longText em play e edit; demais só em edit (Evoluir). Recursos de jogo declaram [play]. O modo é UX (o servidor valida cada escrita), mas o editableIn também classifica a mudança: em rating, number, percent, mark, tags e list, o que tem [play] é jogo; sem ele, evolução (README §3).",
           "type": "array",
           "items": { "$ref": "#/$defs/mode" },
           "minItems": 1,
@@ -1933,46 +1976,130 @@
       "minProperties": 1
     },
     "effectParamsRules": {
-      "description": "Parâmetros exigidos por efeito: resource.spend e resource.gain pedem field e amount; health.heal pede field e types; rest.long e rest.short não têm parâmetros.",
+      "description": "Parâmetros exigidos por efeito: resource.spend e resource.gain pedem field e amount; health.heal pede field e types; rest.long e rest.short não têm parâmetros. resource.restore exige apenas field, um recurso com permanente.",
       "allOf": [
         {
           "if": {
             "properties": {
-              "effect": { "enum": ["resource.spend", "resource.gain"] }
+              "effect": {
+                "enum": [
+                  "resource.spend",
+                  "resource.gain"
+                ]
+              }
             },
-            "required": ["effect"]
+            "required": [
+              "effect"
+            ]
           },
           "then": {
-            "required": ["params"],
+            "required": [
+              "params"
+            ],
             "properties": {
               "params": {
-                "required": ["field", "amount"],
-                "not": { "required": ["types"] }
+                "required": [
+                  "field",
+                  "amount"
+                ],
+                "not": {
+                  "required": [
+                    "types"
+                  ]
+                }
               }
             }
           }
         },
         {
           "if": {
-            "properties": { "effect": { "const": "health.heal" } },
-            "required": ["effect"]
+            "properties": {
+              "effect": {
+                "const": "health.heal"
+              }
+            },
+            "required": [
+              "effect"
+            ]
           },
           "then": {
-            "required": ["params"],
+            "required": [
+              "params"
+            ],
             "properties": {
               "params": {
-                "required": ["field", "types"],
-                "not": { "required": ["amount"] }
+                "required": [
+                  "field",
+                  "types"
+                ],
+                "not": {
+                  "required": [
+                    "amount"
+                  ]
+                }
               }
             }
           }
         },
         {
           "if": {
-            "properties": { "effect": { "enum": ["rest.long", "rest.short"] } },
-            "required": ["effect"]
+            "properties": {
+              "effect": {
+                "enum": [
+                  "rest.long",
+                  "rest.short"
+                ]
+              }
+            },
+            "required": [
+              "effect"
+            ]
           },
-          "then": { "not": { "required": ["params"] } }
+          "then": {
+            "not": {
+              "required": [
+                "params"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "const": "resource.restore"
+              }
+            },
+            "required": [
+              "effect"
+            ]
+          },
+          "then": {
+            "required": [
+              "params"
+            ],
+            "properties": {
+              "params": {
+                "required": [
+                  "field"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "amount"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "types"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -1989,6 +2116,55 @@
       },
       "additionalProperties": false,
       "allOf": [{ "$ref": "#/$defs/effectParamsRules" }]
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "help",
+        "effects"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "help": {
+          "$ref": "#/$defs/helpText"
+        },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/recoveryEffect"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recoveryEffect": {
+      "type": "object",
+      "required": [
+        "effect"
+      ],
+      "properties": {
+        "effect": {
+          "$ref": "#/$defs/effect"
+        },
+        "params": {
+          "$ref": "#/$defs/actionParams"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "$ref": "#/$defs/effectParamsRules"
+        }
+      ]
     },
     "resourceAction": {
       "description": "Ação com custo no próprio recurso (ex.: Curar 1 nível de dano por 1 Sangue).",

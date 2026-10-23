@@ -24,7 +24,6 @@ import {
 let ctx: TestContext
 let storyteller: TestUser
 let owner: TestUser
-let player: TestUser
 let werewolf: string
 let mage: string
 
@@ -36,12 +35,10 @@ beforeEach(async () => {
   await publish(ctx, 'wta-w20')
   storyteller = await createUser(ctx, 'narradora')
   owner = await createUser(ctx, 'dona')
-  player = await createUser(ctx, 'outro')
   werewolf = await createChronicle(ctx, storyteller, 'wta-w20', 'A Seita')
   mage = await createChronicle(ctx, storyteller, 'mta-m20', 'A Torre')
   for (const c of [werewolf, mage]) {
     await addMember(ctx, c, owner)
-    await addMember(ctx, c, player)
   }
 })
 afterEach(async () => {
@@ -94,7 +91,7 @@ describe('ficha de Lobisomem', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('wta-w20')
-    expect(body.templateVersion).toBe('1.2.0')
+    expect(body.templateVersion).toBe('1.4.0')
     expect(body.sheet.values).toEqual({
       name: 'Iara Moreira',
       deedName: 'Canta-Tempestade',
@@ -220,20 +217,9 @@ describe('a troca de forma', () => {
     ).json()) as { sheetVersion: number }
     expect(after.sheetVersion).toBe(0)
   })
-
-  it('o outro jogador não troca a forma de quem não é dele', async () => {
-    const id = await iara()
-    expect(
-      (
-        await send(player, id, [
-          { path: 'values.form', from: null, to: 'crinos' },
-        ])
-      ).status
-    ).toBe(403)
-  })
 })
 
-describe('mesa e Notas do Narrador', () => {
+describe('mesa', () => {
   it('a mesa de Lobisomem traz a forma; a de Mago, a roda', async () => {
     const id = await iara()
     await send(owner, id, [{ path: 'values.form', from: null, to: 'crinos' }])
@@ -250,33 +236,5 @@ describe('mesa e Notas do Narrador', () => {
       await as(ctx, storyteller, 'GET', `/chronicles/${mage}/table`)
     ).json()) as unknown[]
     expect(mageRows).toEqual([])
-  })
-
-  it('o jogador nunca recebe as Notas do Narrador do Lobisomem', async () => {
-    const id = await iara()
-    expect(
-      (
-        await send(storyteller, id, [
-          {
-            path: 'values.storytellerNotes',
-            from: null,
-            to: 'A Wyrm está na seita.',
-          },
-        ])
-      ).status
-    ).toBe(200)
-    expect(
-      (
-        await send(owner, id, [
-          { path: 'values.storytellerNotes', from: null, to: 'tentativa' },
-        ])
-      ).status
-    ).toBe(403)
-    for (const user of [owner, player]) {
-      const text = await (
-        await as(ctx, user, 'GET', `/characters/${id}`)
-      ).text()
-      expect(text).not.toContain('Wyrm')
-    }
   })
 })

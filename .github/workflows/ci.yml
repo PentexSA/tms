@@ -121,6 +121,27 @@ jobs:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_rolls_test
           NODE_ENV: test
         run: pnpm -C apps/api exec bun test src/rolls/__tests__/rolls.pg.test.ts
+      # A política vale o estado de quando o lote chega: concluir a criação
+      # e um lote de Evoluir ao mesmo tempo (v3, Etapa 5)
+      - name: política contra a conclusão (lock da ficha)
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_policy_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/policy.pg.test.ts
+      # O protocolo de trava do vínculo: criar, escrever e remover ao mesmo
+      # tempo, sem ficha órfã nem deadlock (v3, Etapa 7)
+      - name: membros contra criação e escrita (lock do vínculo)
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_members_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/members.pg.test.ts
+      # Operações em grupo: fichas travadas em ordem de id, idempotência
+      # depois das travas, sem deadlock (v3, Etapa 11)
+      - name: operações em grupo concorrentes (lock das fichas)
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_operations_test
+          NODE_ENV: test
+        run: pnpm -C apps/api exec bun test src/__tests__/operations.pg.test.ts
 
   e2e:
     name: E2E web (Playwright, Chromium e WebKit)
@@ -157,6 +178,22 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # O mirror Azure do runner pode ficar lento e repetir downloads até
+      # estourar o job. Mantém os mesmos pacotes e a verificação de assinaturas.
+      - name: usar o arquivo oficial do Ubuntu para as dependências web
+        run: |
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          directory = Path('/etc/apt/sources.list.d')
+          paths = [Path('/etc/apt/sources.list'), *directory.glob('*.list'), *directory.glob('*.sources'), *Path('/etc/apt').glob('apt-mirrors*.txt')]
+          for path in paths:
+              if path.is_file():
+                  source = path.read_text()
+                  updated = source.replace('azure.archive.ubuntu.com', 'archive.ubuntu.com')
+                  if updated != source:
+                      path.write_text(updated)
+                      print(f'Espelho atualizado: {path}')
+          PY
       - run: pnpm -C e2e exec playwright install --with-deps chromium webkit
       # Exporta o app web com a URL da API do E2E e confere o bundle
       - run: pnpm -C e2e build:web

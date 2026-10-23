@@ -477,6 +477,7 @@ describe('IMPLEMENTED_EFFECTS', () => {
     expect([...IMPLEMENTED_EFFECTS].sort()).toEqual([
       'health.heal',
       'resource.gain',
+      'resource.restore',
       'resource.spend',
     ])
     // Os descansos do D&D ainda não têm efeito nesta versão

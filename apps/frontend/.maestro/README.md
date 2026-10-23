@@ -13,6 +13,7 @@ SQLCipher, dock com toque longo e modo avião.
 | `04-airplane-mode` | gastar offline, reiniciar sem rede (dados do banco cifrado) e sincronizar ao voltar (só Android) |
 | `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
 | `06-werewolf-form` | a Forma do Lobisomem no dock: Crinos com a mudança instantânea e Desfazer (v2) |
+| `07-storyteller-table` | Mesa do narrador: dano e Nova noite em duas fichas, prévia e reversão no servidor (v3) |
 
 ## Preparar
 
@@ -21,6 +22,8 @@ SQLCipher, dock com toque longo e modo avião.
    precisa estar acima de 0. Cada rodada do `04` gasta 1. Para o `05`, uma
    crônica de Mago com uma ficha da conta e menos de 20 de Paradoxo na roda
    (o Desfazer devolve o que a rodada tirou).
+   Para o `07`, a conta também narra uma crônica de Vampiro com duas fichas
+   capazes de levar 1 nível letal; ambas devem estar em criação ou ativas.
 2. O dev build apontando para esse servidor:
 
    ```bash
@@ -39,7 +42,10 @@ maestro test apps/frontend/.maestro \
   -e CHARACTER_ID=<uuid da ficha> \
   -e MAGE_CHRONICLE="<crônica de Mago>" -e MAGE_CHARACTER="<ficha de Mago>" \
   -e WEREWOLF_CHRONICLE="<crônica de Lobisomem>" \
-  -e WEREWOLF_CHARACTER="<ficha de Lobisomem fora de Crinos>"
+  -e WEREWOLF_CHARACTER="<ficha de Lobisomem fora de Crinos>" \
+  -e STORYTELLER_CHRONICLE="<crônica narrada pela conta>" \
+  -e STORYTELLER_CHARACTER_A="<nome da primeira ficha>" \
+  -e STORYTELLER_CHARACTER_B="<nome da segunda ficha>"
 ```
 
 No iOS, exclua o fluxo de modo avião: `--exclude-tags android`.
@@ -64,3 +70,5 @@ Para conferir a cifra num Android de desenvolvimento, copie
 com.tms.app cat files/SQLite/tms-offline.db > /tmp/x.db`. O arquivo não pode
 abrir no `sqlite3` comum ("file is not a database") nem conter o texto da ficha
 (`strings /tmp/x.db | grep -i sangue` não acha nada).
+
+O fechamento da v3 e os resultados da rodada estão em [validacao-v3.md](../../../doc/validacao-v3.md) e no [PR #31](https://github.com/PentexSA/tms/pull/31). A execução iOS permanece pendente por decisão do usuário.

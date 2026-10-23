@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely'
 import { accountRoutes } from './account/routes'
 import { authGuard } from './auth/guard'
 import { authRoutes, meRoutes } from './auth/routes'
+import { operationRoutes } from './chronicles/operations'
 import { chronicleRoutes } from './chronicles/routes'
 import { tableRoutes } from './chronicles/table'
 import { onError } from './http/on-error'
@@ -15,6 +16,7 @@ import { type AppOptions, resolveOptions } from './options'
 import { rollRoutes } from './rolls/routes'
 import { eventRoutes } from './sheets/events'
 import { sheetRoutes } from './sheets/routes'
+import { statusRoutes } from './sheets/status'
 
 /**
  * Cria a aplicação Elysia (sem .listen)
@@ -69,7 +71,9 @@ export const createApp = (
       .use(chronicleRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
+      .use(statusRoutes(db, options, guard))
       .use(tableRoutes(db, guard))
+      .use(operationRoutes(db, options, guard))
       .use(rollRoutes(db, options, guard))
   )
 }

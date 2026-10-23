@@ -19,9 +19,11 @@ import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
+import { PolicyBanner } from './PolicyBanner'
 import { ActionsButton } from './play/ActionsMenu'
 import { CombatDock, dockFields } from './play/CombatDock'
 import { FieldSheetProvider } from './play/FieldSheet'
+import { blockedBy, useLifecycle } from './policy'
 import { SectionView } from './SectionView'
 import { createSheetStore, type SheetStore } from './store/sheetStore'
 
@@ -94,9 +96,14 @@ function SheetBody({
 }) {
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
+  const lifecycle = useLifecycle()
+  // Travada ou arquivada, o dono não muda de modo: a política tirou o Editar
   const writer = useMemo(
-    () => editable && canEditSomething(model, new Set(roles)),
-    [editable, model, roles]
+    () =>
+      editable &&
+      canEditSomething(model, new Set(roles)) &&
+      !blockedBy(new Set(roles), lifecycle, 'edit'),
+    [editable, model, roles, lifecycle]
   )
   const [tab, setTab] = useState(zones[0]?.id ?? 'build')
   const active: CompiledZone | undefined =
@@ -125,6 +132,7 @@ function SheetBody({
               keyboardShouldPersistTaps="handled"
             >
               <ConflictBanner />
+              {editable ? <PolicyBanner /> : null}
               {mode === 'play' ? (
                 <View style={styles.toolbar}>
                   {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}

@@ -36,6 +36,12 @@ Table characters {
   system_id uuid [not null, ref: > game_systems.id]
   name text [not null]
   sheet_data jsonb
+  template_version text [not null]
+  sheet_version integer [not null, default: 0]
+  status text [not null, default: 'creating', note: 'creating | active | archived | dead']
+  locked_at timestamptz
+  creation_completed_at timestamptz
+  creation_completed_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp
@@ -45,4 +51,67 @@ Table trait_templates {
   id uuid [pk]
   system_id uuid [not null, ref: > game_systems.id]
   template_data jsonb
+  version text [not null]
+  published_at timestamptz [not null]
+  indexes {
+    (system_id, version) [unique]
+  }
+}
+
+Table chronicle_members {
+  chronicle_id uuid [not null, ref: > chronicles.id]
+  user_id uuid [not null, ref: > users.id]
+  joined_at timestamptz [not null]
+  indexes {
+    (chronicle_id, user_id) [pk]
+  }
+}
+
+Table character_batches {
+  id uuid [pk]
+  character_id uuid [not null, ref: > characters.id, note: 'ON DELETE CASCADE']
+  client_batch_id uuid [not null]
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  by_role text [not null]
+  sheet_version integer [not null]
+  created_at timestamptz [not null]
+  operation_id uuid [ref: > chronicle_operations.id, note: 'ON DELETE SET NULL']
+  indexes {
+    (character_id, client_batch_id) [unique]
+  }
+}
+
+Table character_events {
+  id uuid [pk]
+  batch_id uuid [not null, ref: > character_batches.id, note: 'ON DELETE CASCADE']
+  seq integer [not null]
+  path text [not null]
+  from_value jsonb
+  to_value jsonb
+  from_absent boolean [not null, default: false]
+}
+
+Table chronicle_audit {
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  actor_id uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  action text [not null]
+  target_character_id uuid [ref: > characters.id, note: 'ON DELETE SET NULL']
+  target_user_id uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  payload jsonb [not null, note: 'Mínimo necessário, sem conteúdo de notas']
+  created_at timestamptz [not null]
+}
+
+Table chronicle_operations {
+  id uuid [pk]
+  chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']
+  client_operation_id uuid [not null]
+  kind text [not null, note: 'damage | heal | recovery (reservado) | revert']
+  created_by uuid [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at timestamptz [not null]
+  reverts_operation_id uuid [unique, ref: > chronicle_operations.id, note: 'ON DELETE SET NULL; nunca junto com reverts_batch_id']
+  reverts_batch_id uuid [unique, ref: > character_batches.id, note: 'ON DELETE SET NULL']
+  indexes {
+    (chronicle_id, client_operation_id) [unique]
+  }
 }

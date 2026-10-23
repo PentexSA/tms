@@ -2,17 +2,20 @@ import type { DB } from '@tms/db'
 import { isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
+import { audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { chronicleRoles } from '../authz'
+import { chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import { clientIp } from '../http/security'
 import type { AppOptions } from '../options'
 import { hashInviteCode, newInviteCode } from './invite-code'
 
-// Crônicas e convites (doc/plano-v0.md, Etapa 10). Quem cria a crônica é o
-// narrador; os jogadores entram por convite. Sem vínculo, 404.
+// Crônicas, convites e membros (doc/plano-v0.md, Etapa 10; doc/plano-v3.md,
+// Etapa 7). Quem cria a crônica é o narrador; os jogadores entram por convite
+// e saem sozinhos ou removidos. Sem vínculo, 404. O ex-membro (`former`) lê a
+// crônica e as fichas dele; o resto responde como para quem não tem vínculo.
 
 const DAY = 24 * 60 * 60 * 1000
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -36,11 +39,76 @@ export function chronicleRoutes(
   guard: ReturnType<typeof authGuard>
 ) {
   const requireStoryteller = async (userId: string, chronicleId: string) => {
-    const roles = await chronicleRoles(db, userId, chronicleId)
-    if (roles.size === 0) throw notFound()
-    if (!roles.has('storyteller')) throw storytellerOnly()
-    return roles
+    const role = await chronicleAccess(db, userId, chronicleId)
+    if (role === null || role === 'former') throw notFound()
+    if (role !== 'storyteller') throw storytellerOnly()
   }
+
+  /**
+   * Tira `userId` da crônica (remover ou sair), pelo protocolo de trava da
+   * Etapa 7: primeiro o vínculo, depois as fichas da pessoa, em ordem de id.
+   * As fichas vão para `archived` (sem trava), o vínculo sai e o registro
+   * ganha uma linha. Sem vínculo: 404.
+   */
+  const removeMember = (
+    chronicleId: string,
+    userId: string,
+    by: { readonly actorId: string; readonly revokeInvites: boolean }
+  ) =>
+    db.transaction().execute(async trx => {
+      const member = await trx
+        .selectFrom('chronicle_members')
+        .select('user_id')
+        .where('chronicle_id', '=', chronicleId)
+        .where('user_id', '=', userId)
+        .forUpdate()
+        .executeTakeFirst()
+      if (!member) throw notFound()
+      // Lidas depois da trava do vínculo: incluem a de uma criação que
+      // terminou antes
+      const characters = await trx
+        .selectFrom('characters')
+        .select('id')
+        .where('chronicle_id', '=', chronicleId)
+        .where('user_id', '=', userId)
+        .where('deleted_at', 'is', null)
+        .orderBy('id')
+        .forUpdate()
+        .execute()
+      const now = options.now()
+      const ids = characters.map(c => c.id)
+      if (ids.length)
+        await trx
+          .updateTable('characters')
+          .set({ status: 'archived', locked_at: null, updated_at: now })
+          .where('id', 'in', ids)
+          .execute()
+      await trx
+        .deleteFrom('chronicle_members')
+        .where('chronicle_id', '=', chronicleId)
+        .where('user_id', '=', userId)
+        .execute()
+      // O removido não volta sozinho com um convite que já tinha (§7, decisão 4)
+      if (by.revokeInvites)
+        await trx
+          .updateTable('chronicle_invites')
+          .set({ revoked_at: now })
+          .where('chronicle_id', '=', chronicleId)
+          .where('revoked_at', 'is', null)
+          .execute()
+      await audit(trx, {
+        chronicleId,
+        actorId: by.actorId,
+        action: by.actorId === userId ? 'member.leave' : 'member.remove',
+        userId,
+        payload: {
+          characters: ids,
+          ...(by.revokeInvites && { invitesRevoked: true }),
+        },
+        at: now,
+      })
+      return { archived: ids }
+    })
 
   return new Elysia()
     .use(guard)
@@ -107,22 +175,42 @@ export function chronicleRoutes(
         .leftJoin('chronicle_members as m', join =>
           join.onRef('m.chronicle_id', '=', 'c.id').on('m.user_id', '=', me)
         )
+        // O ex-membro continua vendo a crônica em que tem ficha ("Você saiu")
         .where(eb =>
-          eb.or([eb('c.storyteller_id', '=', me), eb('m.user_id', '=', me)])
+          eb.or([
+            eb('c.storyteller_id', '=', me),
+            eb('m.user_id', '=', me),
+            eb.exists(
+              eb
+                .selectFrom('characters as mine')
+                .select('mine.id')
+                .whereRef('mine.chronicle_id', '=', 'c.id')
+                .where('mine.user_id', '=', me)
+                .where('mine.deleted_at', 'is', null)
+            ),
+          ])
         )
         .select(eb => [
           'c.id',
           'c.name',
           'c.storyteller_id',
+          'm.user_id as member',
           'c.created_at',
           'g.code as systemCode',
           'g.name as systemName',
           'st.username as storyteller',
+          // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
           eb
             .selectFrom('characters as ch')
             .select(eb.fn.countAll<string>().as('n'))
             .whereRef('ch.chronicle_id', '=', 'c.id')
             .where('ch.deleted_at', 'is', null)
+            .where(eb =>
+              eb.or([
+                eb('ch.user_id', '=', me),
+                eb('c.storyteller_id', '=', me),
+              ])
+            )
             .as('characterCount'),
         ])
         .orderBy('c.created_at', 'desc')
@@ -134,7 +222,9 @@ export function chronicleRoutes(
         role:
           r.storyteller_id === me
             ? ('storyteller' as const)
-            : ('player' as const),
+            : r.member
+              ? ('player' as const)
+              : ('former' as const),
         storyteller: { username: r.storyteller },
         characterCount: Number(r.characterCount ?? 0),
       }))
@@ -143,8 +233,8 @@ export function chronicleRoutes(
       '/chronicles/:id',
       async ({ params, userId }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null) throw notFound()
         const c = await db
           .selectFrom('chronicles as c')
           .innerJoin('game_systems as g', 'g.id', 'c.system_id')
@@ -159,21 +249,29 @@ export function chronicleRoutes(
           ])
           .where('c.id', '=', params.id)
           .executeTakeFirstOrThrow()
+        const head = {
+          id: c.id,
+          name: c.name,
+          system: { code: c.systemCode, name: c.systemName },
+          storyteller: { id: c.storytellerId, username: c.storyteller },
+        }
+        // O ex-membro não recebe os membros
+        if (role === 'former')
+          return { ...head, role: 'former' as const, members: [] }
         const members = await db
           .selectFrom('chronicle_members as m')
           .innerJoin('users as u', 'u.id', 'm.user_id')
-          .select(['u.id', 'u.username'])
+          .select(['u.id', 'u.username', 'm.joined_at as joinedAt'])
           .where('m.chronicle_id', '=', params.id)
           .orderBy('m.joined_at')
           .execute()
         return {
-          id: c.id,
-          name: c.name,
-          system: { code: c.systemCode, name: c.systemName },
-          role: roles.has('storyteller')
-            ? ('storyteller' as const)
-            : ('player' as const),
-          storyteller: { id: c.storytellerId, username: c.storyteller },
+          ...head,
+          // O rótulo da crônica para o app; o papel na ficha é outro
+          role:
+            role === 'storyteller'
+              ? ('storyteller' as const)
+              : ('player' as const),
           members,
         }
       },
@@ -317,6 +415,44 @@ export function chronicleRoutes(
       },
       { params: t.Object({ id: uuid, inviteId: uuid }) }
     )
+    .delete(
+      '/chronicles/:id/members/me',
+      async ({ params, userId, set }) => {
+        const me = requireUser(userId)
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null || role === 'former') throw notFound()
+        if (role === 'storyteller')
+          throw new ApiError(
+            403,
+            'o narrador não sai da crônica: só deixa de narrar transferindo'
+          )
+        await removeMember(params.id, me, {
+          actorId: me,
+          revokeInvites: false,
+        })
+        set.status = 204
+        return null
+      },
+      { params: idParams }
+    )
+    .delete(
+      '/chronicles/:id/members/:userId',
+      async ({ params, body, userId, set }) => {
+        const me = requireUser(userId)
+        await requireStoryteller(me, params.id)
+        // O narrador não está em chronicle_members: removê-lo dá 404
+        await removeMember(params.id, params.userId, {
+          actorId: me,
+          revokeInvites: body?.revokeInvites ?? true,
+        })
+        set.status = 204
+        return null
+      },
+      {
+        params: t.Object({ id: uuid, userId: uuid }),
+        body: t.Optional(t.Object({ revokeInvites: t.Optional(t.Boolean()) })),
+      }
+    )
     .post(
       '/invites/accept',
       async ({ body, userId, request, server, set }) => {
@@ -357,13 +493,16 @@ export function chronicleRoutes(
             invite.uses >= invite.max_uses
           )
             throw new ApiError(404, INVALID_INVITE)
-          const roles = await chronicleRoles(trx, me, invite.chronicle_id)
-          if (roles.size > 0)
+          const role = await chronicleAccess(trx, me, invite.chronicle_id)
+          // O ex-membro volta como membro, e gasta um uso; as fichas dele
+          // continuam arquivadas até o narrador reativar (§7, decisão 4)
+          if (role === 'storyteller' || role === 'member')
             return {
               chronicleId: invite.chronicle_id,
-              role: roles.has('storyteller')
-                ? ('storyteller' as const)
-                : ('player' as const),
+              role:
+                role === 'storyteller'
+                  ? ('storyteller' as const)
+                  : ('player' as const),
             }
           await trx
             .insertInto('chronicle_members')

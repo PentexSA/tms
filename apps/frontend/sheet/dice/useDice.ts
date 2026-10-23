@@ -13,14 +13,16 @@ import {
   type RandomSource,
   rollPool,
 } from '@tms/sheet-core'
+import { useToast } from '@tms/ui'
 import { getRandomValues, randomUUID } from 'expo-crypto'
 import { useCallback, useMemo, useState } from 'react'
 import { AccessibilityInfo } from 'react-native'
 import { useStore } from 'zustand'
 
 import { api } from '../../lib/api'
-import { messageOf } from '../../lib/errors'
+import { messageOf, statusOf } from '../../lib/errors'
 import { sheetKeys } from '../data'
+import { refusalCodeOf, refusalReason } from '../policy'
 import type { SheetStore } from '../store/sheetStore'
 import { commitMessage } from '../useCommit'
 
@@ -67,6 +69,7 @@ export function useDice(
   const random = deps.random ?? deviceRandom
   const uuid = deps.uuid ?? randomUUID
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { model, roles } = store.getState()
   const roll = poolRollOf(model)
   const values = useStore(store, s => s.values)
@@ -168,7 +171,22 @@ export function useDice(
           ...(manual ? { manual } : {}),
         })
         if (res.error) {
-          setError(messageOf(res.error, 'Não foi possível rolar.'))
+          // Recusa da política (travada, arquivada): o motivo, e a ficha
+          // rebuscada mostra o estado novo
+          const code =
+            statusOf(res.error) === 403 ? refusalCodeOf(res.error.value) : null
+          const why = refusalReason(code)
+          if (why) {
+            const message = `${why} A rolagem não foi feita.`
+            // A passagem para Leitura desmonta o sheet de Dados. O aviso
+            // precisa sobreviver à rebusca que aplica o estado novo.
+            if (code === 'NOT_MEMBER' || code === 'SHEET_NOT_EDITABLE')
+              toast.show({ message })
+            else setError(message)
+            void queryClient.invalidateQueries({
+              queryKey: sheetKeys.character(characterId),
+            })
+          } else setError(messageOf(res.error, 'Não foi possível rolar.'))
           return
         }
         const { roll: r, sheet, sheetVersion } = res.data
@@ -217,6 +235,7 @@ export function useDice(
       preset,
       store,
       queryClient,
+      toast,
       record,
       local,
     ]

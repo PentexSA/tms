@@ -53,6 +53,9 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `fields` | sim | objeto | Catálogo de campos indexado por id. O id é a chave em `sheet_data.values` (§3). |
 | `sections` | sim | lista | Seções por zona, em ordem (§4). |
 | `zoneLabels` | não | objeto | Rótulo das abas por zona (`build`, `powers`, `lore`), até 14 caracteres (§4). |
+| `statusLabels` | não | objeto | Rótulo do estado `dead` da ficha (`{ "dead": "Torpor" }`), até 20 caracteres. Sem ele, "Fora de jogo". |
+| `alerts` | não | lista (até 10) | Quando uma linha da Mesa merece atenção (§6). |
+| `recoveries` | não | lista (1 a 12) | Períodos do narrador com prévia por personagem (§8). |
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |
@@ -72,6 +75,8 @@ Não coloque `$schema` dentro do template: o topo é fechado (`additionalPropert
 Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLabel`, `sublabel` (linha secundária, ex.: "Des"), `help` e `editableIn`.
 
 `editableIn` diz em quais modos o campo muda: `play` (modo Jogo) e `edit` (modo Evoluir). Padrão: `text` e `longText` em ambos; os demais só em Evoluir. Recursos de jogo declaram `["play"]`. O modo é UX: o servidor valida cada escrita (§11).
+
+O `editableIn` também classifica cada mudança para a política de escrita (doc/plano-v3.md, Etapa 4). Em `rating`, `number`, `percent`, `mark`, `tags` e `list`, o que muda com `["play"]` é **jogo** (a Inspiração e o Ouro do D&D, as Condições, a quantidade do inventário); sem ele, é **evolução** (Atributo, Posto, nível), que depois da criação só o narrador grava. Na dúvida, evolução. Declare `["play"]` onde o jogo gasta ou marca o valor; o permanente de um `resource` e o `value` de um item de lista são sempre evolução.
 
 | `type` | `display` | Valor em `sheet_data.values` | Componente | WoD | D&D 5e | CoC 7e | Fate |
 |---|---|---|---|---|---|---|---|
@@ -323,8 +328,8 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
   "fields": ["storytellerNotes"], "permissions": { "read": ["storyteller"], "write": ["storyteller"] } }
 ```
 
-- Papéis: `owner` (dono da ficha), `storyteller` (narrador da crônica) e `player` (outro jogador da mesma crônica).
-- Sem `permissions`: todos da crônica leem; dono e narrador escrevem.
+- Papéis: `owner` (dono da ficha) e `storyteller` (narrador da crônica). Outro jogador da crônica não tem papel na ficha: não a lê nem a escreve (o servidor responde 404).
+- Sem `permissions`: dono e narrador leem e escrevem.
 - `read` restrito: o **servidor** remove os campos da seção antes de responder a quem não pode ler (§11). Esconder na UI não basta. Por isso esses campos não podem aparecer em `identity` (header, cartões, mesa) nem no `dock`: `validateTemplate` rejeita.
 - `write` restrito: o servidor rejeita a escrita de quem não está na lista.
 
@@ -376,6 +381,16 @@ Regras:
 
 **Multi-sistema:** Vampiro usa Vitalidade, Sangue e FdV; D&D usa PV, CA e espaços; CoC usa PV, Sanidade e Sorte; Fate usa Estresse, Destino e Consequências. A moldura é a mesma.
 
+**Alertas da Mesa.** `alerts` diz quando a linha de um personagem na Mesa do narrador merece atenção; o painel só pinta o selo, com o `label` como nome acessível. Cada alerta é `{ id, label, rule, field }` mais o parâmetro da regra, de uma lista fechada (`REGISTRY.alertRules`), nunca expressão:
+
+| `rule` | Campo | Parâmetro | Ativo quando |
+|---|---|---|---|
+| `track-at-level` | `track` | `level` (inteiro ≥ 1) | a trilha está marcada até o nível `level` (Incapacitado é o último nível do WoD) |
+| `resource-at-most` | `resource` | `value` (inteiro ≥ 0) | o atual está em `value` ou menos (FdV zerada é `value: 0`) |
+| `resource-below-share` | `resource` | `share` (entre 0 e 1) | o atual está abaixo da fração do máximo (PV do D&D abaixo da metade é `share: 0.5`) |
+
+Um alerta sobre campo que o papel não lê não existe para ele. `label` até 40 caracteres.
+
 ---
 
 ## 7. Rolagem
@@ -421,10 +436,13 @@ Ações aparecem no menu ⋯ da ficha (`actions`, no topo do template) ou no she
 | `health.heal` | `field` (track), `types` | Cura 1 nível, procurando dano do último para o primeiro tipo de `types` (com `["bashing", "lethal"]`, cura letal antes de contusivo; agravado fica de fora), e paga `cost` do recurso. No menu da ficha (`actions` do topo), não tem custo | Curar 1 nível por 1 Sangue; Regenerar (Lobisomem) |
 | `resource.spend` | `field`, `amount` | Debita `amount` do recurso (mínimo 0) | Despertar: −1 Sangue |
 | `resource.gain` | `field`, `amount` | Credita `amount` respeitando o teto | Recuperar Força de Vontade |
+| `resource.restore` | `field` | Enche o atual até o permanente, sem alterar o permanente | Fim da história |
 | `rest.long` | – | Recursos com `tempFirst` ao máximo e sem temporários; recursos com `max.field` recuperam metade; `slots` zerados; `track boxes` zeradas | Descanso longo D&D |
 | `rest.short` | – | Permite gastar dados de vida para recuperar PV | Descanso curto D&D |
 
-`schema.json` exige os parâmetros certos por efeito: `field` e `amount` para `resource.*`, `field` e `types` para `health.heal`, nenhum para `rest.*`. No protótipo, a prévia está implementada para `resource.spend` e `rest.long`, e `health.heal` funciona como ação de recurso; os demais mostram só o texto de ajuda.
+`schema.json` exige os parâmetros certos por efeito: `field` e `amount` para `resource.spend` e `resource.gain`, apenas `field` para `resource.restore`, `field` e `types` para `health.heal`, nenhum para `rest.*`. No protótipo, a prévia está implementada para `resource.spend` e `rest.long`, e `health.heal` funciona como ação de recurso; os demais mostram só o texto de ajuda.
+
+**Recuperações da Mesa.** `recoveries: [{ id, label, help, effects: [{ effect, params? }] }]` declara os períodos que o narrador aplica aos personagens selecionados, com prévia, confirmação e Desfazer. De 1 a 12 períodos, com ids únicos, e de 1 a 20 efeitos por período. Os efeitos usam a mesma lista fechada e os mesmos parâmetros das ações. O core compõe os efeitos em sequência e consolida um evento por campo. Recurso já cheio não cancela os outros efeitos; nenhuma mudança deixa o período indisponível com motivo. Efeitos sem implementação (`rest.long` e `rest.short`) ficam indisponíveis, sem aplicação parcial. As versões novas dos templates e as regras conferidas estão em [recuperacoes-v3.md](../../doc/recuperacoes-v3.md).
 
 **Multi-sistema:** "descanso" e "nova noite" são o mesmo mecanismo (lote de alterações com prévia). Um efeito de outro sistema, como "fim de sessão" do Fate (Destino volta à Recarga), é um nome novo na lista (§9).
 
@@ -443,8 +461,9 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `trackRules` | `trackRule` | `wod-stacking`, `boxes` |
 | `resourceRules` | `resourceRule` | `tempFirst` |
 | `clockRules` | `clockRule` | `mage-quint-paradox` |
+| `alertRules` | `alertRule` | `track-at-level`, `resource-at-most`, `resource-below-share` |
 | `atZero` | `atZero` | `deathSaves` |
-| `effects` | `effect` | `health.heal`, `resource.spend`, `resource.gain`, `rest.long`, `rest.short` |
+| `effects` | `effect` | `health.heal`, `resource.spend`, `resource.gain`, `resource.restore`, `rest.long`, `rest.short` |
 | `rollModels` | `rollModel` | `pool-success`, `sum-vs-target`, `roll-under-percent`, `fudge`, `pbta-2d6` |
 | `dice` | `die` | `2`, `3`, `4`, `6`, `8`, `10`, `12`, `20`, `100` |
 | `diceNotation` | `diceNotation` | `1d20`, `2d6`, `1d100`, `4dF` |
@@ -455,7 +474,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `layouts` | `layout` | `grid`, `groups`, `list`, `pyramid`, `fields`, `facts`, `text` |
 | `filterRules` | `filterRule` | `invested`, `proficient`, `aboveBase` |
 | `modes` | `mode` | `play`, `edit` |
-| `roles` | `role` | `owner`, `storyteller`, `player` |
+| `roles` | `role` | `owner`, `storyteller` |
 | `defaultActions` | `defaultAction` | `spend1`, `gain1`, `damage1`, `use1` |
 | `modifierOps` | `modifierOp` | `add`, `set` |
 | `conditionRoll` | `conditionRoll` | `advantage`, `disadvantage` |

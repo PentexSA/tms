@@ -225,10 +225,29 @@ describe('validateSheet: ramos de forma e de teto', () => {
   })
 
   // Template mínimo: o teto de um resource vem de outro campo, que pode ser
-  // derivado, gravado (permanente ou atual) ou só ter padrão.
+  // derivado, gravado (permanente ou atual) ou só ter padrão (número ou fórmula).
   const capTemplate = (from: Json) => ({
     fields: {
       base: { type: 'number', label: 'Base', default: 8 },
+      clan: {
+        type: 'choice',
+        label: 'Clã',
+        options: [
+          { id: 'a', label: 'A' },
+          { id: 'b', label: 'B' },
+        ],
+      },
+      byClan: {
+        type: 'number',
+        label: 'Pelo clã',
+        max: 10,
+        default: { from: 'clan', map: { a: 7, b: 3 } },
+      },
+      byHalf: {
+        type: 'number',
+        label: 'Pela metade',
+        default: { derive: 'half', from: 'base' },
+      },
       half: {
         type: 'number',
         label: 'Metade',
@@ -240,6 +259,15 @@ describe('validateSheet: ramos de forma e de teto', () => {
         type: 'resource',
         label: 'Reserva',
         permanent: { min: 0, max: 20 },
+      },
+      well: {
+        type: 'resource',
+        label: 'Poço',
+        permanent: {
+          min: 0,
+          max: 20,
+          default: { derive: 'half', from: 'base' },
+        },
       },
       r: { type: 'resource', label: 'R', max: from },
       free: { type: 'resource', label: 'Livre', temp: true },
@@ -256,6 +284,9 @@ describe('validateSheet: ramos de forma e de teto', () => {
       6,
     ],
     ['atual de outro resource', { field: 'pool' }, { pool: { current: 3 } }, 3],
+    ['padrão em fórmula derivada', { field: 'byHalf' }, {}, 4],
+    ['padrão pela escolha', { field: 'byClan' }, { clan: 'a' }, 7],
+    ['padrão do permanente de outro resource', { field: 'well' }, {}, 4],
   ])('teto pelo campo: %s', (_, max, values, cap) => {
     const t = capTemplate(max)
     const ok = validateSheet(t, { values: { ...values, r: { current: cap } } })

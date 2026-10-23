@@ -4,11 +4,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import { AccessibilityInfo, StyleSheet, View } from 'react-native'
+import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
@@ -31,11 +32,31 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null)
 
+interface ToastLayerApi {
+  readonly toast: ToastMessage | null
+  readonly hide: () => void
+  readonly modals: readonly string[]
+  readonly setModal: (id: string, active: boolean) => void
+}
+const ToastLayerContext = createContext<ToastLayerApi | null>(null)
+
 export const TOAST_MS = 5000
 export const TOAST_SCREEN_READER_MS = 10000
 
 export function ToastProvider({ children }: { readonly children: ReactNode }) {
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [modals, setModals] = useState<readonly string[]>([])
+  const setModal = useCallback((id: string, active: boolean) => {
+    setModals(current =>
+      active
+        ? current.includes(id)
+          ? current
+          : [...current, id]
+        : current.includes(id)
+          ? current.filter(x => x !== id)
+          : current
+    )
+  }, [])
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const reader = useRef(false)
 
@@ -68,13 +89,37 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
     [hide]
   )
   const api = useMemo(() => ({ show, hide }), [show, hide])
+  const layer = useMemo(
+    () => ({ toast, hide, modals, setModal }),
+    [toast, hide, modals, setModal]
+  )
 
   return (
     <ToastContext.Provider value={api}>
-      {children}
-      {toast ? <ToastView toast={toast} onDone={hide} /> : null}
+      <ToastLayerContext.Provider value={layer}>
+        {children}
+        {toast && modals.length === 0 ? (
+          <ToastView toast={toast} onDone={hide} />
+        ) : null}
+      </ToastLayerContext.Provider>
     </ToastContext.Provider>
   )
+}
+
+/** RN Modal tem uma janela acima da raiz do app. O aviso acompanha o modal
+ * superior e volta à raiz quando ele fecha, com o mesmo prazo e a mesma ação. */
+export function ModalToastHost({ visible }: { readonly visible: boolean }) {
+  const layer = useContext(ToastLayerContext)
+  const id = useId()
+  const setModal = layer?.setModal
+  const active = visible && Platform.OS !== 'web'
+  useEffect(() => {
+    if (!active || !setModal) return
+    setModal(id, true)
+    return () => setModal(id, false)
+  }, [active, id, setModal])
+  if (!active || !layer?.toast || layer.modals.at(-1) !== id) return null
+  return <ToastView toast={layer.toast} onDone={layer.hide} />
 }
 
 export function useToast(): ToastApi {

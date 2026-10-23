@@ -6,6 +6,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { useEffect, useState } from 'react'
+import { LifecycleContext, type SheetLifecycle } from '../sheet/policy'
 import { SheetView } from '../sheet/SheetView'
 import { createSheetStore, type SheetStore } from '../sheet/store/sheetStore'
 import type { QueuedBatch } from '../sheet/sync/outbox'
@@ -29,6 +30,8 @@ export interface LiveProps {
   readonly sheet: SheetData
   readonly roles?: readonly RoleName[]
   readonly mode?: SheetMode
+  // Estado da ficha (v3): sem ele, `creating`, o comportamento de antes
+  readonly lifecycle?: SheetLifecycle
   readonly onStore?: (store: SheetStore) => void
 }
 
@@ -37,6 +40,7 @@ export function Live({
   sheet,
   roles = ['owner'],
   mode,
+  lifecycle,
   onStore,
 }: LiveProps) {
   const sync = useSync()
@@ -55,7 +59,14 @@ export function Live({
   })
   useEffect(() => sync.register(LIVE_ID, store), [sync, store])
   onStore?.(store)
-  return <SheetView store={store} editable />
+  const view = <SheetView store={store} editable />
+  return lifecycle ? (
+    <LifecycleContext.Provider value={lifecycle}>
+      {view}
+    </LifecycleContext.Provider>
+  ) : (
+    view
+  )
 }
 
 /** Um servidor que aplica o lote como o de verdade (o mesmo applyBatch). */

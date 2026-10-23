@@ -8,8 +8,14 @@ import {
 } from '@tms/sheet-core'
 import { Pressable, Text, tokens, useInsets, useTheme, useToast } from '@tms/ui'
 import { memo } from 'react'
-import { type AccessibilityActionEvent, StyleSheet, View } from 'react-native'
+import {
+  type AccessibilityActionEvent,
+  AccessibilityInfo,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { useFieldEntry, useSheet, useSheetStore } from '../context'
+import { blockedBy, blockedNote, refusalReason, useLifecycle } from '../policy'
 import { useCommit } from '../useCommit'
 import { resolveView } from '../views'
 import { planLabel, useEditable } from './editable'
@@ -20,6 +26,8 @@ import { useFieldSheet } from './sheetContext'
 // campos vêm de `template.dock` (de 1 a 3): Vampiro [Vitalidade, Sangue, FdV],
 // D&D [PV, CA, Espaços], Fate [Estresse, Destino, Consequências]. Toque abre
 // o sheet; toque longo aplica a ação padrão do campo, com Desfazer no aviso.
+// Com a ficha travada (ou arquivada), o toque não abre o sheet de gasto: diz
+// o motivo, também ao leitor de tela.
 
 export const LONG_PRESS_MS = 500
 const MAX_DOCK = 3
@@ -71,7 +79,8 @@ export function CombatDock() {
 }
 
 const DockChip = memo(function DockChip({ id }: { readonly id: FieldId }) {
-  const { model } = useSheet()
+  const { model, roles } = useSheet()
+  const lifecycle = useLifecycle()
   const store = useSheetStore()
   const commit = useCommit()
   const toast = useToast()
@@ -79,7 +88,14 @@ const DockChip = memo(function DockChip({ id }: { readonly id: FieldId }) {
   const { colors } = useTheme()
   const { editable } = useEditable(id)
   const entry = useFieldEntry(id)
+  const blocked = blockedBy(roles, lifecycle, 'play')
   if (!entry) return null
+  const why = blocked ? (refusalReason(blocked) ?? blockedNote(blocked)) : null
+  const open = () => {
+    if (!why) return sheets?.open({ kind: 'field', id })
+    toast.show({ message: why })
+    AccessibilityInfo.announceForAccessibility(why)
+  }
   const { resolved, sheet } = entry
   // A ação padrão só depende do próprio campo: a entrada muda quando ela muda
   const def = resolved.field.def
@@ -98,8 +114,7 @@ const DockChip = memo(function DockChip({ id }: { readonly id: FieldId }) {
   }
   const onAction = (e: AccessibilityActionEvent) => {
     if (e.nativeEvent.actionName === 'longpress') runDefault()
-    if (e.nativeEvent.actionName === 'activate')
-      sheets?.open({ kind: 'field', id })
+    if (e.nativeEvent.actionName === 'activate') open()
   }
 
   const ChipView = resolveView(model.skin, resolved.type, 'chip')
@@ -115,8 +130,9 @@ const DockChip = memo(function DockChip({ id }: { readonly id: FieldId }) {
           ? [{ name: 'activate' }, { name: 'longpress', label: plan.label }]
           : [{ name: 'activate' }]
       }
+      accessibilityHint={why ?? undefined}
       onAccessibilityAction={onAction}
-      onPress={() => sheets?.open({ kind: 'field', id })}
+      onPress={open}
       onLongPress={hasDefault ? runDefault : undefined}
       delayLongPress={LONG_PRESS_MS}
       testID={`dock-${id}`}

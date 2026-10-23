@@ -26,6 +26,9 @@ name: Forma do Lobisomem e desfazer
 - assertVisible:
     text: "Forma.*Crinos.*"
 - tapOn: "Desfazer"
+# O indicador fica na ficha, fora da janela modal nativa.
+- tapOn:
+    id: "bottom-sheet-close"
 - extendedWaitUntil:
     visible:
       text: "Sincronização: Salvo"

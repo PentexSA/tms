@@ -228,7 +228,9 @@ describe('para o jogador a Mesa não existe', () => {
     expect(await screen.findByText('Narrador: ana')).toBeTruthy()
     expect(screen.queryByRole('tab', { name: 'Mesa' })).toBeNull()
     expect(screen.queryByLabelText('Visão da crônica')).toBeNull()
-    expect(screen.getByText('Nenhuma ficha ainda.')).toBeTruthy()
+    expect(
+      screen.getByText('Você ainda não tem ficha nesta crônica.')
+    ).toBeTruthy()
     expect(calls.chronicle.tableGet).not.toHaveBeenCalled()
   })
 })

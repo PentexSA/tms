@@ -2,19 +2,23 @@ import type { DB } from '@tms/db'
 import {
   canWrite,
   type Issue,
+  type RoleName,
   type SheetData,
   stripRestricted,
   validateSheet,
   withValueDeps,
+  writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
+import { audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
-import { characterAccess, chronicleRoles } from '../authz'
+import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
 import { latestTemplate, modelFor } from './models'
+import { lockCharacter, refusal, writeAccess } from './policy'
 
 // Fichas: leitura e criação (doc/plano-v0.md, Etapa 12). Toda saída passa por
 // stripRestricted com os papéis resolvidos no banco: o aparelho de quem não
@@ -22,6 +26,11 @@ import { latestTemplate, modelFor } from './models'
 
 export const MAX_CHARACTERS_PER_CHRONICLE = 20
 const notFound = () => new ApiError(404, 'não encontrado')
+const notMember = () =>
+  new ApiError(403, 'você não faz mais parte desta crônica', {
+    code: 'NOT_MEMBER',
+    paths: [],
+  })
 
 // "values.clan" → "/values/clan", o mesmo formato dos erros de validação
 const fieldsOf = (issues: readonly Issue[]) =>
@@ -92,8 +101,10 @@ export function sheetRoutes(
       '/chronicles/:id/characters',
       async ({ params, body, userId, set }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null) throw notFound()
+        // O ex-membro sabe que a crônica existe: o motivo vai para a tela
+        if (role === 'former') throw notMember()
         const chronicle = await db
           .selectFrom('chronicles')
           .select('system_id')
@@ -134,28 +145,44 @@ export function sheetRoutes(
         const issues = validateSheet(model.template, sheet)
         if (issues.length) throw invalid(issues)
 
-        const { count } = await db
-          .selectFrom('characters')
-          .select(db.fn.countAll<string>().as('count'))
-          .where('chronicle_id', '=', params.id)
-          .where('user_id', '=', me)
-          .where('deleted_at', 'is', null)
-          .executeTakeFirstOrThrow()
-        if (Number(count) >= MAX_CHARACTERS_PER_CHRONICLE)
-          throw new ApiError(422, 'limite de fichas nesta crônica')
-
-        const row = await db
-          .insertInto('characters')
-          .values({
-            user_id: me,
-            chronicle_id: params.id,
-            system_id: chronicle.system_id,
-            name,
-            sheet_data: JSON.stringify(sheet),
-            template_version: template.version,
-          })
-          .returning('id')
-          .executeTakeFirstOrThrow()
+        // Protocolo de trava da Etapa 7 (doc/plano-v3.md): o membro trava o
+        // vínculo antes de criar. Uma remoção ao mesmo tempo ou termina antes
+        // (e aqui não há mais vínculo) ou espera e arquiva a ficha nova. O
+        // limite é contado com o vínculo travado: duas criações no limite não
+        // passam juntas. O narrador não tem vínculo para travar
+        const row = await db.transaction().execute(async trx => {
+          if (role === 'member') {
+            const link = await trx
+              .selectFrom('chronicle_members')
+              .select('user_id')
+              .where('chronicle_id', '=', params.id)
+              .where('user_id', '=', me)
+              .forUpdate()
+              .executeTakeFirst()
+            if (!link) throw notMember()
+          }
+          const { count } = await trx
+            .selectFrom('characters')
+            .select(trx.fn.countAll<string>().as('count'))
+            .where('chronicle_id', '=', params.id)
+            .where('user_id', '=', me)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirstOrThrow()
+          if (Number(count) >= MAX_CHARACTERS_PER_CHRONICLE)
+            throw new ApiError(422, 'limite de fichas nesta crônica')
+          return trx
+            .insertInto('characters')
+            .values({
+              user_id: me,
+              chronicle_id: params.id,
+              system_id: chronicle.system_id,
+              name,
+              sheet_data: JSON.stringify(sheet),
+              template_version: template.version,
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+        })
         set.status = 201
         return { id: row.id }
       },
@@ -172,9 +199,9 @@ export function sheetRoutes(
       '/chronicles/:id/characters',
       async ({ params, userId }) => {
         const me = requireUser(userId)
-        const roles = await chronicleRoles(db, me, params.id)
-        if (roles.size === 0) throw notFound()
-        const rows = await db
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null) throw notFound()
+        let q = db
           .selectFrom('characters as ch')
           .innerJoin('users as u', 'u.id', 'ch.user_id')
           .select([
@@ -189,12 +216,14 @@ export function sheetRoutes(
           ])
           .where('ch.chronicle_id', '=', params.id)
           .where('ch.deleted_at', 'is', null)
-          .orderBy('ch.created_at')
-          .execute()
+        // O jogador só recebe as fichas dele; o narrador, todas
+        if (role !== 'storyteller') q = q.where('ch.user_id', '=', me)
+        const rows = await q.orderBy('ch.created_at').execute()
         const out = []
         for (const r of rows) {
           const model = await modelFor(db, r.system_id, r.template_version)
-          const mine = new Set(roles)
+          const mine = new Set<RoleName>()
+          if (role === 'storyteller') mine.add('storyteller')
           if (r.user_id === me) mine.add('owner')
           const { identity, dock } = model.template
           // Só o que a lista e a mesa mostram (identidade e dock), com o que os
@@ -252,6 +281,8 @@ export function sheetRoutes(
             'ch.sheet_version',
             'ch.template_version',
             'ch.updated_at',
+            'ch.status',
+            'ch.locked_at',
             'c.id as chronicleId',
             'c.name as chronicleName',
             'g.code as systemCode',
@@ -265,6 +296,11 @@ export function sheetRoutes(
           access.character.systemId,
           access.character.templateVersion
         )
+        // A pessoa é membro ou narrador da crônica agora: o app calcula a
+        // mesma política do servidor (o ex-membro só lê)
+        const member =
+          (await chronicleAccess(db, me, access.character.chronicleId)) !==
+          'former'
         return {
           id: row.id,
           name: row.name,
@@ -274,6 +310,9 @@ export function sheetRoutes(
           templateVersion: row.template_version,
           sheetVersion: row.sheet_version,
           roles: [...access.roles],
+          status: row.status,
+          lockedAt: row.locked_at,
+          member,
           updatedAt: row.updated_at,
           sheet: stripRestricted(
             model,
@@ -290,16 +329,40 @@ export function sheetRoutes(
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
         if (!access) throw notFound()
-        if (!access.roles.has('owner') && !access.roles.has('storyteller'))
-          throw new ApiError(
-            403,
-            'só o dono ou o narrador pode excluir a ficha'
+        const model = await modelFor(
+          db,
+          access.character.systemId,
+          access.character.templateVersion
+        )
+        // A política da escrita, sem classe (doc/plano-v3.md §7, decisão 5):
+        // o dono exclui em creating e em active sem trava; o ex-membro, nunca;
+        // o narrador, sempre. Entra no registro da crônica
+        await db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const verdict = writePolicy(
+            await writeAccess(trx, access.roles, row.chronicleId, me),
+            row.status,
+            row.lockedAt !== null,
+            []
           )
-        await db
-          .updateTable('characters')
-          .set({ deleted_at: new Date() })
-          .where('id', '=', params.id)
-          .execute()
+          if (!verdict.ok)
+            throw refusal(verdict, { model, roles: access.roles, paths: [] })
+          const now = new Date()
+          await trx
+            .updateTable('characters')
+            .set({ deleted_at: now })
+            .where('id', '=', params.id)
+            .execute()
+          await audit(trx, {
+            chronicleId: row.chronicleId,
+            actorId: me,
+            action: 'character.delete',
+            characterId: params.id,
+            userId: row.userId,
+            payload: { status: row.status },
+            at: now,
+          })
+        })
         set.status = 204
         return null
       },

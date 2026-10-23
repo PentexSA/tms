@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { Issue } from '@tms/sheet-core'
 import { chronicleKeys } from '../../lib/queries/chronicles'
 import { sheetKeys } from '../data'
+import { refusalCodeOf, refusalReason } from '../policy'
 import type { SheetStore, SheetSync } from '../store/sheetStore'
 import type { Outbox, QueuedBatch } from './outbox'
 import { createSender, type PostOutcome, type Sender } from './sender'
@@ -75,11 +76,18 @@ export function issuesOf(body: unknown): Issue[] {
     .map(i => ({ path: i.path, message: i.message }))
 }
 
+/**
+ * O aviso de um lote recusado. Um 403 da política traz o motivo (`code`):
+ * "O narrador travou a ficha. A alteração foi desfeita."
+ */
 export function rejectionMessage(
   label: string,
   status: number,
-  draft = false
+  draft = false,
+  body: unknown = null
 ): string {
+  const why = status === 403 ? refusalReason(refusalCodeOf(body)) : null
+  if (why) return `${why} A alteração foi desfeita.`
   if (status === 403)
     return `Sem permissão para “${label}”. A alteração foi desfeita.`
   if (status === 404)
@@ -171,8 +179,10 @@ export function createSync(deps: SyncDeps): Sync {
             batch.clientBatchId,
             status === 422 ? issuesOf(body) : undefined
           )
-        notify(rejectionMessage(batch.label, status, batch.draft))
-        if (status === 404) void refetch(characterId)
+        notify(rejectionMessage(batch.label, status, batch.draft, body))
+        // A recusa da política diz que o estado mudou (travada, concluída):
+        // a ficha rebuscada mostra o motivo no lugar
+        if (status === 404 || refusalCodeOf(body)) void refetch(characterId)
       },
     },
   })

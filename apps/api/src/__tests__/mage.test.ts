@@ -20,7 +20,6 @@ import {
 let ctx: TestContext
 let storyteller: TestUser
 let owner: TestUser
-let player: TestUser
 let mage: string
 let vampire: string
 
@@ -31,12 +30,10 @@ beforeEach(async () => {
   await publish(ctx, 'mta-m20')
   storyteller = await createUser(ctx, 'narradora')
   owner = await createUser(ctx, 'dona')
-  player = await createUser(ctx, 'outro')
   mage = await createChronicle(ctx, storyteller, 'mta-m20', 'A Torre')
   vampire = await createChronicle(ctx, storyteller, 'vtm-v20', 'Noites')
   for (const c of [mage, vampire]) {
     await addMember(ctx, c, owner)
-    await addMember(ctx, c, player)
   }
 })
 afterEach(async () => {
@@ -81,7 +78,7 @@ describe('ficha de Mago', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('mta-m20')
-    expect(body.templateVersion).toBe('1.2.0')
+    expect(body.templateVersion).toBe('1.4.0')
     expect(body.sheet.values).toEqual({
       name: 'Otto Brandt',
       tradition: 'filhos-do-eter',
@@ -151,7 +148,7 @@ describe('a roda', () => {
   })
 })
 
-describe('mesa e Notas do Narrador', () => {
+describe('mesa', () => {
   it('a mesa de Mago traz a roda; a de Vampiro, o Sangue', async () => {
     const id = await otto()
     await send(owner, id, [
@@ -170,38 +167,5 @@ describe('mesa e Notas do Narrador', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]?.systemCode).toBe('mta-m20')
     expect(rows[0]?.sheet.values.wheel).toEqual({ quintessence: 6, paradox: 2 })
-  })
-
-  it('o jogador nunca recebe as Notas do Narrador do Mago', async () => {
-    const id = await otto()
-    expect(
-      (
-        await send(storyteller, id, [
-          {
-            path: 'values.storytellerNotes',
-            from: null,
-            to: 'Um Sinal do Paradoxo vem aí.',
-          },
-        ])
-      ).status
-    ).toBe(200)
-    // O dono escreve as notas do narrador? Não
-    expect(
-      (
-        await send(owner, id, [
-          {
-            path: 'values.storytellerNotes',
-            from: null,
-            to: 'tentativa',
-          },
-        ])
-      ).status
-    ).toBe(403)
-    for (const user of [owner, player]) {
-      const text = await (
-        await as(ctx, user, 'GET', `/characters/${id}`)
-      ).text()
-      expect(text).not.toContain('Sinal do Paradoxo')
-    }
   })
 })

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { RoleName, SheetMode } from '@tms/sheet-core'
 import { AppBar, Button, EmptyState, Screen, Skeleton, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf, statusOf } from '../lib/errors'
@@ -12,9 +12,12 @@ import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
+import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
 import { SheetView } from './SheetView'
 import { createSheetStore } from './store/sheetStore'
+import { StatusMenuButton } from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
+import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
 
@@ -101,6 +104,15 @@ export function SheetScreen({
         actions={
           <View style={styles.actions}>
             <SyncIndicator />
+            {state.status === 'ready' && state.roles.includes('storyteller') ? (
+              <StatusMenuButton
+                characterId={id}
+                chronicleId={state.character.chronicle.id}
+                model={state.model}
+                status={state.character.status}
+                locked={state.character.lockedAt !== null}
+              />
+            ) : null}
             {state.status === 'ready' ? (
               <Button
                 title="Histórico"
@@ -113,10 +125,22 @@ export function SheetScreen({
         }
       />
       <OfflineBanner />
-      {body}
+      {state.status === 'ready' && state.roles.includes('storyteller') ? (
+        // Vindo da Mesa, o narrador passa de uma ficha a outra deslizando
+        <SwipeArea characterId={id}>
+          <TableNav characterId={id} />
+          {body}
+        </SwipeArea>
+      ) : (
+        body
+      )}
       {state.status === 'ready' ? (
         <HistorySheet
           characterId={id}
+          chronicleId={state.character.chronicle.id}
+          characterName={state.character.name}
+          model={state.model}
+          storyteller={state.roles.includes('storyteller')}
           visible={history}
           onClose={() => setHistory(false)}
         />
@@ -132,6 +156,21 @@ export function SheetScreen({
 export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
   roles.includes('owner') ? 'play' : 'read'
 
+/**
+ * O modo que a política deixa, quando ela tira algum (doc/plano-v3.md, Etapa
+ * 6): travada, a ficha fica em Jogo sem nada editável (a rolagem sem custo
+ * continua); arquivada, fora de jogo ou de quem saiu, em Leitura. Null: o
+ * modo é livre.
+ */
+export function policyMode(
+  roles: readonly RoleName[],
+  lifecycle: SheetLifecycle
+): Exclude<SheetMode, 'evolve'> | null {
+  const code = blockedBy(new Set(roles), lifecycle, 'play')
+  if (!code) return null
+  return code === 'SHEET_LOCKED' ? 'play' : 'read'
+}
+
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
 function LiveSheet({
   state,
@@ -141,7 +180,12 @@ function LiveSheet({
   readonly initialMode?: SheetMode
 }) {
   const sync = useSync()
-  const { id, sheet, sheetVersion } = state.character
+  const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
+  const lifecycle = useMemo<SheetLifecycle>(
+    () => ({ status, locked: lockedAt !== null, member }),
+    [status, lockedAt, member]
+  )
+  const forced = policyMode(state.roles, lifecycle)
   const [store] = useState(() => {
     // Só quem escreve algum campo começa em Evoluir (ficha recém-criada); sem
     // pedido, o modo padrão do papel
@@ -158,25 +202,34 @@ function LiveSheet({
       sheet: state.sheet,
       sheetVersion,
       roles: state.roles,
-      mode,
+      mode: forced ?? mode,
       sync,
     })
-    if (mode === 'evolve') created.getState().startDraft()
+    if (!forced && mode === 'evolve') created.getState().startDraft()
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
+  // O estado mudou (o narrador travou, arquivou, reativou): o modo acompanha.
+  // Sem modo forçado, a ficha do dono volta ao Jogo
+  useEffect(() => {
+    const s = store.getState()
+    const next = forced ?? (s.mode === 'read' ? defaultMode(state.roles) : null)
+    if (!next || next === s.mode) return
+    if (s.mode === 'evolve') s.discardDraft()
+    s.setMode(next)
+  }, [store, forced, state.roles])
   // Rebuscada (foco, conflito): o store confere a versão e valida
   useEffect(() => {
     store.getState().received(sheet, sheetVersion)
   }, [store, sheet, sheetVersion])
   return (
-    <>
+    <LifecycleContext.Provider value={lifecycle}>
       <SheetProvider store={store}>
         <StorytellerBar ownerName={state.character.owner.username} />
       </SheetProvider>
       <SheetView store={store} editable />
       <LeaveGuard store={store} />
-    </>
+    </LifecycleContext.Provider>
   )
 }
 

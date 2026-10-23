@@ -195,7 +195,7 @@ describe('POST /characters/:id/rolls', () => {
     expect(batches).toHaveLength(1)
     expect(rolls[0]?.batch_id).toBe(batches[0]?.id as string)
     const history = (await (
-      await as(ctx, player, 'GET', `/characters/${characterId}/history`)
+      await as(ctx, owner, 'GET', `/characters/${characterId}/history`)
     ).json()) as { items: { byRole: string; changes: { label: string }[] }[] }
     expect(history.items[0]).toMatchObject({
       byRole: 'owner',
@@ -390,8 +390,8 @@ describe('POST /characters/:id/rolls', () => {
     expect(res.status).toBe(400)
   })
 
-  it('o outro jogador da crônica não rola a ficha (403); sem vínculo, 404', async () => {
-    expect((await roll(player, dexAthletics)).status).toBe(403)
+  it('o outro jogador da crônica não rola a ficha; sem vínculo, também 404', async () => {
+    expect((await roll(player, dexAthletics)).status).toBe(404)
     const stranger = await createUser(ctx, 'estranho')
     expect((await roll(stranger, dexAthletics)).status).toBe(404)
   })
@@ -456,7 +456,7 @@ describe('GET /characters/:id/rolls', () => {
     })
     const res = await as(
       ctx,
-      player,
+      owner,
       'GET',
       `/characters/${characterId}/rolls?limit=10`
     )
@@ -466,6 +466,15 @@ describe('GET /characters/:id/rolls', () => {
       ['storyteller', true, 'botch'],
       ['owner', false, 'success'],
     ])
+    // O outro jogador da crônica não recebe as rolagens da dona
+    const other = await as(
+      ctx,
+      player,
+      'GET',
+      `/characters/${characterId}/rolls?limit=10`
+    )
+    expect(other.status).toBe(404)
+    expect(await other.text()).not.toContain('success')
   })
 
   it('limite fora do intervalo: 400', async () => {

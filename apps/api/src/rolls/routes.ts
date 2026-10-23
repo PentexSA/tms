@@ -1,12 +1,14 @@
 import type { DB } from '@tms/db'
 import {
   applyBatch,
+  classifyBatch,
   manualResult,
   type PoolPlan,
   type PoolResult,
   parsePath,
   planPool,
   poolRollOf,
+  rollPolicy,
   rollPool,
   type SheetData,
   type SheetModel,
@@ -22,6 +24,7 @@ import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
 import { modelFor } from '../sheets/models'
+import { lockCharacter, refusal, writeAccess } from '../sheets/policy'
 
 // Rolagem de dados no servidor (doc/plano-v0.md, Etapa 21). O cliente manda só
 // o pedido (slots, atalho, dificuldade, especialização, boosts); o servidor monta a
@@ -29,7 +32,8 @@ import { modelFor } from '../sheets/models'
 // cliente nunca é aceito: o corpo não tem onde pô-lo, e o parser descarta o
 // que sobra. "Rolei na mão" é a única entrada de resultado, e fica marcada
 // como manual. O custo (FdV) é um lote do histórico, na mesma transação, com
-// a ficha travada.
+// a ficha travada. Antes de rolar, a política do estado atual (v3): travada,
+// não rola gastando FdV; sem custo, rola.
 
 const notFound = () => new ApiError(404, 'não encontrado')
 
@@ -137,6 +141,7 @@ async function recordCost(
         path: e.path,
         from_value: JSON.stringify(e.from ?? null),
         to_value: JSON.stringify(e.to ?? null),
+        from_absent: (args.events[seq]?.from ?? null) === null,
       }))
     )
     .execute()
@@ -198,14 +203,8 @@ export function rollRoutes(
         const byRole = roles.has('owner') ? 'owner' : 'storyteller'
 
         return db.transaction().execute(async trx => {
-          const character = await trx
-            .selectFrom('characters')
-            .select(['sheet_data', 'sheet_version', 'deleted_at'])
-            .where('id', '=', params.id)
-            .forUpdate()
-            .executeTakeFirstOrThrow()
-          if (character.deleted_at !== null) throw notFound()
-          const current = character.sheet_data as unknown as SheetData
+          const character = await lockCharacter(trx, params.id)
+          const current = character.sheet
 
           // Reenvio: a mesma rolagem não rola de novo nem cobra duas vezes
           const done = await selectRoll(trx)
@@ -216,7 +215,7 @@ export function rollRoutes(
             return {
               duplicate: true,
               roll: rollOut(done),
-              sheetVersion: character.sheet_version,
+              sheetVersion: character.sheetVersion,
               sheet: stripRestricted(model, current, roles),
             }
 
@@ -229,6 +228,24 @@ export function rollRoutes(
           }
           const plan = planPool(model, current, request, roles)
           if (!plan.ok) throw planFailure(plan)
+          // O custo classificado sobre a ficha travada: o primeiro gasto de FdV
+          // (do padrão ao valor gravado) também passa por aqui
+          const cost = plan.events.length
+            ? classifyBatch(model, current, plan.events).parts
+            : null
+          const verdict = rollPolicy(
+            await writeAccess(trx, roles, character.chronicleId, me),
+            character.status,
+            character.lockedAt !== null,
+            cost?.map(p => p.kind) ?? null
+          )
+          if (!verdict.ok)
+            throw refusal(verdict, {
+              model,
+              roles,
+              paths: plan.events.map(e => e.path),
+              parts: cost ?? [],
+            })
           const result = body.manual
             ? manualResult(
                 body.manual.successes,
@@ -242,7 +259,7 @@ export function rollRoutes(
             })
 
           let sheet = current
-          let sheetVersion = character.sheet_version
+          let sheetVersion = character.sheetVersion
           let batchId: string | null = null
           if (plan.events.length) {
             const applied = applyBatch(model, current, plan, roles)

@@ -19,7 +19,8 @@ tags:
 # Reiniciar sem rede: a lista de crônicas não fica no disco, então a ficha
 # abre direto pelo link; ela e o pendente vêm do banco cifrado
 - stopApp
-- launchApp
+# O link inicia o processo diretamente: abrir primeiro pela MAIN e enviar o
+# link enquanto o Router ainda monta perde o destino no Android.
 - openLink: "tms://characters/${CHARACTER_ID}"
 - extendedWaitUntil:
     visible:

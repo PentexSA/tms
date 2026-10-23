@@ -1,5 +1,5 @@
 import type { FieldDefOf, Roll, Section, Template } from '../contract'
-import { type FieldTypeName, REGISTRY } from '../registry'
+import { type AlertRule, type FieldTypeName, REGISTRY } from '../registry'
 import type { Issue } from './issues'
 import { isSafeText } from './safe-text'
 import {
@@ -15,6 +15,19 @@ import {
   own,
   rec,
 } from './util'
+
+// O tipo de campo e o parâmetro de cada regra de alerta: uma regra nova no
+// REGISTRY sem entrada aqui quebra o build.
+const ALERT_PARAMS: {
+  readonly [R in AlertRule]: {
+    readonly type: FieldTypeName
+    readonly key: 'level' | 'value' | 'share'
+  }
+} = {
+  'track-at-level': { type: 'track', key: 'level' },
+  'resource-at-most': { type: 'resource', key: 'value' },
+  'resource-below-share': { type: 'resource', key: 'share' },
+}
 
 // Porta de validateTemplate (design/scripts/validate.mjs) com as mesmas
 // mensagens e caminhos. Checa o que JSON Schema não expressa: referências entre
@@ -46,6 +59,9 @@ const KEYS = {
     'ladders',
     'sections',
     'zoneLabels',
+    'statusLabels',
+    'alerts',
+    'recoveries',
     'dock',
     'roll',
     'actions',
@@ -643,6 +659,56 @@ function check(
       text(`zoneLabels.${z}`, label, 14)
   }
 
+  // Estados da ficha (doc/painel-narrador.md §5.1): o template só nomeia o
+  // `dead` ("Torpor", "Desaparecido"); os outros têm nome fixo no app.
+  if (t.statusLabels != null) {
+    keys('statusLabels', t.statusLabels, ['dead'])
+    for (const [s, label] of Object.entries(rec(t.statusLabels) ?? {}))
+      text(`statusLabels.${s}`, label, 20)
+  }
+
+  // Alertas da Mesa (doc/plano-v3.md, Etapa 8): regra da lista fechada, o
+  // tipo do campo que ela lê e só o parâmetro dela, nunca expressão.
+  const alertIds = new Set<unknown>()
+  const alerts = objs('alerts', t.alerts)
+  if (alerts.length > 10) err('alerts', 'no máximo 10 alertas')
+  for (const a of alerts) {
+    const p = `alerts.${a.id}`
+    keys(p, a, ['id', 'label', 'rule', 'field', 'level', 'value', 'share'])
+    if (!isId(a.id) || alertIds.has(a.id))
+      err(`${p}.id`, 'id inválido ou repetido')
+    alertIds.add(a.id)
+    text(`${p}.label`, a.label, 40)
+    oneOf(`${p}.rule`, a.rule, REGISTRY.alertRules, 'regra de alerta')
+    const f = field(a.field)
+    if (!f) err(`${p}.field`, `campo '${a.field}' não existe`)
+    const param = ALERT_PARAMS[a.rule as keyof typeof ALERT_PARAMS]
+    if (!param) continue
+    if (f && f.type !== param.type)
+      err(`${p}.field`, `a regra '${a.rule}' lê um campo ${param.type}`)
+    for (const k of ['level', 'value', 'share'])
+      if (k !== param.key && a[k] !== undefined)
+        err(`${p}.${k}`, `parâmetro de outra regra`)
+    if (param.key === 'level') {
+      const total =
+        f?.rule === 'boxes'
+          ? asArray(f.rows).reduce<number>(
+              (n, r) => n + (Number(rec(r)?.boxes) || 0),
+              0
+            )
+          : asArray(f?.levels).length
+      if (!isIntIn(a.level, 1, Math.max(total, 1)))
+        err(`${p}.level`, `precisa ser inteiro entre 1 e ${Math.max(total, 1)}`)
+    }
+    if (param.key === 'value' && !isIntIn(a.value, 0, NUM_LIMIT))
+      err(`${p}.value`, `precisa ser inteiro entre 0 e ${NUM_LIMIT}`)
+    if (
+      param.key === 'share' &&
+      !(typeof a.share === 'number' && a.share > 0 && a.share < 1)
+    )
+      err(`${p}.share`, 'precisa ser um número entre 0 e 1')
+  }
+
   // O que aparece fora da ficha (header, lista de personagens, mesa, dock) não
   // pode vir de seção com leitura restrita: vazaria para quem não pode lê-la.
   const identity = rec(t.identity) ?? {}
@@ -836,6 +902,71 @@ function check(
         err(`${p}.params.types`, `tipo '${ty}' não existe na trilha`)
   }
   for (const a of asArray(t.actions).map(rec)) checkHeal(`actions.${a?.id}`, a)
+  if (t.recoveries !== undefined) {
+    const recoveries = objs('recoveries', t.recoveries)
+    if (!recoveries.length || recoveries.length > 12)
+      err('recoveries', 'de 1 a 12 períodos')
+    const ids = new Set<unknown>()
+    for (const [i, recovery] of recoveries.entries()) {
+      const p = `recoveries.${i}`
+      keys(p, recovery, ['id', 'label', 'help', 'effects'])
+      if (!isId(recovery.id) || ids.has(recovery.id))
+        err(`${p}.id`, 'id inválido ou repetido')
+      ids.add(recovery.id)
+      text(`${p}.label`, recovery.label)
+      text(`${p}.help`, recovery.help, 1000)
+      const effects = objs(`${p}.effects`, recovery.effects)
+      if (!effects.length || effects.length > 20)
+        err(`${p}.effects`, 'de 1 a 20 efeitos')
+      for (const [j, e] of effects.entries()) {
+        const ep = `${p}.effects.${j}`
+        keys(ep, e, ['effect', 'params'])
+        oneOf(`${ep}.effect`, e.effect, REGISTRY.effects, 'effect')
+        if (e.effect === 'rest.long' || e.effect === 'rest.short') {
+          if (e.params !== undefined)
+            err(`${ep}.params`, 'efeito sem parâmetros')
+          continue
+        }
+        const params = rec(e.params)
+        const restore = e.effect === 'resource.restore'
+        const health = e.effect === 'health.heal'
+        keys(
+          `${ep}.params`,
+          params,
+          health
+            ? ['field', 'types']
+            : restore
+              ? ['field']
+              : ['field', 'amount']
+        )
+        if (health) {
+          checkHeal(ep, e)
+          const types = list(`${ep}.params.types`, params?.types)
+          if (
+            !types.length ||
+            types.length > 5 ||
+            new Set(types).size !== types.length
+          )
+            err(`${ep}.params.types`, 'de 1 a 5 tipos distintos')
+        } else {
+          const resource = field(params?.field)
+          if (
+            resource?.type !== 'resource' ||
+            resource.readOnly ||
+            resource.derive
+          )
+            err(
+              `${ep}.params.field`,
+              'precisa apontar para um resource gravável'
+            )
+          if (restore && !resource?.permanent)
+            err(`${ep}.params.field`, 'recurso precisa ter permanente')
+          if (!restore && !isIntIn(params?.amount, 1, 99))
+            err(`${ep}.params.amount`, 'precisa ser inteiro entre 1 e 99')
+        }
+      }
+    }
+  }
   for (const [fid, raw] of Object.entries(fields)) {
     const f = rec(raw)
     if (!f) continue

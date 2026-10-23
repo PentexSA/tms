@@ -47,6 +47,9 @@ const character = (sheet = example('helena').sheet) =>
     templateVersion: '1.0.0',
     sheetVersion: 3,
     roles: ['owner'],
+    status: 'creating',
+    lockedAt: null,
+    member: true,
     updatedAt: '2026-10-18T12:00:00Z',
     sheet,
   })

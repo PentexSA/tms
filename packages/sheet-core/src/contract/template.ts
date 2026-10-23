@@ -1,4 +1,5 @@
 import type {
+  AlertRule,
   BoostEffect,
   DiceNotation,
   Die,
@@ -161,12 +162,38 @@ export type Roll =
   | FudgeRoll
   | PbtaRoll
 
+/** Um alerta da Mesa: regra da lista fechada e o parâmetro dela. */
+export interface TemplateAlert {
+  readonly id: string
+  readonly label: string
+  readonly rule: AlertRule
+  readonly field: FieldId
+  // track-at-level: o nível que a trilha precisa ter marcado
+  readonly level?: number
+  // resource-at-most: o atual em `value` ou menos
+  readonly value?: number
+  // resource-below-share: o atual abaixo desta fração do máximo
+  readonly share?: number
+}
+
 export interface TemplateAction {
   readonly id: string
   readonly label: string
   readonly effect: EffectName
   readonly params?: ActionParams
   readonly help?: string
+}
+
+export interface RecoveryEffect {
+  readonly effect: EffectName
+  readonly params?: ActionParams
+}
+
+export interface TemplateRecovery {
+  readonly id: string
+  readonly label: string
+  readonly help: string
+  readonly effects: readonly RecoveryEffect[]
 }
 
 export type TabZone = 'build' | 'powers' | 'lore'
@@ -188,7 +215,12 @@ export interface Template {
   readonly fields: Readonly<Record<FieldId, FieldDef>>
   readonly sections: readonly Section[]
   readonly zoneLabels?: Readonly<Partial<Record<TabZone, string>>>
+  // Rótulo do estado `dead` da ficha ("Torpor"); sem ele, "Fora de jogo"
+  readonly statusLabels?: { readonly dead?: string }
+  // Quando uma linha da Mesa merece atenção (doc/plano-v3.md, Etapa 8)
+  readonly alerts?: readonly TemplateAlert[]
   readonly dock: readonly FieldId[]
   readonly roll: Roll
   readonly actions?: readonly TemplateAction[]
+  readonly recoveries?: readonly TemplateRecovery[]
 }

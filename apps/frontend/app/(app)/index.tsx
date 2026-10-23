@@ -75,7 +75,9 @@ export default function ChroniclesScreen() {
             meta={`${
               item.role === 'storyteller'
                 ? 'Você narra'
-                : `Narrador: ${item.storyteller.username}`
+                : item.role === 'former'
+                  ? 'Você saiu'
+                  : `Narrador: ${item.storyteller.username}`
             } · ${plural(item.characterCount, 'personagem', 'personagens')}`}
             leading={<Avatar name={item.name} />}
             onPress={() => router.push(`/chronicles/${item.id}`)}

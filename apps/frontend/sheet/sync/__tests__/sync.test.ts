@@ -161,6 +161,41 @@ it.each([
   }
 )
 
+// v3, Etapa 6: o 403 da política traz o motivo; a fila desfaz como antes
+it.each([
+  ['SHEET_LOCKED', 'O narrador travou a ficha. A alteração foi desfeita.'],
+  [
+    'SHEET_NOT_EDITABLE',
+    'A ficha está arquivada ou fora de jogo: só o narrador muda isto agora. A alteração foi desfeita.',
+  ],
+  [
+    'NEEDS_XP_APPROVAL',
+    'Depois da criação, subir um traço passa pelo narrador. A alteração foi desfeita.',
+  ],
+  [
+    'NOT_MEMBER',
+    'Você saiu desta crônica: a ficha é só leitura. A alteração foi desfeita.',
+  ],
+  ['FORBIDDEN', 'Sem permissão para “Sangue −1”. A alteração foi desfeita.'],
+  ['OUTRO', 'Sem permissão para “Sangue −1”. A alteração foi desfeita.'],
+])(
+  '403 %s: a frase do código, e a ficha é rebuscada',
+  async (code, message) => {
+    const body = { error: 'x', code, paths: ['values.blood'] }
+    const { store, notify, invalidate } = setup(() => ({ status: 403, body }))
+    await flush()
+    store.getState().commit([blood(9, 8)], 'Sangue −1')
+    await flush()
+    expect(store.getState().values.values.blood).toEqual({ current: 9 })
+    expect(notify).toHaveBeenCalledWith(message)
+    expect(rejectionMessage('Sangue −1', 403, false, body)).toBe(message)
+    if (code !== 'OUTRO')
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: sheetKeys.character(ID),
+      })
+  }
+)
+
 it('sem rede: fica otimista, tenta de novo e confirma', async () => {
   let online = false
   const { store, post } = setup(() =>

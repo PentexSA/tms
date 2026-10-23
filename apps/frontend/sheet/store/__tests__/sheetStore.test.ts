@@ -73,7 +73,7 @@ describe('commit: o otimista', () => {
   })
 
   it('campo derivado, conflito local e sem permissão', () => {
-    const { s } = setup(['player'])
+    const { s } = setup(['owner'])
     expect(
       s().commit(
         [{ path: 'values.storytellerNotes', from: null, to: 'x' }],

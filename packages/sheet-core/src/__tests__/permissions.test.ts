@@ -15,13 +15,15 @@ const model = compileTemplate(templates['vtm-v20'])
 const helena = () => character('helena').sheet as unknown as SheetData
 
 // Seção "storyteller" do Vampiro: read e write só do narrador. As demais não
-// declaram permissions (todos leem; dono e narrador escrevem).
+// declaram permissions (dono e narrador leem e escrevem). Outro jogador da
+// crônica não tem papel na ficha: o `player` saiu do registry na v3 e vale
+// como papel desconhecido.
 describe('matriz papel × seção', () => {
   it.each([
     // papéis           campo comum       notas do narrador
     [['owner'], { read: true, write: true }, { read: false, write: false }],
     [['storyteller'], { read: true, write: true }, { read: true, write: true }],
-    [['player'], { read: true, write: false }, { read: false, write: false }],
+    [['player'], { read: false, write: false }, { read: false, write: false }],
     [
       ['owner', 'storyteller'],
       { read: true, write: true },
@@ -41,9 +43,17 @@ describe('matriz papel × seção', () => {
   })
 
   it('campo fora de seção segue a regra padrão (clã)', () => {
-    expect(canRead(model, 'clan', ['player'])).toBe(true)
+    expect(canRead(model, 'clan', ['owner'])).toBe(true)
+    expect(canRead(model, 'clan', ['storyteller'])).toBe(true)
+    expect(canRead(model, 'clan', ['player'])).toBe(false)
     expect(canWrite(model, 'clan', ['player'])).toBe(false)
     expect(canWrite(model, 'clan', ['owner'])).toBe(true)
+  })
+
+  it('seção sem permissions com papel desconhecido: não lê (fail secure)', () => {
+    expect(canReadSection(model, 'attributes', ['player'])).toBe(false)
+    expect(canReadSection(model, 'attributes', ['viewer'])).toBe(false)
+    expect(canRead(model, 'strength', ['admin', 'player'])).toBe(false)
   })
 
   it('campo inexistente nunca é lido nem escrito', () => {
@@ -59,9 +69,9 @@ describe('matriz papel × seção', () => {
   })
 
   it('seções', () => {
-    expect(canReadSection(model, 'storyteller', ['player'])).toBe(false)
+    expect(canReadSection(model, 'storyteller', ['owner'])).toBe(false)
     expect(canReadSection(model, 'storyteller', ['storyteller'])).toBe(true)
-    expect(canReadSection(model, 'attributes', ['player'])).toBe(true)
+    expect(canReadSection(model, 'attributes', ['owner'])).toBe(true)
     expect(canReadSection(model, 'naoExiste', ['storyteller'])).toBe(false)
   })
 
@@ -75,7 +85,7 @@ describe('matriz papel × seção', () => {
       'about',
       'storyteller',
     ])
-    expect(canRead(m, 'storytellerNotes', ['player'])).toBe(false)
+    expect(canRead(m, 'storytellerNotes', ['owner'])).toBe(false)
     expect(canWrite(m, 'storytellerNotes', ['owner'])).toBe(false)
   })
 })
@@ -87,14 +97,17 @@ describe('stripRestricted', () => {
       ...sheet,
       specialties: { ...sheet.specialties, storytellerNotes: 'x' },
     } as SheetData
-    for (const roles of [['owner'], ['player']] as const) {
-      const out = stripRestricted(model, withSpecialty, roles)
-      expect(Object.hasOwn(out.values, 'storytellerNotes')).toBe(false)
-      expect(Object.hasOwn(out.specialties ?? {}, 'storytellerNotes')).toBe(
-        false
-      )
-      expect(out.values.name).toBe('Helena Varga')
-    }
+    const out = stripRestricted(model, withSpecialty, ['owner'])
+    expect(Object.hasOwn(out.values, 'storytellerNotes')).toBe(false)
+    expect(Object.hasOwn(out.specialties ?? {}, 'storytellerNotes')).toBe(false)
+    expect(out.values.name).toBe('Helena Varga')
+  })
+
+  it('outro jogador (papel fora do registry) não recebe nada', () => {
+    expect(stripRestricted(model, helena(), ['player'])).toEqual({
+      values: {},
+      specialties: {},
+    })
   })
 
   it('o narrador recebe tudo', () => {
