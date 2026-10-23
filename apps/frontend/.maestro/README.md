@@ -14,6 +14,7 @@ SQLCipher, dock com toque longo e modo avião.
 | `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
 | `06-werewolf-form` | a Forma do Lobisomem no dock: Crinos com a mudança instantânea e Desfazer (v2) |
 | `07-storyteller-table` | Mesa do narrador: dano e Nova noite em duas fichas, prévia e reversão no servidor (v3) |
+| `08-backstage` | Bastidores: criar NPC oculto, revelar só a identidade, parada livre oculta na Mesa e sessão no diário (v5) |
 
 ## Preparar
 
@@ -24,6 +25,8 @@ SQLCipher, dock com toque longo e modo avião.
    (o Desfazer devolve o que a rodada tirou).
    Para o `07`, a conta também narra uma crônica de Vampiro com duas fichas
    capazes de levar 1 nível letal; ambas devem estar em criação ou ativas.
+   O `08` usa a mesma crônica narrada: cada rodada cria um NPC "NPC Nativo",
+   uma rolagem livre oculta e uma sessão (dados de teste, nunca de produção).
 2. O dev build apontando para esse servidor:
 
    ```bash

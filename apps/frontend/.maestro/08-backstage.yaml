@@ -1,0 +1,74 @@
+# v5: a conta narra STORYTELLER_CHRONICLE. Cria um NPC (nasce oculto),
+# revela só a identidade, rola uma parada livre oculta na Mesa e registra a
+# sessão nos Bastidores. A privacidade do jogador é provada na API e no
+# Playwright; aqui é o toque, o teclado e a tela no aparelho.
+appId: com.tms.app
+name: Bastidores do narrador
+---
+- runFlow: subflows/login.yaml
+- tapOn:
+    text: "${STORYTELLER_CHRONICLE}, .*"
+- extendedWaitUntil:
+    visible: "Criar NPC"
+    timeout: 20000
+- tapOn: "Criar NPC"
+- extendedWaitUntil:
+    visible: "Novo NPC"
+    timeout: 20000
+- tapOn: "Nome \\(obrigatório\\)"
+- inputText: "NPC Nativo"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Tremere"
+- tapOn: "Tremere"
+- scrollUntilVisible:
+    element: "Criar ficha"
+- tapOn: "Criar ficha"
+- extendedWaitUntil:
+    visible: "Visibilidade do NPC"
+    timeout: 20000
+# Nasce oculto: o botão da visibilidade atual fica desabilitado
+- assertVisible:
+    text: "Oculto"
+    enabled: false
+- tapOn: "Identidade"
+- extendedWaitUntil:
+    visible:
+      text: "Identidade"
+      enabled: false
+    timeout: 15000
+- back
+- extendedWaitUntil:
+    visible: "Mesa"
+    timeout: 20000
+- tapOn: "Mesa"
+- scrollUntilVisible:
+    element: "Rótulo"
+    centerElement: true
+- tapOn: "Rótulo"
+# O rótulo já vem preenchido ("Parada livre")
+- eraseText: 40
+- inputText: "Presságio nativo"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Rolar"
+# A parada livre nasce oculta
+- assertVisible:
+    text: "Oculta"
+    selected: true
+- tapOn: "Rolar"
+- scrollUntilVisible:
+    element: "Presságio nativo, .*"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Bastidores"
+    direction: UP
+- tapOn: "Bastidores"
+- tapOn: "Título da sessão"
+- inputText: "Sessão nativa"
+- hideKeyboard
+- tapOn: "Registrar sessão"
+# O sucesso limpa o formulário; a sessão entra na lista abaixo dele
+- scrollUntilVisible:
+    element: "Sessão nativa, .*"
+    timeout: 20000

@@ -7,8 +7,20 @@ name: Mesa do narrador, dano, período e desfazer
     text: "${STORYTELLER_CHRONICLE}, .*"
 - tapOn: "Mesa"
 - tapOn: "Selecionar personagens"
+# Desde a v4 a configuração da criação fica acima das abas: as linhas da Mesa
+# começam abaixo da dobra
+- scrollUntilVisible:
+    element: "Selecionar ${STORYTELLER_CHARACTER_A}"
+    centerElement: true
 - tapOn: "Selecionar ${STORYTELLER_CHARACTER_A}"
+- scrollUntilVisible:
+    element: "Selecionar ${STORYTELLER_CHARACTER_B}"
+    centerElement: true
 - tapOn: "Selecionar ${STORYTELLER_CHARACTER_B}"
+# A barra de ações fica acima das linhas
+- scrollUntilVisible:
+    element: "Aplicar dano"
+    direction: UP
 - tapOn: "Aplicar dano"
 - tapOn: "Letal"
 - tapOn: "Ver prévia"
@@ -19,6 +31,9 @@ name: Mesa do narrador, dano, período e desfazer
 - extendedWaitUntil:
     visible: "Alteração desfeita."
     timeout: 15000
+- scrollUntilVisible:
+    element: "Nova noite"
+    direction: UP
 - tapOn: "Nova noite"
 - assertVisible: "Desconta 1 ponto de Sangue.*"
 - tapOn: "Ver prévia"
