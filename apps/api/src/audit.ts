@@ -8,6 +8,13 @@ import type { Transaction } from 'kysely'
 
 export type AuditAction =
   | 'character.creation.complete'
+  // v4 (doc/plano-v4.md §3.4): submissão do dono, decisões do narrador e
+  // ajustes da criação. O motivo da devolução não entra aqui: fica na ficha
+  | 'character.creation.submit'
+  | 'character.creation.approve'
+  | 'character.creation.return'
+  | 'character.creation.update'
+  | 'chronicle.creation.settings'
   | 'character.status'
   | 'character.lock'
   | 'character.unlock'
@@ -24,7 +31,7 @@ export async function audit(
     readonly characterId?: string
     readonly userId?: string
     readonly payload?: Readonly<
-      Record<string, string | boolean | null | readonly string[]>
+      Record<string, string | number | boolean | null | readonly string[]>
     >
     readonly at: Date
   }

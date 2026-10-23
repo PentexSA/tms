@@ -21,14 +21,15 @@ import { modelFor } from '../sheets/models'
 // pode depender de outro campo (o máximo do Sangue vem da Geração), e mesmo
 // assim passa por stripRestricted com os papéis resolvidos no banco.
 //
-// v3, Etapa 9: a Mesa mostra `creating` e `active`; `?status=archived,dead`
+// v3, Etapa 9: a Mesa mostra `creating`, `pending` e `active`; `?status=archived,dead`
 // traz as outras. O filtro é aqui, para a resposta não levar o que a tela
 // esconde.
 
 const notFound = () => new ApiError(404, 'não encontrado')
 
-// Os estados que a Mesa mostra sem filtro
-const IN_PLAY = ['creating', 'active'] as const
+// Os estados que a Mesa mostra sem filtro; `pending` (v4) aparece para o
+// narrador aprovar ou devolver
+const IN_PLAY = ['creating', 'pending', 'active'] as const
 
 export function tableRoutes(
   db: Kysely<DB>,

@@ -26,6 +26,8 @@ const REFUSALS: Readonly<Record<RefusalCode, string>> = {
   FORBIDDEN: 'sem permissão de escrita',
 }
 
+const PENDING = 'a ficha aguarda aprovação do narrador'
+
 export interface LockedCharacter {
   readonly chronicleId: string
   readonly userId: string
@@ -34,6 +36,10 @@ export interface LockedCharacter {
   readonly status: string
   readonly lockedAt: Date | null
   readonly creationCompletedAt: Date | null
+  // Metadados da criação (doc/plano-v4.md §3.4), crus do banco
+  readonly creation: unknown
+  readonly creationRevision: number
+  readonly activatedAt: Date | null
 }
 
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -57,6 +63,9 @@ export async function lockCharacter(
       'status',
       'locked_at',
       'creation_completed_at',
+      'creation',
+      'creation_revision',
+      'activated_at',
     ])
     .where('id', '=', id)
     .forUpdate()
@@ -70,6 +79,9 @@ export async function lockCharacter(
     status: row.status,
     lockedAt: date(row.locked_at),
     creationCompletedAt: date(row.creation_completed_at),
+    creation: row.creation,
+    creationRevision: row.creation_revision,
+    activatedAt: date(row.activated_at),
   }
 }
 
@@ -122,8 +134,13 @@ export function refusal(
     const p = parsePath(path.split('#')[0])
     return p !== null && canRead(args.model, p.fieldId, args.roles)
   })
-  return new ApiError(403, REFUSALS[result.code], {
-    code: result.code,
-    paths,
-  })
+  return new ApiError(
+    403,
+    result.reason === 'pending' ? PENDING : REFUSALS[result.code],
+    {
+      code: result.code,
+      ...(result.reason && { reason: result.reason }),
+      paths,
+    }
+  )
 }

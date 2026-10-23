@@ -33,8 +33,12 @@ export interface MatrixRow {
   ) => unknown
   // A linha muda o cenário (excluir, gravar): monta um cenário por ator
   readonly mutates?: true
-  // Estado da ficha antes da requisição (travar pede `active`)
-  readonly sheet?: { readonly status: 'active'; readonly locked?: true }
+  // Estado da ficha antes da requisição (travar pede `active`; aprovar e
+  // devolver pedem `pending`)
+  readonly sheet?: {
+    readonly status: 'active' | 'pending'
+    readonly locked?: true
+  }
 }
 
 // O ex-membro responde como quem não tem vínculo, salvo onde a linha diz
@@ -177,6 +181,37 @@ export const MATRIX: readonly MatrixRow[] = [
     route: '/characters/:id/creation/complete',
     mutates: true,
     expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  // Criação e aprovação (v4, Etapa 4). Os templates do produto ainda não têm
+  // `creation` (Etapa 2b): a criação é livre, e só o narrador conclui
+  {
+    method: 'PATCH',
+    route: '/characters/:id/creation',
+    body: () => ({ revision: 0, choices: {} }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/approve',
+    sheet: { status: 'pending' },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/return',
+    body: () => ({ reason: 'Refaça os Antecedentes' }),
+    sheet: { status: 'pending' },
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'PATCH',
+    route: '/chronicles/:id/creation-settings',
+    body: () => ({ revision: 0, approval: true }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 403, ...denied },
   },
   {
     method: 'POST',

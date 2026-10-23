@@ -119,9 +119,15 @@ describe('GET /chronicles/:id/table', () => {
   })
 
   // v3, Etapa 9: arquivada e fora de jogo somem; o filtro as traz
-  it('mostra creating e active; ?status= traz as outras', async () => {
+  it('mostra creating, pending e active; ?status= traz as outras', async () => {
     const ids: Record<string, string> = {}
-    for (const status of ['creating', 'active', 'archived', 'dead'] as const) {
+    for (const status of [
+      'creating',
+      'pending',
+      'active',
+      'archived',
+      'dead',
+    ] as const) {
       ids[status] = await createCharacter(ctx, owner, chronicleId, {
         name: status,
       })
@@ -138,14 +144,15 @@ describe('GET /chronicles/:id/table', () => {
           )
         ).json()) as { name: string; status: string }[]
       ).map(r => r.status)
-    expect(await names()).toEqual(['creating', 'active'])
+    expect(await names()).toEqual(['creating', 'pending', 'active'])
+    expect(await names('?status=pending')).toEqual(['pending'])
     expect(await names('?status=archived,dead')).toEqual(['archived', 'dead'])
     expect(await names('?status=active')).toEqual(['active'])
     const bad = await as(
       ctx,
       storyteller,
       'GET',
-      `/chronicles/${chronicleId}/table?status=pending`
+      `/chronicles/${chronicleId}/table?status=zumbi`
     )
     expect(bad.status).toBe(422)
   })

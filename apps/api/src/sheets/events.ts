@@ -2,10 +2,13 @@ import type { DB } from '@tms/db'
 import {
   applyBatch,
   canRead,
+  checkCreationBatch,
   classifyBatch,
+  creationInputOf,
   describeEvent,
   isReversible,
   MAX_EVENTS_PER_BATCH,
+  parseCharacterCreation,
   parsePath,
   type RoleName,
   type SheetEvent,
@@ -21,6 +24,7 @@ import { characterAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
+import { creationRefusal } from './creation'
 import { modelFor } from './models'
 import { lockCharacter, refusal, writeAccess } from './policy'
 
@@ -148,6 +152,26 @@ export function eventRoutes(
               paths: body.events.map(e => e.path),
               parts: classes.parts,
             })
+
+          // Avaliação parcial da criação por pontos (doc/plano-v4.md §3.1):
+          // falta de básicos passa; bônus acima do saldo, teto ou avanço sem
+          // prioridade, não. Vale para dono e narrador (§2.3, 21), com os
+          // metadados de agora, lidos com a ficha travada
+          if (
+            character.status === 'creating' ||
+            character.status === 'pending'
+          ) {
+            const worse = checkCreationBatch(
+              model,
+              current,
+              result.sheet,
+              creationInputOf(
+                model,
+                parseCharacterCreation(model, character.creation)
+              )
+            )
+            if (worse) throw creationRefusal(model, roles, worse)
+          }
 
           const sheetVersion = character.sheetVersion + 1
           const nameField = model.template.identity.name

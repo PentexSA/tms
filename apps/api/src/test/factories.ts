@@ -128,12 +128,18 @@ export async function createCharacter(
 export async function setStatus(
   ctx: TestContext,
   characterId: string,
-  status: 'creating' | 'active' | 'archived' | 'dead',
+  status: 'creating' | 'pending' | 'active' | 'archived' | 'dead',
   locked = false
 ) {
   await ctx.db
     .updateTable('characters')
-    .set({ status, locked_at: locked ? new Date() : null })
+    .set({
+      status,
+      locked_at: locked ? new Date() : null,
+      // Ativa (ou já foi): passou pela conclusão, como na rota
+      ...(status !== 'creating' &&
+        status !== 'pending' && { activated_at: new Date() }),
+    })
     .where('id', '=', characterId)
     .execute()
 }

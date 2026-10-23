@@ -2,9 +2,11 @@ import type { DB } from '@tms/db'
 import {
   canWrite,
   type Issue,
+  parseCharacterCreation,
   type RoleName,
   type SheetData,
   stripRestricted,
+  validateCreationConfig,
   validateSheet,
   withValueDeps,
   writePolicy,
@@ -17,6 +19,7 @@ import { requireUser } from '../auth/guard'
 import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
+import { creationView } from './creation'
 import { latestTemplate, modelFor } from './models'
 import { lockCharacter, refusal, writeAccess } from './policy'
 
@@ -107,7 +110,7 @@ export function sheetRoutes(
         if (role === 'former') throw notMember()
         const chronicle = await db
           .selectFrom('chronicles')
-          .select('system_id')
+          .select(['system_id', 'creation_defaults'])
           .where('id', '=', params.id)
           .executeTakeFirstOrThrow()
         const template = await latestTemplate(db, chronicle.system_id)
@@ -144,6 +147,17 @@ export function sheetRoutes(
         }
         const issues = validateSheet(model.template, sheet)
         if (issues.length) throw invalid(issues)
+        // A configuração efetiva fica registrada ao nascer: mudar o padrão
+        // da crônica depois só vale para fichas novas (doc/plano-v4.md §3.4)
+        const defaults = chronicle.creation_defaults
+        const creation =
+          model.template.creation &&
+          defaults &&
+          typeof defaults === 'object' &&
+          Object.keys(defaults).length &&
+          !validateCreationConfig(model, defaults).length
+            ? { config: defaults }
+            : {}
 
         // Protocolo de trava da Etapa 7 (doc/plano-v3.md): o membro trava o
         // vínculo antes de criar. Uma remoção ao mesmo tempo ou termina antes
@@ -179,6 +193,7 @@ export function sheetRoutes(
               name,
               sheet_data: JSON.stringify(sheet),
               template_version: template.version,
+              creation: JSON.stringify(creation),
             })
             .returning('id')
             .executeTakeFirstOrThrow()
@@ -283,6 +298,11 @@ export function sheetRoutes(
             'ch.updated_at',
             'ch.status',
             'ch.locked_at',
+            'ch.creation',
+            'ch.creation_revision',
+            'ch.creation_completed_at',
+            'ch.approved_at',
+            'c.character_approval',
             'c.id as chronicleId',
             'c.name as chronicleName',
             'g.code as systemCode',
@@ -312,6 +332,17 @@ export function sheetRoutes(
           roles: [...access.roles],
           status: row.status,
           lockedAt: row.locked_at,
+          // Criação por pontos e aprovação (v4): só dono e narrador chegam aqui
+          creation: {
+            ...creationView(
+              model,
+              parseCharacterCreation(model, row.creation),
+              row.creation_revision
+            ),
+            approval: row.character_approval,
+            completedAt: row.creation_completed_at,
+            approvedAt: row.approved_at,
+          },
           member,
           updatedAt: row.updated_at,
           sheet: stripRestricted(

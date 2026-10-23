@@ -16,9 +16,12 @@ import { type LockedCharacter, lockCharacter } from './policy'
 // no `chronicle_audit`. Uma ação que não muda nada (concluir de novo, travar
 // a travada) é 409 e não gera linha.
 //
-// creating → active (concluir) → archived | dead, e de volta a active
-// (reativar). Voltar para creating não existe. A trava só vale em active, e
-// sair de active a limpa (§7, decisão 6).
+// creating → (pending →) active pela conclusão (creation.ts) → archived |
+// dead, e de volta a active (reativar). A rota de estado nunca ativa uma
+// ficha que não passou pela conclusão (doc/plano-v4.md §3.4): voltar a active
+// exige `activated_at`. Uma ficha arquivada antes de ser ativada só volta
+// para creating (e conclui de novo). A trava só vale em active, e sair de
+// active a limpa (§7, decisão 6).
 
 const notFound = () => new ApiError(404, 'não encontrado')
 const conflict = (message: string) => new ApiError(409, message)
@@ -30,7 +33,12 @@ interface Change {
 }
 
 // Os estados que o narrador escolhe pela rota de estado.
-const TARGETS: readonly CharacterStatus[] = ['active', 'archived', 'dead']
+const TARGETS: readonly CharacterStatus[] = [
+  'creating',
+  'active',
+  'archived',
+  'dead',
+]
 
 export function statusRoutes(
   db: Kysely<DB>,
@@ -77,22 +85,6 @@ export function statusRoutes(
   return new Elysia()
     .use(guard)
     .post(
-      '/characters/:id/creation/complete',
-      ({ params, userId }) =>
-        administer(requireUser(userId), params.id, (row, now) => {
-          if (row.status !== 'creating') throw conflict('criação já concluída')
-          return {
-            set: {
-              status: 'active',
-              creation_completed_at: now,
-              creation_completed_by: requireUser(userId),
-            },
-            action: 'character.creation.complete',
-          }
-        }),
-      { params: idParams }
-    )
-    .post(
       '/characters/:id/status',
       ({ params, body, userId }) => {
         const to = body.status
@@ -102,9 +94,18 @@ export function statusRoutes(
           })
         return administer(requireUser(userId), params.id, row => {
           if (row.status === to) throw conflict('a ficha já está nesse estado')
-          // De creating para active, só concluindo a criação
-          if (row.status === 'creating' && to === 'active')
+          // Só ativa quem já passou pela conclusão (e aprovação): nada de
+          // creating → archived → active
+          if (to === 'active' && row.activatedAt === null)
             throw conflict('conclua a criação')
+          // De volta à criação, só quem nunca foi ativada e saiu de jogo;
+          // pending volta pela devolução, com motivo
+          if (
+            to === 'creating' &&
+            (row.activatedAt !== null ||
+              (row.status !== 'archived' && row.status !== 'dead'))
+          )
+            throw conflict('a ficha não volta para a criação')
           const unlocked = row.lockedAt !== null
           return {
             set: { status: to, locked_at: null },

@@ -174,6 +174,8 @@ describe('GET /chronicles/:id', () => {
       },
       role: 'player',
       storyteller: { id: storyteller.id, username: 'narradora' },
+      // Aprovação de ficha desligada por padrão (v4)
+      creation: { approval: false, defaults: {}, revision: 0 },
       members: [
         { id: player.id, username: 'jogador', joinedAt: expect.any(String) },
       ],
