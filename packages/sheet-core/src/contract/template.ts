@@ -12,6 +12,7 @@ import type {
   SpecialtyRule,
   ZoneName,
 } from '../registry'
+import type { CostsDef, CreationDef } from './accounting'
 import type { ActionParams, FieldDef, FieldId } from './fields'
 
 // O template inteiro (`trait_templates.template_data`), espelhando
@@ -223,4 +224,7 @@ export interface Template {
   readonly roll: Roll
   readonly actions?: readonly TemplateAction[]
   readonly recoveries?: readonly TemplateRecovery[]
+  // Criação por pontos e preços de evolução (doc/plano-v4.md §3)
+  readonly creation?: CreationDef
+  readonly costs?: CostsDef
 }

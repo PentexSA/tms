@@ -36,6 +36,9 @@ const SCHEMA_DEFS = {
   emblems: 'emblem',
   skins: 'skin',
   slotResets: 'slotReset',
+  budgetRules: 'budgetRule',
+  capRules: 'capRule',
+  costRules: 'costRule',
 } satisfies Record<keyof Registry, string>
 
 describe('REGISTRY', () => {

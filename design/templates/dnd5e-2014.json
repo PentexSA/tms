@@ -4,7 +4,7 @@
   "name": "D&D 5ª edição (SRD 5.1)",
   "family": "d20",
   "edition": "5e 2014",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "locale": "pt-BR",
   "skin": "dnd",
   "license": "Nomes e regras do System Reference Document 5.1, da Wizards of the Coast LLC, sob a licença Creative Commons Attribution 4.0 International (CC BY 4.0). Este template é o teste de aceitação da arquitetura: usa o mesmo esqueleto de tela da ficha de Vampiro.",
@@ -705,5 +705,50 @@
         }
       ]
     }
-  ]
+  ],
+  "creation": {
+    "budgets": [
+      {
+        "id": "abilities",
+        "label": "Atributos",
+        "rule": "point-buy",
+        "budget": 27,
+        "base": 8,
+        "table": [0, 1, 2, 3, 4, 5, 7, 9],
+        "targets": ["str", "dex", "con", "int", "wis", "cha"]
+      }
+    ],
+    "untracked": [
+      "level",
+      "saveStr",
+      "saveDex",
+      "saveCon",
+      "saveInt",
+      "saveWis",
+      "saveCha",
+      "acrobatics",
+      "animalHandling",
+      "arcana",
+      "athletics",
+      "performance",
+      "deception",
+      "stealth",
+      "history",
+      "intimidation",
+      "insight",
+      "investigation",
+      "medicine",
+      "nature",
+      "perception",
+      "persuasion",
+      "sleightOfHand",
+      "religion",
+      "survival",
+      "hp",
+      "ac",
+      "spellSlots",
+      "attacks",
+      "spells"
+    ]
+  }
 }

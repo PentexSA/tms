@@ -4,7 +4,7 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.5.0",
+  "templateVersion": "1.6.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
@@ -664,6 +664,7 @@
       "zone": "powers",
       "title": "Experiência",
       "layout": "groups",
+      "permissions": { "read": ["owner", "storyteller"], "write": ["storyteller"] },
       "groups": [
         {
           "id": "experience",
@@ -759,5 +760,8 @@
         }
       ]
     }
-  ]
+  ],
+  "costs": {
+    "xp": { "total": "xpTotal", "spent": "xpSpent" }
+  }
 }

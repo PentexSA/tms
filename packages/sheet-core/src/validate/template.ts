@@ -1,5 +1,6 @@
 import type { FieldDefOf, Roll, Section, Template } from '../contract'
 import { type AlertRule, type FieldTypeName, REGISTRY } from '../registry'
+import { checkAccounting } from './accounting'
 import type { Issue } from './issues'
 import { isSafeText } from './safe-text'
 import {
@@ -65,6 +66,8 @@ const KEYS = {
     'dock',
     'roll',
     'actions',
+    'creation',
+    'costs',
   ],
   fieldCommon: [
     'type',
@@ -1014,4 +1017,5 @@ function check(
         "o primeiro estado precisa ser 'none' (sem marca)"
       )
   }
+  checkAccounting(t, { err, text, keys, num, field })
 }

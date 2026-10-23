@@ -76,6 +76,10 @@ export const REGISTRY = {
   emblems: ['ankh', 'nine-star', 'claws'],
   skins: ['wod', 'dnd', 'coc', 'fate'],
   slotResets: ['longRest', 'shortRest'],
+  // Contabilização da criação e da evolução (doc/plano-v4.md §3)
+  budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
+  capRules: ['creation-cap', 'hard-cap'],
+  costRules: ['flat', 'per-current', 'item-meta', 'credit'],
 } as const
 
 export type Registry = typeof REGISTRY
@@ -107,6 +111,9 @@ export type ConditionRoll = Registry['conditionRoll'][number]
 export type GlyphName = Registry['glyphs'][number]
 export type EmblemName = Registry['emblems'][number]
 export type SlotReset = Registry['slotResets'][number]
+export type BudgetRule = Registry['budgetRules'][number]
+export type CapRule = Registry['capRules'][number]
+export type CostRule = Registry['costRules'][number]
 
 // Confere se um valor desconhecido (vindo do banco ou do cliente) está na lista.
 export function isOneOf<T extends readonly unknown[]>(

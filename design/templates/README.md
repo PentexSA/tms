@@ -59,6 +59,8 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `dock` | sim | lista (1–3) | Recursos do dock e da mesa do narrador (§6). |
 | `roll` | sim | objeto | Parada de dados (§7). |
 | `actions` | não | lista | Ações nomeadas com prévia (§8). |
+| `creation` | não | objeto | Criação por pontos: orçamentos, tetos e iniciais (§14). |
+| `costs` | não | objeto | Preços em pontos de bônus e em XP (§14). |
 
 Ids (de campo, seção, opção, estado, linha, tipo de dano) seguem `^[a-zA-Z][a-zA-Z0-9-]*$`, com até 64 caracteres. Nomes herdados de `Object.prototype` (`constructor`, `toString`, `valueOf`...) são proibidos.
 
@@ -482,6 +484,9 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `emblems` | `emblem` | `ankh`, `nine-star`, `claws` |
 | `skins` | `skin` | `wod`, `dnd`, `coc`, `fate` |
 | `slotResets` | `slotReset` | `longRest`, `shortRest` |
+| `budgetRules` | `budgetRule` | `priority-budget`, `fixed-budget`, `item-count`, `point-buy` |
+| `capRules` | `capRule` | `creation-cap`, `hard-cap` |
+| `costRules` | `costRule` | `flat`, `per-current`, `item-meta`, `credit` |
 
 Derivações, com assinatura:
 
@@ -731,3 +736,129 @@ Este exemplo passa em `schema.json`, em `validateTemplate` e, com uma ficha de t
 Em produção, um sistema novo é **uma linha em `game_systems`** (código, família, nome) **e uma linha em `trait_templates`** (`template_data` = o JSON), inseridas por perfil administrativo pelo endpoint que aplica `schema.json` e `validateTemplate`. Sem migration e sem tela nova.
 
 **Multi-sistema:** o exemplo PbtA reaproveita `number`, `track`, `list`, `choice` e `pbta-2d6`, que já existiam. O único ponto que pediria código, um relógio de PbtA com um preenchimento, entra uma vez como regra de `clock` e passa a servir Blades in the Dark e qualquer outro sistema com relógios.
+
+---
+
+## 14. Contabilização: criação por pontos e XP
+
+A criação tem um orçamento, e a evolução depois dela tem preço em XP. O template declara as regras; o core calcula com duas funções puras, as mesmas no app e no servidor: `checkCreation` (conta da criação) e `costOf` (preço de subir um nível). O que a ficha grava são só as **escolhas** do jogador (a ordem das prioridades) e a **configuração** do narrador (orçamentos, criação livre). A origem de cada ponto nunca é gravada: é calculada do estado final da ficha, então a ordem em que os pontos foram distribuídos não muda o resultado.
+
+Os três templates WoD têm só o mapeamento do extrato (`costs.xp` com `total` e `spent`, sem `rules`) e a seção `experience` com escrita só do narrador; orçamentos e preços entram depois de conferidos no livro (doc/plano-v4.md, Etapa 2b). O fixture de D&D usa `creation` para provar o point-buy de 27 pelo mesmo código, sem ser publicado.
+
+### `creation`
+
+```json
+"creation": {
+  "freebies": 15,
+  "budgets": [
+    { "id": "attributes", "label": "Atributos", "rule": "priority-budget", "budgets": [7, 5, 3],
+      "groups": [{ "id": "physical", "label": "Físicos", "targets": ["strength", "dexterity", "stamina"] }, ...] },
+    { "id": "disciplines", "label": "Disciplinas", "rule": "fixed-budget", "budget": 3, "targets": ["disciplines"] }
+  ],
+  "caps": [{ "rule": "creation-cap", "targets": ["alertness", ...], "max": 3 },
+           { "rule": "hard-cap", "targets": ["spheres..."], "max": { "field": "arete" } }],
+  "baselines": [{ "targets": ["appearance"], "value": 0, "locked": true, "when": { "field": "clan", "in": ["nosferatu"] } }],
+  "untracked": ["..."]
+}
+```
+
+*(Números do exemplo ilustrativos; a regra de cada livro entra só com fonte e página.)*
+
+| Chave | Efeito |
+|---|---|
+| `freebies` | Saldo de pontos de bônus (0 a 1000). |
+| `budgets` | Orçamentos, de 1 a 20. Cada um tem `id`, `label` (até 40) e `rule` da lista `budgetRules`. |
+| `caps` | Tetos: `creation-cap` limita só o que os pontos básicos pagam (acima, só bônus); `hard-cap` limita a criação inteira, com número ou `{ field }` (o valor de um `rating`/`number`). |
+| `baselines` | Valor inicial condicional: substitui o padrão do campo na conta quando `when` vale. `locked: true` proíbe comprar acima dele. |
+| `untracked` | Campos de evolução que a criação não contabiliza (o resto da ficha de D&D). |
+
+| `rule` | Parâmetros | Conta |
+|---|---|---|
+| `priority-budget` | `budgets` (2 a 5) e `groups` (um por orçamento) | O jogador ordena os grupos; o primário recebe o primeiro orçamento. |
+| `fixed-budget` | `budget`, `targets` | Pontos acima do inicial. Lista: soma dos pontos dos itens (precisa de `item.value`). |
+| `item-count` | `budget`, `targets` (listas) | Quantidade de itens. |
+| `point-buy` | `budget`, `base`, `table`, `targets` | `table[i]` é o custo acumulado de ter `base + i`; começa em 0 e nunca diminui. Fora da tabela, recusado. Sem bônus. |
+
+**Alvos.** Um `target` é um id de campo: o valor de `rating`/`number` gravável, o **permanente** de `resource` ou os itens de `list`. Conta sempre a **base** (gravada ou o padrão), nunca o efetivo: modificadores de Forma não geram investimento nem desconto. Um campo entra em no máximo um grupo de orçamento, um preço de bônus e uma regra de XP; seletor sobreposto é recusado.
+
+**A conta, por grupo.**
+
+1. `inicial`: o `baseline` que vale, ou a `base` do point-buy, ou o padrão do campo (o que ele vale sem valor gravado; uma fórmula acompanha as fontes finais). Item de lista começa no `item.value.min`.
+2. `investido` = valor − inicial (nunca negativo). Abaixo do inicial não gera crédito: é `CREATION_BELOW_INITIAL`.
+3. `elegível` = a parte do investido até o `creation-cap`.
+4. `básicos` = min(soma dos elegíveis, orçamento do grupo).
+5. `extra` = investido − básicos, pago com bônus ao preço do grupo. Ultrapassar os básicos não é erro em si: é financiado pelo bônus.
+6. Faltar básicos (`CREATION_BASICS_UNSPENT`) só impede concluir; básicos e point-buy fecham **exatos**, bônus é **limite** (sobra de bônus é permitida e não vira XP).
+
+O preço de bônus precisa ser **uniforme** no grupo: todos os alvos com o mesmo `flat`, ou nenhum. Com preço variável, a conta dependeria de qual ponto foi pago com o quê, e o validador recusa. Grupo sem preço não compra acima do orçamento (`CREATION_NOT_PURCHASABLE`).
+
+**Fail secure.** Qualquer mudança de evolução (classe `advance` de `classifyChange`) num campo fora de todas as contas, do extrato de XP e de `untracked` é `CREATION_NOT_PURCHASABLE`. Texto, identidade e jogo não entram na conta.
+
+**Baseline e padrão.** O baseline muda só a conta; o valor exibido continua vindo do `default`. Para que ausente e gravado sejam equivalentes, o `default` do campo precisa acompanhar a mesma condição (um `default` por opção de `choice`). Um campo travado com valor acima do baseline bloqueia.
+
+### `costs`
+
+```json
+"costs": {
+  "freebie": [
+    { "id": "attribute", "rule": "flat", "cost": 5, "targets": ["strength", ...] },
+    { "id": "merits", "rule": "item-meta", "meta": "cost", "targets": ["merits"] },
+    { "id": "flaws", "rule": "credit", "meta": "bonus", "max": 7, "targets": ["flaws"] }
+  ],
+  "xp": {
+    "total": "xpTotal", "spent": "xpSpent",
+    "rules": [
+      { "id": "ability", "rule": "per-current", "factor": 2, "new": 3, "targets": ["alertness", ...] },
+      { "id": "spheres", "rule": "per-current", "factor": 8, "new": 10, "targets": ["..."],
+        "when": [{ "if": { "field": "affinity", "equalsTarget": true }, "factor": 7 }] }
+    ]
+  }
+}
+```
+
+| `costs.freebie[].rule` | Parâmetros | Custo em bônus |
+|---|---|---|
+| `flat` | `cost` | Por ponto investido; numa lista sem pontos ou num `item-count`, por item. |
+| `item-meta` | `meta` | Cada item custa o número do seu `meta[meta]`. Item sem o número não é comprável. |
+| `credit` | `meta`, `max` | Os itens devolvem a soma de `meta[meta]`, até `max`. Tirar o item tira o crédito, e o gasto pode estourar. |
+
+Fora dos orçamentos, `flat` cobra o investimento inteiro (Força de Vontade, Humanidade). `item-meta` e `credit` não entram em orçamento.
+
+**XP.** `costs.xp.total` e `costs.xp.spent` são os campos que o extrato projeta (`number` graváveis e distintos): nenhum papel os grava por evento, e eles ficam fora da conta da criação. `rules` é opcional: sem ela, o template só mapeia o extrato e nenhum traço tem preço. Cada regra:
+
+| `rule` | Parâmetros | Preço de subir de `from` para `from + 1` |
+|---|---|---|
+| `flat` | `cost`, `new?` | `cost` por nível. |
+| `per-current` | `factor`, `new?` | `from × factor`. |
+
+- `new` é o preço do primeiro ponto (de 0 para 1, ou item novo). Sem `new`, `per-current` a partir de 0 é **indisponível**, nunca grátis.
+- `when` lista exceções; a **primeira** cuja condição vale substitui `cost`, `factor` ou `new`, ou torna a compra indisponível (`unavailable: true`).
+- Cada pedido sobe **um nível**. Acima do `max` do campo é `XP_MAX_REACHED`; acima do `cap` de um `rating` (Esfera até o Arete) é `XP_PREREQUISITE`.
+- Sem `costs.xp`, ou campo sem regra, `costOf` responde `XP_COST_UNAVAILABLE`, sem exceção e sem preço zero.
+
+**Condições** (`when` e `baselines[].when`), sempre sobre um `choice` e nunca expressão:
+
+| Chave | Vale quando |
+|---|---|
+| `in` | a opção escolhida está na lista |
+| `equalsTarget: true` | a opção escolhida é o id do campo-alvo (afinidade) |
+| `itemIn` | o item-alvo da lista tem um destes nomes, e o nome está no `catalog` da lista. Texto digitado fora do catálogo nunca concede desconto. |
+
+Uma condição precisa de `in` ou `equalsTarget`; `itemIn` só vale para regras cujos alvos são listas.
+
+### Resultados
+
+`checkCreation(model, sheet, { config, choices })` devolve, por orçamento e grupo, `budget`, `invested`, `eligible`, `basic`, `missing`, `extra`, `price` e `freebieCost`, mais as linhas de bônus fora dos orçamentos, o resumo `{ available, credit, spent, remaining }` e os problemas. Um problema tem `code`, `severity` (`blocking` impede salvar e concluir; `incomplete` só concluir), `budget`/`group` quando é de um grupo, `paths` (`values.<campo>` ou `values.<campo>#<item>`) e `amount`. Nenhum texto da ficha aparece no resultado.
+
+| Problema | Severidade |
+|---|---|
+| `CREATION_PRIORITIES_REQUIRED` | `blocking` se o grupo tem pontos; senão `incomplete` |
+| `CREATION_BASICS_UNSPENT`, `CREATION_POINTBUY_UNSPENT`, `CREATION_BELOW_INITIAL` | `incomplete` |
+| `CREATION_FREEBIES_EXCEEDED`, `CREATION_POINTBUY_EXCEEDED`, `CREATION_OUT_OF_RANGE`, `CREATION_HARD_CAP`, `CREATION_LOCKED`, `CREATION_NOT_PURCHASABLE` | `blocking` |
+
+- **Rascunho** (`checkCreationBatch`): compara a ficha antes e depois do lote inteiro. Recusa só o problema `blocking` novo ou maior (`CREATION_PRIORITIES_REQUIRED` ou `CREATION_BUDGET_EXCEEDED`); uma redistribuição no mesmo lote passa, e um problema antigo que não piorou não trava o nome ou as notas.
+- **Conclusão** (`completionRefusal`): qualquer problema recusa; sem `blocking`, o código é `CREATION_INCOMPLETE`.
+- **Configuração**: `effectiveCreationConfig` aplica template → crônica → ficha; `validateCreationConfig` e `validateCreationChoices` conferem uma camada e as prioridades antes de gravar. Sem `creation`, a criação é sempre livre.
+- **Congelar** (`creationFreeze`): os campos ainda sem valor cujo padrão é fórmula, para gravar ao concluir; sem isso, evoluir a Consciência depois subiria a Humanidade de graça.
+- **Identidade do traço** (`xpTargetKey`): o id do campo; num item que a ficha tem, `campo#idDoItem` (o nome é editável); num item novo, `campo@nome`. É a chave do pendente único por traço.
+- **XP**: `costOf(model, sheet, { field, item?, name? })` devolve `cost`, `from`, `to`, `kind` (`new` ou `raise`) e o `context` que decide o preço (regra, exceção aplicada, opções lidas, teto); `xpBalance` lê o saldo projetado e `xpLedgerFields`, os campos do extrato.
