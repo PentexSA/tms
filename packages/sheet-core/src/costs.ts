@@ -7,7 +7,9 @@ import {
   resolveSheet,
 } from './accounting'
 import type { SheetModel } from './compile'
-import type { FieldId, SheetData, XpCost, XpWhen } from './contract'
+import type { FieldId, ListItem, SheetData, XpCost, XpWhen } from './contract'
+import { parsePath, type SheetEvent } from './events'
+import { stored } from './fields'
 import { isSafeText } from './validate'
 import { targetKind } from './validate/accounting'
 import { NUM_LIMIT } from './validate/util'
@@ -229,4 +231,109 @@ export function xpBalance(
 export function xpLedgerFields(model: SheetModel): readonly FieldId[] {
   const xp = model.template.costs?.xp
   return xp ? [xp.total, xp.spent] : []
+}
+
+/**
+ * Os caminhos de um lote que tocam as projeções do extrato, inclusive para
+ * apagar o valor. Nenhum papel grava esses campos por evento (§3.5): o
+ * narrador concede, ajusta e aprova pelos comandos contábeis.
+ */
+export function ledgerPaths(
+  model: SheetModel,
+  events: readonly { readonly path: string }[]
+): string[] {
+  const ledger = xpLedgerFields(model)
+  if (!ledger.length) return []
+  return events
+    .map(e => e.path)
+    .filter(path => {
+      const p = parsePath(path)
+      return p?.scope === 'values' && ledger.includes(p.fieldId)
+    })
+}
+
+/** O que a aprovação confere de novo: o pedido como foi apresentado. */
+export interface XpRequestSnapshot {
+  readonly target: XpTarget
+  readonly from: number
+  readonly cost: number
+}
+
+export type XpSpendPlan =
+  | {
+      readonly ok: true
+      readonly events: readonly SheetEvent[]
+      readonly from: number
+      readonly to: number
+      readonly cost: number
+    }
+  | {
+      readonly ok: false
+      // `target`: o traço mudou; `price`: o custo mudou; `eligibility`: a
+      // compra deixou de valer (teto, máximo, exceção, item duplicado)
+      readonly stale: 'target' | 'price' | 'eligibility'
+    }
+
+/**
+ * O lote de uma aprovação, sobre a ficha atual: o traço sobe um nível e o
+ * gasto projetado (`spent` + custo) vai para o campo do extrato. Um pedido
+ * cujo alvo, preço ou elegibilidade mudou fica desatualizado; mudança que
+ * não altera o preço nem a elegibilidade não o invalida. `newItemId` é o id
+ * do item que um pedido de item novo cria.
+ */
+export function planXpSpend(
+  model: SheetModel,
+  sheet: SheetData | unknown,
+  request: XpRequestSnapshot,
+  opts: { readonly spent: number; readonly newItemId: string }
+): XpSpendPlan {
+  const xp = model.template.costs?.xp
+  const now = costOf(model, sheet, request.target)
+  if (!xp || !now.ok)
+    return {
+      ok: false,
+      stale:
+        now.from !== null && now.from !== request.from
+          ? 'target'
+          : 'eligibility',
+    }
+  if (now.from !== request.from) return { ok: false, stale: 'target' }
+  if (now.cost !== request.cost) return { ok: false, stale: 'price' }
+
+  const r = resolveSheet(model, sheet)
+  const raw = (id: FieldId) => {
+    const values = (sheet as SheetData | null)?.values
+    return values && Object.hasOwn(values, id) ? values[id] : null
+  }
+  const id = request.target.field
+  const field = r.get(id)
+  let to: unknown = now.to
+  if (field?.type === 'resource')
+    to = { ...(stored(field, r) as object), permanent: now.to }
+  else if (field?.type === 'list') {
+    const items = stored(field, r) as readonly ListItem[]
+    to =
+      request.target.item !== undefined
+        ? items.map(x =>
+            x.id === request.target.item ? { ...x, value: now.to } : x
+          )
+        : [
+            ...items,
+            { id: opts.newItemId, name: request.target.name, value: now.to },
+          ]
+  }
+  return {
+    ok: true,
+    from: now.from,
+    to: now.to,
+    cost: now.cost,
+    events: [
+      { path: `values.${id}`, from: raw(id), to },
+      {
+        path: `values.${xp.spent}`,
+        from: raw(xp.spent),
+        to: opts.spent + now.cost,
+      },
+    ],
+  }
 }

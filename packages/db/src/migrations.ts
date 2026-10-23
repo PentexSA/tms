@@ -15,6 +15,8 @@ import * as m0013 from './migrations/0013_account_deletion'
 import * as m0014 from './migrations/0014_character_status'
 import * as m0015 from './migrations/0015_chronicle_operations'
 import * as m0016 from './migrations/0016_character_creation'
+import * as m0017 from './migrations/0017_xp_ledger'
+import * as m0018 from './migrations/0018_xp_requests'
 
 /**
  * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
@@ -38,6 +40,8 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0014_character_status': m0014,
   '0015_chronicle_operations': m0015,
   '0016_character_creation': m0016,
+  '0017_xp_ledger': m0017,
+  '0018_xp_requests': m0018,
 }
 
 export const migrationProvider: MigrationProvider = {

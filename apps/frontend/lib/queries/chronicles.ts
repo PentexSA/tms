@@ -162,11 +162,14 @@ export const useCreateCharacter = (id: string) => {
  * A Mesa do narrador (Etapa 19): todas as fichas da crônica numa requisição.
  * A API responde 404 para quem não narra; a tela nem pede.
  */
-/** O que a Mesa mostra: em jogo (creating e active) ou fora (archived e dead). */
+/**
+ * O que a Mesa mostra: em jogo (creating, pending e active) ou fora
+ * (archived e dead). Pending precisa aparecer para o narrador avaliar a ficha.
+ */
 export type TableScope = 'playing' | 'out'
 
 const SCOPE_STATUS: Readonly<Record<TableScope, string>> = {
-  playing: 'creating,active',
+  playing: 'creating,pending,active',
   out: 'archived,dead',
 }
 

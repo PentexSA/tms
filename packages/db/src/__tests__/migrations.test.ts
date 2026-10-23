@@ -38,6 +38,8 @@ describe('migrations', () => {
         'refresh_tokens',
         'trait_templates',
         'users',
+        'xp_entries',
+        'xp_requests',
       ])
     } finally {
       await destroy()
@@ -410,7 +412,7 @@ describe('migrations', () => {
     }
   })
 
-  it('0016: pending, metadados de criação, configuração da crônica e comandos idempotentes', async () => {
+  it('0016–0018: criação, extrato e um pedido pendente por traço', async () => {
     const { db, destroy } = await createPGliteTestDb()
     try {
       const user = await db
@@ -476,6 +478,77 @@ describe('migrations', () => {
       await command()
       // A mesma chave na mesma ficha não grava duas vezes
       await expect(command()).rejects.toThrow()
+
+      // As operações de XP entram na lista de tipos
+      await db
+        .insertInto('chronicle_operations')
+        .values({
+          chronicle_id: chronicle.id,
+          client_operation_id: crypto.randomUUID(),
+          kind: 'xp-grant',
+          request_hash: 'h',
+        })
+        .execute()
+      const entry = (values: {
+        kind: string
+        total_delta?: number
+        spent_delta?: number
+        reverses_entry_id?: string
+      }) =>
+        db
+          .insertInto('xp_entries')
+          .values({ character_id: character.id, ...values })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const grant = await entry({ kind: 'grant', total_delta: 5 })
+      await expect(entry({ kind: 'grant', total_delta: -1 })).rejects.toThrow()
+      await expect(entry({ kind: 'adjust', total_delta: 0 })).rejects.toThrow()
+      await expect(entry({ kind: 'spend', spent_delta: 0 })).rejects.toThrow()
+      await expect(
+        entry({ kind: 'spend', spent_delta: 1, total_delta: 1 })
+      ).rejects.toThrow()
+      // Estorno: só um ajuste negativo aponta a concessão
+      await entry({
+        kind: 'adjust',
+        total_delta: -2,
+        reverses_entry_id: grant.id,
+      })
+      await expect(
+        entry({ kind: 'adjust', total_delta: 2, reverses_entry_id: grant.id })
+      ).rejects.toThrow()
+
+      const request = (values: { status?: string; to_value?: number } = {}) =>
+        db
+          .insertInto('xp_requests')
+          .values({
+            character_id: character.id,
+            client_request_id: crypto.randomUUID(),
+            target_field: 'dexterity',
+            target_key: 'dexterity',
+            from_value: 2,
+            to_value: 3,
+            cost: 8,
+            ...values,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      await request()
+      // Um pendente por traço; decididos não contam
+      await expect(request()).rejects.toThrow()
+      await request({ status: 'rejected' })
+      await expect(
+        request({ status: 'approved', to_value: 4 })
+      ).rejects.toThrow()
+      await expect(request({ status: 'lost' })).rejects.toThrow()
+
+      // A ficha sai: extrato e pedidos vão junto, mesmo com estorno apontando
+      await db.deleteFrom('characters').execute()
+      expect(await db.selectFrom('xp_entries').select('id').execute()).toEqual(
+        []
+      )
+      expect(await db.selectFrom('xp_requests').select('id').execute()).toEqual(
+        []
+      )
     } finally {
       await destroy()
     }

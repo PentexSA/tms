@@ -128,6 +128,7 @@ export interface ChronicleOperations {
   created_by: string | null
   id: Generated<string>
   kind: string
+  request_hash: string | null
   reverts_batch_id: string | null
   reverts_operation_id: string | null
 }
@@ -182,6 +183,43 @@ export interface Users {
   username: string
 }
 
+export interface XpEntries {
+  batch_id: string | null
+  character_id: string
+  created_at: Generated<Timestamp>
+  created_by: string | null
+  id: Generated<string>
+  kind: string
+  operation_id: string | null
+  reason: string | null
+  request_id: string | null
+  reverses_entry_id: string | null
+  spent_delta: Generated<number>
+  total_delta: Generated<number>
+}
+
+export interface XpRequests {
+  batch_id: string | null
+  character_id: string
+  client_request_id: string
+  context: Generated<Json>
+  cost: number
+  decided_at: Timestamp | null
+  decided_by: string | null
+  decision_key: string | null
+  from_value: number
+  id: Generated<string>
+  reason: string | null
+  requested_at: Generated<Timestamp>
+  requested_by: string | null
+  status: Generated<string>
+  target_field: string
+  target_item: string | null
+  target_key: string
+  target_name: string | null
+  to_value: number
+}
+
 export interface DB {
   character_batches: CharacterBatches
   character_commands: CharacterCommands
@@ -197,4 +235,6 @@ export interface DB {
   refresh_tokens: RefreshTokens
   trait_templates: TraitTemplates
   users: Users
+  xp_entries: XpEntries
+  xp_requests: XpRequests
 }
