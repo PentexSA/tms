@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely'
 import { accountRoutes } from './account/routes'
 import { authGuard } from './auth/guard'
 import { authRoutes, meRoutes } from './auth/routes'
+import { backstageRoutes } from './chronicles/backstage'
 import { operationRoutes } from './chronicles/operations'
 import { chronicleRoutes } from './chronicles/routes'
 import { tableRoutes } from './chronicles/table'
@@ -72,6 +73,7 @@ export const createApp = (
       .use(meRoutes(db, guard))
       .use(accountRoutes(db, options, guard))
       .use(chronicleRoutes(db, options, guard))
+      .use(backstageRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
       .use(statusRoutes(db, options, guard))

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   type ActionPlan,
@@ -178,6 +179,7 @@ export async function writeBatch(
     readonly operationId: string
     readonly userId: string
     readonly now: Date
+    readonly sessionId?: string
   }
 ) {
   const { character: c } = args
@@ -202,6 +204,7 @@ export async function writeBatch(
       sheet_version: sheetVersion,
       created_at: args.now,
       operation_id: args.operationId,
+      session_id: args.sessionId ?? null,
     })
     .returning('id')
     .executeTakeFirstOrThrow()
@@ -233,6 +236,8 @@ async function applyAll(
     readonly kind: Kind | 'revert'
     readonly userId: string
     readonly now: Date
+    readonly sessionId?: string
+    readonly requestHash: string
     readonly reverts?: {
       readonly operationId?: string
       readonly batchId?: string
@@ -274,6 +279,8 @@ async function applyAll(
       created_at: args.now,
       reverts_operation_id: args.reverts?.operationId ?? null,
       reverts_batch_id: args.reverts?.batchId ?? null,
+      session_id: args.sessionId ?? null,
+      request_hash: args.requestHash,
     })
     .returning('id')
     .executeTakeFirstOrThrow()
@@ -287,6 +294,7 @@ async function applyAll(
         operationId: operation.id,
         userId: args.userId,
         now: args.now,
+        sessionId: args.sessionId,
       })
     )
   // Em ordem de ficha, como o reenvio devolve
@@ -320,7 +328,7 @@ export const findOperation = (
 ) =>
   trx
     .selectFrom('chronicle_operations')
-    .select('id')
+    .select(['id', 'request_hash'])
     .where('chronicle_id', '=', chronicleId)
     .where('client_operation_id', '=', clientOperationId)
     .executeTakeFirst()
@@ -466,6 +474,45 @@ export function operationRoutes(
         const me = requireUser(userId)
         await requireStoryteller(me, params.id)
         const key = body.clientOperationId
+        const requestHash = createHash('sha256')
+          .update(
+            JSON.stringify({
+              kind: body.kind,
+              amount: body.amount ?? null,
+              type: body.type ?? null,
+              recoveryId: body.recoveryId ?? null,
+              targets: [...(body.targets ?? [])].sort((a, b) =>
+                a.characterId.localeCompare(b.characterId)
+              ),
+              revertsOperationId: body.revertsOperationId ?? null,
+              revertsBatchId: body.revertsBatchId ?? null,
+              sessionId: body.sessionId ?? null,
+            })
+          )
+          .digest('hex')
+        const replay = async (trx: Kysely<DB> | Transaction<DB>) => {
+          const done = await findOperation(trx, params.id, key)
+          if (!done) return null
+          if (done.request_hash !== requestHash)
+            throw new ApiError(
+              409,
+              'esta chave já foi usada para outra operação',
+              {
+                code: 'IDEMPOTENCY_CONFLICT',
+              }
+            )
+          return stored(trx, done.id)
+        }
+        const validateSession = async (trx: Transaction<DB>) => {
+          if (!body.sessionId) return
+          const session = await trx
+            .selectFrom('chronicle_sessions')
+            .select('id')
+            .where('id', '=', body.sessionId)
+            .where('chronicle_id', '=', params.id)
+            .executeTakeFirst()
+          if (!session) throw notFound()
+        }
         const run = async () => {
           if (body.kind === 'revert') {
             const reverts =
@@ -481,14 +528,23 @@ export function operationRoutes(
               )
             const batches = await revertTargets(db, params.id, reverts)
             return db.transaction().execute(async trx => {
+              const chronicle = await trx
+                .selectFrom('chronicles')
+                .select('storyteller_id')
+                .where('id', '=', params.id)
+                .forShare()
+                .executeTakeFirst()
+              if (!chronicle || chronicle.storyteller_id !== me)
+                throw notFound()
+              await validateSession(trx)
               const locked = await lockCharacters(
                 db,
                 trx,
                 params.id,
                 batches.map(b => b.character_id)
               )
-              const done = await findOperation(trx, params.id, key)
-              if (done) return stored(trx, done.id)
+              const done = await replay(trx)
+              if (done) return done
               const owners = await trx
                 .selectFrom('character_batches')
                 .select('operation_id')
@@ -552,6 +608,8 @@ export function operationRoutes(
                 userId: me,
                 now: options.now(),
                 reverts,
+                sessionId: body.sessionId,
+                requestHash,
                 batches: inverted,
               })
             })
@@ -561,6 +619,14 @@ export function operationRoutes(
           if (!targets.length) throw new ApiError(422, 'diga as fichas')
           const operation = readOperation(body)
           return db.transaction().execute(async trx => {
+            const chronicle = await trx
+              .selectFrom('chronicles')
+              .select('storyteller_id')
+              .where('id', '=', params.id)
+              .forShare()
+              .executeTakeFirst()
+            if (!chronicle || chronicle.storyteller_id !== me) throw notFound()
+            await validateSession(trx)
             const locked = await lockCharacters(
               db,
               trx,
@@ -568,8 +634,8 @@ export function operationRoutes(
               targets.map(x => x.characterId)
             )
             // Depois das travas: o reenvio simultâneo espera o primeiro gravar
-            const done = await findOperation(trx, params.id, key)
-            if (done) return stored(trx, done.id)
+            const done = await replay(trx)
+            if (done) return done
             const planned = planAll(locked, targets, operation)
             if (
               targets.some(
@@ -590,6 +656,8 @@ export function operationRoutes(
               kind: body.kind as Kind,
               userId: me,
               now: options.now(),
+              sessionId: body.sessionId,
+              requestHash,
               batches: planned.map(p => ({
                 character: locked.get(p.characterId) as Locked,
                 events: p.plan.ok ? p.plan.events : [],
@@ -607,6 +675,14 @@ export function operationRoutes(
           if (!isUniqueViolation(e, 'chronicle_operations_client_key')) throw e
           const done = await findOperation(db, params.id, key)
           if (!done) throw e
+          if (done.request_hash !== requestHash)
+            throw new ApiError(
+              409,
+              'esta chave já foi usada para outra operação',
+              {
+                code: 'IDEMPOTENCY_CONFLICT',
+              }
+            )
           set.status = 200
           return stored(db, done.id)
         }
@@ -636,6 +712,7 @@ export function operationRoutes(
           ),
           revertsOperationId: t.Optional(uuid),
           revertsBatchId: t.Optional(uuid),
+          sessionId: t.Optional(uuid),
         }),
       }
     )

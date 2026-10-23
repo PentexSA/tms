@@ -1,5 +1,5 @@
 import type { DB } from '@tms/db'
-import { isSafeText } from '@tms/sheet-core'
+import { effectiveChronicleOptions, isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
 import { audit } from '../audit'
@@ -10,6 +10,8 @@ import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import { clientIp } from '../http/security'
 import type { AppOptions } from '../options'
+import { latestTemplate, modelFor } from '../sheets/models'
+import { sessionDate } from './backstage'
 import { hashInviteCode, newInviteCode } from './invite-code'
 
 // Crônicas, convites e membros (doc/plano-v0.md, Etapa 10; doc/plano-v3.md,
@@ -56,6 +58,15 @@ export function chronicleRoutes(
     by: { readonly actorId: string; readonly revokeInvites: boolean }
   ) =>
     db.transaction().execute(async trx => {
+      const chronicle = await trx
+        .selectFrom('chronicles')
+        .select('storyteller_id')
+        .where('id', '=', chronicleId)
+        .forShare()
+        .executeTakeFirst()
+      if (!chronicle) throw notFound()
+      if (by.actorId !== userId && chronicle.storyteller_id !== by.actorId)
+        throw notFound()
       const member = await trx
         .selectFrom('chronicle_members')
         .select('user_id')
@@ -207,8 +218,13 @@ export function chronicleRoutes(
             .where('ch.deleted_at', 'is', null)
             .where(eb =>
               eb.or([
-                eb('ch.user_id', '=', me),
+                eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
                 eb('c.storyteller_id', '=', me),
+                eb.and([
+                  eb('m.user_id', 'is not', null),
+                  eb('ch.kind', '=', 'npc'),
+                  eb('ch.visibility', 'in', ['identity', 'full']),
+                ]),
               ])
             )
             .as('characterCount'),
@@ -242,6 +258,7 @@ export function chronicleRoutes(
           .select([
             'c.id',
             'c.name',
+            'c.system_id',
             'g.code as systemCode',
             'g.name as systemName',
             'st.id as storytellerId',
@@ -249,14 +266,26 @@ export function chronicleRoutes(
             'c.character_approval',
             'c.creation_defaults',
             'c.creation_settings_revision',
+            'c.description',
+            'c.image_url',
+            'c.options',
+            'c.settings_revision',
           ])
           .where('c.id', '=', params.id)
           .executeTakeFirstOrThrow()
+        const published = await latestTemplate(db, c.system_id)
+        const model = published
+          ? await modelFor(db, c.system_id, published.version)
+          : null
         const head = {
           id: c.id,
           name: c.name,
           system: { code: c.systemCode, name: c.systemName },
           storyteller: { id: c.storytellerId, username: c.storyteller },
+          description: c.description,
+          imageUrl: c.image_url,
+          options: model ? effectiveChronicleOptions(model, c.options) : {},
+          settingsRevision: c.settings_revision,
         }
         // O ex-membro não recebe os membros
         if (role === 'former')
@@ -268,6 +297,14 @@ export function chronicleRoutes(
           .where('m.chronicle_id', '=', params.id)
           .orderBy('m.joined_at')
           .execute()
+        const optionCatalog = model?.template.options ?? []
+        const lastSession = await db
+          .selectFrom('chronicle_sessions')
+          .select(['id', sessionDate, 'title', 'public_summary'])
+          .where('chronicle_id', '=', params.id)
+          .orderBy('chronicle_sessions.session_date', 'desc')
+          .orderBy('id', 'desc')
+          .executeTakeFirst()
         return {
           ...head,
           // Configuração da criação (v4): o narrador ajusta; o jogador vê se
@@ -283,6 +320,15 @@ export function chronicleRoutes(
               ? ('storyteller' as const)
               : ('player' as const),
           members,
+          optionCatalog,
+          lastSession: lastSession
+            ? {
+                id: lastSession.id,
+                date: lastSession.session_date,
+                title: lastSession.title,
+                summary: lastSession.public_summary,
+              }
+            : null,
         }
       },
       { params: idParams }

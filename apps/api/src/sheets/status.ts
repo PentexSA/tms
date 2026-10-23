@@ -52,7 +52,7 @@ export function statusRoutes(
     decide: (row: LockedCharacter, now: Date) => Change
   ) => {
     const access = await characterAccess(db, me, id)
-    if (!access) throw notFound()
+    if (!access || access.roles.has('viewer')) throw notFound()
     if (!access.roles.has('storyteller'))
       throw new ApiError(403, 'só o narrador muda o estado da ficha')
     return db.transaction().execute(async trx => {

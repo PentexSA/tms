@@ -174,7 +174,7 @@ export function requestRoutes(
       async ({ params, body, userId, set }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         if (!access.roles.has('owner'))
           throw new ApiError(403, 'o pedido é do dono da ficha', {
             code: 'FORBIDDEN',
@@ -356,7 +356,7 @@ export function requestRoutes(
       async ({ params, query, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         const model = await modelFor(
           db,
           access.character.systemId,
@@ -461,7 +461,7 @@ export function requestRoutes(
       async ({ params, body, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         if (!access.roles.has('storyteller'))
           throw new ApiError(403, 'só o narrador aprova', { code: 'FORBIDDEN' })
         const chronicleId = access.character.chronicleId
@@ -475,6 +475,15 @@ export function requestRoutes(
               params.id,
             ])
             const c = locked.get(params.id) as Locked
+            if (body.sessionId) {
+              const session = await trx
+                .selectFrom('chronicle_sessions')
+                .select('id')
+                .where('id', '=', body.sessionId)
+                .where('chronicle_id', '=', chronicleId)
+                .executeTakeFirst()
+              if (!session) throw notFound()
+            }
             if (
               c.status !== 'active' ||
               !(await isMember(trx, chronicleId, access.character.userId))
@@ -540,7 +549,11 @@ export function requestRoutes(
                 kind: 'xp-spend',
                 created_by: me,
                 created_at: now,
-                request_hash: intentHash({ approve: r.id }),
+                request_hash: intentHash({
+                  approve: r.id,
+                  sessionId: body.sessionId ?? null,
+                }),
+                session_id: body.sessionId ?? null,
               })
               .returning('id')
               .executeTakeFirstOrThrow()
@@ -551,6 +564,7 @@ export function requestRoutes(
               operationId: operation.id,
               userId: me,
               now,
+              sessionId: body.sessionId,
             })
             await trx
               .insertInto('xp_entries')
@@ -636,7 +650,7 @@ export function requestRoutes(
       },
       {
         params: t.Object({ id: uuid, requestId: uuid }),
-        body: t.Object({ decisionKey: uuid }),
+        body: t.Object({ decisionKey: uuid, sessionId: t.Optional(uuid) }),
       }
     )
     .post(
@@ -644,7 +658,7 @@ export function requestRoutes(
       async ({ params, body, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         if (!access.roles.has('storyteller'))
           throw new ApiError(403, 'só o narrador recusa', { code: 'FORBIDDEN' })
         const reason = readReason(body.reason)
@@ -699,7 +713,7 @@ export function requestRoutes(
       async ({ params, body, userId }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         if (!access.roles.has('owner'))
           throw new ApiError(403, 'só o dono cancela o pedido', {
             code: 'FORBIDDEN',

@@ -125,6 +125,7 @@ export async function writeEntry(
     readonly operationId: string
     readonly userId: string
     readonly now: Date
+    readonly sessionId?: string
   }
 ) {
   const { character: c } = args
@@ -148,6 +149,7 @@ export async function writeEntry(
     operationId: args.operationId,
     userId: args.userId,
     now: args.now,
+    sessionId: args.sessionId,
   })
   const entry = await trx
     .insertInto('xp_entries')
@@ -268,6 +270,7 @@ export function ledgerRoutes(
           amount: body.amount,
           reason,
           characters: [...ids].sort(),
+          sessionId: body.sessionId ?? null,
         })
         const key = body.clientOperationId
         const result = await recover(params.id, key, hash, () =>
@@ -276,6 +279,15 @@ export function ledgerRoutes(
             // Depois das travas: o reenvio simultâneo espera o primeiro gravar
             const done = await replay(trx, params.id, key, hash)
             if (done) return done
+            if (body.sessionId) {
+              const session = await trx
+                .selectFrom('chronicle_sessions')
+                .select('id')
+                .where('id', '=', body.sessionId)
+                .where('chronicle_id', '=', params.id)
+                .executeTakeFirst()
+              if (!session) throw notFound()
+            }
             for (const c of locked.values())
               if (!xpLedgerFields(c.model).length) throw unsupported(c.id)
             const sums = await balances(trx, [...locked.keys()])
@@ -289,6 +301,7 @@ export function ledgerRoutes(
                 created_by: me,
                 created_at: now,
                 request_hash: hash,
+                session_id: body.sessionId ?? null,
               })
               .returning('id')
               .executeTakeFirstOrThrow()
@@ -304,6 +317,7 @@ export function ledgerRoutes(
                   operationId: operation.id,
                   userId: me,
                   now,
+                  sessionId: body.sessionId,
                 })
               )
             await audit(trx, {
@@ -333,6 +347,7 @@ export function ledgerRoutes(
             minItems: 1,
             maxItems: MAX_TARGETS,
           }),
+          sessionId: t.Optional(uuid),
         }),
       }
     )
@@ -341,7 +356,7 @@ export function ledgerRoutes(
       async ({ params, body, userId, set }) => {
         const me = requireUser(userId)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         if (!access.roles.has('storyteller'))
           throw new ApiError(403, 'só o narrador ajusta o XP')
         const reason = readReason(body.reason)
@@ -352,6 +367,7 @@ export function ledgerRoutes(
           delta: body.delta,
           reason,
           reverses: body.reversesEntryId ?? null,
+          sessionId: body.sessionId ?? null,
         })
         const key = body.clientOperationId
         const result = await recover(chronicleId, key, hash, () =>
@@ -361,6 +377,15 @@ export function ledgerRoutes(
             ])
             const done = await replay(trx, chronicleId, key, hash)
             if (done) return done
+            if (body.sessionId) {
+              const session = await trx
+                .selectFrom('chronicle_sessions')
+                .select('id')
+                .where('id', '=', body.sessionId)
+                .where('chronicle_id', '=', chronicleId)
+                .executeTakeFirst()
+              if (!session) throw notFound()
+            }
             const c = locked.get(params.id) as Locked
             if (!xpLedgerFields(c.model).length) throw unsupported(c.id)
             if (body.delta === 0)
@@ -418,6 +443,7 @@ export function ledgerRoutes(
                 created_by: me,
                 created_at: now,
                 request_hash: hash,
+                session_id: body.sessionId ?? null,
               })
               .returning('id')
               .executeTakeFirstOrThrow()
@@ -433,6 +459,7 @@ export function ledgerRoutes(
               operationId: operation.id,
               userId: me,
               now,
+              sessionId: body.sessionId,
             })
             await audit(trx, {
               chronicleId,
@@ -464,6 +491,7 @@ export function ledgerRoutes(
           delta: t.Integer({ minimum: -9999, maximum: 9999 }),
           reason: t.String({ minLength: 1, maxLength: REASON_MAX }),
           reversesEntryId: t.Optional(uuid),
+          sessionId: t.Optional(uuid),
         }),
       }
     )
@@ -473,7 +501,7 @@ export function ledgerRoutes(
         const me = requireUser(userId)
         // Dono e narrador; outro jogador não tem papel na ficha (404)
         const access = await characterAccess(db, me, params.id)
-        if (!access) throw notFound()
+        if (!access || access.roles.has('viewer')) throw notFound()
         const model = await modelFor(
           db,
           access.character.systemId,

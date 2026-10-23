@@ -28,6 +28,15 @@ export type AuditAction =
   | 'xp.request.approve'
   | 'xp.request.reject'
   | 'xp.request.stale'
+  | 'character.create-npc'
+  | 'character.visibility'
+  | 'chronicle.settings'
+  | 'chronicle.session.create'
+  | 'chronicle.session.update'
+  | 'chronicle.transfer.request'
+  | 'chronicle.transfer.accept'
+  | 'chronicle.transfer.reject'
+  | 'chronicle.transfer.cancel'
 
 export async function audit(
   trx: Transaction<DB>,

@@ -278,7 +278,7 @@ export function creationRoutes(
 ) {
   const access = async (me: string, id: string): Promise<CharacterAccess> => {
     const a = await characterAccess(db, me, id)
-    if (!a) throw notFound()
+    if (!a || a.roles.has('viewer')) throw notFound()
     return a
   }
   const modelOf = (a: CharacterAccess) =>
