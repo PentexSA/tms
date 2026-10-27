@@ -15,6 +15,8 @@
     "db:migrate": "pnpm -C packages/db migrate:up",
     "db:codegen": "pnpm -C packages/db codegen",
     "templates:publish": "pnpm -C apps/api templates:publish",
+    "seed:roteiro": "bun scripts/seed-roteiro.ts",
+    "tunel": "bash scripts/tunel.sh",
     "test": "turbo run test --concurrency=1",
     "test:watch": "turbo run test:watch --parallel",
     "test:coverage": "turbo run test:coverage --concurrency=1",
