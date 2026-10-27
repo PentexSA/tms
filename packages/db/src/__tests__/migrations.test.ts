@@ -4,6 +4,7 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { Migrator, NO_MIGRATIONS, sql } from 'kysely'
 import { migrationProvider, migrations } from '../migrations'
+import { PRODUCT_TEMPLATES, productTemplate, storeTemplate } from '../templates'
 import { createPGliteTestDb } from '../test/pglite'
 
 const files = readdirSync(join(import.meta.dir, '../migrations'))
@@ -59,7 +60,7 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -135,7 +136,7 @@ describe('migrations', () => {
       const other = await user('outro')
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -236,7 +237,7 @@ describe('migrations', () => {
       const owner = await user('dona')
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -332,7 +333,7 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -427,7 +428,7 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -587,7 +588,7 @@ describe('migrations', () => {
         .executeTakeFirstOrThrow()
       const system = await db
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'V20' })
+        .values({ code: 'sistema-teste', name: 'Teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const chronicle = await db
@@ -622,6 +623,31 @@ describe('migrations', () => {
       expect(String(result.error)).toContain(
         'client_roll_id histórico colide dentro da mesma crônica'
       )
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0020: o banco migrado já tem os templates do produto, imutáveis por versão', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const rows = await db
+        .selectFrom('trait_templates as t')
+        .innerJoin('game_systems as g', 'g.id', 't.system_id')
+        .select(['g.code', 't.version'])
+        .orderBy('g.code')
+        .execute()
+      const current = PRODUCT_TEMPLATES.map(system => ({
+        code: system,
+        version: (productTemplate(system) as { templateVersion: string })
+          .templateVersion,
+      })).sort((a, b) => a.code.localeCompare(b.code))
+      expect(rows).toEqual(current)
+      const vtm = productTemplate('vtm-v20') as Record<string, unknown>
+      expect((await storeTemplate(db, vtm)).status).toBe('unchanged')
+      expect(
+        (await storeTemplate(db, { ...vtm, name: 'Outro conteúdo' })).status
+      ).toBe('conflict')
     } finally {
       await destroy()
     }
