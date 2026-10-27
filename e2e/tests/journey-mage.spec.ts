@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, type Page, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // v1, Etapa 8: a jornada do §1 de doc/plano-v1.md, o Mago (M20) pelo mesmo
 // motor do Vampiro. O jogador usa o celular (390: dock embaixo) e a
@@ -46,6 +46,12 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
     st.getByRole('heading', { name: 'A Torre de Marfim' })
   ).toBeVisible()
   const chronicleUrl = st.url()
+  // A jornada não trata da conta por pontos: a crônica cria em modo livre
+  await freeCreation(
+    desk,
+    storyteller,
+    /chronicles\/([0-9a-f-]{36})/.exec(chronicleUrl)![1]!
+  )
   await st.getByRole('button', { name: 'Convidar' }).click()
   await st.getByRole('button', { name: 'Gerar convite' }).click()
   const code = (await st.getByTestId('invite-code-value').innerText()).trim()

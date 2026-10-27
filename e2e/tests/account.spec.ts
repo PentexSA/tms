@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { API_URL, WEB_URL } from '../env'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // Etapa 22: excluir a conta (LGPD art. 18). Senha errada não exclui; com a
 // senha, a conta sai, o cookie do refresh some, o login avisa e a conta não
@@ -20,6 +20,7 @@ test('excluir a conta: senha errada não exclui; com a senha, não entra mais', 
     '/chronicles',
     { name: 'Crônica solo', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   await apiAs(context, user, 'POST', `/chronicles/${chronicle.id}/characters`, {
     values: { name: 'Helena Varga' },
   })

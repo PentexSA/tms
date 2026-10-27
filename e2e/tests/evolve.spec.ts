@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // Etapa 18: criar → evoluir (atributos, habilidades e disciplinas) → salvar
 // → recarregar → os valores continuam lá. No web o Stepper tem botões de
@@ -14,6 +14,7 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
     '/chronicles',
     { name: 'Crônica da edição', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
 
   await page.goto(`/chronicles/${chronicle.id}/new-character`)
   await page.getByLabel('Nome (obrigatório)').fill('Helena Varga')
@@ -76,6 +77,7 @@ test('sair com rascunho pede confirmação', async ({ page }) => {
     '/chronicles',
     { name: 'Crônica', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   const character = await apiAs<{ id: string }>(
     context,
     user,

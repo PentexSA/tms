@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, eighthGeneration, signUp } from '../support/users'
+import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
 
 // Etapa 13: uma ficha criada pela API abre no navegador em Leitura, com a
 // identidade, "Em jogo" e as 3 abas do Vampiro.
@@ -19,6 +19,7 @@ test('a ficha abre em Leitura com as 3 abas; só o narrador vê as notas dele', 
       systemCode: 'vtm-v20',
     }
   )
+  await freeCreation(context, storyteller, chronicle.id)
   const invite = await apiAs<{ code: string }>(
     context,
     storyteller,

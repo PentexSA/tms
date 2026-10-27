@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // Etapa 22: a jornada do §1 de doc/plano-v0.md inteira, num cenário só, pela
 // tela. A jogadora usa o celular (390 de largura: dock embaixo) e o narrador,
@@ -47,6 +47,12 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
     st.getByRole('heading', { name: 'Crônica da Liberdade' })
   ).toBeVisible()
   const chronicleUrl = st.url()
+  // A jornada não trata da conta por pontos: a crônica cria em modo livre
+  await freeCreation(
+    desk,
+    storyteller,
+    /chronicles\/([0-9a-f-]{36})/.exec(chronicleUrl)![1]!
+  )
   await st.getByRole('button', { name: 'Convidar' }).click()
   await st.getByRole('button', { name: 'Gerar convite' }).click()
   const code = (await st.getByTestId('invite-code-value').innerText()).trim()

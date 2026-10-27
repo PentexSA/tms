@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { apiAs, rawAs, signUp } from '../support/users'
+import { apiAs, freeCreation, rawAs, signUp } from '../support/users'
 
 const PASSWORD = 'correct horse battery staple'
 const NPC = 'Oráculo Velado'
@@ -36,6 +36,7 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
       '/chronicles',
       { name: 'Crônica dos Bastidores', systemCode: 'vtm-v20' }
     )
+    await freeCreation(storytellerContext, storyteller, chronicle.id)
     const invite = await apiAs<{ code: string }>(
       storytellerContext,
       storyteller,

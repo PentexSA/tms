@@ -46,6 +46,25 @@ export async function apiAs<T>(
   return (await res.json()) as T
 }
 
+/**
+ * Criação livre como padrão da crônica, o que o narrador escolhe em Criação de
+ * fichas: as jornadas que não tratam da conta por pontos editam a ficha em
+ * criação sem prioridades, como antes das regras de V20, M20 e W20.
+ */
+export function freeCreation(
+  context: BrowserContext,
+  user: { accessToken: string; ip?: string },
+  chronicleId: string
+) {
+  return apiAs(
+    context,
+    user,
+    'PATCH',
+    `/chronicles/${chronicleId}/creation-settings`,
+    { revision: 0, defaults: { mode: 'free' } }
+  )
+}
+
 /** Chamada autenticada que deixa o teste inspecionar erros e respostas 204. */
 export function rawAs(
   context: BrowserContext,
