@@ -357,7 +357,7 @@ describe('Crônica (detalhe)', () => {
     calls.chronicle.invitesDelete.mockResolvedValue(ok(null))
     const share = jest
       .spyOn(Share, 'share')
-      .mockResolvedValue({ action: 'sharedAction' })
+      .mockResolvedValue({ action: 'sharedAction', activityType: undefined })
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(await screen.findByText('Você narra esta crônica.')).toBeTruthy()
     expect(
