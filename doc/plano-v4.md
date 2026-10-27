@@ -276,7 +276,7 @@ A ordem contrato → motor testado → estrutura de templates → API → interf
 | 0 | Feita | Base conferida em `8a978b1`; `AGENTS.md`/`CLAUDE.md` lidos; branch `feat/v4-criacao-xp` |
 | 1 | Feita, validada localmente | Ver abaixo |
 | 2a | Feita, validada localmente | Ver abaixo |
-| 2b | Bloqueada: livros não disponíveis no workspace | – |
+| 2b | Feita, validada localmente | Regras e fontes em [regras-wod.md](regras-wod.md); templates `vtm-v20` 1.7.0, `mta-m20` 1.6.0, `wta-w20` 1.6.0 e migration `0020_product_templates` |
 | 3–9 | Em andamento | – |
 
 **Etapa 1, entregue.**
