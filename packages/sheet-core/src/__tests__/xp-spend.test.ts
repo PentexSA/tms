@@ -218,10 +218,14 @@ describe('identidade mecânica de itens', () => {
     expect(rename.kind).toBe('edit')
   })
 
-  it('nos WoD, o nome da Disciplina e do Antecedente é mecânico', () => {
+  it('nos WoD, o nome do que entra na conta é mecânico', () => {
     const vtm = compileTemplate(templates['vtm-v20'])
     expect(hasMechanicalNames(vtm, 'disciplines')).toBe(true)
     expect(hasMechanicalNames(vtm, 'backgrounds')).toBe(true)
-    expect(hasMechanicalNames(vtm, 'merits')).toBe(false)
+    // A Qualidade custa bônus pelo `meta.cost`: trocar o nome é evoluir
+    expect(hasMechanicalNames(vtm, 'merits')).toBe(true)
+    // Rotinas ficam fora da conta (untracked): o nome continua edição
+    const mta = compileTemplate(templates['mta-m20'])
+    expect(hasMechanicalNames(mta, 'rotes')).toBe(false)
   })
 })

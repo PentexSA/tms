@@ -4,7 +4,7 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.5.0",
+  "templateVersion": "1.6.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
@@ -1011,7 +1011,122 @@
       ]
     }
   ],
+  "creation": {
+    "freebies": 15,
+    "budgets": [
+      {
+        "id": "attributes",
+        "label": "Atributos",
+        "rule": "priority-budget",
+        "budgets": [7, 5, 3],
+        "groups": [
+          {
+            "id": "physical",
+            "label": "Físicos",
+            "targets": ["strength", "dexterity", "stamina"]
+          },
+          {
+            "id": "social",
+            "label": "Sociais",
+            "targets": ["charisma", "manipulation", "appearance"]
+          },
+          {
+            "id": "mental",
+            "label": "Mentais",
+            "targets": ["perception", "intelligence", "wits"]
+          }
+        ]
+      },
+      {
+        "id": "abilities",
+        "label": "Habilidades",
+        "rule": "priority-budget",
+        "budgets": [13, 9, 5],
+        "groups": [
+          {
+            "id": "talents",
+            "label": "Talentos",
+            "targets": ["alertness", "athletics", "brawl", "empathy", "expression", "intimidation", "leadership", "primalUrge", "streetwise", "subterfuge"]
+          },
+          {
+            "id": "skills",
+            "label": "Perícias",
+            "targets": ["animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival"]
+          },
+          {
+            "id": "knowledges",
+            "label": "Conhecimentos",
+            "targets": ["academics", "computer", "enigmas", "investigation", "law", "medicine", "occult", "rituals", "science", "technology"]
+          }
+        ]
+      },
+      {
+        "id": "backgrounds",
+        "label": "Antecedentes",
+        "rule": "fixed-budget",
+        "budget": 5,
+        "targets": ["backgrounds"]
+      },
+      {
+        "id": "gifts",
+        "label": "Dons",
+        "rule": "item-count",
+        "budget": 3,
+        "targets": ["gifts"]
+      }
+    ],
+    "caps": [
+      {
+        "rule": "creation-cap",
+        "targets": ["alertness", "athletics", "brawl", "empathy", "expression", "intimidation", "leadership", "primalUrge", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "enigmas", "investigation", "law", "medicine", "occult", "rituals", "science", "technology"],
+        "max": 3
+      }
+    ],
+    "untracked": ["rank", "rites", "fetishes", "battleScars"]
+  },
   "costs": {
-    "xp": { "total": "xpTotal", "spent": "xpSpent" }
+    "freebie": [
+      {
+        "id": "attribute",
+        "rule": "flat",
+        "cost": 5,
+        "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "appearance", "perception", "intelligence", "wits"]
+      },
+      {
+        "id": "ability",
+        "rule": "flat",
+        "cost": 2,
+        "targets": ["alertness", "athletics", "brawl", "empathy", "expression", "intimidation", "leadership", "primalUrge", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "enigmas", "investigation", "law", "medicine", "occult", "rituals", "science", "technology"]
+      },
+      { "id": "background", "rule": "flat", "cost": 1, "targets": ["backgrounds"] },
+      { "id": "gift", "rule": "flat", "cost": 7, "targets": ["gifts"] },
+      { "id": "rage", "rule": "flat", "cost": 1, "targets": ["rage"] },
+      { "id": "gnosis", "rule": "flat", "cost": 2, "targets": ["gnosis"] },
+      { "id": "willpower", "rule": "flat", "cost": 1, "targets": ["willpower"] },
+      { "id": "merits", "rule": "item-meta", "meta": "cost", "targets": ["merits"] },
+      { "id": "flaws", "rule": "credit", "meta": "bonus", "max": 7, "targets": ["flaws"] }
+    ],
+    "xp": {
+      "total": "xpTotal",
+      "spent": "xpSpent",
+      "rules": [
+        {
+          "id": "attribute",
+          "rule": "per-current",
+          "factor": 4,
+          "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "appearance", "perception", "intelligence", "wits"]
+        },
+        {
+          "id": "ability",
+          "rule": "per-current",
+          "factor": 2,
+          "new": 3,
+          "targets": ["alertness", "athletics", "brawl", "empathy", "expression", "intimidation", "leadership", "primalUrge", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "enigmas", "investigation", "law", "medicine", "occult", "rituals", "science", "technology"]
+        },
+        { "id": "rage", "rule": "per-current", "factor": 1, "targets": ["rage"] },
+        { "id": "gnosis", "rule": "per-current", "factor": 2, "targets": ["gnosis"] },
+        { "id": "willpower", "rule": "per-current", "factor": 1, "targets": ["willpower"] }
+      ]
+    }
   }
 }
