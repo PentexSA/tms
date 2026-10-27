@@ -15,6 +15,7 @@ import {
   createCharacter,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   setStatus,
   type TestUser,
@@ -84,6 +85,8 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   await addMember(ctx, chronicleId, users.player)
   await createChronicle(ctx, users.otherStoryteller, s.system, 'Outra')
   const characterId = await createCharacter(ctx, users.owner, chronicleId)
+  // A matriz é de AuthZ, não da conta da criação
+  await freeCreation(ctx, characterId)
   const npcId = await createCharacter(ctx, users.storyteller, chronicleId, {
     name: 'NPC oculto',
   })

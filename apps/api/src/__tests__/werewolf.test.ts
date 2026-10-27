@@ -91,7 +91,7 @@ describe('ficha de Lobisomem', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('wta-w20')
-    expect(body.templateVersion).toBe('1.5.0')
+    expect(body.templateVersion).toBe('1.6.0')
     expect(body.sheet.values).toEqual({
       name: 'Iara Moreira',
       deedName: 'Canta-Tempestade',

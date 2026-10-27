@@ -186,8 +186,8 @@ export const MATRIX: readonly MatrixRow[] = [
     mutates: true,
     expect: { storyteller: 200, owner: 403, player: 404, ...denied },
   },
-  // Criação e aprovação (v4, Etapa 4). Os templates do produto ainda não têm
-  // `creation` (Etapa 2b): a criação é livre, e só o narrador conclui
+  // Criação e aprovação (v4, Etapa 4). A ficha da matriz está em criação
+  // livre: só o narrador conclui, e a aprovação não refaz a conta
   {
     method: 'PATCH',
     route: '/characters/:id/creation',
@@ -445,7 +445,8 @@ export const MATRIX: readonly MatrixRow[] = [
     body: s => ({ clientRequestId: crypto.randomUUID(), field: s.ratingField }),
     sheet: { status: 'active' },
     mutates: true,
-    expect: { storyteller: 403, owner: 422, player: 404, ...denied },
+    // O traço tem preço (Etapa 2b), mas a ficha da matriz não tem XP
+    expect: { storyteller: 403, owner: 409, player: 404, ...denied },
   },
   {
     method: 'GET',

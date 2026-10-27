@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { DB } from '@tms/db'
+import { canonicalJson, type DB, storeTemplate } from '@tms/db'
 import {
   compileTemplate,
   type Issue,
@@ -79,21 +78,7 @@ export function schemaIssues(json: unknown): PublishIssue[] {
   return issues
 }
 
-// JSON com as chaves em ordem: a comparação não depende da ordem do arquivo.
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, (_, v) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(
-          Object.keys(v)
-            .sort()
-            .map(k => [k, (v as Record<string, unknown>)[k]])
-        )
-      : v
-  )
-}
-
-const hashOf = (json: unknown) =>
-  createHash('sha256').update(canonicalJson(json)).digest('hex')
+export { canonicalJson }
 
 export async function publishTemplate(
   db: Kysely<DB>,
@@ -117,63 +102,17 @@ export async function publishTemplate(
     throw new PublishError(e.issues.map(i => ({ ...i, stage: 'contract' })))
   }
 
-  const t = json as {
-    system: string
-    templateVersion: string
-    name: string
-    family: string
-  }
-  const hash = hashOf(json)
   return db.transaction().execute(async trx => {
-    const system = await trx
-      .insertInto('game_systems')
-      .values({ code: t.system, name: t.name, family: t.family })
-      .onConflict(oc =>
-        oc.column('code').doUpdateSet(eb => ({
-          name: eb.ref('excluded.name'),
-          family: eb.ref('excluded.family'),
-        }))
-      )
-      .returning('id')
-      .executeTakeFirstOrThrow()
-
-    const existing = await trx
-      .selectFrom('trait_templates')
-      .select('template_data')
-      .where('system_id', '=', system.id)
-      .where('version', '=', t.templateVersion)
-      .executeTakeFirst()
-    if (existing) {
-      if (hashOf(existing.template_data) === hash)
-        return {
-          status: 'unchanged',
-          system: t.system,
-          version: t.templateVersion,
-          hash,
-        }
-      // Versão publicada é imutável: o app guarda o template por versão.
+    const stored = await storeTemplate(trx, json)
+    // Versão publicada é imutável: o erro desfaz também o nome do sistema
+    if (stored.status === 'conflict')
       throw new PublishError([
         {
           stage: 'version',
           path: 'templateVersion',
-          message: `${t.system}@${t.templateVersion} já foi publicado com outro conteúdo: suba o templateVersion`,
+          message: `${stored.system}@${stored.version} já foi publicado com outro conteúdo: suba o templateVersion`,
         },
       ])
-    }
-
-    await trx
-      .insertInto('trait_templates')
-      .values({
-        system_id: system.id,
-        version: t.templateVersion,
-        template_data: JSON.stringify(json),
-      })
-      .execute()
-    return {
-      status: 'published',
-      system: t.system,
-      version: t.templateVersion,
-      hash,
-    }
+    return { ...stored, status: stored.status }
   })
 }
