@@ -7,6 +7,11 @@
 
 FROM node:24-bookworm-slim AS build
 COPY --from=oven/bun:1.4.3 /usr/local/bin/bun /usr/local/bin/bun
+# O caddy da imagem oficial vem com cap_net_bind_service (setcap), e o Render
+# nega o exec de binário com capability ("Operation not permitted"). O cp sem
+# --preserve não leva o xattr, e a porta do Render (10000) dispensa a capability.
+COPY --from=caddy:2.10 /usr/bin/caddy /tmp/caddy
+RUN mkdir -p /out-bin && cp /tmp/caddy /out-bin/caddy
 ENV HUSKY=0 CI=true
 RUN corepack enable
 WORKDIR /repo
@@ -32,7 +37,7 @@ RUN EXPO_PUBLIC_API_URL=https://tms-origin.invalid npx expo export -p web \
  && find /out/web -name '*.map' -delete
 
 FROM oven/bun:1.4.3-slim
-COPY --from=caddy:2.10 /usr/bin/caddy /usr/bin/caddy
+COPY --from=build /out-bin/caddy /usr/bin/caddy
 WORKDIR /app
 COPY --from=build /out ./
 COPY deploy/render/Caddyfile deploy/render/start.sh ./
