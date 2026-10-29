@@ -15,13 +15,17 @@
 		file_server
 	}
 
-	# Navegação do navegador numa rota da SPA: o index.html
+	# Navegação do navegador numa rota da SPA: o index.html. A URL é a mesma
+	# da rota da API (/chronicles/:id): sem o Vary e com o cache heurístico
+	# do Last-Modified, o fetch do app recebia este HTML do cache do navegador.
 	@page {
 		method GET HEAD
 		header Accept *text/html*
 	}
 	handle @page {
 		import headers.caddy
+		header Cache-Control no-cache
+		header +Vary Accept
 		rewrite * /index.html
 		file_server
 	}
@@ -32,6 +36,7 @@
 	handle {
 		reverse_proxy 127.0.0.1:{$API_PORT:3001} {
 			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_down +Vary Accept
 		}
 	}
 }
