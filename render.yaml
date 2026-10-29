@@ -1,0 +1,20 @@
+# Deploy de teste (mesa de teste), não o de produção: API e app web num
+# serviço free do Render, banco no Neon. Detalhes em deploy/render/Dockerfile.
+services:
+  - type: web
+    name: tms
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # Connection string do Neon, a direta (DATABASE_URL_UNPOOLED do
+      # `neon env pull`), com sslmode=verify-full
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TRUST_PROXY
+        value: 'true'
