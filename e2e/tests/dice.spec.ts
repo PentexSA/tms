@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // Etapa 21: montar Destreza + Esportes no sheet "Dados" e rolar. Quem rola é
 // o servidor; a tela mostra o resultado e a parada que saiu da ficha.
@@ -14,6 +14,7 @@ test('montar Destreza + Esportes e rolar', async ({ page }) => {
     '/chronicles',
     { name: 'Crônica dos Dados', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   const character = await apiAs<{ id: string }>(
     context,
     user,

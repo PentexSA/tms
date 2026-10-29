@@ -66,8 +66,8 @@ describe('Nova ficha', () => {
     expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
       values: { name: 'Helena Varga', clan: 'tremere' },
     })
-    // A ficha nova abre em Evoluir (Etapa 18)
-    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=evolve')
+    // O Vampiro tem criação por pontos: a ficha nova abre na Criação
+    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
     // O template mais recente do sistema da crônica
     expect(calls.templateGet).toHaveBeenCalledWith(
       'vtm-v20',

@@ -527,7 +527,7 @@ describe('criação livre', () => {
   })
 
   it('template sem `creation` é sempre livre', () => {
-    const m = compileTemplate(templates['vtm-v20'])
+    const m = compileTemplate(templates['coc7e'])
     expect(effectiveCreationConfig(m, { mode: 'points' })).toEqual({
       mode: 'free',
     })
@@ -673,8 +673,8 @@ describe('configuração e escolhas', () => {
     expect(validateCreationConfig(model, { budgets: [] })).toEqual([
       { path: 'budgets', message: 'precisa ser objeto' },
     ])
-    const vtm = compileTemplate(templates['vtm-v20'])
-    expect(validateCreationConfig(vtm, { mode: 'points' })).toEqual([
+    const coc = compileTemplate(templates['coc7e'])
+    expect(validateCreationConfig(coc, { mode: 'points' })).toEqual([
       { path: 'mode', message: 'o template não tem criação por pontos' },
     ])
   })

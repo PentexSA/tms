@@ -5,6 +5,7 @@ import {
   as,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   type TestUser,
 } from '../test/factories'
@@ -61,10 +62,14 @@ const send = (user: TestUser, id: string, events: unknown[]) =>
   })
 
 describe('GET /systems', () => {
-  it('os dois sistemas publicados neste teste', async () => {
+  it('o Mago está entre os sistemas do produto, que a migration grava', async () => {
     const res = await as(ctx, owner, 'GET', '/systems')
     const systems = (await res.json()) as { code: string }[]
-    expect(systems.map(s => s.code).sort()).toEqual(['mta-m20', 'vtm-v20'])
+    expect(systems.map(s => s.code).sort()).toEqual([
+      'mta-m20',
+      'vtm-v20',
+      'wta-w20',
+    ])
   })
 })
 
@@ -78,7 +83,7 @@ describe('ficha de Mago', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('mta-m20')
-    expect(body.templateVersion).toBe('1.5.0')
+    expect(body.templateVersion).toBe('1.6.0')
     expect(body.sheet.values).toEqual({
       name: 'Otto Brandt',
       tradition: 'filhos-do-eter',
@@ -139,7 +144,10 @@ describe('a roda', () => {
   })
 
   it('Esfera acima do Arete é aceita: o teto não é destrutivo', async () => {
+    // Na criação por pontos o teto do Arete vale (hard-cap); fora dela, a
+    // Esfera acima do Arete é gravada e só não conta
     const id = await otto()
+    await freeCreation(ctx, id)
     const res = await send(owner, id, [
       { path: 'values.arete', from: null, to: 2 },
       { path: 'values.forces', from: null, to: 4 },

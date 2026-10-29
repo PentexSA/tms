@@ -739,7 +739,7 @@ Este exemplo passa em `schema.json`, em `validateTemplate` e, com uma ficha de t
 
 ### 6. Publicar
 
-Em produção, um sistema novo é **uma linha em `game_systems`** (código, família, nome) **e uma linha em `trait_templates`** (`template_data` = o JSON), inseridas por perfil administrativo pelo endpoint que aplica `schema.json` e `validateTemplate`. Sem migration e sem tela nova.
+Em produção, um sistema novo é **uma linha em `game_systems`** (código, família, nome) **e uma linha em `trait_templates`** (`template_data` = o JSON), inseridas por perfil administrativo pelo endpoint que aplica `schema.json` e `validateTemplate`. Sem tela nova. Os templates do produto (`PRODUCT_TEMPLATES` em `@tms/db`) também entram por migration (`0020_product_templates`): todo banco migrado já os tem, e cada versão nova ganha a sua migration.
 
 **Multi-sistema:** o exemplo PbtA reaproveita `number`, `track`, `list`, `choice` e `pbta-2d6`, que já existiam. O único ponto que pediria código, um relógio de PbtA com um preenchimento, entra uma vez como regra de `clock` e passa a servir Blades in the Dark e qualquer outro sistema com relógios.
 
@@ -749,7 +749,7 @@ Em produção, um sistema novo é **uma linha em `game_systems`** (código, fam�
 
 A criação tem um orçamento, e a evolução depois dela tem preço em XP. O template declara as regras; o core calcula com duas funções puras, as mesmas no app e no servidor: `checkCreation` (conta da criação) e `costOf` (preço de subir um nível). O que a ficha grava são só as **escolhas** do jogador (a ordem das prioridades) e a **configuração** do narrador (orçamentos, criação livre). A origem de cada ponto nunca é gravada: é calculada do estado final da ficha, então a ordem em que os pontos foram distribuídos não muda o resultado.
 
-Os três templates WoD têm só o mapeamento do extrato (`costs.xp` com `total` e `spent`, sem `rules`) e a seção `experience` com escrita só do narrador; orçamentos e preços entram depois de conferidos no livro (doc/plano-v4.md, Etapa 2b). O fixture de D&D usa `creation` para provar o point-buy de 27 pelo mesmo código, sem ser publicado.
+Os três templates WoD (`vtm-v20` 1.7.0, `mta-m20` 1.6.0, `wta-w20` 1.6.0) têm `creation`, `costs.freebie` e `costs.xp.rules` com as regras de V20, M20 e W20; os números, as fontes e o que fica com o narrador estão em [doc/regras-wod.md](../../doc/regras-wod.md). O fixture de D&D usa `creation` para provar o point-buy de 27 pelo mesmo código, sem ser publicado.
 
 ### `creation`
 

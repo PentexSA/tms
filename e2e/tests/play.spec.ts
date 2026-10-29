@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // Etapa 17: a dona abre a ficha em Jogo, gasta Sangue e leva dano; depois de
 // recarregar a página, os valores vieram do servidor (não do otimista).
@@ -14,6 +14,7 @@ async function newCharacter(page: Page) {
     '/chronicles',
     { name: 'Crônica da Liberdade', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   // 13ª geração (padrão) e Sangue sem valor guardado: cheio, 10 de 10. A
   // criação só aceita os campos da identidade
   return apiAs<{ id: string }>(

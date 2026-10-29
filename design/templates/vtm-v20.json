@@ -4,7 +4,7 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.6.0",
+  "templateVersion": "1.7.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
@@ -121,7 +121,7 @@
       "shortLabel": "Apa",
       "min": 0,
       "max": 5,
-      "default": 1,
+      "default": { "from": "clan", "map": {"assamitas": 1, "brujah": 1, "gangrel": 1, "giovanni": 1, "lasombra": 1, "malkavianos": 1, "ravnos": 1, "seguidores-de-set": 1, "toreador": 1, "tremere": 1, "tzimisce": 1, "ventrue": 1, "caitiff": 1} },
       "specialty": true
     },
     "perception": {
@@ -761,7 +761,269 @@
       ]
     }
   ],
+  "creation": {
+    "freebies": 15,
+    "budgets": [
+      {
+        "id": "attributes",
+        "label": "Atributos",
+        "rule": "priority-budget",
+        "budgets": [7, 5, 3],
+        "groups": [
+          {
+            "id": "physical",
+            "label": "Físicos",
+            "targets": ["strength", "dexterity", "stamina"]
+          },
+          {
+            "id": "social",
+            "label": "Sociais",
+            "targets": ["charisma", "manipulation", "appearance"]
+          },
+          {
+            "id": "mental",
+            "label": "Mentais",
+            "targets": ["perception", "intelligence", "wits"]
+          }
+        ]
+      },
+      {
+        "id": "abilities",
+        "label": "Habilidades",
+        "rule": "priority-budget",
+        "budgets": [13, 9, 5],
+        "groups": [
+          {
+            "id": "talents",
+            "label": "Talentos",
+            "targets": ["alertness", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge"]
+          },
+          {
+            "id": "skills",
+            "label": "Perícias",
+            "targets": ["animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival"]
+          },
+          {
+            "id": "knowledges",
+            "label": "Conhecimentos",
+            "targets": ["academics", "computer", "finance", "investigation", "law", "medicine", "occult", "politics", "science", "technology"]
+          }
+        ]
+      },
+      {
+        "id": "disciplines",
+        "label": "Disciplinas",
+        "rule": "fixed-budget",
+        "budget": 3,
+        "targets": ["disciplines"]
+      },
+      {
+        "id": "backgrounds",
+        "label": "Antecedentes",
+        "rule": "fixed-budget",
+        "budget": 5,
+        "targets": ["backgrounds"]
+      },
+      {
+        "id": "virtues",
+        "label": "Virtudes",
+        "rule": "fixed-budget",
+        "budget": 7,
+        "targets": ["conscience", "selfControl", "courage"]
+      }
+    ],
+    "caps": [
+      {
+        "rule": "creation-cap",
+        "targets": ["alertness", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "finance", "investigation", "law", "medicine", "occult", "politics", "science", "technology"],
+        "max": 3
+      }
+    ],
+    "baselines": [
+      {
+        "targets": ["appearance"],
+        "value": 0,
+        "locked": true,
+        "when": { "field": "clan", "in": ["nosferatu"] }
+      }
+    ]
+  },
   "costs": {
-    "xp": { "total": "xpTotal", "spent": "xpSpent" }
+    "freebie": [
+      {
+        "id": "attribute",
+        "rule": "flat",
+        "cost": 5,
+        "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "appearance", "perception", "intelligence", "wits"]
+      },
+      {
+        "id": "ability",
+        "rule": "flat",
+        "cost": 2,
+        "targets": ["alertness", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "finance", "investigation", "law", "medicine", "occult", "politics", "science", "technology"]
+      },
+      { "id": "discipline", "rule": "flat", "cost": 7, "targets": ["disciplines"] },
+      { "id": "background", "rule": "flat", "cost": 1, "targets": ["backgrounds"] },
+      {
+        "id": "virtue",
+        "rule": "flat",
+        "cost": 2,
+        "targets": ["conscience", "selfControl", "courage"]
+      },
+      { "id": "humanity", "rule": "flat", "cost": 2, "targets": ["humanity"] },
+      { "id": "willpower", "rule": "flat", "cost": 1, "targets": ["willpower"] },
+      { "id": "merits", "rule": "item-meta", "meta": "cost", "targets": ["merits"] },
+      { "id": "flaws", "rule": "credit", "meta": "bonus", "max": 7, "targets": ["flaws"] }
+    ],
+    "xp": {
+      "total": "xpTotal",
+      "spent": "xpSpent",
+      "rules": [
+        {
+          "id": "attribute",
+          "rule": "per-current",
+          "factor": 4,
+          "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "perception", "intelligence", "wits"]
+        },
+        {
+          "id": "appearance",
+          "rule": "per-current",
+          "factor": 4,
+          "targets": ["appearance"],
+          "when": [
+            { "if": {"field": "clan", "in": ["nosferatu"]}, "unavailable": true }
+          ]
+        },
+        {
+          "id": "ability",
+          "rule": "per-current",
+          "factor": 2,
+          "new": 3,
+          "targets": ["alertness", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "animalKen", "crafts", "drive", "etiquette", "firearms", "larceny", "melee", "performance", "stealth", "survival", "academics", "computer", "finance", "investigation", "law", "medicine", "occult", "politics", "science", "technology"]
+        },
+        {
+          "id": "discipline",
+          "rule": "per-current",
+          "factor": 7,
+          "new": 10,
+          "targets": ["disciplines"],
+          "when": [
+            { "if": {"field": "clan", "in": ["caitiff"]}, "factor": 6 },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["assamitas"],
+                "itemIn": ["Rapidez", "Ofuscação", "Quietus"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["brujah"],
+                "itemIn": ["Rapidez", "Potência", "Presença"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["gangrel"],
+                "itemIn": ["Animalismo", "Fortitude", "Metamorfose"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["giovanni"],
+                "itemIn": ["Dominação", "Necromancia", "Potência"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["lasombra"],
+                "itemIn": ["Dominação", "Tenebrosidade", "Potência"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["malkavianos"],
+                "itemIn": ["Auspícios", "Demência", "Ofuscação"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["nosferatu"],
+                "itemIn": ["Animalismo", "Ofuscação", "Potência"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["ravnos"],
+                "itemIn": ["Animalismo", "Quimerismo", "Fortitude"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["seguidores-de-set"],
+                "itemIn": ["Ofuscação", "Presença", "Serpentis"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["toreador"],
+                "itemIn": ["Auspícios", "Rapidez", "Presença"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["tremere"],
+                "itemIn": ["Auspícios", "Dominação", "Taumaturgia"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["tzimisce"],
+                "itemIn": ["Animalismo", "Auspícios", "Vicissitude"]
+              },
+              "factor": 5
+            },
+            {
+              "if": {
+                "field": "clan",
+                "in": ["ventrue"],
+                "itemIn": ["Dominação", "Fortitude", "Presença"]
+              },
+              "factor": 5
+            }
+          ]
+        },
+        {
+          "id": "virtue",
+          "rule": "per-current",
+          "factor": 2,
+          "targets": ["conscience", "selfControl", "courage"]
+        },
+        { "id": "humanity", "rule": "per-current", "factor": 2, "targets": ["humanity"] },
+        { "id": "willpower", "rule": "per-current", "factor": 1, "targets": ["willpower"] }
+      ]
+    }
   }
 }

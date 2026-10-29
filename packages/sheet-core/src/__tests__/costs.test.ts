@@ -222,7 +222,7 @@ describe('costOf: indisponível e inválido', () => {
 
   it('lista fixa não ganha item novo', () => {
     // Ressonância do Mago: lista fixa com pontos
-    const t = structuredClone(templates['mta-m20']) as Json
+    const { creation: _, ...t } = structuredClone(templates['mta-m20']) as Json
     const r = costOf(
       compileTemplate({
         ...t,
@@ -269,18 +269,6 @@ describe('sem `costs.xp`', () => {
       expect(xpLedgerFields(m)).toEqual([])
     })
   }
-
-  it('campos de XP sem custos ficam como estão, sem compra', () => {
-    // Os WoD têm xpTotal/xpSpent, mas ainda sem `costs.xp`
-    const m = compileTemplate(templates['vtm-v20'])
-    expect(m.fields.has('xpTotal')).toBe(true)
-    expect(
-      costOf(m, { values: { dexterity: 2 } }, { field: 'dexterity' })
-    ).toMatchObject({
-      ok: false,
-      code: 'XP_COST_UNAVAILABLE',
-    })
-  })
 })
 
 describe('saldo', () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, type Page, test } from '@playwright/test'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 // v2, Etapa 7: a jornada do §1 de doc/plano-v2.md, o Lobisomem (W20) pelo
 // mesmo motor do Vampiro e do Mago. O jogador usa o celular (390: dock
@@ -47,6 +47,12 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
     st.getByRole('heading', { name: 'Seita da Serra do Mar' })
   ).toBeVisible()
   const chronicleUrl = st.url()
+  // A jornada não trata da conta por pontos: a crônica cria em modo livre
+  await freeCreation(
+    desk,
+    storyteller,
+    /chronicles\/([0-9a-f-]{36})/.exec(chronicleUrl)![1]!
+  )
   await st.getByRole('button', { name: 'Convidar' }).click()
   await st.getByRole('button', { name: 'Gerar convite' }).click()
   const code = (await st.getByTestId('invite-code-value').innerText()).trim()

@@ -64,7 +64,7 @@ describe('@tms/db - Database Client', () => {
     it('should reject the same template version twice', async () => {
       const system = await testDb
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'Vampiro', family: 'wod' })
+        .values({ code: 'sistema-teste', name: 'Teste', family: 'teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const row = {
@@ -91,7 +91,7 @@ describe('@tms/db - Database Client', () => {
     it('should store jsonb as structured data', async () => {
       const system = await testDb
         .insertInto('game_systems')
-        .values({ code: 'vtm-v20', name: 'Vampiro', family: 'wod' })
+        .values({ code: 'sistema-teste', name: 'Teste', family: 'teste' })
         .returning('id')
         .executeTakeFirstOrThrow()
       const template = await testDb

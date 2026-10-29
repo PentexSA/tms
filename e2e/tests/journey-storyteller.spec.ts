@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 import { API_URL } from '../env'
-import { apiAs, signUp } from '../support/users'
+import { apiAs, freeCreation, signUp } from '../support/users'
 
 test.use({ actionTimeout: 15_000 })
 
@@ -94,6 +94,7 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
       page.getByRole('heading', { name: 'Mesa administrável' })
     ).toBeVisible()
     const chronicleId = /chronicles\/([0-9a-f-]{36})/.exec(page.url())![1]!
+    await freeCreation(desk, storyteller, chronicleId)
     await page.getByRole('button', { name: 'Convidar' }).click()
     await page.getByRole('button', { name: 'Gerar convite' }).click()
     const code = (

@@ -15,6 +15,7 @@ import {
   createCharacter,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   setStatus,
   type TestUser,
@@ -108,6 +109,8 @@ async function sheet(
     chronicles[system] as string,
     { name: 'Ficha', ...BASE[system], ...opts.values }
   )
+  // A tabela é da política, não da conta da criação por pontos
+  await freeCreation(ctx, id)
   const state = opts.state ?? 'creating'
   if (state !== 'creating')
     await setStatus(

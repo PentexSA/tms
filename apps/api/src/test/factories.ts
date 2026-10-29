@@ -122,6 +122,18 @@ export async function createCharacter(
 }
 
 /**
+ * Criação livre direto no banco, como se o narrador a liberasse: para testes
+ * de política e AuthZ, em que a conta da criação por pontos não é o assunto.
+ */
+export async function freeCreation(ctx: TestContext, characterId: string) {
+  await ctx.db
+    .updateTable('characters')
+    .set({ creation: JSON.stringify({ config: { mode: 'free' } }) })
+    .where('id', '=', characterId)
+    .execute()
+}
+
+/**
  * Estado da ficha direto no banco, sem passar pelas rotas do narrador nem
  * pelo `chronicle_audit`: para montar o cenário de um teste.
  */

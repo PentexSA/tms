@@ -73,7 +73,18 @@ describe('GET /systems', () => {
       .values({ code: 'sem-template', name: 'Sem template', family: 'x' })
       .execute()
     const res = await as(ctx, stranger, 'GET', '/systems')
+    // Os do produto vêm da migration; o sem template fica de fora
     expect(await res.json()).toEqual([
+      {
+        code: 'wta-w20',
+        name: 'Lobisomem: O Apocalipse — Edição de 20º Aniversário',
+        family: 'wod',
+      },
+      {
+        code: 'mta-m20',
+        name: 'Mago: A Ascensão — Edição de 20º Aniversário',
+        family: 'wod',
+      },
       {
         code: 'vtm-v20',
         name: 'Vampiro: A Máscara — Edição de 20º Aniversário',

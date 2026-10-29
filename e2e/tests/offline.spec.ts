@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 import { API_URL } from '../env'
-import { apiAs, eighthGeneration, signUp } from '../support/users'
+import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
 
 // Etapa 20: o jogo continua sem rede e sincroniza ao voltar.
 //
@@ -38,6 +38,7 @@ test('gastar Sangue e levar dano offline, recarregar e sincronizar', async ({
     '/chronicles',
     { name: 'Crônica sem rede', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   const character = await apiAs<{ id: string }>(
     context,
     user,
@@ -102,6 +103,7 @@ test('logout apaga o que ficou no aparelho', async ({ page }) => {
     '/chronicles',
     { name: 'Crônica', systemCode: 'vtm-v20' }
   )
+  await freeCreation(context, user, chronicle.id)
   const character = await apiAs<{ id: string }>(
     context,
     user,

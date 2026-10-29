@@ -1,10 +1,11 @@
 import { join } from 'node:path'
+import { PRODUCT_TEMPLATES } from '@tms/db'
 
 // Os templates do produto, na ordem de publicação (plano-v1, Etapa 7). Os
 // outros de design/templates são fixtures de teste e nunca vão ao banco. Um
 // template só entra aqui depois que a versão do app que o desenha estiver no
 // ar (doc/arquitetura §5.3): o app antigo abriria a ficha, mas sem as regras.
-export const PUBLISHED_SYSTEMS = ['vtm-v20', 'mta-m20', 'wta-w20'] as const
+export const PUBLISHED_SYSTEMS = PRODUCT_TEMPLATES
 
 const ROOT = join(import.meta.dir, '../../../..')
 

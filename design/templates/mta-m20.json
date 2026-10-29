@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.5.0",
+  "templateVersion": "1.6.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
@@ -895,7 +895,148 @@
       ]
     }
   ],
+  "creation": {
+    "freebies": 15,
+    "budgets": [
+      {
+        "id": "attributes",
+        "label": "Atributos",
+        "rule": "priority-budget",
+        "budgets": [7, 5, 3],
+        "groups": [
+          {
+            "id": "physical",
+            "label": "Físicos",
+            "targets": ["strength", "dexterity", "stamina"]
+          },
+          {
+            "id": "social",
+            "label": "Sociais",
+            "targets": ["charisma", "manipulation", "appearance"]
+          },
+          {
+            "id": "mental",
+            "label": "Mentais",
+            "targets": ["perception", "intelligence", "wits"]
+          }
+        ]
+      },
+      {
+        "id": "abilities",
+        "label": "Habilidades",
+        "rule": "priority-budget",
+        "budgets": [13, 9, 5],
+        "groups": [
+          {
+            "id": "talents",
+            "label": "Talentos",
+            "targets": ["alertness", "art", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge"]
+          },
+          {
+            "id": "skills",
+            "label": "Perícias",
+            "targets": ["crafts", "drive", "etiquette", "firearms", "martialArts", "meditation", "melee", "research", "stealth", "survival", "technology"]
+          },
+          {
+            "id": "knowledges",
+            "label": "Conhecimentos",
+            "targets": ["academics", "computer", "cosmology", "enigmas", "esoterica", "investigation", "law", "medicine", "occult", "politics", "science"]
+          }
+        ]
+      },
+      {
+        "id": "backgrounds",
+        "label": "Antecedentes",
+        "rule": "fixed-budget",
+        "budget": 7,
+        "targets": ["backgrounds"]
+      },
+      {
+        "id": "spheres",
+        "label": "Esferas",
+        "rule": "fixed-budget",
+        "budget": 6,
+        "targets": ["correspondence", "entropy", "forces", "life", "matter", "mind", "prime", "spirit", "time"]
+      }
+    ],
+    "caps": [
+      {
+        "rule": "creation-cap",
+        "targets": ["alertness", "art", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "crafts", "drive", "etiquette", "firearms", "martialArts", "meditation", "melee", "research", "stealth", "survival", "technology", "academics", "computer", "cosmology", "enigmas", "esoterica", "investigation", "law", "medicine", "occult", "politics", "science"],
+        "max": 3
+      },
+      { "rule": "hard-cap", "targets": ["arete"], "max": 3 },
+      {
+        "rule": "hard-cap",
+        "targets": ["correspondence", "entropy", "forces", "life", "matter", "mind", "prime", "spirit", "time"],
+        "max": { "field": "arete" }
+      }
+    ],
+    "untracked": ["rotes", "resonance", "wonders"]
+  },
   "costs": {
-    "xp": { "total": "xpTotal", "spent": "xpSpent" }
+    "freebie": [
+      {
+        "id": "attribute",
+        "rule": "flat",
+        "cost": 5,
+        "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "appearance", "perception", "intelligence", "wits"]
+      },
+      {
+        "id": "ability",
+        "rule": "flat",
+        "cost": 2,
+        "targets": ["alertness", "art", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "crafts", "drive", "etiquette", "firearms", "martialArts", "meditation", "melee", "research", "stealth", "survival", "technology", "academics", "computer", "cosmology", "enigmas", "esoterica", "investigation", "law", "medicine", "occult", "politics", "science"]
+      },
+      { "id": "background", "rule": "flat", "cost": 1, "targets": ["backgrounds"] },
+      {
+        "id": "sphere",
+        "rule": "flat",
+        "cost": 7,
+        "targets": ["correspondence", "entropy", "forces", "life", "matter", "mind", "prime", "spirit", "time"]
+      },
+      { "id": "arete", "rule": "flat", "cost": 4, "targets": ["arete"] },
+      { "id": "willpower", "rule": "flat", "cost": 1, "targets": ["willpower"] },
+      { "id": "merits", "rule": "item-meta", "meta": "cost", "targets": ["merits"] },
+      { "id": "flaws", "rule": "credit", "meta": "bonus", "max": 7, "targets": ["flaws"] }
+    ],
+    "xp": {
+      "total": "xpTotal",
+      "spent": "xpSpent",
+      "rules": [
+        {
+          "id": "attribute",
+          "rule": "per-current",
+          "factor": 4,
+          "targets": ["strength", "dexterity", "stamina", "charisma", "manipulation", "appearance", "perception", "intelligence", "wits"]
+        },
+        {
+          "id": "ability",
+          "rule": "per-current",
+          "factor": 2,
+          "new": 3,
+          "targets": ["alertness", "art", "athletics", "awareness", "brawl", "empathy", "expression", "intimidation", "leadership", "streetwise", "subterfuge", "crafts", "drive", "etiquette", "firearms", "martialArts", "meditation", "melee", "research", "stealth", "survival", "technology", "academics", "computer", "cosmology", "enigmas", "esoterica", "investigation", "law", "medicine", "occult", "politics", "science"]
+        },
+        {
+          "id": "background",
+          "rule": "per-current",
+          "factor": 3,
+          "new": 3,
+          "targets": ["backgrounds"]
+        },
+        {
+          "id": "sphere",
+          "rule": "per-current",
+          "factor": 8,
+          "new": 10,
+          "targets": ["correspondence", "entropy", "forces", "life", "matter", "mind", "prime", "spirit", "time"],
+          "when": [
+            { "if": {"field": "affinity", "equalsTarget": true}, "factor": 7 }
+          ]
+        },
+        { "id": "arete", "rule": "per-current", "factor": 8, "targets": ["arete"] },
+        { "id": "willpower", "rule": "per-current", "factor": 1, "targets": ["willpower"] }
+      ]
+    }
   }
 }
