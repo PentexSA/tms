@@ -1,40 +1,87 @@
 #!/usr/bin/env bash
-# Corte de release: leva a branch `release`, a que o Render publica, até um
-# commit da main e marca o corte com uma tag. Só avança (fast-forward): o que
-# está no ar sempre veio da main, e um corte nunca reescreve outro.
+# Corte de release: sobe o "version" do package.json da raiz (semver) num
+# commit em cima da origin/main, marca com a tag vX.Y.Z e leva a branch
+# `release`, a que o Render publica, até esse commit. Só avança
+# (fast-forward): o que está no ar sempre veio da main.
 #
-#   pnpm release            # corta da origin/main
-#   pnpm release <commit>   # corta de um commit que já está na main
+#   pnpm release patch   # 1.0.0 -> 1.0.1
+#   pnpm release minor   # 1.0.0 -> 1.1.0
+#   pnpm release major   # 1.0.0 -> 2.0.0
 #
-# Para voltar atrás, use o Rollback do Render (ou um revert na main e um
-# corte novo), nunca um force push na release.
+# O corte é feito num worktree temporário: a sua árvore e a sua branch não
+# mudam. Para voltar atrás, use o Rollback do Render (ou um revert na main e
+# um corte novo), nunca um force push na release.
 set -euo pipefail
 
-REF=${1:-origin/main}
-git fetch --quiet --tags origin main release
-TARGET=$(git rev-parse --verify "$REF^{commit}")
+BUMP=${1:-}
+case $BUMP in
+  patch | minor | major) ;;
+  *)
+    echo "uso: pnpm release <patch|minor|major>"
+    exit 2
+    ;;
+esac
 
-if ! git merge-base --is-ancestor "$TARGET" origin/main; then
-  echo "$REF não está na origin/main: faça o merge do PR antes do corte."
+git fetch --quiet --tags origin main release
+if ! git merge-base --is-ancestor origin/release origin/main; then
+  echo "A release tem commits fora da main, e o corte só avança."
   exit 1
 fi
-if git merge-base --is-ancestor "$TARGET" origin/release; then
-  echo "Nada novo: a release já contém $REF."
+if [ -z "$(git rev-list origin/release..origin/main)" ]; then
+  echo "Nada novo: a release já está na origin/main."
   exit 0
 fi
-if ! git merge-base --is-ancestor origin/release "$TARGET"; then
-  echo "A release tem commits fora de $REF, e o corte só avança."
+
+CURRENT=$(git show origin/main:package.json |
+  node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')
+NEXT=$(node -e '
+  const [version, bump] = process.argv.slice(1)
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+  if (!m) {
+    console.error(`version fora do semver: ${version}`)
+    process.exit(1)
+  }
+  let [major, minor, patch] = m.slice(1).map(Number)
+  if (bump === "major") [major, minor, patch] = [major + 1, 0, 0]
+  else if (bump === "minor") [minor, patch] = [minor + 1, 0]
+  else patch++
+  console.log(`${major}.${minor}.${patch}`)
+' "$CURRENT" "$BUMP")
+TAG=v$NEXT
+if git rev-parse --quiet --verify "refs/tags/$TAG" >/dev/null; then
+  echo "A tag $TAG já existe."
   exit 1
 fi
 
-TAG=release-$(date +%Y%m%d-%H%M%S)
-echo "Corte $TAG ($(git rev-parse --short "$TARGET")), entram:"
-git log --oneline origin/release.."$TARGET"
+echo "Corte $TAG ($CURRENT -> $NEXT), entram:"
+git log --oneline origin/release..origin/main
 read -r -p "Publicar? [s/N] " ok
-[ "$ok" = s ] || [ "$ok" = S ] || { echo "Cancelado."; exit 1; }
+[ "$ok" = s ] || [ "$ok" = S ] || {
+  echo "Cancelado."
+  exit 1
+}
 
-git tag -a "$TAG" -m "Corte de release $TAG" "$TARGET"
-# Sem o pre-push: ele roda a suíte na árvore local, e o corte só move a
-# release para commits que já passaram pelo CI na main
-git push --no-verify origin "$TARGET:refs/heads/release" "refs/tags/$TAG"
+WT=$(mktemp -d)
+trap 'git worktree remove --force "$WT" >/dev/null 2>&1 || true; rm -rf "$WT"' EXIT
+git worktree add --quiet --detach "$WT" origin/main
+node -e '
+  const fs = require("fs")
+  const [file, version] = process.argv.slice(1)
+  const text = fs.readFileSync(file, "utf8")
+  fs.writeFileSync(file, text.replace(/"version": "[^"]*"/, `"version": "${version}"`))
+' "$WT/package.json" "$NEXT"
+# Sem os hooks: o worktree não tem node_modules, e o commit só muda a versão
+git -C "$WT" commit --quiet --no-verify -am "chore(release): $TAG"
+git -C "$WT" tag -a "$TAG" -m "Release $TAG"
+SHA=$(git -C "$WT" rev-parse HEAD)
+
+# Atômico: main, release e tag entram juntas ou nenhuma (se a main andou
+# desde o fetch, nada muda). Sem o pre-push: ele roda a suíte na árvore
+# local, e o corte só leva à release commits que já passaram pelo CI na main.
+if ! git push --atomic --no-verify origin \
+  "$SHA:refs/heads/main" "$SHA:refs/heads/release" "refs/tags/$TAG"; then
+  git tag -d "$TAG" >/dev/null
+  echo "O push falhou (a main andou?): nada foi publicado, rode de novo."
+  exit 1
+fi
 echo "Release $TAG enviada: o Render publica a branch release."
