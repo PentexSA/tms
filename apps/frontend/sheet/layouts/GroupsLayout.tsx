@@ -104,6 +104,7 @@ export function GroupsLayout({ section }: LayoutProps) {
                 />
               </View>
             ) : null}
+            {titled ? null : <CreationCounter fieldIds={g.fieldIds} line />}
             {ids.length && filtered && ids.every(id => !isList(id)) ? (
               <ChipFlow ids={ids} />
             ) : ids.length ? (

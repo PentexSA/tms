@@ -23,6 +23,7 @@ import {
 } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { createStore, type StoreApi } from 'zustand/vanilla'
+import { type CreationPhase, draftRefusal } from '../creation/creation'
 import { checkLimits, OutboxLimitError, type QueuedBatch } from '../sync/outbox'
 
 // Um store por ficha aberta (doc/arquitetura §6.5):
@@ -110,6 +111,8 @@ export interface SheetState {
   readonly check: CreationCheck | null
   // A última recusa da avaliação parcial, para a tela explicar por grupo
   readonly creationRefusal: CreationRefusal | null
+  // Na criação, o que a distribuição gasta agora: básicos ou bônus
+  readonly creationPhase: CreationPhase
 }
 
 export interface SheetActions {
@@ -152,6 +155,8 @@ export interface SheetActions {
   discardDraft(): void
   /** A conta da criação mudou (escolhas, orçamento, estado). */
   setCreation(creation: CreationInput | null): void
+  /** Básicos (o grupo cheio trava) ou Bônus (passar do grupo usa o saldo). */
+  setCreationPhase(phase: CreationPhase): void
 }
 
 export type SheetStore = StoreApi<SheetState & SheetActions>
@@ -367,7 +372,25 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           fieldIssues = next
         }
       }
-      set({ draft, fieldIssues, ...derive({ ...s, draft }, s.values) })
+      const next = derive({ ...s, draft }, s.values)
+      // Na criação, a conta vale a cada toque, não só no "Salvar": o grupo
+      // cheio trava em Básicos e o saldo de bônus trava em Bônus
+      if (s.mode === 'create' && s.creation) {
+        const why = draftRefusal(
+          model,
+          { before: shown(s.values, s.draft), after: r.sheet },
+          { before: s.check, after: next.check },
+          s.creation,
+          s.creationPhase
+        )
+        if (why)
+          return {
+            ok: false,
+            kind: 'creation',
+            issues: events.map(e => ({ path: e.path, message: why })),
+          }
+      }
+      set({ draft, fieldIssues, ...next })
       return {
         ok: true,
         batch: { clientBatchId: '', events: [...events], label: '' },
@@ -406,6 +429,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       }),
       creation: init.creation ?? null,
       creationRefusal: null,
+      creationPhase: 'basics',
       mode: init.mode ?? 'read',
       draft: null,
       undoStack: [],
@@ -580,6 +604,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           creationRefusal: null,
           ...derive({ ...s, creation }, s.values),
         })
+      },
+
+      setCreationPhase(creationPhase) {
+        set({ creationPhase })
       },
     }
   })

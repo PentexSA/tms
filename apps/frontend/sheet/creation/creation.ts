@@ -1,14 +1,16 @@
-import type {
-  CreationCheck,
-  CreationChoices,
-  CreationConfig,
-  CreationGroup,
-  CreationInput,
-  CreationProblem,
-  CreationRefusalCode,
-  FieldId,
-  RoleName,
-  SheetModel,
+import {
+  type CreationCheck,
+  type CreationChoices,
+  type CreationConfig,
+  type CreationGroup,
+  type CreationInput,
+  type CreationProblem,
+  type CreationRefusalCode,
+  checkCreationBatch,
+  type FieldId,
+  type RoleName,
+  type SheetData,
+  type SheetModel,
 } from '@tms/sheet-core'
 
 // A criação por pontos no app (doc/plano-v4.md, Etapa 5). A conta é a do core
@@ -104,6 +106,12 @@ export function findGroup(
       ?.groups.find(g => g.id === where.group) ?? null
   )
 }
+
+export const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quinta']
+
+/** "Primária", "Secundária"... e, depois da quinta, "6ª". */
+export const rankLabel = (index: number): string =>
+  RANKS[index] ?? `${index + 1}ª`
 
 /** "5/7", "3/3 · +1 bônus", "Escolha a prioridade". */
 export function counterText(g: CreationGroup): string {
@@ -213,3 +221,58 @@ export function reorder(
   order[from] = other
   return order
 }
+
+/**
+ * Em que a distribuição gasta: os pontos básicos de cada grupo ou o saldo de
+ * bônus. Em `basics`, o grupo cheio trava; em `freebies`, passar do grupo é
+ * pago com bônus, até o saldo acabar.
+ */
+export type CreationPhase = 'basics' | 'freebies'
+
+/**
+ * Por que uma mudança no rascunho da criação não entra, ou null. A mesma
+ * avaliação parcial do "Salvar" (`checkCreationBatch`), agora a cada toque, e
+ * em `basics` também o grupo que passaria do orçamento. Só o app trava aqui:
+ * gastar bônus continua valendo no servidor.
+ */
+export function draftRefusal(
+  model: SheetModel,
+  sheets: { readonly before: SheetData; readonly after: SheetData },
+  checks: {
+    readonly before: CreationCheck | null
+    readonly after: CreationCheck | null
+  },
+  input: CreationInput,
+  phase: CreationPhase
+): string | null {
+  const refused = checkCreationBatch(model, sheets.before, sheets.after, input)
+  if (refused) {
+    const first = refused.problems[0]
+    return first && refused.code === 'CREATION_BUDGET_EXCEEDED'
+      ? problemText(model, checks.after, first)
+      : REFUSAL_TEXT[refused.code]
+  }
+  if (phase !== 'basics' || !checks.after) return null
+  for (const b of checks.after.budgets)
+    for (const g of b.groups) {
+      const was = checks.before?.budgets
+        .find(x => x.id === b.id)
+        ?.groups.find(x => x.id === g.id)
+      if (g.budget !== null && g.extra > (was?.extra ?? 0))
+        return basicsSpentText(g, checks.after.freebies !== null)
+    }
+  return null
+}
+
+/** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
+export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
+  const unit = g.measure === 'items' ? 'itens' : 'pontos'
+  const spent = `${g.label}: os ${g.budget} ${unit} básicos já foram usados.`
+  return freebies && g.price !== null
+    ? `${spent} Para passar disso, use os pontos de bônus.`
+    : spent
+}
+
+/** O corpo de um erro da API (`error.value`), ou null. */
+export const errorBodyOf = (error: unknown): unknown =>
+  (error as { value?: unknown } | null)?.value ?? null

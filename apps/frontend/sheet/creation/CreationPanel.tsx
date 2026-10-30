@@ -1,8 +1,7 @@
-import type { CreationProblem, PriorityBudget } from '@tms/sheet-core'
+import type { CreationProblem } from '@tms/sheet-core'
 import {
   Banner,
   Button,
-  Choice,
   SectionHeader,
   Stepper,
   Text,
@@ -23,19 +22,29 @@ import {
 import { useSheet, useSheetSelector } from '../context'
 import { useCreation } from './CreationContext'
 import {
+  type CreationPhase,
   completeLabel,
   creationRefusalOf,
+  errorBodyOf,
   problemText,
   REFUSAL_TEXT,
-  reorder,
 } from './creation'
+import { RadioChips } from './RadioChips'
 
-// O painel do modo de criação (doc/plano-v4.md, Etapa 5): prioridades, saldo
-// de bônus, o que falta para fechar e "Concluir criação", separado do
-// "Salvar alterações" do rascunho. Concluir exige rede, rascunho salvo e a
-// fila confirmada: a conclusão nunca confirma escolhas ainda locais.
+// O painel do modo de criação (doc/plano-v4.md, Etapa 5): o que os pontos
+// gastam (básicos ou bônus), saldo de bônus, o que falta para fechar e
+// "Concluir criação", separado do "Salvar alterações" do rascunho. As
+// prioridades ficam no cabeçalho de cada grupo (CreationCounter). Concluir
+// exige rede, rascunho salvo e a fila confirmada: a conclusão nunca confirma
+// escolhas ainda locais.
 
-const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quinta']
+const PHASES: readonly {
+  readonly id: CreationPhase
+  readonly label: string
+}[] = [
+  { id: 'basics', label: 'Pontos básicos' },
+  { id: 'freebies', label: 'Pontos de bônus' },
+]
 
 export function CreationPanel() {
   const creation = useCreation()
@@ -44,8 +53,8 @@ export function CreationPanel() {
   const refusal = useSheetSelector(s => s.creationRefusal)
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
+  const phase = useSheetSelector(s => s.creationPhase)
   const toast = useToast()
-  const save = useSaveCreation(creation?.characterId ?? '')
   const complete = useCompleteCreation(
     creation?.characterId ?? '',
     creation?.chronicleId ?? ''
@@ -62,41 +71,6 @@ export function CreationPanel() {
     return null
   const { info } = creation
   const storyteller = roles.has('storyteller')
-  const priorities = (model.template.creation?.budgets ?? []).filter(
-    (b): b is PriorityBudget => b.rule === 'priority-budget'
-  )
-
-  const choose = (budget: PriorityBudget, group: string, rank: number) => {
-    const current = info.choices.priorities?.[budget.id]
-    const order = reorder(
-      current,
-      budget.groups.map(g => g.id),
-      group,
-      rank
-    )
-    save.mutate(
-      {
-        revision: info.revision,
-        choices: {
-          priorities: {
-            ...(info.choices.priorities ?? {}),
-            [budget.id]: order,
-          },
-        },
-      },
-      {
-        onError: error => {
-          const code = creationRefusalOf(errorBody(error))
-          toast.show({
-            message: code
-              ? REFUSAL_TEXT[code]
-              : messageOf(error, 'Não foi possível salvar as prioridades.'),
-          })
-        },
-      }
-    )
-  }
-
   const blocked = dirty
     ? 'Salve as alterações antes de concluir.'
     : queued
@@ -121,7 +95,7 @@ export function CreationPanel() {
                 : 'Criação concluída. Subir um traço agora passa pelo narrador.',
           }),
         onError: error => {
-          const body = errorBody(error) as { problems?: unknown } | null
+          const body = errorBodyOf(error) as { problems?: unknown } | null
           if (Array.isArray(body?.problems))
             setServerProblems(body.problems as CreationProblem[])
           const code = creationRefusalOf(body)
@@ -155,37 +129,24 @@ export function CreationPanel() {
           testID="creation-refused"
         />
       ) : null}
-      {priorities.map(budget => {
-        const order = info.choices.priorities?.[budget.id]
-        const values =
-          (info.effective.budgets?.[budget.id] as number[] | undefined) ??
-          budget.budgets
-        return (
-          <View key={budget.id} style={styles.block}>
-            <SectionHeader
-              title={`Prioridades: ${budget.label}`}
-              level="group"
-            />
-            {budget.groups.map(g => {
-              const rank = order ? order.indexOf(g.id) : -1
-              return (
-                <Choice
-                  key={g.id}
-                  label={g.label}
-                  testID={`priority-${budget.id}-${g.id}`}
-                  value={rank < 0 ? null : String(rank)}
-                  onChange={id => choose(budget, g.id, Number(id))}
-                  options={values.map((n, i) => ({
-                    id: String(i),
-                    label: `${RANKS[i] ?? `${i + 1}ª`} (${n})`,
-                    spoken: `${g.label}, ${RANKS[i] ?? `${i + 1}ª`}, ${n} pontos`,
-                  }))}
-                />
-              )
-            })}
-          </View>
-        )
-      })}
+      {freebies ? (
+        <View style={styles.block}>
+          <RadioChips
+            label="O que os pontos gastam"
+            options={PHASES}
+            value={phase}
+            onChange={id =>
+              store.getState().setCreationPhase(id as CreationPhase)
+            }
+            testID="creation-phase"
+          />
+          <Text variant="caption" color="inkMuted">
+            {phase === 'basics'
+              ? 'Cada grupo trava quando os pontos básicos acabam. Depois, passe para os pontos de bônus.'
+              : 'Passar do orçamento de um grupo usa os pontos de bônus, até o saldo acabar.'}
+          </Text>
+        </View>
+      ) : null}
       {freebies ? (
         <Text
           testID="creation-freebies"
@@ -251,7 +212,7 @@ export function CreationStatusPanel() {
   const storyteller = roles.has('storyteller')
 
   const failed = (failure: unknown, fallback: string) => {
-    const code = creationRefusalOf(errorBody(failure))
+    const code = creationRefusalOf(errorBodyOf(failure))
     const text = code ? REFUSAL_TEXT[code] : messageOf(failure, fallback)
     setError(text)
     toast.show({ message: text })
@@ -356,7 +317,7 @@ function BudgetControls() {
       {
         onSuccess: () => toast.show({ message: done }),
         onError: error => {
-          const code = creationRefusalOf(errorBody(error))
+          const code = creationRefusalOf(errorBodyOf(error))
           toast.show({
             message: code
               ? REFUSAL_TEXT[code]
@@ -397,9 +358,6 @@ function BudgetControls() {
     </View>
   )
 }
-
-const errorBody = (error: unknown): unknown =>
-  (error as { value?: unknown } | null)?.value ?? null
 
 const styles = StyleSheet.create({
   panel: {
