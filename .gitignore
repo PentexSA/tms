@@ -35,3 +35,4 @@ Thumbs.db
 
 .turbo
 tsconfig.tsbuildinfo
+.neon

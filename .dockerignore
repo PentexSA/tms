@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/.expo
+**/.env
+**/.env.*
+!.env.example
+.git
+.neon
+.claude
+e2e/test-results
+e2e/playwright-report
+*.log

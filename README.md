@@ -227,6 +227,23 @@ pnpm db:migrate       # Roda migrations
 pnpm db:codegen       # Gera tipos TypeScript do schema
 ```
 
+### Deploy de teste (Render + Neon)
+
+Os PRs entram na `main`; o Render publica só a branch `release` (`render.yaml`,
+`deploy/render/`). Para subir o que está na `main`, corte uma release:
+
+```bash
+pnpm release patch        # 1.0.0 -> 1.0.1
+pnpm release minor        # 1.0.0 -> 1.1.0
+pnpm release major        # 1.0.0 -> 2.0.0
+```
+
+O corte sobe o `version` do `package.json` da raiz num commit
+`chore(release): vX.Y.Z` em cima da `origin/main`, cria a tag `vX.Y.Z` e leva a
+`release` até ele, num push atômico (main, release e tag, ou nada). Só avança
+(fast-forward), pede confirmação e não mexe na sua árvore. Para voltar atrás,
+use o Rollback do Render ou reverta na `main` e corte de novo.
+
 ### Apps Individuais
 
 ```bash

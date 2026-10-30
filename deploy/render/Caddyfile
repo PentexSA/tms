@@ -1,0 +1,42 @@
+{
+	admin off
+	auto_https off
+}
+
+# O Render termina o TLS e manda tudo para a $PORT
+:{$PORT:10000} {
+	root * web
+	encode gzip
+
+	# Arquivo do export (bundle, assets, a própria raiz)
+	@static file
+	handle @static {
+		import headers.caddy
+		file_server
+	}
+
+	# Navegação do navegador numa rota da SPA: o index.html. A URL é a mesma
+	# da rota da API (/chronicles/:id): sem o Vary e com o cache heurístico
+	# do Last-Modified, o fetch do app recebia este HTML do cache do navegador.
+	@page {
+		method GET HEAD
+		header Accept *text/html*
+	}
+	handle @page {
+		import headers.caddy
+		header Cache-Control no-cache
+		header +Vary Accept
+		rewrite * /index.html
+		file_server
+	}
+
+	# O resto é fetch do app: a API está na raiz da origem (lib/env.ts usa
+	# só o origin). O X-Forwarded-For segue como o Render mandou: com
+	# TRUST_PROXY, a API usa o último, o IP que o Render viu.
+	handle {
+		reverse_proxy 127.0.0.1:{$API_PORT:3001} {
+			header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+			header_down +Vary Accept
+		}
+	}
+}
