@@ -36,3 +36,5 @@ Thumbs.db
 .turbo
 tsconfig.tsbuildinfo
 .neon
+.claude/settings.local.json
+.claude/worktrees
