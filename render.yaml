@@ -6,6 +6,8 @@ services:
     runtime: docker
     plan: free
     region: virginia
+    # Só a release vai ao ar: o corte é o `pnpm release` (scripts/release.sh)
+    branch: release
     dockerfilePath: ./deploy/render/Dockerfile
     dockerContext: .
     healthCheckPath: /health
