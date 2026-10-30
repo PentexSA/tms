@@ -4,13 +4,17 @@ import {
   BottomSheet,
   Button,
   IconButton,
+  Pressable,
   Text,
   tokens,
+  useLayout,
+  useTheme,
   useToast,
 } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { stateLabel } from '../../components/chronicles/tableItems'
 import { api } from '../../lib/api'
 import { messageOf } from '../../lib/errors'
 import { chronicleKeys } from '../../lib/queries/chronicles'
@@ -125,16 +129,24 @@ export function StatusMenuButton({
   readonly locked: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const { breakpoint } = useLayout()
   const actions = statusActions(model, status, locked)
   if (!actions.length) return null
+  const state = stateLabel(model, status, locked)
   return (
     <>
-      <IconButton
-        label="Ações do narrador"
-        glyph="⋯"
-        testID="status-menu"
-        onPress={() => setOpen(true)}
-      />
+      {breakpoint === 'compact' ? (
+        <IconButton
+          label="Ações do narrador"
+          glyph="⋯"
+          testID="status-menu"
+          onPress={() => setOpen(true)}
+        />
+      ) : (
+        // Na tela larga o ⋯ sozinho some entre "Experiência" e "Histórico":
+        // o botão diz de quem são as ações e em que estado a ficha está
+        <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
+      )}
       {open ? (
         <StatusMenu
           characterId={characterId}
@@ -144,6 +156,38 @@ export function StatusMenuButton({
         />
       ) : null}
     </>
+  )
+}
+
+function StatusMenuTrigger({
+  state,
+  onPress,
+}: {
+  readonly state: string | null
+  readonly onPress: () => void
+}) {
+  const { colors } = useTheme()
+  return (
+    <Pressable
+      testID="status-menu"
+      accessibilityRole="button"
+      accessibilityLabel="Ações do narrador"
+      accessibilityHint={state ? `Ficha ${state.toLowerCase()}` : undefined}
+      onPress={onPress}
+      style={[styles.trigger, { borderColor: colors.borderControl }]}
+    >
+      <Text variant="fieldLabel">Narrador</Text>
+      {state ? (
+        <View style={[styles.state, { borderColor: colors.action }]}>
+          <Text variant="caption" color="action">
+            {state}
+          </Text>
+        </View>
+      ) : null}
+      <Text variant="caption" color="inkMuted">
+        ▾
+      </Text>
+    </Pressable>
   )
 }
 
@@ -233,4 +277,17 @@ function StatusMenu({
 
 const styles = StyleSheet.create({
   list: { gap: tokens.space[2] },
+  trigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[2],
+    borderRadius: tokens.radius.md,
+    borderWidth: tokens.borderWidth.control,
+    paddingHorizontal: tokens.space[3],
+  },
+  state: {
+    borderRadius: tokens.radius.pill,
+    borderWidth: tokens.borderWidth.hair,
+    paddingHorizontal: tokens.space[2],
+  },
 })

@@ -297,6 +297,23 @@ describe('a tela da ficha com o estado', () => {
     ).toBeTruthy()
   })
 
+  it('no celular, o menu do narrador é o ⋯', async () => {
+    await open(['storyteller'], 'creating')
+    expect(screen.getByLabelText('Ações do narrador')).toBeTruthy()
+    expect(screen.queryByText('Narrador')).toBeNull()
+  })
+
+  it('na tela larga, o menu do narrador diz de quem é e o estado da ficha', async () => {
+    Dimensions.set({ window: TABLET, screen: TABLET })
+    await open(['storyteller'], 'active', '2026-10-18T12:00:00Z')
+    const trigger = screen.getByLabelText('Ações do narrador')
+    expect(trigger.props.accessibilityHint).toBe('Ficha travada')
+    expect(screen.getByText('Narrador')).toBeTruthy()
+    expect(screen.getByText('Travada')).toBeTruthy()
+    fireEvent.press(trigger)
+    expect(screen.getByTestId('status-unlock')).toBeTruthy()
+  })
+
   it('arquivar pede confirmação antes de chamar o servidor', async () => {
     calls.statusPost.mockResolvedValue(
       ok({ status: 'archived', lockedAt: null, creationCompletedAt: null })
