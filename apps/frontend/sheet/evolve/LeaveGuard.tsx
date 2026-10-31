@@ -1,74 +1,31 @@
 import { BottomSheet, Button, Text } from '@tms/ui'
-import { useNavigation } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { Platform } from 'react-native'
+import { usePreventRemove } from 'expo-router'
+import { useState } from 'react'
+import { useStore } from 'zustand'
 import type { SheetStore } from '../store/sheetStore'
 import { changesLabel } from './ModeBar'
 
-// Sair da ficha com rascunho de Evoluir pede confirmação: o `beforeRemove`
-// da navegação (voltar, replace, gesto) e, no web, o `beforeunload` do
-// navegador (recarregar, fechar a aba).
-
-interface BeforeRemoveEvent {
-  preventDefault(): void
-  readonly data: { readonly action: unknown }
-}
-
-interface Navigation {
-  addListener?(
-    event: 'beforeRemove',
-    cb: (e: BeforeRemoveEvent) => void
-  ): () => void
-  dispatch?(action: unknown): void
-}
-
-// O app não carrega a lib DOM do TypeScript: só o que o web usa aqui
-interface UnloadEvent {
-  preventDefault(): void
-  returnValue: unknown
-}
-interface WebWindow {
-  addEventListener(type: 'beforeunload', cb: (e: UnloadEvent) => void): void
-  removeEventListener(type: 'beforeunload', cb: (e: UnloadEvent) => void): void
-}
+// Sair da ficha com rascunho de Evoluir pede confirmação: o usePreventRemove
+// segura a navegação (voltar, replace, gesto) e, no web, o `beforeunload` do
+// navegador (recarregar, fechar a aba). O evento `beforeRemove` não existe
+// mais na navegação do Expo Router 58: escutá-lo não segurava nada.
 
 export function LeaveGuard({ store }: { readonly store: SheetStore }) {
-  const navigation = useNavigation() as unknown as Navigation | undefined
+  const count = useStore(store, s => s.draft?.size ?? 0)
   const [pending, setPending] = useState<{
     readonly count: number
     readonly leave: () => void
   } | null>(null)
-  const nav = useRef(navigation)
-  nav.current = navigation
 
-  useEffect(() => {
-    const unsubscribe = navigation?.addListener?.('beforeRemove', e => {
-      const count = store.getState().draft?.size ?? 0
-      if (!count) return
-      e.preventDefault()
-      setPending({
-        count,
-        leave: () => {
-          store.getState().discardDraft()
-          nav.current?.dispatch?.(e.data.action)
-        },
-      })
+  usePreventRemove(count > 0, ({ repeat }) => {
+    setPending({
+      count,
+      leave: () => {
+        store.getState().discardDraft()
+        repeat()
+      },
     })
-    return unsubscribe
-  }, [navigation, store])
-
-  useEffect(() => {
-    const win = (globalThis as { window?: WebWindow }).window
-    if (Platform.OS !== 'web' || !win) return
-    const handler = (e: UnloadEvent) => {
-      if (!store.getState().draft?.size) return
-      e.preventDefault()
-      // Navegadores antigos só mostram o aviso com returnValue preenchido
-      e.returnValue = ''
-    }
-    win.addEventListener('beforeunload', handler)
-    return () => win.removeEventListener('beforeunload', handler)
-  }, [store])
+  })
 
   return (
     <BottomSheet

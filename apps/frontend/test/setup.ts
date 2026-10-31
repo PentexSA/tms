@@ -18,8 +18,8 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
   })),
   useLocalSearchParams: jest.fn(() => ({})),
-  // beforeRemove do LeaveGuard (Evoluir): o teste define o retorno
-  useNavigation: jest.fn(() => undefined),
+  // Saída com rascunho (LeaveGuard): o teste pega o callback
+  usePreventRemove: jest.fn(() => jest.fn()),
   useFocusEffect: jest.fn(),
   Link: 'Link',
 }))
