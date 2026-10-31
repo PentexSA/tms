@@ -19,7 +19,11 @@ import {
   destroyTestDb,
   makeRequest,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Exclusão de conta (LGPD art. 18, VI; doc/plano-v0.md, Etapa 22) e exclusão
 // de crônica pelo narrador.

@@ -16,7 +16,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Extrato, concessão, ajuste e pedidos de XP (doc/plano-v4.md, Etapas 6 e 7)
 // sobre o template sintético `acct-teste` (números de teste) e uma cópia de

@@ -14,7 +14,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Remover jogador, sair e o ex-membro (doc/painel-narrador.md §5.2;
 // doc/plano-v3.md, Etapa 7). Nada é apagado: as fichas vão para `archived`, o

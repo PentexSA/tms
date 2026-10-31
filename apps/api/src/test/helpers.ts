@@ -1,6 +1,10 @@
+import { afterAll, beforeAll } from 'bun:test'
 import { type Treaty, treaty } from '@elysiajs/eden'
 import type { DB } from '@tms/db'
-import { createPGliteTestDb } from '@tms/db/testing'
+import {
+  createPGliteTestDb,
+  createResettablePGliteTestDb,
+} from '@tms/db/testing'
 import type { Kysely } from 'kysely'
 import type { TokenConfig } from '../auth/tokens'
 import { type App, createApp } from '../index'
@@ -8,6 +12,28 @@ import type { AppOptions } from '../options'
 
 // Banco do teste atual, destruído por destroyTestDb()
 let testDbCleanup: (() => Promise<void>) | null = null
+
+// Banco do arquivo (useTestDb): criado no beforeAll, restaurado a cada
+// createTestContext, fechado no afterAll
+let fileDb: Awaited<ReturnType<typeof createResettablePGliteTestDb>> | null =
+  null
+
+/**
+ * Um PGLite para o arquivo de teste inteiro, no lugar de um por teste
+ * (~234 ms cada). Chame no topo do arquivo, antes dos hooks dele: cada
+ * createTestContext() volta o banco ao estado de logo depois das migrations
+ * e monta app, relógio e tokens novos. Os módulos são compartilhados entre
+ * os arquivos do `bun test`: por isso a chamada é explícita em cada um.
+ */
+export function useTestDb() {
+  beforeAll(async () => {
+    fileDb = await createResettablePGliteTestDb()
+  })
+  afterAll(async () => {
+    await fileDb?.destroy()
+    fileDb = null
+  })
+}
 
 /**
  * Cria uma instância de teste da aplicação Elysia com PGLite database
@@ -46,7 +72,11 @@ export interface TestContext {
 export async function createTestContext(
   overrides: Partial<AppOptions> = {}
 ): Promise<TestContext> {
-  // Banco novo a cada teste, com todas as migrations de @tms/db
+  if (fileDb) {
+    await fileDb.reset()
+    return createTestContextOn(fileDb.db, overrides)
+  }
+  // Sem useTestDb: banco novo a cada teste, com todas as migrations de @tms/db
   const { db, destroy } = await createPGliteTestDb()
   testDbCleanup = destroy
   return createTestContextOn(db, overrides)
@@ -111,7 +141,8 @@ export function createTestClient(app: App): Treaty.Create<App> {
 
 /**
  * Destroi o banco de dados de teste e libera recursos
- * Deve ser chamado após cada teste
+ * Deve ser chamado após cada teste. Com useTestDb, o banco é do arquivo: fica
+ * para o próximo teste (que o restaura) e fecha no afterAll
  */
 export async function destroyTestDb() {
   if (testDbCleanup) {

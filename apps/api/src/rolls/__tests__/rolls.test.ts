@@ -16,7 +16,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Rolagem no servidor (doc/plano-v0.md, Etapa 21): a parada sai da ficha
 // gravada, o dado é do servidor e o custo entra no histórico uma vez só.

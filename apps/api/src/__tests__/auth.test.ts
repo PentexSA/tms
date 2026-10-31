@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { createPGliteTestDb } from '@tms/db/testing'
 import { SignJWT } from 'jose'
 import { sql } from 'kysely'
 import { createRateLimiter } from '../http/rate-limit'
@@ -7,10 +8,15 @@ import { logger } from '../logger'
 import { defaultLimits } from '../options'
 import {
   createTestContext,
+  createTestContextOn,
   destroyTestDb,
   makeRequest,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Autenticação (doc/plano-v0.md, Etapa 7): cadastro, login, JWT, rotação do
 // refresh token, rate limit, CORS e cabeçalhos.
@@ -468,17 +474,27 @@ describe('CORS, cabeçalhos e erros', () => {
   })
 
   it('erro interno sem stack trace nem mensagem', async () => {
-    // Falha de banco no meio da rota
-    await sql`drop table users cascade`.execute(ctx.db)
-    const res = await post(
-      '/auth/login',
-      { email: ana.email, password: ana.password },
-      NATIVE
-    )
-    expect(res.status).toBe(500)
-    const text = await res.text()
-    expect(JSON.parse(text)).toEqual({ error: 'erro interno' })
-    expect(text).not.toContain('at ')
+    // Falha de banco no meio da rota, num banco só deste teste: o do arquivo
+    // continua inteiro para os próximos
+    const own = await createPGliteTestDb()
+    try {
+      ctx = createTestContextOn(own.db, {
+        corsOrigins: [ORIGIN],
+        tokens: tokens(() => clockNow()),
+      })
+      await sql`drop table users cascade`.execute(own.db)
+      const res = await post(
+        '/auth/login',
+        { email: ana.email, password: ana.password },
+        NATIVE
+      )
+      expect(res.status).toBe(500)
+      const text = await res.text()
+      expect(JSON.parse(text)).toEqual({ error: 'erro interno' })
+      expect(text).not.toContain('at ')
+    } finally {
+      await own.destroy()
+    }
   })
 
   it('corpo que não é JSON: 400 genérico', async () => {

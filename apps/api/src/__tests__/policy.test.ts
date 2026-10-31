@@ -25,8 +25,12 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
 import { MATRIX_SYSTEMS, systemCase } from '../test/matrix-systems'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // A política de escrita (doc/painel-narrador.md §5.1; doc/plano-v3.md, Etapa 5):
 // cada estado × cada classe de mudança × dono, narrador e ex-membro, nos três

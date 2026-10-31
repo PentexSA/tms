@@ -16,7 +16,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Fichas: criação, leitura filtrada por papel, lista e exclusão (Etapa 12).
 

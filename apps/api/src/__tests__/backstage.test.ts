@@ -14,8 +14,12 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
 import { systemCase } from '../test/matrix-systems'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 let ctx: TestContext
 let storyteller: TestUser

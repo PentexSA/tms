@@ -17,7 +17,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // O endpoint de eventos e o histórico (doc/plano-v0.md, Etapa 15).
 
