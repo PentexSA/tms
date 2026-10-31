@@ -42,7 +42,9 @@
     "turbo": "2.11.7"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json}": ["biome check --write --no-errors-on-unmatched"]
+    "*.{js,jsx,ts,tsx,json,jsonc}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16"

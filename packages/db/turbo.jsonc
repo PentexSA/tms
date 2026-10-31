@@ -5,16 +5,10 @@
     // A migration dos templates do produto lê design/templates: mudar um
     // template invalida o cache dos testes.
     "test": {
-      "inputs": [
-        "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/design/templates/**"
-      ]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
     },
     "test:coverage": {
-      "inputs": [
-        "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/design/templates/**"
-      ]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
     }
   }
 }

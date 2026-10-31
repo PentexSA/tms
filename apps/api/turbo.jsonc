@@ -5,16 +5,10 @@
     // Os testes publicam os templates de design/templates (e o banco de teste
     // migra com eles): mudar um template invalida o cache dos testes.
     "test": {
-      "inputs": [
-        "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/design/templates/**"
-      ]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
     },
     "test:coverage": {
-      "inputs": [
-        "$TURBO_EXTENDS$",
-        "$TURBO_ROOT$/design/templates/**"
-      ]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
     }
   }
 }
