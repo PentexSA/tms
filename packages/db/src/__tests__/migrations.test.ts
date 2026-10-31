@@ -653,6 +653,25 @@ describe('migrations', () => {
     }
   })
 
+  it('0020 não sobrescreve a versão já gravada com outro conteúdo', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect((await migrator.migrateTo('0019_backstage')).error).toBeUndefined()
+      await db.deleteFrom('trait_templates').execute()
+      const vtm = productTemplate('vtm-v20') as Record<string, unknown>
+      expect(
+        (await storeTemplate(db, { ...vtm, name: 'Outro conteúdo' })).status
+      ).toBe('published')
+      const result = await migrator.migrateToLatest()
+      expect(String(result.error)).toContain(
+        'já está no banco com outro conteúdo'
+      )
+    } finally {
+      await destroy()
+    }
+  })
+
   it('uma migration quebrada derruba o banco de teste', async () => {
     const broken = {
       getMigrations: async () => ({
