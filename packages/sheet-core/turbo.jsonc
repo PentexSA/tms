@@ -11,6 +11,14 @@
         "$TURBO_ROOT$/design/scripts/validate.mjs",
         "$TURBO_ROOT$/design/design-system/tokens.json"
       ]
+    },
+    "test:coverage": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/design/templates/**",
+        "$TURBO_ROOT$/design/scripts/validate.mjs",
+        "$TURBO_ROOT$/design/design-system/tokens.json"
+      ]
     }
   }
 }
