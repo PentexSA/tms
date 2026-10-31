@@ -75,6 +75,22 @@ describe('Nova ficha', () => {
     )
   })
 
+  it('Natureza e Comportamento saem da lista do livro', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(await screen.findByTestId('editor-name'), 'Helena')
+    fireEvent.press(screen.getByTestId('suggest-nature'))
+    fireEvent.press(screen.getByRole('button', { name: 'Arquiteto' }))
+    // O texto continua livre
+    fireEvent.changeText(screen.getByTestId('editor-demeanor'), 'Galã')
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
+      values: { name: 'Helena', nature: 'Arquiteto', demeanor: 'Galã' },
+    })
+  })
+
   it('422 do servidor marca o campo', async () => {
     calls.chronicle.charactersPost.mockResolvedValue({
       data: null,
@@ -173,6 +189,53 @@ describe('Fichas na crônica', () => {
     expect(router.push).toHaveBeenCalledWith(
       `/chronicles/${CHRONICLE}/new-character`
     )
+  })
+
+  it('o narrador vê a ficha que aguarda a revisão dele', async () => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'storyteller',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        {
+          id: 'ch1',
+          name: 'Helena Varga',
+          mine: false,
+          owner: { id: 'u2', username: 'dona' },
+          status: 'pending',
+          templateVersion: '1.0.0',
+          updatedAt: '',
+          values: { name: 'Helena Varga' },
+        },
+        {
+          id: 'ch2',
+          name: 'Caio',
+          mine: false,
+          owner: { id: 'u3', username: 'beto' },
+          status: 'active',
+          templateVersion: '1.0.0',
+          updatedAt: '',
+          values: { name: 'Caio' },
+        },
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(await screen.findByText('1 ficha aguarda sua revisão')).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: /^Helena Varga, .*de dona · Aguarda sua revisão$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /^Caio, .*de beto$/ })
+    ).toBeTruthy()
   })
 
   it('sem fichas e com erro', async () => {

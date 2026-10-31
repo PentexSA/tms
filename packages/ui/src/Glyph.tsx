@@ -61,7 +61,6 @@ export function Glyph({ name, param, size = 20, color, testID }: GlyphProps) {
       height={size}
       viewBox="0 0 24 24"
       testID={testID}
-      accessible={false}
       aria-hidden
     >
       {GLYPHS[name](param, color)}

@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
+import { SuggestionChips } from '../editors/Suggestions'
 import type { FieldViewProps } from '../views/types'
 import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
@@ -106,6 +107,16 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           placeholder={def.placeholder}
           autoFocus
         />
+        {def.type === 'text' && def.suggestions?.length ? (
+          <View style={styles.suggestions}>
+            <SuggestionChips
+              options={def.suggestions}
+              value={text}
+              onPick={setText}
+              testID={`suggest-${resolved.id}`}
+            />
+          </View>
+        ) : null}
       </BottomSheet>
     </>
   )
@@ -124,4 +135,5 @@ const styles = StyleSheet.create({
   },
   compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
+  suggestions: { paddingTop: tokens.space[3] },
 })

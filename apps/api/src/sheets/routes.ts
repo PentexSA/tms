@@ -337,6 +337,7 @@ export function sheetRoutes(
             'ch.kind',
             'ch.visibility',
             'ch.portrait_url',
+            'ch.status',
             'u.username',
           ])
           .where('ch.chronicle_id', '=', params.id)
@@ -407,6 +408,8 @@ export function sheetRoutes(
             identity: publicIdentity,
             owner: { id: r.user_id, username: r.username },
             mine: r.user_id === me,
+            // A lista avisa o narrador da ficha que aguarda a revisão dele
+            status: r.status,
             templateVersion: r.template_version,
             updatedAt: r.updated_at,
             values: Object.fromEntries(

@@ -1198,6 +1198,13 @@
         "placeholder": {
           "description": "Extensão documentada: texto de exemplo no campo vazio (ainda não consumido pelo protótipo).",
           "$ref": "#/$defs/label"
+        },
+        "suggestions": {
+          "description": "Sugestões para escolher com um toque (os Arquétipos do livro). O texto continua livre.",
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/label" }
         }
       },
       "unevaluatedProperties": false

@@ -40,6 +40,7 @@ export function GridLayout({ section }: LayoutProps) {
                 />
               </View>
             ) : null}
+            {tabs.bar ? <CreationCounter fieldIds={g.fieldIds} line /> : null}
             {g.fieldIds.map(id => (
               <FieldSlot key={id} id={id} variant="row" />
             ))}
@@ -77,6 +78,9 @@ export function GridLayout({ section }: LayoutProps) {
           >
             {g.title}
           </Text>
+          <View style={styles.counter}>
+            <CreationCounter fieldIds={g.fieldIds} />
+          </View>
           {g.fieldIds.map(id => (
             <FieldSlot key={id} id={id} variant="cell" />
           ))}
@@ -95,6 +99,7 @@ const styles = StyleSheet.create({
   },
   column: { flex: 1, gap: tokens.space[1] },
   head: { paddingVertical: tokens.space[1] },
+  counter: { alignItems: 'flex-start' },
   wrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

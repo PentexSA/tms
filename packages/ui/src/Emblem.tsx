@@ -56,7 +56,6 @@ export function Emblem({ name, size, color, testID }: EmblemProps) {
       height={size}
       viewBox="0 0 24 24"
       testID={testID}
-      accessible={false}
       aria-hidden
     >
       {PATHS[name].map(d => (
