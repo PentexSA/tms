@@ -220,6 +220,7 @@ Regras:
 - `maxLength` (até 20000) é o limite que o servidor aplica; sem ele, 200 em `text` e 4000 em `longText`. Declare sempre.
 - `text` com `aspect: true` é um aspecto do Fate: texto de primeira classe, exibido como bloco no topo da zona de jogo.
 - `placeholder`: extensão documentada (texto de exemplo no campo vazio), ainda não consumida pelo protótipo.
+- `suggestions` (só `text`): até 100 textos para escolher com um toque, cada um até o `maxLength` do campo e sem repetir. O texto continua livre: a sugestão só preenche o campo. A V20 traz os Arquétipos do livro em Natureza e Comportamento.
 - Notas (`longText`) nunca vão para logs (§11).
 
 ### `choice` e `tags`
@@ -749,7 +750,7 @@ Em produção, um sistema novo é **uma linha em `game_systems`** (código, fam�
 
 A criação tem um orçamento, e a evolução depois dela tem preço em XP. O template declara as regras; o core calcula com duas funções puras, as mesmas no app e no servidor: `checkCreation` (conta da criação) e `costOf` (preço de subir um nível). O que a ficha grava são só as **escolhas** do jogador (a ordem das prioridades) e a **configuração** do narrador (orçamentos, criação livre). A origem de cada ponto nunca é gravada: é calculada do estado final da ficha, então a ordem em que os pontos foram distribuídos não muda o resultado.
 
-Os três templates WoD (`vtm-v20` 1.7.0, `mta-m20` 1.6.0, `wta-w20` 1.6.0) têm `creation`, `costs.freebie` e `costs.xp.rules` com as regras de V20, M20 e W20; os números, as fontes e o que fica com o narrador estão em [doc/regras-wod.md](../../doc/regras-wod.md). O fixture de D&D usa `creation` para provar o point-buy de 27 pelo mesmo código, sem ser publicado.
+Os três templates WoD (`vtm-v20` 1.8.0, `mta-m20` 1.6.0, `wta-w20` 1.6.0) têm `creation`, `costs.freebie` e `costs.xp.rules` com as regras de V20, M20 e W20; os números, as fontes e o que fica com o narrador estão em [doc/regras-wod.md](../../doc/regras-wod.md). O fixture de D&D usa `creation` para provar o point-buy de 27 pelo mesmo código, sem ser publicado.
 
 ### `creation`
 

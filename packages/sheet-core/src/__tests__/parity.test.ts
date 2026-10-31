@@ -413,6 +413,21 @@ const vtmOnlyMutations: [string, (t: Json) => void][] = [
       if (blood) blood.max = { derive: 'vtmBloodPool', from: 'naoExiste' }
     },
   ],
+  [
+    'sugestão repetida ou acima do maxLength do campo',
+    t => {
+      const nature = fieldsOf(t).nature
+      if (nature)
+        nature.suggestions = ['Arquiteto', 'Arquiteto', 'x'.repeat(41)]
+    },
+  ],
+  [
+    'sugestões que não são lista',
+    t => {
+      const demeanor = fieldsOf(t).demeanor
+      if (demeanor) demeanor.suggestions = 'Arquiteto'
+    },
+  ],
 ]
 
 // As ações do menu da ficha (Regenerar, sem custo) passam pela mesma checagem

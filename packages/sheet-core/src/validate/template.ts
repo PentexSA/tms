@@ -116,7 +116,7 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions'],
     longText: ['maxLength', 'placeholder'],
     choice: ['options', 'glyph'],
     tags: ['options'],
@@ -401,6 +401,16 @@ function check(
     if (f.badge && !has(badge?.field))
       err(`${p}.badge.field`, `campo '${badge?.field}' não existe`)
     if (f.maxLength != null) num(`${p}.maxLength`, f.maxLength, 1, 20000)
+    if (f.type === 'text' && f.suggestions != null) {
+      if (!Array.isArray(f.suggestions) || f.suggestions.length > 100)
+        err(`${p}.suggestions`, 'lista de até 100 textos')
+      else {
+        const max = numOr(f.maxLength, 200)
+        f.suggestions.forEach((v, i) => text(`${p}.suggestions.${i}`, v, max))
+        if (new Set(f.suggestions).size !== f.suggestions.length)
+          err(`${p}.suggestions`, 'sugestão repetida')
+      }
+    }
     if (f.type === 'rating')
       formula(`${p}.default`, f.default, numOr(f.min, 0), numOr(f.max, 10))
     else if (f.default != null)

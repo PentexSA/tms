@@ -228,6 +228,15 @@ export function chronicleRoutes(
               ])
             )
             .as('characterCount'),
+          // Fichas que aguardam a revisão do narrador: só ele recebe a conta
+          eb
+            .selectFrom('characters as ch')
+            .select(eb.fn.countAll<string>().as('n'))
+            .whereRef('ch.chronicle_id', '=', 'c.id')
+            .where('ch.deleted_at', 'is', null)
+            .where('ch.status', '=', 'pending')
+            .where('c.storyteller_id', '=', me)
+            .as('pendingReview'),
         ])
         .orderBy('c.created_at', 'desc')
         .execute()
@@ -243,6 +252,7 @@ export function chronicleRoutes(
               : ('former' as const),
         storyteller: { username: r.storyteller },
         characterCount: Number(r.characterCount ?? 0),
+        pendingReview: Number(r.pendingReview ?? 0),
       }))
     })
     .get(

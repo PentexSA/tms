@@ -1,6 +1,7 @@
 import { identityOf, resolve, type SheetData } from '@tms/sheet-core'
 import {
   Avatar,
+  Banner,
   Button,
   ListItem,
   SectionHeader,
@@ -34,6 +35,8 @@ interface FullRow {
   readonly kind?: 'pc' | 'npc'
   readonly visibility?: 'hidden' | 'identity' | 'full'
   readonly identity?: PublicIdentity
+  // creating, pending (aguarda o narrador), active...
+  readonly status?: string
 }
 
 interface IdentityRow {
@@ -51,9 +54,11 @@ type Row = FullRow | IdentityRow
 function CharacterRow({
   row,
   systemCode,
+  narrating,
 }: {
   readonly row: Row
   readonly systemCode: string
+  readonly narrating: boolean
 }) {
   const router = useRouter()
   const partial = row.projection === 'identity'
@@ -74,6 +79,10 @@ function CharacterRow({
       ? 'Sua ficha'
       : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
+  const pending = !partial && row.status === 'pending'
+  const who = pending
+    ? `${owner} · ${narrating ? 'Aguarda sua revisão' : 'Aguarda aprovação'}`
+    : owner
   return (
     <ThemeProvider
       accent={
@@ -89,7 +98,7 @@ function CharacterRow({
               : (identity.subtitle ?? undefined)
             : undefined
         }
-        meta={identity?.chip ? `${identity.chip} · ${owner}` : owner}
+        meta={identity?.chip ? `${identity.chip} · ${who}` : who}
         leading={
           <Avatar
             name={name}
@@ -131,6 +140,8 @@ export function CharacterList({
     row.projection === 'identity' ? true : row.kind === 'npc'
   )
   const shown = narrating ? pcs : pcs.filter(r => r.mine)
+  // A ficha enviada para aprovação espera o narrador: o aviso fica no topo
+  const review = narrating ? shown.filter(r => r.status === 'pending') : []
   const create = (
     <Button
       title="Nova ficha"
@@ -156,6 +167,19 @@ export function CharacterList({
           right={canCreate ? create : undefined}
         />
       </View>
+      {review.length ? (
+        <View style={styles.header} testID="review-pending">
+          <Banner
+            tone="warning"
+            title={
+              review.length === 1
+                ? '1 ficha aguarda sua revisão'
+                : `${review.length} fichas aguardam sua revisão`
+            }
+            message={`${review.map(r => r.name).join(', ')}: abra a ficha para aprovar ou devolver para correção.`}
+          />
+        </View>
+      ) : null}
       {characters.isPending ? (
         <Skeleton lines={2} label="Carregando as fichas" />
       ) : characters.isError ? (
@@ -170,7 +194,12 @@ export function CharacterList({
         </Text>
       ) : (
         shown.map(row => (
-          <CharacterRow key={row.id} row={row} systemCode={systemCode} />
+          <CharacterRow
+            key={row.id}
+            row={row}
+            systemCode={systemCode}
+            narrating={narrating}
+          />
         ))
       )}
       {(narrating || npcs.length > 0) && (
@@ -187,7 +216,12 @@ export function CharacterList({
             </Text>
           ) : (
             npcs.map(row => (
-              <CharacterRow key={row.id} row={row} systemCode={systemCode} />
+              <CharacterRow
+                key={row.id}
+                row={row}
+                systemCode={systemCode}
+                narrating={narrating}
+              />
             ))
           )}
         </>

@@ -1,6 +1,6 @@
-import type { CreationProblem } from '@tms/sheet-core'
 import {
   Banner,
+  BottomSheet,
   Button,
   SectionHeader,
   Stepper,
@@ -9,8 +9,8 @@ import {
   tokens,
   useToast,
 } from '@tms/ui'
-import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import {
@@ -22,6 +22,7 @@ import {
 import { useSheet, useSheetSelector } from '../context'
 import { useCreation } from './CreationContext'
 import {
+  basicsDone,
   type CreationPhase,
   completeLabel,
   creationRefusalOf,
@@ -31,12 +32,12 @@ import {
 } from './creation'
 import { RadioChips } from './RadioChips'
 
-// O painel do modo de criação (doc/plano-v4.md, Etapa 5): o que os pontos
-// gastam (básicos ou bônus), saldo de bônus, o que falta para fechar e
-// "Concluir criação", separado do "Salvar alterações" do rascunho. As
-// prioridades ficam no cabeçalho de cada grupo (CreationCounter). Concluir
-// exige rede, rascunho salvo e a fila confirmada: a conclusão nunca confirma
-// escolhas ainda locais.
+// O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
+// a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
+// Orçamento (CreationPanel), e o botão único da barra (ModeBar) salva o
+// rascunho ou, com a conta fechada, conclui. As prioridades ficam no
+// cabeçalho de cada grupo (CreationCounter). Concluir exige rede, rascunho
+// salvo e a fila confirmada: a conclusão nunca confirma escolhas ainda locais.
 
 const PHASES: readonly {
   readonly id: CreationPhase
@@ -46,46 +47,59 @@ const PHASES: readonly {
   { id: 'freebies', label: 'Pontos de bônus' },
 ]
 
-export function CreationPanel() {
+/** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
+export function useCreating(): boolean {
   const creation = useCreation()
-  const { model, roles, store } = useSheet()
-  const check = useSheetSelector(s => s.check)
-  const refusal = useSheetSelector(s => s.creationRefusal)
+  return Boolean(
+    creation?.active && creation.status === 'creating' && creation.info
+  )
+}
+
+/** "Bônus: 10 de 15", para a barra; null sem bônus. */
+export function useFreebiesText(): string | null {
+  return useSheetSelector(s => {
+    const f = s.check?.freebies
+    if (!f) return null
+    const total = f.available + f.credit
+    return f.remaining < 0
+      ? `Bônus: ${-f.remaining} acima`
+      : `Bônus: ${f.remaining} de ${total}`
+  })
+}
+
+/**
+ * O botão único da criação. Com a conta fechada (`ready`), ele conclui:
+ * `start` espera o rascunho salvo e a fila confirmada e só então chama a API.
+ * Mexer na ficha enquanto espera cancela a conclusão.
+ */
+export function useFinishCreation() {
+  const creation = useCreation()
+  const { roles, store } = useSheet()
+  const creating = useCreating()
+  const ready = useSheetSelector(s => s.check?.complete === true)
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
-  const phase = useSheetSelector(s => s.creationPhase)
   const toast = useToast()
   const complete = useCompleteCreation(
     creation?.characterId ?? '',
     creation?.chronicleId ?? ''
   )
-  const [serverProblems, setServerProblems] = useState<
-    readonly CreationProblem[] | null
-  >(null)
-  if (
-    !creation?.active ||
-    creation.status !== 'creating' ||
-    !creation.info ||
-    !check
-  )
-    return null
-  const { info } = creation
-  const storyteller = roles.has('storyteller')
-  const blocked = dirty
-    ? 'Salve as alterações antes de concluir.'
-    : queued
-      ? 'Aguarde a sincronização antes de concluir.'
-      : !check.complete
-        ? REFUSAL_TEXT.CREATION_INCOMPLETE
-        : null
+  const [waiting, setWaiting] = useState(false)
+  const info = creation?.info ?? null
 
-  const finish = () => {
-    setServerProblems(null)
+  useEffect(() => {
+    if (!waiting) return
+    if (dirty) {
+      setWaiting(false)
+      return
+    }
+    if (queued) return
+    setWaiting(false)
+    const s = store.getState()
+    // O servidor recusou o rascunho (ou houve conflito): a conta reabriu
+    if (!info || s.conflict || !s.check?.complete) return
     complete.mutate(
-      {
-        revision: info.revision,
-        sheetVersion: store.getState().sheetVersion,
-      },
+      { revision: info.revision, sheetVersion: s.sheetVersion },
       {
         onSuccess: result =>
           toast.show({
@@ -95,10 +109,7 @@ export function CreationPanel() {
                 : 'Criação concluída. Subir um traço agora passa pelo narrador.',
           }),
         onError: error => {
-          const body = errorBodyOf(error) as { problems?: unknown } | null
-          if (Array.isArray(body?.problems))
-            setServerProblems(body.problems as CreationProblem[])
-          const code = creationRefusalOf(body)
+          const code = creationRefusalOf(errorBodyOf(error))
           toast.show({
             message: code
               ? REFUSAL_TEXT[code]
@@ -107,18 +118,34 @@ export function CreationPanel() {
         },
       }
     )
+  }, [waiting, dirty, queued, info, store, complete, toast])
+
+  return {
+    ready: creating && ready,
+    label: info ? completeLabel(info, roles) : '',
+    // A ficha vai para o narrador aprovar
+    approval: info?.approval === true && !roles.has('storyteller'),
+    busy: waiting || complete.isPending,
+    waitingSync: waiting && queued,
+    start: () => setWaiting(true),
   }
+}
 
-  const problems = serverProblems ?? check.problems
-  const freebies = check.freebies
-
+/** Os avisos que ficam na ficha: a devolução do narrador e a última recusa. */
+export function CreationAlerts() {
+  const creation = useCreation()
+  const refusal = useSheetSelector(s => s.creationRefusal)
+  if (!creation?.active || creation.status !== 'creating' || !creation.info)
+    return null
+  const { returned } = creation.info
+  if (!returned && !refusal) return null
   return (
-    <View style={styles.panel} testID="creation-panel">
-      {info.returned && creation.status === 'creating' ? (
+    <View style={styles.panel}>
+      {returned ? (
         <Banner
           tone="warning"
           title="O narrador devolveu a ficha"
-          message={info.returned.reason}
+          message={returned.reason}
           testID="creation-returned"
         />
       ) : null}
@@ -129,6 +156,28 @@ export function CreationPanel() {
           testID="creation-refused"
         />
       ) : null}
+    </View>
+  )
+}
+
+/** A aba Orçamento: o que os pontos gastam, o saldo e o que falta. */
+export function CreationPanel() {
+  const creation = useCreation()
+  const { model, roles, store } = useSheet()
+  const check = useSheetSelector(s => s.check)
+  const phase = useSheetSelector(s => s.creationPhase)
+  if (
+    !creation?.active ||
+    creation.status !== 'creating' ||
+    !creation.info ||
+    !check
+  )
+    return null
+  const storyteller = roles.has('storyteller')
+  const { problems, freebies } = check
+
+  return (
+    <View style={styles.panel} testID="creation-panel">
       {freebies ? (
         <View style={styles.block}>
           <RadioChips
@@ -163,6 +212,7 @@ export function CreationPanel() {
           accessibilityLabel="O que falta na criação"
           testID="creation-problems"
         >
+          <SectionHeader title="O que falta" level="group" />
           {problems.slice(0, 12).map(p => (
             <Text
               key={`${p.code}:${p.budget ?? ''}:${p.group ?? ''}:${p.paths.join(',')}`}
@@ -173,22 +223,70 @@ export function CreationPanel() {
             </Text>
           ))}
         </View>
-      ) : null}
+      ) : (
+        <Text variant="caption" color="inkMuted" testID="creation-ready">
+          A conta fechou: conclua a criação pela barra de cima.
+        </Text>
+      )}
       {storyteller ? <BudgetControls /> : null}
-      <View style={styles.actions}>
-        {blocked ? (
-          <Text variant="caption" color="inkMuted" style={styles.flex}>
-            {blocked}
-          </Text>
-        ) : null}
-        <Button
-          title={completeLabel(info, roles)}
-          testID="creation-complete"
-          disabled={Boolean(blocked) || complete.isPending}
-          onPress={finish}
-        />
-      </View>
     </View>
+  )
+}
+
+/**
+ * O aviso de que os pontos básicos acabaram: a distribuição passa a gastar
+ * os pontos de bônus. Só na passagem (a ficha que já abre assim muda de fase
+ * sem aviso) e uma vez por tela.
+ */
+export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
+  const { store } = useSheet()
+  const creating = useCreating()
+  const done = useSheetSelector(s => basicsDone(s.check))
+  const remaining = useSheetSelector(s => s.check?.freebies?.remaining ?? 0)
+  const [open, setOpen] = useState(false)
+  const was = useRef<boolean | null>(null)
+  const shown = useRef(false)
+
+  useEffect(() => {
+    if (!creating) return
+    const before = was.current
+    was.current = done
+    if (!done || before === true) return
+    const s = store.getState()
+    if (s.creationPhase === 'basics') s.setCreationPhase('freebies')
+    // Já abriu com tudo distribuído: sem aviso
+    if (before === null || shown.current) return
+    shown.current = true
+    setOpen(true)
+    AccessibilityInfo.announceForAccessibility(
+      'Pontos básicos distribuídos. Agora os pontos gastam bônus.'
+    )
+  }, [creating, done, store])
+
+  return (
+    <BottomSheet
+      visible={open}
+      title="Começaram os pontos de bônus"
+      onClose={() => setOpen(false)}
+      testID="bonus-notice"
+      footer={
+        <>
+          <Button
+            title="Ver orçamento"
+            variant="ghost"
+            onPress={() => {
+              setOpen(false)
+              onBudget()
+            }}
+          />
+          <Button title="Entendi" onPress={() => setOpen(false)} />
+        </>
+      }
+    >
+      <Text>
+        {`Os pontos básicos de todos os grupos foram distribuídos. A partir de agora, cada ponto a mais gasta os pontos de bônus: ${remaining === 1 ? 'resta 1' : `restam ${remaining}`}.`}
+      </Text>
+    </BottomSheet>
   )
 }
 
@@ -373,5 +471,4 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: tokens.space[2],
   },
-  flex: { flex: 1, minWidth: 160 },
 })

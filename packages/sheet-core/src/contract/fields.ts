@@ -226,6 +226,9 @@ export interface TextField extends FieldBase<'text'> {
   readonly maxLength?: number
   readonly aspect?: boolean
   readonly placeholder?: string
+  // Sugestões para escolher com um toque (os Arquétipos do livro). O texto
+  // continua livre: a sugestão só preenche o campo.
+  readonly suggestions?: readonly string[]
 }
 
 export interface LongTextField extends FieldBase<'longText'> {

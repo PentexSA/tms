@@ -15,7 +15,13 @@ import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
-import { CreationPanel, CreationStatusPanel } from './creation/CreationPanel'
+import {
+  BonusNotice,
+  CreationAlerts,
+  CreationPanel,
+  CreationStatusPanel,
+  useCreating,
+} from './creation/CreationPanel'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBar } from './evolve/ModeBar'
@@ -31,6 +37,9 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // A ficha montada pelo template (doc/arquitetura §6.1): identidade, "Em jogo"
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
 // template). Aba sem seção legível some.
+//
+// Na criação por pontos, a conta ganha uma aba própria (Orçamento), depois
+// das da ficha: a distribuição fica nas abas, a conta não empurra a ficha.
 //
 // Em Jogo, no celular (compact), o "Em jogo" vira o CombatDock fixo embaixo;
 // a partir de 600 o dock some e a seção mostra os mesmos campos (design
@@ -50,6 +59,7 @@ export type SheetViewProps =
     }
 
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
+const BUDGET_TAB = 'creation'
 
 function readableZones(model: SheetModel, roles: readonly RoleName[]) {
   return model.zones.filter(
@@ -106,16 +116,24 @@ function SheetBody({
       !blockedBy(new Set(roles), lifecycle, 'edit'),
     [editable, model, roles, lifecycle]
   )
-  const [tab, setTab] = useState(zones[0]?.id ?? 'build')
-  const active: CompiledZone | undefined =
-    zones.find(z => z.id === tab) ?? zones[0]
+  const [tab, setTab] = useState<string>(zones[0]?.id ?? 'build')
+  const mode = useStore(store, s => s.mode)
+  const creating = useCreating()
+  const budget = editable && mode === 'create' && creating
+  const onBudget = budget && tab === BUDGET_TAB
+  const active: CompiledZone | undefined = onBudget
+    ? undefined
+    : (zones.find(z => z.id === tab) ?? zones[0])
+  const tabs = [
+    ...zones.map(z => ({ id: z.id, label: z.label ?? z.id })),
+    ...(budget ? [{ id: BUDGET_TAB, label: 'Orçamento' }] : []),
+  ]
   const play = model.zones.find(z => z.id === 'play')?.sections ?? []
   const accent = useStoreWithEqualityFn(
     store,
     s => identityOf(s.resolved).accent,
     jsonEqual
   )
-  const mode = useStore(store, s => s.mode)
   const { breakpoint } = useLayout()
   const docked =
     mode === 'play' &&
@@ -135,7 +153,7 @@ function SheetBody({
               <ConflictBanner />
               {editable ? <PolicyBanner /> : null}
               {editable ? <CreationStatusPanel /> : null}
-              {editable && mode === 'create' ? <CreationPanel /> : null}
+              {editable && mode === 'create' ? <CreationAlerts /> : null}
               {mode === 'play' ? (
                 <View style={styles.toolbar}>
                   {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
@@ -157,19 +175,17 @@ function SheetBody({
                   ))}
                 </View>
               ) : null}
-              {zones.length ? (
+              {tabs.length ? (
                 <View style={styles.tabs}>
                   <Tabs
                     accessibilityLabel="Partes da ficha"
-                    items={zones.map(z => ({
-                      id: z.id,
-                      label: z.label ?? z.id,
-                    }))}
-                    selected={active?.id ?? ''}
-                    onSelect={id => setTab(id as typeof tab)}
+                    items={tabs}
+                    selected={onBudget ? BUDGET_TAB : (active?.id ?? '')}
+                    onSelect={setTab}
                   />
                 </View>
               ) : null}
+              {onBudget ? <CreationPanel /> : null}
               {active?.sections.map(s => (
                 <SectionView
                   key={s.id}
@@ -179,6 +195,9 @@ function SheetBody({
               ))}
             </ScrollView>
             {docked ? <CombatDock /> : null}
+            {budget ? (
+              <BonusNotice onBudget={() => setTab(BUDGET_TAB)} />
+            ) : null}
           </View>
         </FieldSheetProvider>
       </SheetProvider>

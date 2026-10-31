@@ -182,7 +182,7 @@ describe('publishTemplate', () => {
     expect(result).toMatchObject({
       status: 'published',
       system: 'vtm-v20',
-      version: '1.7.0',
+      version: '1.8.0',
     })
     expect(result.hash).toMatch(/^[0-9a-f]{64}$/)
     const system = await db
@@ -194,7 +194,7 @@ describe('publishTemplate', () => {
       .selectFrom('trait_templates')
       .selectAll()
       .executeTakeFirstOrThrow()
-    expect(row.version).toBe('1.7.0')
+    expect(row.version).toBe('1.8.0')
     expect(row.published_at).toBeInstanceOf(Date)
     expect(canonicalJson(row.template_data)).toBe(
       canonicalJson(template('vtm-v20'))
@@ -225,7 +225,7 @@ describe('publishTemplate', () => {
         stage: 'version',
         path: 'templateVersion',
         message:
-          'vtm-v20@1.7.0 já foi publicado com outro conteúdo: suba o templateVersion',
+          'vtm-v20@1.8.0 já foi publicado com outro conteúdo: suba o templateVersion',
       },
     ])
   })
@@ -233,14 +233,14 @@ describe('publishTemplate', () => {
   it('uma versão nova convive com a anterior', async () => {
     await publishTemplate(db, template('vtm-v20'))
     const next = template('vtm-v20')
-    next.templateVersion = '1.8.0'
+    next.templateVersion = '1.9.0'
     expect((await publishTemplate(db, next)).status).toBe('published')
     const versions = await db
       .selectFrom('trait_templates')
       .select('version')
       .orderBy('version')
       .execute()
-    expect(versions.map(v => v.version)).toEqual(['1.7.0', '1.8.0'])
+    expect(versions.map(v => v.version)).toEqual(['1.8.0', '1.9.0'])
   })
 
   it.each([
@@ -315,10 +315,10 @@ describe('pnpm templates:publish (CLI)', () => {
     expect(await run(['vtm.json'])).toBe(0)
     expect(out).toHaveLength(1)
     expect(out[0]).toMatch(
-      /^publicado: vtm-v20@1\.7\.0 \(sha256 [0-9a-f]{12}\)$/
+      /^publicado: vtm-v20@1\.8\.0 \(sha256 [0-9a-f]{12}\)$/
     )
     expect(await run(['vtm.json'])).toBe(0)
-    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.7.0')
+    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.8.0')
   })
 
   it('sai com 1 e lista os problemas quando recusa', async () => {
@@ -342,7 +342,7 @@ describe('pnpm templates:publish (CLI)', () => {
   it('--published grava os templates do produto, na ordem', async () => {
     expect(await run(['--published'])).toBe(0)
     expect(out.map(l => l.split(' (')[0])).toEqual([
-      'publicado: vtm-v20@1.7.0',
+      'publicado: vtm-v20@1.8.0',
       'publicado: mta-m20@1.6.0',
       'publicado: wta-w20@1.6.0',
     ])

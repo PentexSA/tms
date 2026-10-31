@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
@@ -61,7 +61,10 @@ afterEach(() => {
   Dimensions.set({ window: TABLET, screen: TABLET })
 })
 
-const character = (priorities?: Record<string, string[]>) =>
+const character = (
+  priorities?: Record<string, string[]>,
+  values: Record<string, unknown> = {}
+) =>
   ok({
     id: ID,
     name: 'Nova',
@@ -75,7 +78,10 @@ const character = (priorities?: Record<string, string[]>) =>
     lockedAt: null,
     member: true,
     updatedAt: '2026-10-18T12:00:00Z',
-    sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+    sheet: {
+      values: { name: 'Nova', clan: 'tremere', ...values },
+      specialties: {},
+    },
     creation: {
       revision: 1,
       mode: 'points',
@@ -88,8 +94,11 @@ const character = (priorities?: Record<string, string[]>) =>
     },
   })
 
-async function open(priorities?: Record<string, string[]>) {
-  calls.characterGet.mockResolvedValue(character(priorities))
+async function open(
+  priorities?: Record<string, string[]>,
+  values?: Record<string, unknown>
+) {
+  calls.characterGet.mockResolvedValue(character(priorities, values))
   calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
   const { session } = testSession(
     () => json(200, tokens()),
@@ -97,7 +106,48 @@ async function open(priorities?: Record<string, string[]>) {
   )
   await session.restore()
   renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-  await screen.findByTestId('creation-panel')
+  await screen.findByRole('tab', { name: 'Orçamento' })
+}
+
+const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
+
+const PRIORITIES = {
+  attributes: ['physical', 'social', 'mental'],
+  abilities: ['talents', 'skills', 'knowledges'],
+}
+
+// Todos os pontos básicos da V20 distribuídos, menos 1 de Vigor
+const ALMOST = {
+  strength: 4,
+  dexterity: 3,
+  stamina: 2,
+  charisma: 3,
+  manipulation: 3,
+  appearance: 2,
+  perception: 2,
+  intelligence: 2,
+  wits: 2,
+  alertness: 3,
+  athletics: 3,
+  awareness: 3,
+  brawl: 3,
+  empathy: 1,
+  animalKen: 3,
+  crafts: 3,
+  drive: 3,
+  academics: 3,
+  computer: 2,
+  disciplines: [
+    { id: 'd1', name: 'Taumaturgia', value: 2 },
+    { id: 'd2', name: 'Auspícios', value: 1 },
+  ],
+  backgrounds: [
+    { id: 'b1', name: 'Recursos', value: 3 },
+    { id: 'b2', name: 'Mentor', value: 2 },
+  ],
+  conscience: 4,
+  selfControl: 3,
+  courage: 3,
 }
 
 const step = (name: string) =>
@@ -172,13 +222,82 @@ describe('trava da distribuição', () => {
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
 
+    tab('Orçamento')
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
     fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
+    tab('Ficha')
     step('Vigor')
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus'
     )
+    tab('Orçamento')
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
       'Bônus: 10 de 15 restantes.'
+    )
+  })
+})
+
+describe('aba Orçamento e botão único', () => {
+  it('a conta fica na aba, e a barra tem um botão só', async () => {
+    await open(PRIORITIES)
+    expect(screen.queryByTestId('creation-panel')).toBeNull()
+    expect(screen.queryByText('Concluir criação')).toBeNull()
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Salvar alterações'
+    )
+    tab('Orçamento')
+    expect(screen.getByTestId('creation-problems')).toBeTruthy()
+  })
+
+  it('com a conta fechada, o botão conclui depois de salvar', async () => {
+    // O servidor devolve a ficha aplicada, como a API
+    calls.eventsPost.mockResolvedValue({
+      ...ok({
+        sheetVersion: 2,
+        sheet: {
+          values: { name: 'Nova', clan: 'tremere', ...ALMOST, stamina: 3 },
+          specialties: {},
+        },
+      }),
+      status: 200,
+      response: {} as Response,
+      headers: {},
+    })
+    calls.completePost.mockResolvedValue(ok({ status: 'active' }))
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir criação'
+    )
+    fireEvent.press(screen.getByTestId('creation-action'))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-confirm'))
+    })
+    expect(calls.eventsPost).toHaveBeenCalled()
+    // Só depois que a fila confirma o lote
+    await waitFor(() =>
+      expect(calls.completePost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({ revision: 1, sheetVersion: 2 })
+      )
+    )
+  })
+})
+
+describe('aviso dos pontos de bônus', () => {
+  it('o último ponto básico abre o aviso e passa para os bônus', async () => {
+    await open(PRIORITIES, ALMOST)
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+    step('Vigor')
+    expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ver orçamento' }))
+    expect(screen.getByRole('radio', { name: 'Pontos de bônus' })).toBeChecked()
+    // Em Bônus, o grupo cheio passa
+    tab('Ficha')
+    step('Vigor')
+    expect(screen.getByTestId('counter-physical').props.children).toBe(
+      '7/7 · +1 bônus'
     )
   })
 })

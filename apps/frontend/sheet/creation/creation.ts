@@ -264,6 +264,19 @@ export function draftRefusal(
   return null
 }
 
+/**
+ * Todos os pontos básicos distribuídos (cada grupo com a prioridade escolhida
+ * e o orçamento cheio) e ainda há bônus para gastar: a hora de avisar que a
+ * distribuição passa a gastar os pontos de bônus.
+ */
+export function basicsDone(check: CreationCheck | null): boolean {
+  if (!check?.freebies || check.freebies.remaining <= 0) return false
+  const groups = check.budgets.flatMap(b => b.groups)
+  return (
+    groups.length > 0 && groups.every(g => g.budget !== null && g.missing === 0)
+  )
+}
+
 /** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
 export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
   const unit = g.measure === 'items' ? 'itens' : 'pontos'

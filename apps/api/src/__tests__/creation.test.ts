@@ -337,6 +337,20 @@ describe('concluir, aprovar e devolver', () => {
     await choose(id)
     const sent = await complete(id)
     expect(await json(sent)).toMatchObject({ status: 'pending' })
+    // A lista da crônica avisa o narrador da ficha que aguarda a revisão
+    const list = (await json(
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/characters`)
+    )) as unknown as { id: string; status: string }[]
+    expect(list.find(c => c.id === id)?.status).toBe('pending')
+    const pendingReview = async (user: TestUser) =>
+      (
+        (await json(await as(ctx, user, 'GET', '/chronicles'))) as unknown as {
+          pendingReview: number
+        }[]
+      )[0]?.pendingReview
+    expect(await pendingReview(storyteller)).toBe(1)
+    // O jogador não recebe a conta da revisão
+    expect(await pendingReview(owner)).toBe(0)
     const write = await send(id, owner, 'name', 'Teste', 'X')
     expect(write.status).toBe(403)
     expect(await json(write)).toMatchObject({
@@ -624,7 +638,7 @@ describe('Mesa', () => {
     await setStatus(ctx, id, 'pending')
     const table = (await (
       await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/table`)
-    ).json()) as { id: string; status: string }[]
+    ).json()) as unknown as { id: string; status: string }[]
     expect(table.map(r => [r.id, r.status])).toEqual([[id, 'pending']])
   })
 })
