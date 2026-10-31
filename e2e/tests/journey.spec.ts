@@ -60,7 +60,12 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   // 1. A jogadora cria a conta pela tela e entra
   const username = `joga_${Date.now().toString(36)}`.slice(0, 24)
   await page.goto('/')
+  await expect(page).toHaveURL(/\/login$/)
   await page.getByRole('button', { name: 'Criar conta' }).click()
+  // O login também tem "E-mail": preencher antes da troca de tela perde o
+  // texto (no CI, mais lento, acontecia)
+  await expect(page).toHaveURL(/\/register$/)
+  await expect(page.getByRole('heading', { name: 'Criar conta' })).toBeVisible()
   await page.getByLabel('E-mail').fill(`${username}@example.test`)
   await page.getByLabel('Nome de usuário').fill(username)
   await page.getByLabel('Senha').fill(PASSWORD)
