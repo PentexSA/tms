@@ -13,7 +13,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // v1, Etapa 7: o Mago (M20) ao lado do Vampiro, pelas mesmas rotas. Nenhuma
 // rota tem nome de sistema: criação, lote, histórico e mesa vêm do template.

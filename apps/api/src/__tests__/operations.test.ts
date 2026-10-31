@@ -14,7 +14,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Operações em grupo e reversão (doc/painel-narrador.md §5.4; doc/plano-v3.md,
 // Etapa 11): idempotentes, atômicas, com a prévia conferida pela versão.

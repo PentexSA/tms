@@ -1,5 +1,6 @@
 # CI da v0 (doc/plano-v0.md, Etapa 1). Actions fixadas por SHA (supply chain);
-# o comentário diz a versão. Atualize as duas juntas.
+# o comentário diz a versão. Atualize as duas juntas. Os jobs correm em
+# paralelo (doc/plano-pipeline-testes.md): o mais lento é o E2E.
 name: CI
 
 on:
@@ -16,13 +17,13 @@ concurrency:
 
 env:
   NODE_VERSION: '24'
-  BUN_VERSION: '1.4.3'
+  # A versão do Bun fica em .bun-version: a mesma no CI e na máquina
 
 jobs:
   check:
-    name: lint, typecheck, testes e auditoria
+    name: lint, typecheck e auditoria
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,15 +35,56 @@ jobs:
           cache: pnpm
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
       - run: pnpm install --frozen-lockfile
+      # Cache do turbo entre runs: os inputs de cada tarefa declaram o que ela
+      # lê (inclusive design/, nos turbo.jsonc dos pacotes)
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-
       - run: pnpm exec biome ci .
       - run: pnpm typecheck
       # O código conhece tipos; o template conhece o sistema (plano-v1 §4)
-      - run: node scripts/check-system-names.mjs
-      # Testes com as metas de cobertura de cada pacote (bunfig.toml e jest.config.js)
-      - run: pnpm test:coverage
-      - run: pnpm audit --audit-level high
+      - if: ${{ !cancelled() }}
+        run: node scripts/check-system-names.mjs
+      - if: ${{ !cancelled() }}
+        run: pnpm audit --audit-level high
+
+  # Testes com as metas de cobertura de cada pacote (bunfig.toml e
+  # jest.config.js). --continue: uma falha não esconde as dos outros pacotes
+  test:
+    name: testes (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            filter: --filter=@tms/config --filter=@tms/db --filter=@tms/sheet-core --filter=@tms/api
+          - name: frontend
+            filter: --filter=@tms/ui --filter=frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo/cache
+          key: turbo-test-${{ matrix.name }}-${{ github.sha }}
+          restore-keys: turbo-test-${{ matrix.name }}-
+      - run: pnpm turbo run test:coverage ${{ matrix.filter }} --continue --concurrency=2
 
   design:
     name: design (gerados em dia e contraste)
@@ -62,10 +104,11 @@ jobs:
       - run: node design/scripts/build.mjs
       - name: arquivos gerados estão em dia
         run: git diff --exit-code
-      - run: python3 -I design/design-system/scripts/check_tokens.py design/design-system/tokens.json design/design-system/skins/*.json
+      - if: ${{ !cancelled() }}
+        run: python3 -I design/design-system/scripts/check_tokens.py design/design-system/tokens.json design/design-system/skins/*.json
 
   postgres:
-    name: Postgres real (migrations e tipos)
+    name: Postgres real (migrations, tipos e concorrência)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -94,10 +137,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-      # O script de publicação e o teste de concorrência rodam no Bun
+      # O script de publicação e os testes de concorrência rodam no Bun
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
       - run: pnpm install --frozen-lockfile
       # As migrations importam config e logger pelos artefatos compilados.
       - run: pnpm turbo run build --filter='@tms/api^...'
@@ -109,58 +152,33 @@ jobs:
           git diff --exit-code packages/db/src/types.ts
       # O template da v0 publica num Postgres real (schema.json + contrato)
       - run: pnpm templates:publish --published
-      # O PGLite serializa tudo; o FOR UPDATE dos eventos só se prova aqui
-      - name: eventos concorrentes (lock da ficha)
+      # O PGLite serializa tudo: FOR UPDATE, idempotência e troca de
+      # autoridade com conexões independentes só se provam aqui. Todo
+      # *.pg.test.ts entra (o filtro pega src/rolls/__tests__ também), em
+      # série: cada arquivo apaga e recria o schema do mesmo banco. Sem
+      # PG_TEST_URL eles seriam pulados; o passo falha se algum for.
+      - name: testes de concorrência em Postgres real
+        if: ${{ !cancelled() }}
         env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_events_test
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_pg_test
           NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/events.pg.test.ts
-      # Rolagens: a FdV é debitada uma vez, mesmo com reenvio em paralelo
-      - name: rolagens concorrentes (lock da ficha)
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_rolls_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/rolls/__tests__/rolls.pg.test.ts
-      # A política vale o estado de quando o lote chega: concluir a criação
-      # e um lote de Evoluir ao mesmo tempo (v3, Etapa 5)
-      - name: política contra a conclusão (lock da ficha)
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_policy_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/policy.pg.test.ts
-      # O protocolo de trava do vínculo: criar, escrever e remover ao mesmo
-      # tempo, sem ficha órfã nem deadlock (v3, Etapa 7)
-      - name: membros contra criação e escrita (lock do vínculo)
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_members_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/members.pg.test.ts
-      # Operações em grupo: fichas travadas em ordem de id, idempotência
-      # depois das travas, sem deadlock (v3, Etapa 11)
-      - name: operações em grupo concorrentes (lock das fichas)
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_operations_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/operations.pg.test.ts
-      # XP: concessão, ajuste e pedidos concorrentes; pedido antes da ficha,
-      # saldo nunca negativo, projeção igual ao extrato (v4, Etapas 6 e 7)
-      - name: extrato e pedidos de XP concorrentes
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_xp_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/xp.pg.test.ts
-      # V5: idempotência por crônica, revisões e troca de autoridade usam
-      # conexões independentes; PGLite não demonstra essas disputas.
-      - name: bastidores e transferência concorrentes
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_backstage_test
-          NODE_ENV: test
-        run: pnpm -C apps/api exec bun test src/__tests__/backstage.pg.test.ts
+        working-directory: apps/api
+        run: |
+          set -o pipefail
+          bun test .pg.test 2>&1 | tee pg-test.log
+          if grep -qE '^ *[1-9][0-9]* skip$' pg-test.log; then
+            echo '::error::algum teste em Postgres real foi pulado'
+            exit 1
+          fi
 
   e2e:
-    name: E2E web (Playwright, Chromium e WebKit)
+    name: E2E web (${{ matrix.browser }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
     services:
       postgres:
         image: postgres:16
@@ -189,7 +207,7 @@ jobs:
           cache: pnpm
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       # O mirror Azure do runner pode ficar lento e repetir downloads até
@@ -208,13 +226,15 @@ jobs:
                       path.write_text(updated)
                       print(f'Espelho atualizado: {path}')
           PY
-      - run: pnpm -C e2e exec playwright install --with-deps chromium webkit
+      # Só o navegador deste job (o cache dos binários fica como experimento:
+      # o Playwright avisa que restaurá-lo custa quase o mesmo que baixar)
+      - run: pnpm -C e2e exec playwright install --with-deps ${{ matrix.browser }}
       # Exporta o app web com a URL da API do E2E e confere o bundle
       - run: pnpm -C e2e build:web
-      - run: pnpm -C e2e test:e2e
+      - run: pnpm -C e2e test:e2e --project=${{ matrix.browser }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.browser }}
           path: e2e/playwright-report
           retention-days: 7

@@ -19,9 +19,9 @@
     "tunel": "bash scripts/tunel.sh",
     "backend": "bash scripts/backend.sh",
     "release": "bash scripts/release.sh",
-    "test": "turbo run test --concurrency=1",
+    "test": "turbo run test --concurrency=2",
     "test:watch": "turbo run test:watch --parallel",
-    "test:coverage": "turbo run test:coverage --concurrency=1",
+    "test:coverage": "turbo run test:coverage --concurrency=2",
     "test:api": "turbo run test --filter=@tms/api",
     "test:ui": "turbo run test --filter='./packages/ui' -- && turbo run test --filter=frontend",
     "test:packages": "turbo run test --filter='./packages/*'",
@@ -42,7 +42,9 @@
     "turbo": "2.11.7"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json}": ["biome check --write --no-errors-on-unmatched"]
+    "*.{js,jsx,ts,tsx,json,jsonc}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16"

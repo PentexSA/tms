@@ -19,7 +19,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Crônicas e convites (doc/plano-v0.md, Etapa 10).
 

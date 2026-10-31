@@ -3,7 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { sleep } from 'bun'
 import type { App } from '../index'
 import { logger } from '../logger'
-import { createTestApp, destroyTestDb, makeRequest } from '../test/helpers'
+import {
+  createTestApp,
+  destroyTestDb,
+  makeRequest,
+  useTestDb,
+} from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 describe('TMS API Tests', () => {
   let app: App

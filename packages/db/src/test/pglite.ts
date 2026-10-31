@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite'
-import { Kysely, type MigrationProvider, Migrator } from 'kysely'
+import { Kysely, type MigrationProvider, Migrator, sql } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
 import { migrationProvider } from '../migrations'
 import type { DB } from '../types'
@@ -25,6 +25,53 @@ export async function createPGliteTestDb(
       ? new PGlite({ loadDataDir: await migratedSnapshot() })
       : await migrated(provider)
   return open(pglite)
+}
+
+/**
+ * Banco de teste que se restaura sem subir outro PGLite: `reset()` volta os
+ * dados ao estado de logo depois das migrations (~24 ms contra ~234 ms de um
+ * banco novo). Apaga tudo e devolve as linhas que as migrations semearam
+ * (sistemas e templates do produto), inclusive as que um teste mudou.
+ *
+ * @example
+ * const { db, reset, destroy } = await createResettablePGliteTestDb()
+ * await reset() // antes de cada teste
+ * await destroy() // no fim do arquivo
+ */
+export async function createResettablePGliteTestDb() {
+  const { db, destroy } = await createPGliteTestDb()
+  const tables = (
+    await sql<{ name: string }>`
+      select tablename as name from pg_tables
+      where schemaname = 'public' and tablename not like 'kysely_%'
+      order by tablename`.execute(db)
+  ).rows.map(r => `"${r.name}"`)
+  // Uma cópia do que as migrations deixaram em cada tabela com dados
+  await sql`create schema test_seed`.execute(db)
+  const seeded: string[] = []
+  for (const table of tables) {
+    await sql
+      .raw(`create table test_seed.${table} as table public.${table}`)
+      .execute(db)
+    const { rows } = await sql<{ n: number }>`
+      select count(*)::int as n from ${sql.raw(`test_seed.${table}`)}`.execute(
+      db
+    )
+    if (rows[0]?.n) seeded.push(table)
+    else await sql.raw(`drop table test_seed.${table}`).execute(db)
+  }
+  const restore = [
+    `truncate ${tables.map(t => `public.${t}`).join(', ')} restart identity cascade`,
+    // Sem as chaves estrangeiras durante a cópia: a ordem das tabelas não
+    // importa (o `local` vale só até o fim da transação)
+    'set local session_replication_role = replica',
+    ...seeded.map(t => `insert into public.${t} select * from test_seed.${t}`),
+  ]
+  const reset = () =>
+    db.transaction().execute(async trx => {
+      for (const statement of restore) await sql.raw(statement).execute(trx)
+    })
+  return { db, reset, destroy }
 }
 
 let snapshot: Promise<Blob> | undefined

@@ -10,6 +10,7 @@ import {
   createCharacter,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   type TestUser,
 } from '../test/factories'
@@ -91,6 +92,8 @@ describe.skipIf(!URL_)('política num Postgres real', () => {
       const id = await createCharacter(ctx, owner, chronicleId, {
         name: `Ficha ${round}`,
       })
+      // A conta dos pontos não é o assunto: só a disputa pela trava
+      await freeCreation(ctx, id)
       const [batch, done] = await Promise.all([
         as(ctx, owner, 'POST', `/characters/${id}/events`, {
           clientBatchId: crypto.randomUUID(),

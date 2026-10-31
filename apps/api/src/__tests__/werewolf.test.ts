@@ -15,7 +15,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // v2, Etapa 6: o Lobisomem (W20) ao lado do Vampiro e do Mago, pelas mesmas
 // rotas. A troca de forma é um lote como outro qualquer: o servidor confere

@@ -14,7 +14,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Criação por pontos e aprovação na API (doc/plano-v4.md, Etapa 4), com o
 // template sintético `acct-teste` (números de teste, nunca publicado fora do

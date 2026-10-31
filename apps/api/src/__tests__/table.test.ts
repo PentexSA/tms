@@ -14,7 +14,11 @@ import {
   createTestContext,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // A Mesa do narrador (doc/plano-v0.md, Etapa 19).
 

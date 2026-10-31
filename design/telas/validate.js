@@ -63,7 +63,7 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions'],
     longText: ['maxLength', 'placeholder'],
     choice: ['options', 'glyph'],
     tags: ['options'],
@@ -618,6 +618,16 @@ function validateTemplate(t, palette) {
     sources(`${p}.from`, f.from)
     if (f.badge && !has(f.badge.field)) err(`${p}.badge.field`, `campo '${f.badge.field}' não existe`)
     if (f.maxLength != null) num(`${p}.maxLength`, f.maxLength, 1, 20000)
+    if (f.type === 'text' && f.suggestions != null) {
+      if (!Array.isArray(f.suggestions) || f.suggestions.length > 100)
+        err(`${p}.suggestions`, 'lista de até 100 textos')
+      else {
+        const max = f.maxLength ?? 200
+        f.suggestions.forEach((v, i) => text(`${p}.suggestions.${i}`, v, max))
+        if (new Set(f.suggestions).size !== f.suggestions.length)
+          err(`${p}.suggestions`, 'sugestão repetida')
+      }
+    }
     if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
     else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
     if (f.spendLabel) text(`${p}.spendLabel`, f.spendLabel, 24)

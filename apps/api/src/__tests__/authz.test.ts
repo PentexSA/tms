@@ -25,12 +25,16 @@ import {
   createTestContextOn,
   destroyTestDb,
   type TestContext,
+  useTestDb,
 } from '../test/helpers'
 import {
   MATRIX_SYSTEMS,
   type SystemCase,
   systemCase,
 } from '../test/matrix-systems'
+
+// Um PGLite para o arquivo, restaurado a cada createTestContext
+useTestDb()
 
 // Matriz de AuthZ: cada rota protegida contra cada ator (doc/plano-v0.md §4),
 // nos três sistemas do produto (doc/plano-v3.md, Etapa 3). O cenário é
