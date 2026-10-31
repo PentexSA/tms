@@ -117,11 +117,11 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 
 #### Key Features
 
-- **@tms/sheet-core**: 946 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
+- **@tms/sheet-core**: 962 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
 - **@tms/api**: 1565 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
-- **@tms/db**: 23 tests (Bun): migrations sobem e descem
+- **@tms/db**: 29 tests (Bun): migrations sobem e descem, banco de teste restaurável
 - **@tms/ui**: 91 tests (Jest)
-- **frontend**: 612 tests (Jest + React Native Testing Library)
+- **frontend**: 630 tests (Jest + React Native Testing Library)
 - Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
 #### E2E (Playwright, Chromium e WebKit)
@@ -137,23 +137,17 @@ E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C
 
 #### Concorrência em Postgres real
 
-O PGLite tem uma conexão só; o `FOR UPDATE` só se prova num Postgres de verdade (job `postgres` do CI). O banco precisa terminar em `_test` (o teste apaga o schema):
+O PGLite tem uma conexão só; o `FOR UPDATE` só se prova num Postgres de verdade (job `postgres` do CI). O banco precisa terminar em `_test` (cada arquivo apaga e recria o schema). Todos os `*.pg.test.ts` num comando, em série (o filtro `.pg.test` pega `src/rolls/__tests__` também; sem `PG_TEST_URL` eles são pulados):
 
 ```bash
 cd apps/api
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_events_test bun test src/__tests__/events.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_rolls_test bun test src/rolls/__tests__/rolls.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_policy_test bun test src/__tests__/policy.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_members_test bun test src/__tests__/members.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_operations_test bun test src/__tests__/operations.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_xp_test bun test src/__tests__/xp.pg.test.ts
-PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_backstage_test bun test src/__tests__/backstage.pg.test.ts
+PG_TEST_URL=postgres://postgres:postgres@localhost:5432/tms_pg_test bun test .pg.test
 ```
 
 #### Test Infrastructure
 
-- **Bun Test Runner**: Backend packages use native Bun for ~70% faster execution
-- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry). Each instance holds ~180 MB of WASM until released: `destroy()` drops it even if a test file keeps the `db` referenced, and the AuthZ matrix shares one PGLite across scenarios (`createTestContextOn`), each isolated by its own users/chronicles
+- **Bun Test Runner**: Backend packages use native Bun; the version is pinned in `.bun-version` (CI reads the same file)
+- **PGLite**: In-memory PostgreSQL for isolated, fast database tests (no Docker), from `@tms/db/testing` (never from the main `@tms/db` entry). Each instance holds ~180 MB of WASM until released: `destroy()` drops it even if a test file keeps the `db` referenced, and the AuthZ matrix shares one PGLite across scenarios (`createTestContextOn`), each isolated by its own users/chronicles. API test files call `useTestDb()` at the top: one PGLite per file (beforeAll/afterAll), restored to the post-migration state on every `createTestContext()` (~24 ms instead of ~234 ms for a new instance). A test that breaks the schema uses its own `createPGliteTestDb()`
 - **Jest**: Frontend packages use Jest for React Native/Expo compatibility
 - **@tms/bun-test-config**: Shared Bun test utilities and helpers
 
