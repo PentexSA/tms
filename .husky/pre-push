@@ -1,3 +1,30 @@
-# Run full test suite before pushing
-echo "🧪 Running full test suite before push..."
-npx pnpm test
+# Testes só dos pacotes que mudaram desde o que o remoto já tem (o CI roda
+# tudo). O Git manda uma linha por ref enviada: "<ref> <sha> <ref remota>
+# <sha remoto>". A base é o sha remoto; numa branch nova (sha remoto zerado),
+# o ponto em que ela saiu da origin/main.
+zero=0000000000000000000000000000000000000000
+base=
+pushing=
+while read -r _ local_sha _ remote_sha; do
+  # Remover uma branch remota não envia código
+  [ "$local_sha" = "$zero" ] && continue
+  pushing=1
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha" 2>/dev/null; then
+    base=$remote_sha
+  else
+    base=$(git merge-base origin/main "$local_sha" 2>/dev/null)
+  fi
+  break
+done
+
+[ -z "$pushing" ] && exit 0
+
+if [ -z "$base" ]; then
+  echo "🧪 Sem base para comparar: rodando todos os testes antes do push..."
+  npx pnpm test
+else
+  echo "🧪 Testes dos pacotes que mudaram desde ${base%"${base#???????}"}..."
+  # Os pacotes alterados e os que dependem deles. O --affected do turbo
+  # pede um Git mais novo (2.30+) que o de algumas máquinas
+  npx pnpm turbo run test "--filter=...[$base]" --concurrency=2
+fi
