@@ -17,6 +17,7 @@
     "templates:publish": "pnpm -C apps/api templates:publish",
     "seed:roteiro": "bun scripts/seed-roteiro.ts",
     "tunel": "bash scripts/tunel.sh",
+    "backend": "bash scripts/backend.sh",
     "release": "bash scripts/release.sh",
     "test": "turbo run test --concurrency=1",
     "test:watch": "turbo run test:watch --parallel",
