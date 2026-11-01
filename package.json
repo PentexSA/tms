@@ -19,7 +19,7 @@
     "db:migrate": "pnpm -C packages/db migrate:up",
     "db:codegen": "pnpm -C packages/db codegen",
     "templates:publish": "pnpm -C apps/api templates:publish",
-    "seed:roteiro": "node scripts/check-dev-env.mjs --dist config logger db sheet-core && bun --env-file=.env scripts/seed-roteiro.ts",
+    "seed:roteiro": "bun --env-file=.env scripts/seed-roteiro.ts",
     "tunel": "bash scripts/tunel.sh",
     "backend": "bash scripts/backend.sh",
     "release": "bash scripts/release.sh",

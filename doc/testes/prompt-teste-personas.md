@@ -61,7 +61,12 @@ Leia antes, para saber o que é esperado e não reportar como novo o que já é 
   web com `npx pnpm dev:web`. Com o banco migrado, rode `npx pnpm seed:roteiro` (a API do
   seed roda dentro dele; não precisa da API no ar nem de `TRUST_PROXY`): ele cria as contas
   N, J1, J2 e N2 (`@roteiro.test`, a senha sai no terminal), uma crônica de criação livre e
-  uma por pontos para cada sistema, e uma crônica de Vampiro com 21 fichas.
+  uma por pontos para cada sistema, e uma crônica de Vampiro com 21 fichas. O seed só roda
+  num banco local (ele apaga e recria as crônicas do roteiro); para um banco remoto de teste,
+  `SEED_ALLOW_REMOTE_DB=1`. Contra uma API remota (`SEED_API_URL=https://...`), as contas
+  dividem o IP: sem um proxy que repasse o `X-Forwarded-For` e a API com `TRUST_PROXY=true`,
+  o `/invites/accept` para no limite por IP (10 a cada 15 min) antes dos 13 aceites, e o seed
+  para com a mensagem do 429. Rode de novo depois de 15 min (ele apaga a rodada incompleta).
   Depois de atualizar o código, rode `npx pnpm bootstrap` de novo: a API e o web se recusam a
   subir com dependências ou build desatualizados e dizem o comando.
   Se algo do setup falhar, pare e me avise em vez de contornar.

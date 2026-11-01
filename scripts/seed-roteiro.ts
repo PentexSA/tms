@@ -2,6 +2,17 @@
 //   pnpm seed:roteiro                       (API em processo, no DATABASE_URL)
 //   SEED_API_URL=https://... pnpm seed:roteiro   (API remota, por HTTP)
 //
+// Em processo, o seed só roda num banco local (localhost, 127.0.0.1, ::1 ou
+// socket): ele apaga e recria as crônicas do roteiro. Para um banco remoto de
+// teste, SEED_ALLOW_REMOTE_DB=1. Antes, confere o ambiente da API
+// (scripts/check-dev-env.mjs), porque importa os pacotes pelo dist.
+//
+// Modo remoto: todas as contas saem do mesmo IP. O IP simulado no
+// X-Forwarded-For só vale se o proxy na frente da API repassar o cabeçalho
+// e ela rodar com TRUST_PROXY=true; sem isso, o /invites/accept para no
+// limite por IP (10 a cada 15 min) antes dos 13 aceites, e o seed para com
+// a mensagem de 429: rode de novo depois de 15 min.
+//
 // Cria (ou reaproveita) as contas N, J1, J2 e N2, apaga as crônicas que essas
 // contas narram (só existem para o roteiro; --keep pula isso) e cria um
 // conjunto novo: uma de v3/v5 (criação livre) e uma de v4 (por pontos) por
@@ -18,6 +29,7 @@
 // produto).
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { checkDevEnv } from './check-dev-env.mjs'
 
 const PASSWORD = 'roteiro de teste tms'
 
@@ -44,6 +56,8 @@ export interface SeedOptions {
   api: (key: Key) => Handle
   /** URL base das requisições. */
   base: string
+  /** API remota (SEED_API_URL): as contas dividem o IP. */
+  remote?: boolean
   /** Não apaga as crônicas da rodada anterior. */
   keep?: boolean
   /** Hora local usada no nome das crônicas. */
@@ -60,6 +74,36 @@ interface Session {
   username: string
   email: string
   token: string
+}
+
+/** 429 da API: o seed para e diz em que ponto. */
+class RateLimited extends Error {}
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
+
+/**
+ * O seed apaga e recria dados: só no banco local, a não ser com
+ * SEED_ALLOW_REMOTE_DB=1. A mensagem diz só o host, nunca a URL nem a senha.
+ * @returns o problema, ou null
+ */
+export function checkSeedDatabase(
+  url: string,
+  env: Record<string, string | undefined> = process.env
+): string | null {
+  let host: string
+  try {
+    const parsed = new URL(url)
+    // Sem host na URL, o libpq usa o socket local; ?host= troca o destino
+    // (caminho = socket local)
+    host =
+      parsed.searchParams.get('host') ??
+      parsed.hostname.replace(/^\[(.*)\]$/, '$1')
+  } catch {
+    return 'DATABASE_URL inválido: confira o .env.'
+  }
+  if (host === '' || host.startsWith('/') || LOCAL_HOSTS.has(host)) return null
+  if (env.SEED_ALLOW_REMOTE_DB === '1') return null
+  return `O seed apaga e recria as crônicas do roteiro e só roda num banco local; o DATABASE_URL aponta para o host "${host}". Para um banco remoto de teste, defina SEED_ALLOW_REMOTE_DB=1.`
 }
 
 export async function runSeed(o: SeedOptions): Promise<SeedResult> {
@@ -94,10 +138,7 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
     body?: unknown
   ): Promise<T> {
     const r = await call<T>(s.key, method, path, { token: s.token, body })
-    if (r.status === 429)
-      throw new Error(
-        `${method} ${path}: rate limit (os aceites de convite são 10 a cada 15 min por conta e por IP). Rode o seed de novo daqui a 15 min.`
-      )
+    if (r.status === 429) throw new RateLimited(`${method} ${path}`)
     if (r.status >= 300)
       throw new Error(
         `${method} ${path}: ${r.status} ${JSON.stringify(r.data)}`
@@ -178,71 +219,88 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
   const join = (user: Session, code: string) =>
     must(user, 'POST', '/invites/accept', { code })
 
-  const sessions: Session[] = []
-  for (let i = 0; i < ACCOUNTS.length; i++) sessions.push(await signIn(i))
-  const by = (k: Key) => sessions.find(s => s.key === k) as Session
-  const N = by('N')
-
-  if (!o.keep) {
-    let wiped = 0
-    for (const s of sessions) wiped += await wipe(s)
-    if (wiped) console.log(`Apagadas ${wiped} crônicas da rodada anterior.`)
-  }
-
-  const systems = await must<{ code: string }[]>(N, 'GET', '/systems')
-  const missing = SYSTEMS.filter(s => !systems.some(x => x.code === s.code))
-  if (missing.length)
-    throw new Error(
-      `sem template publicado: ${missing.map(s => s.code).join(', ')} (rode pnpm db:migrate e pnpm templates:publish --published)`
-    )
-
-  // Hora local (sv-SE = AAAA-MM-DD HH:MM:SS), não UTC
-  const tag = (o.now ?? (() => new Date()))()
-    .toLocaleString('sv-SE')
-    .slice(5, 16)
+  // As crônicas completas desta rodada: com um 429 no meio, o seed diz
+  // quantas ficaram prontas
   const rows: SeedResult['chronicles'] = []
+  try {
+    const sessions: Session[] = []
+    for (let i = 0; i < ACCOUNTS.length; i++) sessions.push(await signIn(i))
+    const by = (k: Key) => sessions.find(s => s.key === k) as Session
+    const N = by('N')
 
-  for (const s of SYSTEMS) {
-    for (const use of ['v3/v5', 'v4'] as const) {
-      const c = await createChronicle(N, `${s.label} ${use} · ${tag}`, s.code)
-      // A v3 e a v5 não tratam da conta por pontos: criação livre, e o
-      // narrador conclui. A v4 fica no padrão do template, por pontos
-      if (use === 'v3/v5') await freeCreation(N, c.id)
-      const inv = await invite(N, c.id)
-      await join(by('J1'), inv.code)
-      await join(by('J2'), inv.code)
-      // N2 só entra no V5-22; o convite aceita mais de um uso para o V5-24
-      // (N2 sai e volta antes da proposta válida do V5-25)
-      const n2 = use === 'v3/v5' ? (await invite(N, c.id, 5)).code : undefined
-      rows.push({ name: c.name, use, n2Invite: n2 })
+    if (!o.keep) {
+      let wiped = 0
+      for (const s of sessions) wiped += await wipe(s)
+      if (wiped) console.log(`Apagadas ${wiped} crônicas da rodada anterior.`)
     }
-  }
 
-  // V3-10: 21 fichas na Mesa, numa crônica separada para não poluir a de
-  // Vampiro do roteiro. Cada pessoa tem no máximo 20 fichas por crônica: são
-  // 20 PCs do narrador e o 21º do J1
-  const crowd = await createChronicle(
-    N,
-    `Vampiro limite 20 · ${tag}`,
-    'vtm-v20'
-  )
-  await freeCreation(N, crowd.id)
-  await join(by('J1'), (await invite(N, crowd.id, 1)).code)
-  for (let i = 1; i <= 21; i++) {
-    const owner = i === 21 ? by('J1') : N
-    await must(owner, 'POST', `/chronicles/${crowd.id}/characters`, {
-      values: { name: `Figurante ${String(i).padStart(2, '0')}` },
-    })
-  }
-  rows.push({ name: crowd.name, use: 'V3-10 (21 fichas)' })
+    const systems = await must<{ code: string }[]>(N, 'GET', '/systems')
+    const missing = SYSTEMS.filter(s => !systems.some(x => x.code === s.code))
+    if (missing.length)
+      throw new Error(
+        `sem template publicado: ${missing.map(s => s.code).join(', ')} (rode pnpm db:migrate e pnpm templates:publish --published)`
+      )
 
-  return {
-    accounts: ACCOUNTS.map(a => ({
-      key: a.key,
-      role: a.role,
-      email: by(a.key).email,
-    })),
-    chronicles: rows,
+    // Hora local (sv-SE = AAAA-MM-DD HH:MM:SS), não UTC
+    const tag = (o.now ?? (() => new Date()))()
+      .toLocaleString('sv-SE')
+      .slice(5, 16)
+
+    for (const s of SYSTEMS) {
+      for (const use of ['v3/v5', 'v4'] as const) {
+        const c = await createChronicle(N, `${s.label} ${use} · ${tag}`, s.code)
+        // A v3 e a v5 não tratam da conta por pontos: criação livre, e o
+        // narrador conclui. A v4 fica no padrão do template, por pontos
+        if (use === 'v3/v5') await freeCreation(N, c.id)
+        const inv = await invite(N, c.id)
+        await join(by('J1'), inv.code)
+        await join(by('J2'), inv.code)
+        // N2 só entra no V5-22; o convite aceita mais de um uso para o V5-24
+        // (N2 sai e volta antes da proposta válida do V5-25)
+        const n2 = use === 'v3/v5' ? (await invite(N, c.id, 5)).code : undefined
+        rows.push({ name: c.name, use, n2Invite: n2 })
+      }
+    }
+
+    // V3-10: 21 fichas na Mesa, numa crônica separada para não poluir a de
+    // Vampiro do roteiro. Cada pessoa tem no máximo 20 fichas por crônica: são
+    // 20 PCs do narrador e o 21º do J1
+    const crowd = await createChronicle(
+      N,
+      `Vampiro limite 20 · ${tag}`,
+      'vtm-v20'
+    )
+    await freeCreation(N, crowd.id)
+    await join(by('J1'), (await invite(N, crowd.id, 1)).code)
+    for (let i = 1; i <= 21; i++) {
+      const owner = i === 21 ? by('J1') : N
+      await must(owner, 'POST', `/chronicles/${crowd.id}/characters`, {
+        values: { name: `Figurante ${String(i).padStart(2, '0')}` },
+      })
+    }
+    rows.push({ name: crowd.name, use: 'V3-10 (21 fichas)' })
+
+    return {
+      accounts: ACCOUNTS.map(a => ({
+        key: a.key,
+        role: a.role,
+        email: by(a.key).email,
+      })),
+      chronicles: rows,
+    }
+  } catch (e) {
+    if (!(e instanceof RateLimited)) throw e
+    throw new Error(
+      [
+        `O seed parou em ${e.message}: limite de requisições da API (429). Os aceites de convite são 10 a cada 15 min por conta e por IP.`,
+        `As crônicas desta rodada ficaram incompletas (${rows.length} de ${SYSTEMS.length * 2 + 1} prontas). Rode o seed de novo daqui a 15 min: ele apaga as da rodada anterior.`,
+        ...(o.remote
+          ? [
+              'No modo remoto (SEED_API_URL), as contas dividem o IP, a não ser que o proxy repasse o X-Forwarded-For e a API rode com TRUST_PROXY=true; os 13 aceites passam do limite por IP.',
+            ]
+          : []),
+      ].join('\n')
+    )
   }
 }
 
@@ -270,9 +328,19 @@ async function main() {
     if (!health) throw new Error(`API fora do ar em ${remote}`)
     api = httpApi
   } else {
-    // O mesmo @tms/db que a API resolve (o dist, conferido pela checagem
-    // do ambiente antes do seed), para fechar o pool no fim
+    // Em processo, a API vem do dist dos pacotes: o mesmo check do dev da API
+    const problems = checkDevEnv(join(import.meta.dir, '..'), {
+      dist: ['config', 'logger', 'db', 'sheet-core'],
+    })
+    if (problems.length) throw new Error(problems.join('\n'))
+    // O mesmo @tms/config e @tms/db que a API resolve, para conferir o
+    // destino antes de conectar e fechar o pool no fim
     const fromApi = createRequire(join(import.meta.dir, '../apps/api/x.js'))
+    const { config } = (await import(fromApi.resolve('@tms/config/env'))) as {
+      config: { DATABASE_URL: string }
+    }
+    const refused = checkSeedDatabase(config.DATABASE_URL)
+    if (refused) throw new Error(refused)
     const { db } = (await import(
       fromApi.resolve('@tms/db')
     )) as typeof import('@tms/db')
@@ -295,6 +363,7 @@ async function main() {
     const result = await runSeed({
       api,
       base,
+      remote: Boolean(remote),
       keep: process.argv.includes('--keep'),
     })
     console.log(
