@@ -76,6 +76,11 @@ export function useSync(): Sync {
   return sync
 }
 
+/** A fila, se houver SyncProvider (telas e testes que montam só a sessão). */
+export function useOptionalSync(): Sync | null {
+  return useContext(SyncContext)
+}
+
 export function useSyncStatus(): SyncStatus {
   const { status } = useSync()
   return useSyncExternalStore(status.subscribe, status.getSnapshot)

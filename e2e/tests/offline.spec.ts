@@ -241,3 +241,68 @@ test('logout sem rede, fechando a aba antes de a rede voltar', async ({
   })
   expect(res.status()).toBe(401)
 })
+
+// QAW-33 (T-14): o Sangue gasto sem rede ainda estava na fila e o "Sair" a
+// apagava sem aviso; de volta à rede, recarregar entrava sozinho
+test('sair com Sangue gasto offline avisa e, de volta à rede, não entra sozinho', async ({
+  page,
+  request,
+}) => {
+  const context = page.context()
+  const user = await signUp(context, 'qaw33')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica sem rede', systemCode: 'vtm-v20' }
+  )
+  await freeCreation(context, user, chronicle.id)
+  const character = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    `/chronicles/${chronicle.id}/characters`,
+    { values: { name: 'Helena Varga', clan: 'tremere' } }
+  )
+  await eighthGeneration(context, user, character.id)
+  await page.goto(`/characters/${character.id}`)
+  await expect(page.getByLabel('Pontos de Sangue, 15 de 15')).toBeVisible()
+  const old = (await context.cookies(`${API_URL}/auth`)).find(
+    c => c.name === 'tms_refresh'
+  )?.value
+
+  await context.setOffline(true)
+  await spendBlood(page)
+  await expect(page.getByLabel('Pontos de Sangue, 14 de 15')).toBeVisible()
+
+  // Volta às Crônicas sem alcançar a API e sai
+  await context.route(`${API_URL}/**`, route =>
+    route.abort('internetdisconnected')
+  )
+  await context.setOffline(false)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Sair' }).click()
+  await expect(page.getByText('Sair e descartar?')).toBeVisible()
+  await expect(
+    page.getByText(
+      '1 alteração ainda não foi enviada e será descartada neste aparelho.'
+    )
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Sair e descartar' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => marker(page)).toBe('logout-pending')
+
+  // A rede volta: recarregar revoga e continua no login
+  await context.unroute(`${API_URL}/**`)
+  const revoked = page.waitForResponse(
+    r => r.url().endsWith('/auth/logout') && r.status() === 204
+  )
+  await page.reload()
+  await revoked
+  await expect(page).toHaveURL(/\/login$/)
+  const res = await request.post(`${API_URL}/auth/refresh`, {
+    headers: { origin: WEB_URL, cookie: `tms_refresh=${old}` },
+  })
+  expect(res.status()).toBe(401)
+})
