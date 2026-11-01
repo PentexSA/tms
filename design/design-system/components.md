@@ -668,7 +668,7 @@ Carregamento com a forma da ficha.
 - **Forma:** título no header, bloco de identidade (64), grade (196) e 12 linhas de larguras variadas.
 - **API RN:** `{ width: number | string; height: number; radius?: number }` + `<SheetSkeleton />` (proposta).
 - **Estados:** animado, estático (reduzir movimento).
-- **A11y:** contêiner com `aria-busy="true"` e "Carregando a ficha" em `role="status"`; peças `aria-hidden`. No `@tms/ui`: no web, o contêiner é `role="status"` com o rótulo num texto visualmente oculto (o `accessible` não existe no web e um `aria-label` num `div` sem papel não é exposto); no app, um elemento `accessible` com o rótulo e `aria-busy`. Na restauração da sessão, a tela de carregamento tem a app bar "TMS" (título fixo, sem dado do usuário).
+- **A11y:** contêiner com `aria-busy="true"` e "Carregando a ficha" em `role="status"`; peças `aria-hidden`. No `@tms/ui`: no web, o contêiner é `role="status"` (sem `aria-busy`, que impediria o anúncio) com o rótulo num texto visualmente oculto, que entra depois da montagem (o `accessible` não existe no web e um `aria-label` num `div` sem papel não é exposto); no app, um elemento `accessible` com o rótulo e `aria-busy`. Na restauração da sessão, a tela de carregamento tem a app bar "TMS" (título fixo, sem dado do usuário).
 - **Multi-sistema:** a forma é do esqueleto (header, identidade, grade, linhas), a mesma para Vampiro, D&D, CoC e Fate.
 - **Resolve:** C-08, DS-07.
 

@@ -644,12 +644,14 @@ describe('Button: nome acessível próprio (T-61)', () => {
 })
 
 describe('Skeleton: carregamento anunciado no web (T-72)', () => {
-  it('no web: role="status", ocupado, "Carregando" em texto; linhas fora da árvore', () => {
+  it('no web: role="status" anunciável (sem aria-busy), "Carregando" em texto; linhas fora da árvore', () => {
     setOS('web')
     render(<Skeleton testID="s" lines={2} />)
     const s = screen.getByTestId('s')
     expect(s.props.role).toBe('status')
-    expect(s).toBeBusy()
+    // Uma região viva ocupada não é anunciada
+    expect(s.props['aria-busy']).toBeUndefined()
+    expect(s).not.toBeBusy()
     expect(screen.getByText('Carregando')).toBeTruthy()
     const hidden = screen
       .getAllByTestId('skeleton-line', { includeHiddenElements: true })

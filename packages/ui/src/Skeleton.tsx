@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { Text } from './Text'
 import { useTheme } from './theme'
@@ -15,7 +16,11 @@ export interface SkeletonProps {
  * No web, o `accessible` não existe e um `aria-label` num `div` sem papel
  * não é exposto (a árvore ficava vazia): o contêiner vira `role="status"`
  * com o rótulo num texto visualmente oculto, e as linhas ficam
- * `aria-hidden` (design system, Skeleton).
+ * `aria-hidden` (design system, Skeleton). A região de status não leva
+ * `aria-busy`: ocupada, ela nunca seria anunciada (o Skeleton some antes de
+ * deixar de estar ocupado). O texto entra depois da montagem, para ser uma
+ * mudança dentro de uma região viva que já existe, que é o que o leitor de
+ * tela anuncia.
  */
 export function Skeleton({
   lines = 3,
@@ -24,6 +29,8 @@ export function Skeleton({
 }: SkeletonProps) {
   const { colors } = useTheme()
   const web = Platform.OS === 'web'
+  const [said, setSaid] = useState(false)
+  useEffect(() => setSaid(true), [])
   const bars = Array.from({ length: lines }, (_, i) => (
     <View
       key={i}
@@ -38,8 +45,8 @@ export function Skeleton({
   ))
   if (web)
     return (
-      <View testID={testID} role="status" aria-busy style={styles.root}>
-        <Text style={styles.hidden}>{label}</Text>
+      <View testID={testID} role="status" style={styles.root}>
+        {said ? <Text style={styles.hidden}>{label}</Text> : null}
         {bars}
       </View>
     )
