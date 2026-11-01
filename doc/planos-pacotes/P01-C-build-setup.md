@@ -453,3 +453,8 @@ Registrados na implementação (branch `pacote/p01-c-build`). Nenhum muda o obje
       - o build nativo;
       - o E2E `template-unsupported.spec.ts`;
       - os cenários de L-01, L-02 e L-03 no navegador e no simulador.
+12. **Depois do `/code-review`.**
+    - **Checagem do dist.** Comparar por data (§3.2) quebrava o job `postgres` do CI: o `db:codegen` regrava o `types.ts` depois do build. Também recusava em salvar sem mudar ou trocar de branch e voltar, e o bootstrap não resolvia. Agora o build de config, logger, db e sheet-core grava `dist/src-hash.json` (`scripts/src-hash.mjs`), e o check compara o conteúdo.
+    - **`check:native`.** Percorre também os `node_modules` aninhados e trava o patch no `^0.0.z`.
+    - **Seed.** Em processo, recusa banco que não seja local, a não ser com `SEED_ALLOW_REMOTE_DB=1`. Só roda o check do ambiente nesse modo. Num 429, para dizendo quantas crônicas ficaram prontas.
+    - **Achado descartado.** O "`loadFailed` continua verdadeiro durante o refetch" do L-01 não se confirmou: no React Query 5, um refetch sem dado volta o status para `pending` (`fetchState` do query-core). O painel mostra "Carregando…" sem o botão.
