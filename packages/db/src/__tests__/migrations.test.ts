@@ -41,6 +41,7 @@ describe('migrations', () => {
         'game_systems',
         'refresh_tokens',
         'trait_templates',
+        'user_commands',
         'users',
         'xp_entries',
         'xp_requests',
@@ -667,6 +668,49 @@ describe('migrations', () => {
       expect(String(result.error)).toContain(
         'já está no banco com outro conteúdo'
       )
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0022: a chave do comando é por usuário e cai com a conta', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = (name: string) =>
+        db
+          .insertInto('users')
+          .values({
+            username: name,
+            email: `${name}@x.test`,
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const a = await user('a')
+      const b = await user('b')
+      const key = crypto.randomUUID()
+      const command = (userId: string) =>
+        db
+          .insertInto('user_commands')
+          .values({
+            user_id: userId,
+            client_command_id: key,
+            kind: 'chronicle.create',
+            request_hash: 'h',
+            result: JSON.stringify({ id: crypto.randomUUID() }),
+          })
+          .execute()
+      await command(a.id)
+      // A mesma chave do mesmo usuário não grava duas vezes
+      await expect(command(a.id)).rejects.toThrow()
+      // Em outra conta, é outra intenção
+      await command(b.id)
+      await db.deleteFrom('users').where('id', '=', a.id).execute()
+      const left = await db
+        .selectFrom('user_commands')
+        .select('user_id')
+        .execute()
+      expect(left).toEqual([{ user_id: b.id }])
     } finally {
       await destroy()
     }

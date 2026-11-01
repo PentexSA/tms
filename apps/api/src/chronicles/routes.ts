@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import { effectiveChronicleOptions, isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -23,6 +24,14 @@ const DAY = 24 * 60 * 60 * 1000
 const notFound = () => new ApiError(404, 'não encontrado')
 const storytellerOnly = () => new ApiError(403, 'só o narrador pode fazer isso')
 const INVALID_INVITE = 'convite inválido ou expirado'
+const commandHash = (kind: string, request: unknown) =>
+  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
+const idempotencyConflict = () =>
+  new ApiError(
+    409,
+    'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
+    { code: 'IDEMPOTENCY_CONFLICT' }
+  )
 export const CONFIRM_DELETE =
   'a crônica tem fichas de outros jogadores: confirme com o nome da crônica'
 
@@ -154,21 +163,93 @@ export function chronicleRoutes(
           throw new ApiError(422, 'sistema sem template publicado', {
             fields: ['/systemCode'],
           })
+        const key = body.clientCommandId
+        if (!key) {
+          // Sem chave (app antigo): cria como antes, sem idempotência
+          const chronicle = await db
+            .insertInto('chronicles')
+            .values({ storyteller_id: me, system_id: system.id, name })
+            .returning(['id', 'name'])
+            .executeTakeFirstOrThrow()
+          set.status = 201
+          return {
+            id: chronicle.id,
+            name: chronicle.name,
+            system: { code: system.code, name: system.name },
+            role: 'storyteller' as const,
+            duplicate: false,
+          }
+        }
+        // T-02: a crônica ainda não existe, então a trava é a da conta de
+        // quem cria (o mesmo protocolo de "travar o pai" da criação). FOR NO
+        // KEY UPDATE serializa duas criações da mesma pessoa e a exclusão de
+        // conta (FOR UPDATE) sem bloquear as FKs de outras escritas.
+        const request = { name: body.name, systemCode: body.systemCode }
+        const hash = commandHash('chronicle.create', request)
+        const result = await db.transaction().execute(async trx => {
+          const user = await trx
+            .selectFrom('users')
+            .select('id')
+            .where('id', '=', me)
+            .forNoKeyUpdate()
+            .executeTakeFirst()
+          if (!user) throw notFound()
+          const done = await trx
+            .selectFrom('user_commands')
+            .select(['kind', 'request_hash', 'result'])
+            .where('user_id', '=', me)
+            .where('client_command_id', '=', key)
+            .executeTakeFirst()
+          if (done) {
+            if (done.kind !== 'chronicle.create' || done.request_hash !== hash)
+              throw idempotencyConflict()
+            return { id: (done.result as { id: string }).id, duplicate: true }
+          }
+          const chronicle = await trx
+            .insertInto('chronicles')
+            .values({ storyteller_id: me, system_id: system.id, name })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+          await trx
+            .insertInto('user_commands')
+            .values({
+              user_id: me,
+              client_command_id: key,
+              kind: 'chronicle.create',
+              request_hash: hash,
+              result: JSON.stringify({ id: chronicle.id }),
+            })
+            .execute()
+          return { id: chronicle.id, duplicate: false }
+        })
+        // A repetição responde com o estado de agora: a crônica pode ter
+        // sido excluída (404) ou transferida (o papel muda)
+        const role = await chronicleAccess(db, me, result.id)
         const chronicle = await db
-          .insertInto('chronicles')
-          .values({ storyteller_id: me, system_id: system.id, name })
-          .returning(['id', 'name'])
-          .executeTakeFirstOrThrow()
-        set.status = 201
+          .selectFrom('chronicles')
+          .select(['id', 'name'])
+          .where('id', '=', result.id)
+          .executeTakeFirst()
+        if (!chronicle || role === null) throw notFound()
+        set.status = result.duplicate ? 200 : 201
         return {
           id: chronicle.id,
           name: chronicle.name,
           system: { code: system.code, name: system.name },
-          role: 'storyteller' as const,
+          role:
+            role === 'storyteller'
+              ? ('storyteller' as const)
+              : role === 'member'
+                ? ('player' as const)
+                : ('former' as const),
+          duplicate: result.duplicate,
         }
       },
       {
         body: t.Object({
+          clientCommandId: t.Optional(
+            t.String({ format: 'uuid', maxLength: 36 })
+          ),
           name: t.String({ minLength: 1, maxLength: 120 }),
           systemCode: t.String({
             maxLength: 64,

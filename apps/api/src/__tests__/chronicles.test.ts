@@ -176,6 +176,85 @@ describe('POST /chronicles e GET /chronicles', () => {
   })
 })
 
+// T-02: dois toques em "Criar crônica" mandam a mesma chave; uma crônica só
+describe('POST /chronicles idempotente pela chave do comando', () => {
+  const key = '3c9e1f7a-2b4d-4e6f-8a1b-5c7d9e0f2a3b'
+  const send = (user: TestUser, name: string, clientCommandId = key) =>
+    as(ctx, user, 'POST', '/chronicles', {
+      name,
+      systemCode: 'vtm-v20',
+      clientCommandId,
+    })
+  const narrated = (user: TestUser) =>
+    ctx.db
+      .selectFrom('chronicles')
+      .select('id')
+      .where('storyteller_id', '=', user.id)
+      .execute()
+
+  it('a mesma chave: 201 e depois 200 com o mesmo corpo e duplicate', async () => {
+    const first = await send(stranger, 'Noites de Lisboa')
+    expect(first.status).toBe(201)
+    const created = (await first.json()) as Record<string, unknown>
+    expect(created).toMatchObject({
+      name: 'Noites de Lisboa',
+      role: 'storyteller',
+      system: { code: 'vtm-v20' },
+      duplicate: false,
+    })
+    const again = await send(stranger, 'Noites de Lisboa')
+    expect(again.status).toBe(200)
+    expect(await again.json()).toEqual({ ...created, duplicate: true })
+    expect(await narrated(stranger)).toHaveLength(1)
+  })
+
+  it('a mesma chave com outro nome: 409, sem o id', async () => {
+    const first = await send(stranger, 'Noites de Lisboa')
+    const { id } = (await first.json()) as { id: string }
+    const res = await send(stranger, 'Outra')
+    expect(res.status).toBe(409)
+    const text = await res.text()
+    expect(text).toContain('IDEMPOTENCY_CONFLICT')
+    expect(text).not.toContain(id)
+    expect(await narrated(stranger)).toHaveLength(1)
+  })
+
+  it('a mesma chave em outra conta é outra crônica', async () => {
+    const mine = (await (await send(stranger, 'Lisboa')).json()) as {
+      id: string
+    }
+    const res = await send(otherStoryteller, 'Lisboa')
+    expect(res.status).toBe(201)
+    const theirs = (await res.json()) as { id: string }
+    expect(theirs.id).not.toBe(mine.id)
+    expect(await narrated(stranger)).toHaveLength(1)
+  })
+
+  it('repetir depois de excluir a crônica: 404, sem recriar', async () => {
+    const { id } = (await (await send(stranger, 'Lisboa')).json()) as {
+      id: string
+    }
+    await ctx.db.deleteFrom('chronicles').where('id', '=', id).execute()
+    expect((await send(stranger, 'Lisboa')).status).toBe(404)
+    expect(await narrated(stranger)).toHaveLength(0)
+  })
+
+  it('sem chave continua criando (app antigo)', async () => {
+    const body = { name: 'Lisboa', systemCode: 'vtm-v20' }
+    expect((await as(ctx, stranger, 'POST', '/chronicles', body)).status).toBe(
+      201
+    )
+    expect((await as(ctx, stranger, 'POST', '/chronicles', body)).status).toBe(
+      201
+    )
+    expect(await narrated(stranger)).toHaveLength(2)
+  })
+
+  it('chave que não é UUID: 400', async () => {
+    expect((await send(stranger, 'Lisboa', 'não-é-uuid')).status).toBe(400)
+  })
+})
+
 describe('GET /chronicles/:id', () => {
   it('detalhe com o narrador e os membros (só nome de usuário)', async () => {
     const res = await as(ctx, player, 'GET', `/chronicles/${chronicleId}`)

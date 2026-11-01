@@ -141,4 +141,30 @@ describe.skipIf(!URL_)('criação idempotente num Postgres real', () => {
       MAX_CHARACTERS_PER_CHRONICLE
     )
   })
+
+  it('quatro "Criar crônica" com a mesma chave criam uma crônica', async () => {
+    const key = crypto.randomUUID()
+    const name = 'Crônica do toque duplo'
+    const responses = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        as(ctx, owner, 'POST', '/chronicles', {
+          name,
+          systemCode: 'vtm-v20',
+          clientCommandId: key,
+        })
+      )
+    )
+    expect(responses.map(r => r.status).sort()).toEqual([200, 200, 200, 201])
+    const ids = await Promise.all(
+      responses.map(async r => ((await r.json()) as { id: string }).id)
+    )
+    expect(new Set(ids).size).toBe(1)
+    const rows = await ctx.db
+      .selectFrom('chronicles')
+      .select('id')
+      .where('storyteller_id', '=', owner.id)
+      .where('name', '=', name)
+      .execute()
+    expect(rows).toHaveLength(1)
+  })
 })
