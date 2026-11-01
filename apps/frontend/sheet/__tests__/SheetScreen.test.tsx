@@ -194,7 +194,7 @@ describe('SheetScreen', () => {
     expect(router.replace).toHaveBeenCalledWith('/')
   })
 
-  it('template que o app não conhece: "Atualize o app"', async () => {
+  it('template que o app não conhece: "Atualize o app" com saída (L-02)', async () => {
     const t = templateJson('vtm-v20')
     t.schema = 2
     calls.characterGet.mockResolvedValue(character())
@@ -203,6 +203,8 @@ describe('SheetScreen', () => {
     expect(
       await screen.findByRole('header', { name: 'Atualize o app' })
     ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar' }))
+    expect(router.replace).toHaveBeenCalledWith('/')
   })
 
   it('ficha que não passa no validador não abre', async () => {

@@ -14,6 +14,7 @@ import { StyleSheet, View } from 'react-native'
 import { whenLabel } from '../../lib/format'
 import { SheetProvider } from '../../sheet/context'
 import { FieldSlot } from '../../sheet/FieldSlot'
+import { unsupportedShort } from '../../sheet/UnsupportedTemplate'
 import type { TableItem } from './tableItems'
 
 // Uma linha da Mesa (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9): os
@@ -42,7 +43,7 @@ export const TableRow = memo(function TableRow({
   const meta = `${row.owner.username} · alterada ${whenLabel(row.updatedAt)}`
   const problem =
     model === null
-      ? 'Atualize o app para ver esta ficha.'
+      ? unsupportedShort('ficha')
       : model && !store
         ? 'Ficha com dados inválidos.'
         : null

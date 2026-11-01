@@ -56,7 +56,9 @@ type Instance = typeof screen.root
 
 const texts = (root: Instance): string[] =>
   root
-    .findAll((n: Instance) => n.type === 'Text')
+    // O tipo do react-test-renderer (@types, puxado pelo gesture-handler)
+    // não lista os componentes nativos: 'Text' é string do host
+    .findAll((n: Instance) => (n.type as unknown) === 'Text')
     .flatMap((n: Instance) => {
       const c = n.props.children
       const parts: unknown[] = Array.isArray(c) ? c : [c]

@@ -428,3 +428,33 @@ Os passos do "PR local" da matriz (`matriz-achados.md:67-73`):
 5. **Boundary em toda tela do `(app)`.** Pôr o mesmo boundary para todas as telas (`unstable_settings.screenErrorBoundary` ou `ErrorBoundary` em `app/(app)/_layout.tsx`, que o P06 mexe no T-72) agora ou depois da onda?
 6. **Digest da imagem do Postgres** (compose e CI) junto com Dependabot (`docker-compose` e `github-actions`), para o digest e os SHAs das actions se atualizarem sozinhos. Entra neste ciclo?
 7. **Tipos no editor.** O `tsc` e o editor continuam lendo os `.d.ts` do `dist` (tipo velho no editor até o build). Vale `customConditions` ou `paths` para o `src` num pacote futuro?
+
+## 10. Desvios na implementação
+
+Registrados na implementação (branch `pacote/p01-c-build`). Nenhum muda o objetivo de um item, remove campo ou afrouxa limite.
+
+1. **T-01, versão fixa.** `react-native-gesture-handler` entrou como `3.3.0` exato (o `~3.3.0` do `bundledNativeModules.json`; só existe a 3.3.0 na faixa), porque o `apps/frontend/package.json` fixa versões exatas. O 3.3.0 depende de `@types/react-test-renderer`, que passou a tipar o `screen.root` do Testing Library: o `sheet/views/__tests__/matrix.test.tsx` comparava `n.type === 'Text'` e ganhou um `as unknown` (TS2367). Testes novos que comparem o tipo do nó com string precisam do mesmo.
+2. **T-01, `expo install --check` offline.** Online, o CLI compara com o último patch publicado (hoje acusa `react-native` 0.88.1, `expo-router` 58.0.29, `jest` 30 e `typescript` 6) e falharia em todo PR, sem depender do lockfile. No CI roda com `EXPO_OFFLINE=1`, contra o `bundledNativeModules.json` do expo instalado. Os patches novos do SDK 58 ficam para uma subida própria.
+3. **D-00, CI.** Runner `macos-26` com `Xcode_26.6` fixo: o `expo-router` 58 usa APIs do SDK do iOS 26 (`@available(iOS 26)`), e o RN 0.88 pede Xcode 16.1 ou mais. `actions/setup-java` v6.1.0 e `gradle/actions/setup-gradle` v6.4.0 por SHA do commit da tag; a v6.4.1 tinha 4 dias e só corrige o `dependency-submission`, que não usamos. O `setup-gradle` vem **depois** do prebuild, para a validação do wrapper ver o `gradle-wrapper.jar` gerado. Sem `needs:` e sem filtro de caminho.
+4. **S-01, barreira do bundle.** O §3.2 dizia que o `scripts/check-bundle.mjs` continuava valendo. Não valia: o Metro do SDK 58 grava index maps (`sections`), e o script lia 0 módulos e aprovava qualquer bundle. Agora ele lê os dois formatos e falha se não ler nenhum módulo (teste em `apps/api/src/__tests__/check-bundle.test.ts`).
+5. **Pergunta 4, `dev:expo`.** Confirmado com `turbo --dry`: o turbo recusa o `turbo run dev --filter=frontend`. O script chama `pnpm -C apps/frontend dev` direto: com o Metro lendo o `src`, o app não precisa de build. O `turbo.json` não mudou.
+6. **Cache do turbo.** Os testes do `@tms/config` leem `.env.example`, `docker-compose.yml` e `ci.yml`, e os da API testam `scripts/`. Os dois `turbo.jsonc` declaram esses arquivos como entrada, para mudar um deles invalidar o cache.
+7. **S-04, seed.** Para fechar o pool no fim, o seed resolve o `@tms/db` a partir de `apps/api` (`createRequire`), o mesmo módulo que a API usa. O aviso de template ausente passou a citar `pnpm db:migrate`, porque as migrations já gravam os templates do produto. O teste do seed também prova que uma API só, para todas as contas, continua barrada pelo limite por IP.
+8. **Testes a mais e em outro lugar.** O teste do S-03 nasceu no commit 4 (o `env-example.test.ts`, que o commit 5 completa). Entraram dois testes que o §4 não listava: `check-native-versions.test.ts` (o caso do 2.28.0 contra o `~3.3.0`) e `check-bundle.test.ts`. O `character-route.test.tsx` já existia: os casos do L-03 entraram nele.
+9. **L-01, estado "não suportado" no app.** Dentro do painel, só o texto curto. "Voltar" não cabe numa seção da tela da crônica. No web, o painel tem "Recarregar".
+10. **L-02, "Voltar" da ficha.** O componente aceita `onBack`. Na ficha, "Voltar" usa a mesma saída da `AppBar` (a crônica, ou Crônicas), não `router.back()`.
+11. **Cenários das personas.**
+    - Repetidos no worktree:
+      - S-01: export web sem os `dist` do `sheet-core` e do `ui`, e a API recusando subir com `src` mais novo;
+      - S-02: `dev:web` recusando com o lockfile instalado divergente;
+      - S-04: `seed:roteiro` em processo num banco próprio, com `TRUST_PROXY=false`, terminando com as 7 crônicas.
+    - Ficam para a integração:
+      - S-03, porque não se reinicia o container compartilhado;
+      - o build nativo;
+      - o E2E `template-unsupported.spec.ts`;
+      - os cenários de L-01, L-02 e L-03 no navegador e no simulador.
+12. **Depois do `/code-review`.**
+    - **Checagem do dist.** Comparar por data (§3.2) quebrava o job `postgres` do CI: o `db:codegen` regrava o `types.ts` depois do build. Também recusava em salvar sem mudar ou trocar de branch e voltar, e o bootstrap não resolvia. Agora o build de config, logger, db e sheet-core grava `dist/src-hash.json` (`scripts/src-hash.mjs`), e o check compara o conteúdo.
+    - **`check:native`.** Percorre também os `node_modules` aninhados e trava o patch no `^0.0.z`.
+    - **Seed.** Em processo, recusa banco que não seja local, a não ser com `SEED_ALLOW_REMOTE_DB=1`. Só roda o check do ambiente nesse modo. Num 429, para dizendo quantas crônicas ficaram prontas.
+    - **Achado descartado.** O "`loadFailed` continua verdadeiro durante o refetch" do L-01 não se confirmou: no React Query 5, um refetch sem dado volta o status para `pending` (`fetchState` do query-core). O painel mostra "Carregando…" sem o botão.

@@ -47,6 +47,7 @@ import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
+import { UnsupportedTemplate } from './UnsupportedTemplate'
 import { ExperienceSheet } from './xp/ExperienceSheet'
 
 export function SheetScreen({
@@ -97,12 +98,7 @@ export function SheetScreen({
       body = <Skeleton lines={6} label="Carregando a ficha" />
       break
     case 'unsupported':
-      body = (
-        <EmptyState
-          title="Atualize o app"
-          message="Esta ficha usa uma versão do sistema que este app ainda não conhece."
-        />
-      )
+      body = <UnsupportedTemplate onBack={back.onPress} />
       break
     case 'invalid':
       body = (

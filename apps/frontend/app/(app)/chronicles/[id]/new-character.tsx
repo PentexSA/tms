@@ -1,4 +1,13 @@
-import { AppBar, EmptyState, Screen, Skeleton, Text, tokens } from '@tms/ui'
+import {
+  AppBar,
+  Button,
+  EmptyState,
+  Screen,
+  Skeleton,
+  Text,
+  tokens,
+  useToast,
+} from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useRef } from 'react'
@@ -19,6 +28,7 @@ import {
   type ServerIssue,
 } from '../../../../sheet/CharacterForm'
 import { useCompiled, useLatestTemplate } from '../../../../sheet/data'
+import { UnsupportedTemplate } from '../../../../sheet/UnsupportedTemplate'
 
 const issuesOf = (error: unknown): ServerIssue[] => {
   const value = (error as { value?: { issues?: unknown } } | null)?.value
@@ -32,6 +42,7 @@ export default function NewCharacterScreen() {
   const template = useLatestTemplate(chronicle.data?.system.code)
   const model = useCompiled(template.data)
   const create = useCreateCharacter(id)
+  const toast = useToast()
   const commandId = useRef<string | null>(null)
   const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
   const back = {
@@ -45,15 +56,19 @@ export default function NewCharacterScreen() {
       <EmptyState
         title="Não foi possível abrir a criação de ficha"
         message={messageOf(chronicle.error ?? template.error)}
+        actions={
+          <Button
+            title="Tentar de novo"
+            onPress={() => {
+              if (chronicle.isError) chronicle.refetch()
+              if (template.isError) template.refetch()
+            }}
+          />
+        }
       />
     )
-  else if (model === null)
-    body = (
-      <EmptyState
-        title="Atualize o app"
-        message="Este sistema usa uma versão que este app ainda não conhece."
-      />
-    )
+  // L-02: template mais novo que o app; a tela dá a saída
+  else if (model === null) body = <UnsupportedTemplate onBack={back.onPress} />
   else if (!model) body = <Skeleton lines={6} label="Carregando o sistema" />
   else
     body = (
@@ -89,6 +104,9 @@ export default function NewCharacterScreen() {
                 // tem criação por pontos; senão, em Evoluir
                 onSuccess: c => {
                   commandId.current = null
+                  // L-03: a confirmação vem antes de abrir a ficha; mesmo que
+                  // ela não abra, a pessoa sabe que a ficha existe
+                  toast.show({ message: 'Ficha criada.' })
                   router.replace(
                     `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
                   )

@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from '@testing-library/react-native'
 import { Dimensions } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
-import { type createFakeApi, ok } from '../../../test/fake-api'
+import { type createFakeApi, fail, ok } from '../../../test/fake-api'
 import { templateJson } from '../../../test/fixtures'
 import {
   json,
@@ -36,7 +36,7 @@ afterEach(() => {
   Dimensions.set({ window: PHONE, screen: PHONE })
 })
 
-async function render() {
+async function renderPanel(systemCode = 'vtm-v20') {
   const { session } = testSession(
     () => json(200, tokens()),
     memoryStore(true, 'r')
@@ -45,13 +45,23 @@ async function render() {
   renderWithSession(
     <CreationSettings
       chronicleId={CHRONICLE}
-      systemCode="vtm-v20"
+      systemCode={systemCode}
       creation={{ approval: false, defaults: {}, revision: 3 }}
     />,
     session
   )
+}
+
+async function render() {
+  await renderPanel()
   await screen.findByTestId('creation-settings-budgets')
 }
+
+const FREE = /criação livre/
+const save = () =>
+  screen.getByRole('button', { name: 'Salvar regras da criação' })
+const turnApprovalOn = () =>
+  fireEvent.press(screen.getByRole('radio', { name: 'Ligada' }))
 
 describe('Regras da criação', () => {
   it('mostra o nome de cada prioridade e de cada orçamento', async () => {
@@ -99,6 +109,60 @@ describe('Regras da criação', () => {
         approval: false,
         defaults: { budgets: { attributes: [8, 5, 3] } },
       }
+    )
+  })
+})
+
+// L-01: "o template não carregou" e "o app não entende o template" não são
+// "criação livre", e as regras não se salvam sem o narrador vê-las
+describe('Regras da criação sem as regras do sistema', () => {
+  it('template mais novo que o app: avisa, sem "criação livre", e não salva', async () => {
+    const t = templateJson('vtm-v20')
+    t.schema = 2
+    calls.templateGet.mockResolvedValue(ok(t))
+    await renderPanel()
+    expect(
+      await screen.findByText(/^As regras deste sistema são mais novas/)
+    ).toBeTruthy()
+    expect(screen.queryByText(FREE)).toBeNull()
+    turnApprovalOn()
+    expect(save()).toBeDisabled()
+  })
+
+  it('o template não carregou: erro com "Tentar de novo", e não salva', async () => {
+    calls.templateGet.mockResolvedValue(fail(500, 'erro no servidor'))
+    await renderPanel()
+    expect(
+      await screen.findByText(
+        'Não foi possível carregar as regras deste sistema.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByText(FREE)).toBeNull()
+    expect(screen.queryByText('Carregando as regras do sistema…')).toBeNull()
+    turnApprovalOn()
+    expect(save()).toBeDisabled()
+
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }))
+    })
+    expect(await screen.findByTestId('creation-settings-budgets')).toBeTruthy()
+    expect(save()).toBeEnabled()
+  })
+
+  it('sistema sem criação por pontos: "criação livre" e a aprovação salva', async () => {
+    calls.templateGet.mockResolvedValue(ok(templateJson('coc7e')))
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
+    await renderPanel('coc7e')
+    expect(await screen.findByText(FREE)).toBeTruthy()
+    turnApprovalOn()
+    expect(save()).toBeEnabled()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(calls.chronicle.creationSettingsPatch).toHaveBeenCalledWith(
+      CHRONICLE,
+      { revision: 3, approval: true, defaults: {} }
     )
   })
 })
