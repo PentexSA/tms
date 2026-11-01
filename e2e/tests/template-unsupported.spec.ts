@@ -48,3 +48,36 @@ test('Nova ficha com template mais novo: "Recarregar" e, depois, o formulário',
   await page.getByRole('button', { name: 'Recarregar' }).click()
   await expect(page.getByLabel('Nome (obrigatório)')).toBeVisible()
 })
+
+// L-01: na crônica por pontos, "Criação de fichas" com o template mais novo
+// avisa e trava o salvar, em vez de dizer "criação livre"
+test('Criação de fichas com template mais novo: aviso, sem "criação livre", sem salvar', async ({
+  page,
+}) => {
+  const context = page.context()
+  const user = await signUp(context, 'tplregras')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica por pontos', systemCode: 'vtm-v20' }
+  )
+
+  await newerTemplate(context)
+  await page.goto(`/chronicles/${chronicle.id}`)
+  const panel = page.getByTestId('creation-settings')
+  await expect(
+    panel.getByText(/^As regras deste sistema são mais novas/)
+  ).toBeVisible()
+  await expect(panel.getByText(/criação livre/)).toHaveCount(0)
+  await panel.getByRole('radio', { name: 'Ligada' }).click()
+  await expect(
+    panel.getByRole('button', { name: 'Salvar regras da criação' })
+  ).toBeDisabled()
+
+  // Sem a interceptação, o painel volta ao normal
+  await context.unroute(TEMPLATE)
+  await panel.getByRole('button', { name: 'Recarregar' }).click()
+  await expect(page.getByTestId('creation-settings-budgets')).toBeVisible()
+})
