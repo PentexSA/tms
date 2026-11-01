@@ -1,9 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { Issue } from '@tms/sheet-core'
+import { type Issue, MAX_EVENTS_PER_BATCH, parsePath } from '@tms/sheet-core'
 import { chronicleKeys } from '../../lib/queries/chronicles'
 import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
-import type { SheetStore, SheetSync } from '../store/sheetStore'
+import type { ConflictDetail, SheetStore, SheetSync } from '../store/sheetStore'
 import { ledgerMessage } from '../xp/messages'
 import { createMemoryDraftStore, type DraftStore } from './draftStore'
 import type { Outbox, QueuedBatch } from './outbox'
@@ -85,6 +85,33 @@ export function issuesOf(body: unknown): Issue[] {
     )
     .slice(0, 50)
     .map(i => ({ path: i.path, message: i.message }))
+}
+
+/**
+ * O corpo de um 409 (`issues` com os caminhos em conflito). A resposta é
+ * input hostil: só caminhos válidos que estão no próprio lote, até 50. O
+ * `current` do corpo é ignorado: o valor atual vem da ficha rebuscada.
+ */
+export function parseConflictBody(
+  body: unknown,
+  batch: QueuedBatch
+): ConflictDetail {
+  const inBatch = new Set(batch.events.map(e => e.path))
+  const raw = (body as { issues?: unknown } | null)?.issues
+  const paths: string[] = []
+  if (Array.isArray(raw))
+    for (const issue of raw) {
+      const path = (issue as { path?: unknown } | null)?.path
+      if (
+        typeof path === 'string' &&
+        inBatch.has(path) &&
+        parsePath(path) &&
+        !paths.includes(path)
+      )
+        paths.push(path)
+      if (paths.length >= MAX_EVENTS_PER_BATCH) break
+    }
+  return { paths }
 }
 
 /**
@@ -184,9 +211,12 @@ export function createSync(deps: SyncDeps): Sync {
           void queryClient.invalidateQueries({ queryKey: chronicleKeys.all })
         }
       },
-      conflicted(characterId, batch) {
+      conflicted(characterId, batch, body) {
         answered()
-        stores.get(characterId)?.getState().conflicted(batch.clientBatchId)
+        stores
+          .get(characterId)
+          ?.getState()
+          .conflicted(batch.clientBatchId, parseConflictBody(body, batch))
         void refetch(characterId)
       },
       rejected(characterId, batch, status, body) {

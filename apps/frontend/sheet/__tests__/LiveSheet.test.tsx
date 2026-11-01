@@ -219,7 +219,15 @@ describe('conflito (409)', () => {
       store?.getState().received(withBlood(3), 4)
     })
     expect(screen.getByLabelText(/^Pontos de Sangue, 3 de/)).toBeTruthy()
-    fireEvent.press(screen.getByRole('button', { name: 'Reaplicar' }))
+    // T-31: a faixa não reaplica às cegas; "Revisar" mostra os dois valores
+    expect(screen.queryByRole('button', { name: 'Reaplicar' })).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Revisar' }))
+    expect(
+      screen.getByLabelText(
+        'Em jogo › Pontos de Sangue. Seu valor: atual 8. Valor atual: atual 3.'
+      )
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Reaplicar tudo' }))
     expect(screen.queryByText('A ficha mudou em outro lugar')).toBeNull()
     await waitFor(() => expect(sent).toHaveLength(2))
     expect(sent[1]?.events).toEqual([
@@ -233,9 +241,8 @@ describe('conflito (409)', () => {
     )
     renderWithSession(<Live />, await signedIn(), { post })
     fireEvent.press(screen.getByRole('button', { name: 'Gastar 1 Sangue' }))
-    fireEvent.press(
-      await screen.findByRole('button', { name: 'Manter como está' })
-    )
+    fireEvent.press(await screen.findByRole('button', { name: 'Revisar' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Manter como está' }))
     expect(screen.queryByText('A ficha mudou em outro lugar')).toBeNull()
     expect(post).toHaveBeenCalledTimes(1)
   })

@@ -5,7 +5,12 @@ import { createSheetStore } from '../../store/sheetStore'
 import { createMemoryDraftStore } from '../draftStore'
 import { createMemoryOutbox, type Outbox, type QueuedBatch } from '../outbox'
 import type { PostOutcome } from '../sender'
-import { createSync, issuesOf, rejectionMessage } from '../sync'
+import {
+  createSync,
+  issuesOf,
+  parseConflictBody,
+  rejectionMessage,
+} from '../sync'
 
 // Etapa 16: fila + envio + store + cache, sem tela.
 
@@ -386,4 +391,64 @@ describe('422 (Etapa 18)', () => {
       issuesOf({ issues: [{ path: 'values.a', message: 'm', extra: 1 }] })
     ).toEqual([{ path: 'values.a', message: 'm' }])
   })
+})
+
+// T-31: o corpo do 409 é input hostil
+describe('parseConflictBody', () => {
+  const batch: QueuedBatch = {
+    clientBatchId: '00000000-0000-4000-8000-000000000001',
+    events: [
+      { path: 'values.sire', from: 'A', to: 'B' },
+      { path: 'values.strength', from: 2, to: 3 },
+    ],
+    label: 'x',
+  }
+
+  it('só caminhos válidos do próprio lote, sem repetição', () => {
+    expect(
+      parseConflictBody(
+        {
+          issues: [
+            { path: 'values.sire', message: 'conflito' },
+            { path: 'values.sire', message: 'de novo' },
+            { path: 'values.storytellerNotes', message: 'fora do lote' },
+            { path: 7 },
+            null,
+          ],
+          current: { 'values.sire': 'ignorado' },
+        },
+        batch
+      )
+    ).toEqual({ paths: ['values.sire'] })
+  })
+
+  it('corpo sem issues ou quebrado: nenhum caminho', () => {
+    for (const body of [null, 'x', {}, { issues: 'x' }])
+      expect(parseConflictBody(body, batch)).toEqual({ paths: [] })
+  })
+
+  it('no máximo 50', () => {
+    const big: QueuedBatch = {
+      ...batch,
+      events: Array.from({ length: 60 }, (_, i) => ({
+        path: `values.f${i}`,
+        from: 0,
+        to: 1,
+      })),
+    }
+    const issues = big.events.map(e => ({ path: e.path, message: 'c' }))
+    expect(parseConflictBody({ issues }, big).paths).toHaveLength(50)
+  })
+})
+
+it('o 409 chega ao store só com os caminhos em conflito', async () => {
+  const { store } = setup(() => ({
+    status: 409,
+    body: { issues: [{ path: 'values.blood', message: 'conflito' }] },
+  }))
+  store
+    .getState()
+    .commit([blood(9, 8), { path: 'values.strength', from: 2, to: 3 }], 'Ação')
+  await flush()
+  expect(store.getState().conflict?.paths).toEqual(['values.blood'])
 })

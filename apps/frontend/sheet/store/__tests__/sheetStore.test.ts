@@ -654,3 +654,105 @@ describe('rascunho recuperado do aparelho', () => {
     expect(s().draftExit).toEqual({ kind: 'discarded' })
   })
 })
+
+// T-31: um campo em conflito recusava o lote e o aviso culpava os 7;
+// "Reaplicar" sobrescrevia o valor do outro sem mostrá-lo
+describe('conflito por campo no "Salvar"', () => {
+  /** Rascunho de 7 alterações salvo: o lote está no outbox. */
+  function savedSeven() {
+    const ctx = setup()
+    const { s } = ctx
+    s().setMode('evolve')
+    s().startDraft()
+    for (const [path, to] of [
+      ['values.strength', 3],
+      ['values.dexterity', 3],
+      ['values.appearance', 3],
+      ['values.occult', 5],
+      ['values.sire', 'Meerlinda'],
+      ['values.concept', 'Arquivista'],
+      ['values.demeanor', 'Galã'],
+    ] as const)
+      expect(s().setDraftValue(path, to)).toMatchObject({ ok: true })
+    const saved = s().saveDraft('7 alterações')
+    if (!saved?.ok) throw new Error('não salvou')
+    return { ...ctx, batch: saved.batch }
+  }
+  // O narrador mudou o Senhor antes de o lote chegar
+  const withSire = (sire: string) => ({
+    ...example('helena').sheet,
+    values: { ...example('helena').sheet.values, sire },
+  })
+
+  it('as 7 voltam ao rascunho; só o Senhor fica marcado e segura o Salvar', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    expect(s().pending).toEqual([])
+    expect(s().mode).toBe('evolve')
+    expect(s().draft?.size).toBe(7)
+    expect(s().conflict).toEqual({
+      batches: [],
+      paths: ['values.sire'],
+      origin: 'draft',
+    })
+    s().received(withSire('Etrius'), 4)
+    expect(s().saveDraft('x')).toMatchObject({ ok: false, kind: 'conflict' })
+  })
+
+  it('"Ficar com o atual" tira a entrada; as outras 6 se salvam', () => {
+    const { s, batch, enqueue } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    s().received(withSire('Etrius'), 4)
+    s().resolveConflict('values.sire', 'theirs')
+    expect(s().conflict).toBeNull()
+    expect(s().draft?.size).toBe(6)
+    const result = s().saveDraft('6 alterações')
+    expect(result).toMatchObject({ ok: true })
+    expect(
+      enqueue.mock.calls.at(-1)?.[1].events.map((e: { path: string }) => e.path)
+    ).not.toContain('values.sire')
+  })
+
+  it('"Usar o meu" refaz o `from` sobre o valor de agora', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    s().received(withSire('Etrius'), 4)
+    s().resolveConflict('values.sire', 'mine')
+    expect(s().conflict).toBeNull()
+    expect(s().draft?.get('values.sire')).toEqual({
+      from: 'Etrius',
+      to: 'Meerlinda',
+    })
+    expect(s().saveDraft('7 alterações')).toMatchObject({ ok: true })
+  })
+
+  it('sem caminhos no 409, o lote inteiro fica marcado (como antes)', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId)
+    expect(s().conflict?.paths).toHaveLength(7)
+  })
+
+  it('lote do Jogo: só os campos do 409, e "Reaplicar" refaz o lote inteiro', () => {
+    const { s } = setup()
+    const r = s().commit(
+      [blood(9, 8), { path: 'values.strength', from: 2, to: 3 }],
+      'Ação'
+    )
+    if (!r.ok) throw new Error('não enfileirou')
+    s().conflicted(r.batch.clientBatchId, { paths: ['values.blood'] })
+    expect(s().conflict).toMatchObject({
+      paths: ['values.blood'],
+      origin: 'play',
+    })
+    expect(s().draft).toBeNull()
+    // resolveConflict não vale no Jogo: a ação volta inteira ou não volta
+    s().resolveConflict('values.blood', 'mine')
+    expect(s().conflict).not.toBeNull()
+    expect(s().reapply()).toMatchObject({ ok: true })
+    expect(
+      s()
+        .pending.at(-1)
+        ?.events.map(e => e.path)
+    ).toEqual(['values.blood', 'values.strength'])
+  })
+})

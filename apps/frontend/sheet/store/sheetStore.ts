@@ -57,11 +57,20 @@ export type Draft = ReadonlyMap<string, DraftEdit>
 
 /**
  * De onde veio o conflito: `play`, um lote do Jogo recusado com 409 (reaplica
- * tudo ou mantém); `recovery`, o rascunho recuperado do aparelho com campos
- * que mudaram desde então (T-03): as entradas ficam no rascunho com o `from`
- * antigo, e o "Salvar" é recusado até a pessoa escolher.
+ * tudo ou mantém: uma ação do Jogo mexe em campos ligados); `draft`, o
+ * "Salvar" de Criação/Editar recusado com 409 (T-31), que volta inteiro ao
+ * rascunho; `recovery`, o rascunho recuperado do aparelho com campos que
+ * mudaram desde então (T-03). Em `draft` e `recovery`, as entradas em
+ * conflito ficam no rascunho com o `from` antigo, e o "Salvar" é recusado até
+ * a pessoa escolher campo a campo.
  */
-export type ConflictOrigin = 'play' | 'recovery'
+export type ConflictOrigin = 'play' | 'draft' | 'recovery'
+
+/** O que o 409 disse, já validado (sync.ts, parseConflictBody). */
+export interface ConflictDetail {
+  // Só os caminhos em conflito, todos do próprio lote
+  readonly paths: readonly string[]
+}
 
 export interface SheetConflict {
   readonly batches: readonly QueuedBatch[]
@@ -159,8 +168,11 @@ export interface SheetActions {
     clientBatchId: string,
     issues?: readonly Issue[]
   ): QueuedBatch | undefined
-  /** 409: sai da fila e fica guardado para "Reaplicar". */
-  conflicted(clientBatchId: string): void
+  /**
+   * 409: sai da fila. O lote do "Salvar" volta ao rascunho, com só os campos
+   * do 409 marcados; o do Jogo fica guardado para "Reaplicar tudo".
+   */
+  conflicted(clientBatchId: string, detail?: ConflictDetail): void
   /** A ficha rebuscada do servidor (foco, reconexão, depois de um 409). */
   received(sheet: unknown, sheetVersion: number): boolean
   /** Lotes que já estavam no outbox (a ficha reaberta antes de sincronizar). */
@@ -168,6 +180,11 @@ export interface SheetActions {
   /** Reaplica o que deu conflito sobre os valores atuais, num lote novo. */
   reapply(): CommitResult | null
   dismissConflict(): void
+  /**
+   * Um campo em conflito do rascunho: `mine` fica com o seu valor sobre o de
+   * agora; `theirs` tira a entrada do rascunho.
+   */
+  resolveConflict(path: string, choice: 'mine' | 'theirs'): void
   setMode(mode: SheetMode): void
   startDraft(): void
   /** Altera o rascunho de Evoluir (validado como um lote). */
@@ -551,16 +568,40 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         return batch
       },
 
-      conflicted(clientBatchId) {
+      conflicted(clientBatchId, detail) {
         const { batch, pending, undoStack } = without(clientBatchId)
         const s = get()
+        const inBatch = new Set(batch?.events.map(e => e.path) ?? [])
+        const marked = (detail?.paths ?? []).filter(p => inBatch.has(p))
+        // O "Salvar" de Criação/Editar (T-31): as alterações voltam todas ao
+        // rascunho, como no 422. As que não conflitam ficam prontas; as do
+        // 409 ficam com o `from` antigo e seguram o Salvar até a escolha
+        if (batch?.draft && !s.draft?.size) {
+          const draft = new Map(
+            batch.events.map(e => [e.path, { from: e.from, to: e.to }])
+          )
+          set({
+            pending,
+            undoStack,
+            draft,
+            mode: s.creation ? 'create' : 'evolve',
+            conflict: {
+              batches: [],
+              paths: marked.length ? marked : [...inBatch],
+              origin: 'draft',
+            },
+            ...derive({ ...s, pending, draft }),
+          })
+          return
+        }
         const batches = [
           ...(s.conflict?.batches ?? []),
           ...(batch ? [batch] : []),
         ]
-        const paths = [
-          ...new Set(batches.flatMap(b => b.events.map(e => e.path))),
-        ]
+        // Só os campos do 409; sem o corpo, o lote inteiro (como antes)
+        const paths = marked.length
+          ? marked
+          : [...new Set(batches.flatMap(b => b.events.map(e => e.path)))]
         set({
           pending,
           undoStack,
@@ -578,8 +619,8 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       reapply() {
         const s = get()
         if (!s.conflict) return null
-        // Rascunho recuperado: o seu valor fica, sobre o valor de agora
-        if (s.conflict.origin === 'recovery' && s.draft) {
+        // Rascunho: o seu valor fica, sobre o valor de agora
+        if (s.conflict.origin !== 'play' && s.draft) {
           const draft = new Map(s.draft)
           for (const path of s.conflict.paths) {
             const edit = draft.get(path)
@@ -603,8 +644,8 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
 
       dismissConflict() {
         const s = get()
-        // Rascunho recuperado: fica o valor de agora; a sua entrada sai
-        if (s.conflict?.origin === 'recovery' && s.draft) {
+        // Rascunho: fica o valor de agora; a sua entrada sai
+        if (s.conflict && s.conflict.origin !== 'play' && s.draft) {
           const draft = new Map(s.draft)
           for (const path of s.conflict.paths) draft.delete(path)
           set({
@@ -615,6 +656,26 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           return
         }
         set({ conflict: null })
+      },
+
+      resolveConflict(path, choice) {
+        const s = get()
+        if (!s.conflict || s.conflict.origin === 'play' || !s.draft) return
+        if (!s.conflict.paths.includes(path)) return
+        const draft = new Map(s.draft)
+        const edit = draft.get(path)
+        if (edit) {
+          const from = valueAt(s.values, path)
+          if (choice === 'theirs' || jsonEqual(from, edit.to))
+            draft.delete(path)
+          else draft.set(path, { from, to: edit.to })
+        }
+        const paths = s.conflict.paths.filter(p => p !== path)
+        set({
+          draft,
+          conflict: paths.length ? { ...s.conflict, paths } : null,
+          ...derive({ ...s, draft }, s.values),
+        })
       },
 
       setMode(mode) {
@@ -662,8 +723,9 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         set({
           draft: null,
           draftExit: { kind: 'discarded' },
-          // O conflito do rascunho recuperado sai com ele
-          conflict: s.conflict?.origin === 'recovery' ? null : s.conflict,
+          // O conflito do rascunho sai com ele
+          conflict:
+            s.conflict && s.conflict.origin !== 'play' ? null : s.conflict,
           fieldIssues: NO_ISSUES,
           creationRefusal: null,
           ...derive({ ...s, draft: null }, s.values),

@@ -306,7 +306,16 @@ export function CreationStatusPanel() {
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
-  if (creation?.status !== 'pending') return null
+  // O painel continua montado fora de `pending`: sem zerar, o formulário de
+  // devolução reaparecia preenchido na próxima revisão (nota do QA app)
+  const pending = creation?.status === 'pending'
+  useEffect(() => {
+    if (pending) return
+    setReturning(false)
+    setReason('')
+    setError(null)
+  }, [pending])
+  if (!pending) return null
   const storyteller = roles.has('storyteller')
 
   const failed = (failure: unknown, fallback: string) => {
@@ -381,10 +390,13 @@ export function CreationStatusPanel() {
                 onPress={() => {
                   setError(null)
                   sendBack.mutate(reason.trim(), {
-                    onSuccess: () =>
+                    onSuccess: () => {
+                      setReturning(false)
+                      setReason('')
                       toast.show({
                         message: 'Ficha devolvida para correção.',
-                      }),
+                      })
+                    },
                     onError: failure =>
                       failed(
                         failure,
