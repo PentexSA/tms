@@ -8,7 +8,9 @@ import { screen } from '@testing-library/react-native'
 export function textInput(label: string) {
   const found = screen
     .getAllByLabelText(label)
-    .filter(el => el.type === 'TextInput')
+    // Com os tipos do react-test-renderer, o tipo não lista os componentes
+    // nativos: 'TextInput' é string do host
+    .filter(el => (el.type as unknown) === 'TextInput')
   if (found.length !== 1)
     throw new Error(`${found.length} campos de texto "${label}"`)
   return found[0] as (typeof found)[number]
