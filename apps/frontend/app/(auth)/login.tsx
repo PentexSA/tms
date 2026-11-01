@@ -66,6 +66,9 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            // O teclado não corrige nem guarda o e-mail (T-38; MASVS-STORAGE-2)
+            autoCorrect={false}
+            spellCheck={false}
             autoComplete="email"
             textContentType="emailAddress"
             maxLength={254}

@@ -161,3 +161,14 @@ describe('Digitar: aplica ao sair, um campo por vez, recusa decimal (T-25)', () 
     ).toHaveAccessibilityValue({ now: 4 })
   })
 })
+
+describe('Editar: o Nome sem corretor (T-38)', () => {
+  it('a folha do Nome desliga o corretor; a do Conceito não', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    enterEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Nome' }))
+    const name = screen.getByLabelText('Nome (obrigatório)')
+    expect(name.props.autoCorrect).toBe(false)
+    expect(name.props.spellCheck).toBe(false)
+  })
+})

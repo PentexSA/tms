@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
+import { properNameInput } from '../editors/properName'
 import { SuggestionChips } from '../editors/Suggestions'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
@@ -106,6 +107,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           hint={def.help}
           placeholder={def.placeholder}
           autoFocus
+          {...(required ? properNameInput : {})}
         />
         {def.type === 'text' && def.suggestions?.length ? (
           <View style={styles.suggestions}>

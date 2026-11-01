@@ -98,6 +98,7 @@ export function CharacterForm({
                   def={def}
                   value={values[id]}
                   required={id === nameField}
+                  properName={id === nameField}
                   error={errors[id] ?? fromServer[id]}
                   onChange={next => {
                     setValues(v => ({ ...v, [id]: next }))

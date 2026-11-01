@@ -70,6 +70,9 @@ export default function RegisterScreen() {
             error={fields.email}
             keyboardType="email-address"
             autoCapitalize="none"
+            // O teclado não corrige nem guarda o e-mail (T-38; MASVS-STORAGE-2)
+            autoCorrect={false}
+            spellCheck={false}
             autoComplete="email"
             textContentType="emailAddress"
             maxLength={254}
@@ -83,6 +86,8 @@ export default function RegisterScreen() {
             error={fields.username}
             hint="Aparece para a sua mesa. Letras minúsculas, números e _."
             autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
             autoComplete="username-new"
             maxLength={24}
             testID="register-username"

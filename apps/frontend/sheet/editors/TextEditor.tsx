@@ -1,5 +1,6 @@
 import { TextArea, TextField, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { properNameInput } from './properName'
 import { SuggestionPicker } from './Suggestions'
 import type { EditorProps } from './types'
 
@@ -11,6 +12,7 @@ export function TextEditor({
   onChange,
   error,
   required,
+  properName,
 }: EditorProps) {
   const long = def.type === 'longText'
   const max =
@@ -33,6 +35,7 @@ export function TextEditor({
           ? def.placeholder
           : undefined
       }
+      {...(properName ? properNameInput : {})}
     />
   )
   // Com sugestões no template (Natureza, Comportamento), a lista ao lado

@@ -94,6 +94,20 @@ describe('Nova ficha: título visível nos grupos de escolha (T-09)', () => {
   })
 })
 
+describe('Nome do personagem sem corretor (T-38)', () => {
+  it('Nova ficha: o Nome sem corretor; o Conceito continua igual', () => {
+    form('vtm-v20')
+    const name = screen.getByLabelText('Nome (obrigatório)')
+    expect(name.props.autoCorrect).toBe(false)
+    expect(name.props.spellCheck).toBe(false)
+    expect(name.props.autoComplete).toBe('off')
+    expect(name.props.autoCapitalize).toBe('sentences')
+    const concept = screen.getByLabelText('Conceito')
+    expect(concept.props.autoCorrect).toBeUndefined()
+    expect(concept.props.spellCheck).toBeUndefined()
+  })
+})
+
 describe('Nova ficha: os dois "Escolher da lista" têm nomes distintos (T-61)', () => {
   it('o nome começa pelo texto visível e diz qual lista abre', () => {
     form('vtm-v20')
