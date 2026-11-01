@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import { effectiveChronicleOptions, isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -12,6 +11,7 @@ import { idParams, uuid } from '../http/params'
 import { clientIp } from '../http/security'
 import type { AppOptions } from '../options'
 import { latestTemplate, modelFor } from '../sheets/models'
+import { idempotencyConflict, intentHash } from '../xp/ledger'
 import { sessionDate } from './backstage'
 import { hashInviteCode, newInviteCode } from './invite-code'
 
@@ -24,14 +24,6 @@ const DAY = 24 * 60 * 60 * 1000
 const notFound = () => new ApiError(404, 'não encontrado')
 const storytellerOnly = () => new ApiError(403, 'só o narrador pode fazer isso')
 const INVALID_INVITE = 'convite inválido ou expirado'
-const commandHash = (kind: string, request: unknown) =>
-  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
-const idempotencyConflict = () =>
-  new ApiError(
-    409,
-    'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
-    { code: 'IDEMPOTENCY_CONFLICT' }
-  )
 export const CONFIRM_DELETE =
   'a crônica tem fichas de outros jogadores: confirme com o nome da crônica'
 
@@ -184,8 +176,12 @@ export function chronicleRoutes(
         // quem cria (o mesmo protocolo de "travar o pai" da criação). FOR NO
         // KEY UPDATE serializa duas criações da mesma pessoa e a exclusão de
         // conta (FOR UPDATE) sem bloquear as FKs de outras escritas.
-        const request = { name: body.name, systemCode: body.systemCode }
-        const hash = commandHash('chronicle.create', request)
+        // O hash usa o nome normalizado: "  Lisboa " e "Lisboa" são o mesmo
+        // pedido
+        const hash = intentHash({
+          kind: 'chronicle.create',
+          request: { name, systemCode: system.code },
+        })
         const result = await db.transaction().execute(async trx => {
           const user = await trx
             .selectFrom('users')
@@ -203,12 +199,16 @@ export function chronicleRoutes(
           if (done) {
             if (done.kind !== 'chronicle.create' || done.request_hash !== hash)
               throw idempotencyConflict()
-            return { id: (done.result as { id: string }).id, duplicate: true }
+            return {
+              id: (done.result as { id: string }).id,
+              name: null,
+              duplicate: true as const,
+            }
           }
           const chronicle = await trx
             .insertInto('chronicles')
             .values({ storyteller_id: me, system_id: system.id, name })
-            .returning('id')
+            .returning(['id', 'name'])
             .executeTakeFirstOrThrow()
           await trx
             .insertInto('user_commands')
@@ -220,8 +220,18 @@ export function chronicleRoutes(
               result: JSON.stringify({ id: chronicle.id }),
             })
             .execute()
-          return { id: chronicle.id, duplicate: false }
+          return { id: chronicle.id, name: chronicle.name, duplicate: false }
         })
+        if (!result.duplicate) {
+          set.status = 201
+          return {
+            id: result.id,
+            name: result.name,
+            system: { code: system.code, name: system.name },
+            role: 'storyteller' as const,
+            duplicate: false,
+          }
+        }
         // A repetição responde com o estado de agora: a crônica pode ter
         // sido excluída (404) ou transferida (o papel muda)
         const role = await chronicleAccess(db, me, result.id)
@@ -231,7 +241,7 @@ export function chronicleRoutes(
           .where('id', '=', result.id)
           .executeTakeFirst()
         if (!chronicle || role === null) throw notFound()
-        set.status = result.duplicate ? 200 : 201
+        set.status = 200
         return {
           id: chronicle.id,
           name: chronicle.name,
@@ -242,7 +252,7 @@ export function chronicleRoutes(
               : role === 'member'
                 ? ('player' as const)
                 : ('former' as const),
-          duplicate: result.duplicate,
+          duplicate: true,
         }
       },
       {

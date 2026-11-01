@@ -208,6 +208,15 @@ describe('POST /chronicles idempotente pela chave do comando', () => {
     expect(await narrated(stranger)).toHaveLength(1)
   })
 
+  it('o hash usa o nome normalizado: espaços em volta são o mesmo pedido', async () => {
+    const first = (await (await send(stranger, 'Lisboa')).json()) as {
+      id: string
+    }
+    const again = await send(stranger, '  Lisboa  ')
+    expect(again.status).toBe(200)
+    expect(((await again.json()) as { id: string }).id).toBe(first.id)
+  })
+
   it('a mesma chave com outro nome: 409, sem o id', async () => {
     const first = await send(stranger, 'Noites de Lisboa')
     const { id } = (await first.json()) as { id: string }
