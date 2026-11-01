@@ -9,11 +9,11 @@ import { logger } from './logger'
 // segredo por aqui, sem mexer em variável de ambiente.
 
 export interface Limits {
-  // Por IP: login, cadastro, refresh e logout.
+  // Por IP: login, cadastro e refresh. O logout não tem limite: só revoga
+  // com posse do token, e um 429 nele deixaria a sessão viva (falha aberta).
   readonly login: RateLimiter
   readonly register: RateLimiter
   readonly refresh: RateLimiter
-  readonly logout: RateLimiter
   // Por e-mail: só as tentativas que falham contam.
   readonly loginFailures: RateLimiter
   // Por usuário e por IP: aceitar convite (força bruta no código).
@@ -55,8 +55,6 @@ export function defaultLimits(now: () => Date): Limits {
       now: clock,
     }),
     refresh: createRateLimiter({ limit: 60, windowMs: MINUTE, now: clock }),
-    // Os mesmos números do refresh, em outro contador
-    logout: createRateLimiter({ limit: 60, windowMs: MINUTE, now: clock }),
     loginFailures: createRateLimiter({
       limit: 10,
       windowMs: 15 * MINUTE,

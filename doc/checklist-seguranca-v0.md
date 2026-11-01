@@ -147,11 +147,11 @@ Os testes rodam no CI:
   - no web, um marcador sem segredo no IndexedDB (`session:state`: `signed-in`, `signed-out`, `logout-pending`), lido a cada renovação; um `BroadcastChannel` tira as outras abas;
   - o servidor apaga o cookie com os mesmos atributos com que o gravou (`Path=/auth`, HttpOnly, Secure, SameSite=Strict), também no refresh recusado e na exclusão de conta;
   - login e cadastro no web revogam a família do cookie anterior (filtro de `Origin`, sem recusar o login);
-  - `POST /auth/logout` tem rate limit por IP com os números do refresh, num contador próprio; o 429 não revoga no servidor, mas apaga o cookie (quem esgota o contador não segura a sessão no navegador de quem saiu); o nativo reenvia a revogação pendente;
+  - `POST /auth/logout` não tem rate limit: só revoga com posse do token, de alta entropia, e um 429 nele deixaria a sessão viva no servidor (falha aberta); com `Origin` fora da allowlist e cookie, é 403 e não apaga o cookie (CSRF);
   - antes de sair, o app tenta enviar a fila; se sobrar alteração, avisa ("Sair e descartar?");
   - sem sessão no web (`signed-out`), abrir o app não chama `/auth/refresh` (T-74).
 - **Testes:**
-  - `api/__tests__/auth.test.ts`: atributos do cookie apagado (com e sem `secureCookies`), refresh recusado, login e cadastro web revogam o cookie anterior, login nativo não mexe em cookie, rate limit do logout e o 429 que apaga o cookie;
+  - `api/__tests__/auth.test.ts`: atributos do cookie apagado (com e sem `secureCookies`), refresh recusado, login e cadastro web revogam o cookie anterior, login nativo não mexe em cookie, logout sem rate limit e o 403 de `Origin` que não apaga o cookie;
   - `app/lib/__tests__/logout.test.ts`: pendência no keychain, token pendente nunca vai a `/auth/refresh`, app morto no meio, marcador do web, outra aba, 429 e 5xx mantêm a pendência;
   - `app/lib/__tests__/persist.test.tsx`: "o logout espera a limpeza do storage do usuário, inclusive chaves draft:";
   - `app/components/session/__tests__/LogoutButton.test.tsx`;

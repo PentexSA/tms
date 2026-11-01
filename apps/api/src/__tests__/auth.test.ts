@@ -550,65 +550,50 @@ describe('POST /auth/refresh e /auth/logout', () => {
     ).toBe(200)
   })
 
-  // Pergunta aberta 8 do plano: o logout ganha o limite do refresh, num
-  // contador próprio. O 429 não revoga: o app reenvia depois
-  it('logout tem rate limit por IP e o 429 não revoga', async () => {
+  // Sem rate limit no logout (revisão do padrão 8): ele só revoga com posse
+  // do token, de alta entropia, e não serve para força bruta. Um 429 ali
+  // deixava a família viva no servidor (falha aberta). Quem esgota os limites
+  // de autenticação do IP não impede ninguém de sair
+  it('logout não tem rate limit: com os limites de autenticação esgotados, revoga e apaga o cookie', async () => {
+    const exhausted = () => createRateLimiter({ limit: 0, windowMs: MINUTE })
     await setup({
       limits: {
         ...defaultLimits(() => new Date()),
-        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
-      },
-    })
-    expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
-    const { body } = await register()
-    const limited = await post(
-      '/auth/logout',
-      { refreshToken: body.refreshToken },
-      NATIVE
-    )
-    expect(limited.status).toBe(429)
-    expect(limited.headers.get('retry-after')).toMatch(/^\d+$/)
-    expect((await refresh(body.refreshToken ?? '')).status).toBe(200)
-  })
-
-  // Fail secure: quem esgota o contador do logout (outro atrás do mesmo NAT,
-  // num computador compartilhado) não segura o cookie no navegador de quem
-  // saiu. O 429 não revoga no servidor, mas apaga o cookie
-  it('logout web com o limite estourado: 429 que apaga o cookie mesmo assim', async () => {
-    await setup({
-      limits: {
-        ...defaultLimits(() => new Date()),
-        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+        login: exhausted(),
+        refresh: exhausted(),
       },
     })
     const { res } = await register(ana, WEB)
     const cookie = `tms_refresh=${cookieValue(res)}`
-    // Outro cliente no mesmo IP gasta o contador
-    expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
-    const limited = await post('/auth/logout', undefined, { ...WEB, cookie })
-    expect(limited.status).toBe(429)
-    expect(limited.headers.get('retry-after')).toMatch(/^\d+$/)
-    expectCleared(limited)
-    // Não revogou no servidor: o limite continua valendo
+    for (let n = 0; n < 30; n++)
+      expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
+    const out = await post('/auth/logout', undefined, { ...WEB, cookie })
+    expect(out.status).toBe(204)
+    expectCleared(out)
+    expect(Object.keys(defaultLimits(() => new Date()))).not.toContain('logout')
+    // Revogou a família do cookie no servidor
+    const alive = await ctx.db
+      .selectFrom('refresh_tokens')
+      .select('id')
+      .where('revoked_at', 'is', null)
+      .execute()
+    expect(alive).toEqual([])
+  })
+
+  // T-14 e CSRF: com Origin fora da allowlist, o logout recusa (403) e não
+  // mexe no cookie de ninguém
+  it('logout web com Origin fora da allowlist: 403, sem apagar o cookie', async () => {
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    const evil = await post('/auth/logout', undefined, {
+      origin: 'https://evil.test',
+      cookie,
+    })
+    expect(evil.status).toBe(403)
+    expect(cookieOf(evil)).toBeUndefined()
     expect(
       (await post('/auth/refresh', undefined, { ...WEB, cookie })).status
     ).toBe(200)
-  })
-
-  it('o limite do logout não gasta o do refresh', async () => {
-    expect(defaultLimits(() => new Date()).logout).not.toBe(
-      defaultLimits(() => new Date()).refresh
-    )
-    await setup({
-      limits: {
-        ...defaultLimits(() => new Date()),
-        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
-        refresh: createRateLimiter({ limit: 1, windowMs: MINUTE }),
-      },
-    })
-    const { body } = await register()
-    await post('/auth/logout', {}, NATIVE)
-    expect((await refresh(body.refreshToken ?? '')).status).toBe(200)
   })
 
   it('logout sem sessão é idempotente', async () => {
