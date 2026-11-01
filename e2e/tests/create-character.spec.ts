@@ -68,6 +68,35 @@ test('sem nome não cria', async ({ page }) => {
   await expect(page).toHaveURL(/new-character$/)
 })
 
+// T-56 (QAW-11): voltar com o formulário preenchido descartava sem perguntar
+test('voltar da Nova ficha preenchida pergunta antes de descartar', async ({
+  page,
+}) => {
+  const context = page.context()
+  const user = await signUp(context, 'guarda')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica da guarda', systemCode: 'vtm-v20' }
+  )
+  await page.goto(`/chronicles/${chronicle.id}`)
+  await page.getByRole('button', { name: 'Nova ficha' }).click()
+  await page.getByLabel('Nome (obrigatório)').fill('Isadora Vex')
+  await page
+    .getByRole('button', { name: 'Voltar para Crônica da guarda' })
+    .click()
+  await expect(page.getByText('Sair sem salvar?')).toBeVisible()
+  await page.getByRole('button', { name: 'Continuar editando' }).click()
+  await expect(page.getByLabel('Nome (obrigatório)')).toHaveValue('Isadora Vex')
+  await page
+    .getByRole('button', { name: 'Voltar para Crônica da guarda' })
+    .click()
+  await page.getByRole('button', { name: 'Descartar e sair' }).click()
+  await expect(page).toHaveURL(new RegExp(`/chronicles/${chronicle.id}$`))
+})
+
 // T-02 (QAW-08): dois cliques rápidos em "Criar ficha" criavam duas fichas
 test('clique duplo em "Criar ficha" cria uma ficha só', async ({ page }) => {
   const context = page.context()

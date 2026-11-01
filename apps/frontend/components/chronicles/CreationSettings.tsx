@@ -21,6 +21,7 @@ import { StyleSheet, View } from 'react-native'
 import { messageOf } from '../../lib/errors'
 import { useChronicleCreationSettings } from '../../lib/queries/creation'
 import { useCompiled, useLatestTemplate } from '../../sheet/data'
+import { UnsavedChangesGuard } from '../UnsavedChangesGuard'
 
 const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quinta']
 
@@ -68,6 +69,10 @@ export function CreationSettings({
   const changed =
     approval !== creation.approval ||
     JSON.stringify(defaults) !== JSON.stringify(layerOf(creation.defaults))
+  const reset = () => {
+    setApproval(creation.approval)
+    setDefaults(layerOf(creation.defaults))
+  }
 
   const setBudget = (id: string, value: number | readonly number[]) =>
     setDefaults(current => ({
@@ -87,6 +92,11 @@ export function CreationSettings({
 
   return (
     <View style={styles.panel} testID="creation-settings">
+      <UnsavedChangesGuard
+        when={changed}
+        message="As regras da criação mudaram e não foram salvas."
+        onDiscard={reset}
+      />
       <SectionHeader
         title="Criação de fichas"
         subtitle="Valem para as fichas criadas a partir de agora. Para mudar uma ficha que já existe, use as Regras da casa dentro dela."

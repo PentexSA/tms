@@ -1,5 +1,5 @@
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
@@ -202,6 +202,49 @@ describe('Nova ficha: um pedido por intenção', () => {
     expect(keyOf(1)).toBe(keyOf(0))
     expect(keyOf(2)).not.toBe(keyOf(1))
     expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
+  })
+})
+
+// T-56 (QAW-11, QAA-23): voltar, F5 ou o Voltar do Android descartavam o
+// formulário preenchido sem perguntar
+describe('Nova ficha: guarda de saída', () => {
+  const last = () => {
+    const all = jest.mocked(usePreventRemove).mock.calls
+    return all[all.length - 1]
+  }
+  const tryLeave = (repeat: jest.Mock) =>
+    act(() => {
+      last()?.[1]?.({ data: { action: { type: 'GO_BACK' } }, repeat } as never)
+    })
+
+  it('formulário preenchido segura a saída com "Sair sem salvar?"', async () => {
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const name = await screen.findByTestId('editor-name')
+    expect(last()?.[0]).toBe(false)
+    fireEvent.changeText(name, '   ')
+    expect(last()?.[0]).toBe(false)
+    fireEvent.changeText(name, 'Isadora')
+    expect(last()?.[0]).toBe(true)
+    const repeat = jest.fn()
+    tryLeave(repeat)
+    expect(screen.getByText('Sair sem salvar?')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    expect(repeat).toHaveBeenCalledTimes(1)
+  })
+
+  it('depois de criar, a ida para a ficha nova passa direto', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(await screen.findByTestId('editor-name'), 'Isadora')
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
+    // O replace remove a tela: a guarda deixa passar sem perguntar
+    const repeat = jest.fn()
+    tryLeave(repeat)
+    expect(repeat).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Sair sem salvar?')).toBeNull()
   })
 })
 

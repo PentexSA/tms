@@ -1,6 +1,6 @@
 import { AppBar, EmptyState, Screen, Skeleton, Text, tokens } from '@tms/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native'
 
+import { UnsavedChangesGuard } from '../../../../components/UnsavedChangesGuard'
 import { messageOf } from '../../../../lib/errors'
 import {
   useChronicle,
@@ -35,6 +36,10 @@ export default function NewCharacterScreen() {
   // vezes antes de o `busy` chegar. Só destrava no erro; no sucesso a tela
   // navega para a ficha nova
   const submitting = useRef(false)
+  // Guarda de saída (T-56): o formulário preenchido segura voltar, o F5 e o
+  // Voltar do Android. Depois de criar, a ida para a ficha passa direto
+  const [dirty, setDirty] = useState(false)
+  const created = useRef(false)
   const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
@@ -77,6 +82,7 @@ export default function NewCharacterScreen() {
               : null
           }
           serverIssues={issuesOf(create.error)}
+          onDirtyChange={setDirty}
           onSubmit={values => {
             if (submitting.current) return
             submitting.current = true
@@ -84,6 +90,7 @@ export default function NewCharacterScreen() {
               // A ficha nova abre no rascunho: na Criação, quando o sistema
               // tem criação por pontos; senão, em Evoluir
               onSuccess: c => {
+                created.current = true
                 router.replace(
                   `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
                 )
@@ -100,6 +107,11 @@ export default function NewCharacterScreen() {
   return (
     <Screen>
       <AppBar title={npc ? 'Novo NPC' : 'Nova ficha'} back={back} />
+      <UnsavedChangesGuard
+        when={dirty}
+        allowLeave={created}
+        message={`O que você preencheu ${npc ? 'no NPC novo' : 'na ficha nova'} ainda não foi criado e será descartado.`}
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
