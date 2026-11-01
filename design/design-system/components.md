@@ -142,6 +142,7 @@ Rótulo curto tocável: seção, filtro, atalho.
 - **API RN:** `{ label: string; selected?: boolean; kind?: 'toggle' | 'current' | 'action'; onPress(): void }`.
 - **Estados:** normal, ativo, pressionado.
 - **A11y:** alternância com `aria-pressed`; seção ativa com `aria-current="true"`. RN `accessibilityState={{ selected }}` ou `{ checked }`.
+  - **No `@tms/ui`:** `kind: 'toggle'` (padrão) põe `aria-pressed` no web (o `aria-selected` não vale em botão e o web não anunciava nada) e mantém o "selecionado" no app. `kind: 'switch'` é para ligar e desligar um estado (Rolagem oculta, Especialização, Oculta na parada livre): `role="switch"` com `aria-checked` nas três plataformas, lido como "interruptor, ativado/desativado". Um estado só alimenta o visual, o anúncio e o pedido. Os filtros de escolha única (Todas/Ocultas/Visíveis, Nome/Última alteração) continuam `toggle` por enquanto (pendência para `radiogroup`, P09-C).
 - **Multi-sistema:** rótulos do template: filtro "Só com pontos" (WoD) e "Só proficientes" (D&D), preset "Conjurar efeito" (Mago) e "Teste de Sanidade" (CoC), perícias na pirâmide (Fate).
 - **Resolve:** C-04, C-07.
 

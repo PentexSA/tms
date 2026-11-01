@@ -97,6 +97,7 @@ export function DiceSheet({
         {dice.storyteller ? (
           <View style={styles.secret}>
             <Chip
+              kind="switch"
               label="Rolagem oculta"
               selected={dice.hidden}
               onPress={() => dice.setHidden(!dice.hidden)}

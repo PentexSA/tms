@@ -10,6 +10,7 @@ import { Modal, Platform, Text as RNText } from 'react-native'
 import {
   BottomSheet,
   Button,
+  Chip,
   Choice,
   ListItem,
   Pressable,
@@ -577,4 +578,45 @@ describe('ListItem sem ação não engole o trailing (T-41)', () => {
     expect(row.props.accessible).toBe(true)
     expect(row.props.accessibilityLabel).toBe('Helena, Tremere')
   })
+})
+
+describe('Chip: alternância e interruptor anunciados (T-42)', () => {
+  it('toggle no web: aria-pressed, sem aria-selected (inválido em botão)', () => {
+    setOS('web')
+    render(<Chip label="Ocultas" selected onPress={jest.fn()} />)
+    const chip = screen.getByRole('button', { name: 'Ocultas' })
+    expect(chip.props['aria-pressed']).toBe(true)
+    expect(chip.props['aria-selected']).toBeUndefined()
+  })
+
+  it('toggle no app: continua "selecionado"', () => {
+    render(<Chip label="Ocultas" selected onPress={jest.fn()} />)
+    expect(screen.getByRole('button', { name: 'Ocultas' })).toBeSelected()
+  })
+
+  it.each(['ios', 'android', 'web'])(
+    'switch (%s): papel switch, ligado ou desligado',
+    os => {
+      setOS(os)
+      const onPress = jest.fn()
+      const { rerender } = render(
+        <Chip kind="switch" label="Rolagem oculta" selected onPress={onPress} />
+      )
+      expect(
+        screen.getByRole('switch', { name: 'Rolagem oculta' })
+      ).toBeChecked()
+      rerender(
+        <Chip
+          kind="switch"
+          label="Rolagem oculta"
+          selected={false}
+          onPress={onPress}
+        />
+      )
+      const off = screen.getByRole('switch', { name: 'Rolagem oculta' })
+      expect(off).not.toBeChecked()
+      fireEvent.press(off)
+      expect(onPress).toHaveBeenCalled()
+    }
+  )
 })

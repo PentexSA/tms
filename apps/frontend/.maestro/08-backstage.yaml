@@ -27,15 +27,15 @@ name: Bastidores do narrador
 - extendedWaitUntil:
     visible: "Visibilidade do NPC"
     timeout: 20000
-# Nasce oculto: o botão da visibilidade atual fica desabilitado
+# Nasce oculto: a visibilidade atual é o rádio marcado
 - assertVisible:
     text: "Oculto"
-    enabled: false
-- tapOn: "Identidade"
+    checked: true
+- tapOn: "Identidade.*"
 - extendedWaitUntil:
     visible:
-      text: "Identidade"
-      enabled: false
+      text: "Identidade.*"
+      checked: true
     timeout: 15000
 - back
 - extendedWaitUntil:
@@ -52,10 +52,10 @@ name: Bastidores do narrador
 - hideKeyboard
 - scrollUntilVisible:
     element: "Rolar"
-# A parada livre nasce oculta
+# A parada livre nasce oculta (interruptor ligado)
 - assertVisible:
     text: "Oculta"
-    selected: true
+    checked: true
 - tapOn: "Rolar"
 - scrollUntilVisible:
     element: "Presságio nativo, .*"

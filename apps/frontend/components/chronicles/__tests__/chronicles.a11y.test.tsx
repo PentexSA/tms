@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react-native'
+import { fireEvent, screen } from '@testing-library/react-native'
 
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { templateJson } from '../../../test/fixtures'
@@ -120,6 +120,21 @@ const insideAccessible = (el: { parent: unknown }): boolean => {
   }
   return false
 }
+
+describe('Mesa › Rolagens: alternadores de sigilo anunciados (T-42)', () => {
+  it('"Oculta" é um interruptor e nasce ligado; "Especialização", desligado', async () => {
+    await renderRolls()
+    const hidden = screen.getByRole('switch', { name: 'Oculta' })
+    expect(hidden).toBeChecked()
+    fireEvent.press(hidden)
+    expect(screen.getByRole('switch', { name: 'Oculta' })).not.toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Especialização' })
+    ).not.toBeChecked()
+    // Os filtros continuam alternâncias (botões)
+    expect(screen.getByRole('button', { name: 'Todas' })).toBeSelected()
+  })
+})
 
 describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () => {
   it('o botão fica fora da linha acessível do convite', async () => {

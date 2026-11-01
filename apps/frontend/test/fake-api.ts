@@ -64,6 +64,8 @@ export function createFakeApi() {
     creationApprovePost: jest.fn(),
     creationReturnPost: jest.fn(),
     statusPost: jest.fn(),
+    // Visibilidade do NPC (v5): só o narrador
+    visibilityPost: jest.fn(),
     lockPost: jest.fn(),
     lockDelete: jest.fn(),
     templateGet: jest.fn(),
@@ -111,6 +113,9 @@ export function createFakeApi() {
         },
       },
       status: { post: (...a: unknown[]) => calls.statusPost(id, ...a) },
+      visibility: {
+        post: (...a: unknown[]) => calls.visibilityPost(id, ...a),
+      },
       lock: {
         post: (...a: unknown[]) => calls.lockPost(id, ...a),
         delete: (...a: unknown[]) => calls.lockDelete(id, ...a),
