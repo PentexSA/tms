@@ -212,6 +212,32 @@ describe('Nova crônica', () => {
     expect(router.replace).toHaveBeenCalledTimes(1)
   })
 
+  it('504 do proxy: a nova tentativa usa a mesma chave', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    calls.chroniclesPost
+      .mockResolvedValueOnce(fail(504, 'Gateway Timeout'))
+      .mockResolvedValueOnce(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    for (let i = 0; i < 2; i++)
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
+      })
+    const keys = calls.chroniclesPost.mock.calls.map(
+      c => (c[0] as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toBe(keys[0])
+  })
+
   it('depois de erro de rede a nova tentativa usa a mesma chave; depois de recusa, outra', async () => {
     calls.systemsGet.mockResolvedValue(ok([VTM]))
     calls.chroniclesPost
