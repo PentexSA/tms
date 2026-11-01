@@ -178,6 +178,38 @@ describe('Nova ficha', () => {
   })
 })
 
+// L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
+// não abrir, a pessoa sabe que ela existe e não cria outra igual
+describe('Nova ficha: confirmação ao criar', () => {
+  it('mostra "Ficha criada." e abre a ficha', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(
+      await screen.findByTestId('editor-name'),
+      'Helena Varga'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(await screen.findByText('Ficha criada.')).toBeTruthy()
+    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
+  })
+
+  it('erro ao criar não confirma nada', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(
+      fail(422, 'limite de fichas nesta crônica')
+    )
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(await screen.findByTestId('editor-name'), 'X')
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByText('Ficha criada.')).toBeNull()
+    expect(router.replace).not.toHaveBeenCalled()
+  })
+})
+
 describe('Fichas na crônica', () => {
   it('lista com selo e resumo do core e leva à ficha', async () => {
     calls.chronicle.charactersGet.mockResolvedValue(

@@ -1,7 +1,8 @@
-import { render } from '@testing-library/react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Try } from 'expo-router/build/views/Try'
 
-import CharacterRoute from '../(app)/characters/[id]'
+import CharacterRoute, { ErrorBoundary } from '../(app)/characters/[id]'
 
 // O ?mode=evolve da criação vale só na chegada: recarregar ou voltar para a
 // ficha abre no modo padrão do papel (dono em Jogo), não num Evoluir vazio.
@@ -41,4 +42,77 @@ it('modo desconhecido na URL é ignorado; sem parâmetro, nada a limpar', () => 
   setParams.mockClear()
   render(<CharacterRoute />)
   expect(setParams).not.toHaveBeenCalled()
+})
+
+// L-03: a ficha tem error boundary. Um erro ao desenhar fica na rota, com
+// "Tentar de novo", e a mensagem do erro (que pode repetir valores da ficha)
+// não aparece.
+
+describe('ErrorBoundary da ficha', () => {
+  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+  beforeEach(() => {
+    jest.mocked(useRouter).mockReturnValue(router as never)
+  })
+
+  it('título, "Tentar de novo" e nada da mensagem do erro', () => {
+    const retry = jest.fn(() => Promise.resolve())
+    render(
+      <ErrorBoundary
+        error={new Error('Helena Varga: força 99 fora do limite')}
+        retry={retry}
+      />
+    )
+    expect(
+      screen.getByRole('header', {
+        name: 'Não foi possível mostrar esta ficha',
+      })
+    ).toBeTruthy()
+    expect(screen.queryByText(/Helena Varga|força 99/)).toBeNull()
+    // No app, sem "Recarregar" (só no web)
+    expect(screen.queryByRole('button', { name: 'Recarregar' })).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }))
+    expect(retry).toHaveBeenCalled()
+  })
+
+  it('voltar sem histórico vai para as crônicas', () => {
+    render(
+      <ErrorBoundary error={new Error('x')} retry={() => Promise.resolve()} />
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônicas' })
+    )
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('o expo-router desenha o boundary no lugar da rota que quebrou', () => {
+    let broken = true
+    function Sheet() {
+      if (broken) throw new Error('valor da ficha')
+      return null
+    }
+    const error = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined)
+    try {
+      render(
+        <Try catch={ErrorBoundary}>
+          <Sheet />
+        </Try>
+      )
+      expect(
+        screen.getByRole('header', {
+          name: 'Não foi possível mostrar esta ficha',
+        })
+      ).toBeTruthy()
+      broken = false
+      fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }))
+      expect(
+        screen.queryByRole('header', {
+          name: 'Não foi possível mostrar esta ficha',
+        })
+      ).toBeNull()
+    } finally {
+      error.mockRestore()
+    }
+  })
 })
