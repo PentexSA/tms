@@ -1,7 +1,8 @@
-import { screen } from '@testing-library/react-native'
+import { screen, waitFor } from '@testing-library/react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
-import { renderWithSession, testSession } from '../../test/session'
+import { json, renderWithSession, testSession } from '../../test/session'
+import AppLayout from '../(app)/_layout'
 import LoginScreen from '../(auth)/login'
 import RegisterScreen from '../(auth)/register'
 
@@ -36,5 +37,17 @@ describe('E-mail e usuário sem corretor (T-38)', () => {
     renderWithSession(<RegisterScreen />, session)
     noKeyboardHelp('register-email')
     noKeyboardHelp('register-username')
+  })
+})
+
+describe('Restauração da sessão (T-72)', () => {
+  it('app bar "TMS" e carregamento anunciado, sem dado do usuário', async () => {
+    const { session } = testSession(() => json(401, {}))
+    renderWithSession(<AppLayout />, session)
+    expect(session.getState().status).toBe('loading')
+    expect(screen.getByRole('header', { name: 'TMS' })).toBeTruthy()
+    expect(screen.getByLabelText('Carregando')).toBeBusy()
+    // Deixa a restauração terminar (vai para o login) antes de desmontar
+    await waitFor(() => expect(session.getState().status).toBe('signedOut'))
   })
 })

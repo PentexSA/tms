@@ -15,6 +15,7 @@ import {
   ListItem,
   Pressable,
   rovingTarget,
+  Skeleton,
   Stepper,
   TabPanel,
   Tabs,
@@ -639,5 +640,28 @@ describe('Button: nome acessível próprio (T-61)', () => {
     expect(screen.getByRole('button').props.accessibilityLabel).toBe(
       'Escolher da lista: Natureza'
     )
+  })
+})
+
+describe('Skeleton: carregamento anunciado no web (T-72)', () => {
+  it('no web: role="status", ocupado, "Carregando" em texto; linhas fora da árvore', () => {
+    setOS('web')
+    render(<Skeleton testID="s" lines={2} />)
+    const s = screen.getByTestId('s')
+    expect(s.props.role).toBe('status')
+    expect(s).toBeBusy()
+    expect(screen.getByText('Carregando')).toBeTruthy()
+    const hidden = screen
+      .getAllByTestId('skeleton-line', { includeHiddenElements: true })
+      .filter(line => line.props['aria-hidden'] === true)
+    expect(hidden).toHaveLength(2)
+  })
+
+  it('no app, continua um elemento só com o rótulo', () => {
+    render(<Skeleton testID="s" label="Carregando a mesa" />)
+    const s = screen.getByTestId('s')
+    expect(s.props.accessible).toBe(true)
+    expect(s.props.accessibilityLabel).toBe('Carregando a mesa')
+    expect(screen.queryByText('Carregando a mesa')).toBeNull()
   })
 })
