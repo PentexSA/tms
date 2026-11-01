@@ -6,8 +6,9 @@ import {
   renderHook,
   screen,
 } from '@testing-library/react-native'
-import { Platform } from 'react-native'
+import { Modal, Platform, Text as RNText } from 'react-native'
 import {
+  BottomSheet,
   Choice,
   Pressable,
   rovingTarget,
@@ -437,5 +438,96 @@ describe('Tabs e TabPanel: teclado, painel e posição no iOS (T-35)', () => {
       screen.getByRole('tab', { name: 'Poderes' }).props.accessibilityValue
         ?.text
     ).toBeUndefined()
+  })
+})
+
+describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)', () => {
+  const sheet = (visible: boolean, onClose = jest.fn()) => (
+    <BottomSheet
+      visible={visible}
+      title="Antecedentes"
+      onClose={onClose}
+      testID="sheet"
+    >
+      <RNText>conteúdo</RNText>
+    </BottomSheet>
+  )
+
+  it('o fundo fecha no toque, mas fica fora da árvore e do Tab', () => {
+    setOS('web')
+    const onClose = jest.fn()
+    render(sheet(true, onClose))
+    expect(screen.getAllByRole('button', { name: 'Fechar' })).toHaveLength(1)
+    const scrim = screen.getByTestId('bottom-sheet-scrim', {
+      includeHiddenElements: true,
+    })
+    expect(scrim.props['aria-hidden']).toBe(true)
+    expect(scrim.props.tabIndex).toBe(-1)
+    expect(scrim.props.accessibilityRole).toBeUndefined()
+    fireEvent.press(scrim)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('iOS: o gesto de escape do VoiceOver fecha', () => {
+    const onClose = jest.fn()
+    render(sheet(true, onClose))
+    fireEvent(screen.getByTestId('sheet'), 'accessibilityEscape')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  describe('no web, o foco volta a quem abriu', () => {
+    const doc = globalThis as { document?: unknown }
+    let trigger: { focus: jest.Mock; isConnected: boolean }
+    let fake: { activeElement: unknown; body: object }
+    beforeEach(() => {
+      jest.useFakeTimers()
+      setOS('web')
+      trigger = { focus: jest.fn(), isConnected: true }
+      fake = { activeElement: trigger, body: {} }
+      doc.document = fake
+    })
+    afterEach(() => {
+      jest.useRealTimers()
+      delete doc.document
+    })
+
+    it('ao fechar (onDismiss do modal), mesmo com o foco perdido no body', () => {
+      const { rerender } = render(sheet(true))
+      fake.activeElement = fake.body
+      rerender(sheet(false))
+      fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+      jest.runAllTimers()
+      expect(trigger.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('ao desmontar aberta (quem chama some com a folha)', () => {
+      const { unmount } = render(sheet(true))
+      fake.activeElement = null
+      unmount()
+      jest.runAllTimers()
+      expect(trigger.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('não rouba o foco de outro elemento nem foca quem saiu da tela', () => {
+      const first = render(sheet(true))
+      fake.activeElement = { isConnected: true }
+      first.unmount()
+      jest.runAllTimers()
+      expect(trigger.focus).not.toHaveBeenCalled()
+
+      fake.activeElement = trigger
+      const second = render(sheet(true))
+      trigger.isConnected = false
+      second.unmount()
+      jest.runAllTimers()
+      expect(trigger.focus).not.toHaveBeenCalled()
+    })
+  })
+
+  it('no app, não mexe no foco', () => {
+    const { rerender } = render(sheet(true))
+    rerender(sheet(false))
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+    expect(screen.queryByText('conteúdo')).toBeNull()
   })
 })
