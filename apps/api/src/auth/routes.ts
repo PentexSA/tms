@@ -29,7 +29,31 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase()
 interface CookieJar {
   value: unknown
   set(options: Record<string, unknown>): void
-  remove(): void
+}
+
+/**
+ * Apaga o cookie do refresh com os mesmos atributos com que ele foi gravado
+ * (T-14). O jar.remove() do Elysia manda só Max-Age=0, sem Path, HttpOnly,
+ * Secure e SameSite, e só se o cookie veio na requisição: a remoção ficava
+ * dependendo do default-path do navegador. Só no web (o nativo não usa
+ * cookie); mesmo sem cookie na requisição, porque apagar o que não existe é
+ * inofensivo.
+ */
+export function clearRefreshCookie(
+  request: Request,
+  jar: Pick<CookieJar, 'set'>,
+  secure: boolean
+) {
+  if (request.headers.get('x-tms-client') === NATIVE) return
+  jar.set({
+    value: '',
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/auth',
+    maxAge: 0,
+    expires: new Date(0),
+  })
 }
 
 export function authRoutes(
@@ -61,6 +85,18 @@ export function authRoutes(
     if (!origin || !options.corsOrigins.includes(origin))
       throw new ApiError(403, 'origem não permitida')
     return raw
+  }
+
+  // Login e cadastro no web: o cookie novo sobrescreve o anterior, que
+  // morreria órfão mas válido no servidor (por exemplo, um logout offline que
+  // não chegou a revogar). Revoga a família dele antes, com o mesmo filtro de
+  // Origin do fromCookie, mas sem recusar o login (T-14).
+  const revokePreviousCookie = async (request: Request, jar: CookieJar) => {
+    if (request.headers.get('x-tms-client') === NATIVE) return
+    const previous = typeof jar.value === 'string' ? jar.value : ''
+    const origin = request.headers.get('origin')
+    if (previous && origin && options.corsOrigins.includes(origin))
+      await revokeSession(db, options.sessions, previous)
   }
 
   const respond = async (
@@ -113,15 +149,11 @@ export function authRoutes(
             409,
             'não foi possível criar a conta com esses dados'
           )
+        const jar = cookie[REFRESH_COOKIE] as unknown as CookieJar
+        await revokePreviousCookie(request, jar)
         const refreshToken = await createSession(db, options.sessions, user.id)
         set.status = 201
-        return respond(
-          user.id,
-          user.username,
-          refreshToken,
-          request,
-          cookie[REFRESH_COOKIE] as unknown as CookieJar
-        )
+        return respond(user.id, user.username, refreshToken, request, jar)
       },
       {
         body: t.Object({
@@ -157,14 +189,10 @@ export function authRoutes(
           options.limits.loginFailures.hit(email)
           throw new ApiError(401, 'e-mail ou senha incorretos')
         }
+        const jar = cookie[REFRESH_COOKIE] as unknown as CookieJar
+        await revokePreviousCookie(request, jar)
         const refreshToken = await createSession(db, options.sessions, user.id)
-        return respond(
-          user.id,
-          user.username,
-          refreshToken,
-          request,
-          cookie[REFRESH_COOKIE] as unknown as CookieJar
-        )
+        return respond(user.id, user.username, refreshToken, request, jar)
       },
       { body: t.Object(credentials) }
     )
@@ -178,7 +206,7 @@ export function authRoutes(
           ? await rotateSession(db, options.sessions, raw)
           : null
         if (!rotated) {
-          jar.remove()
+          clearRefreshCookie(request, jar, options.secureCookies)
           throw unauthorized()
         }
         const user = await db
@@ -202,11 +230,15 @@ export function authRoutes(
     )
     .post(
       '/logout',
-      async ({ body, request, set, cookie }) => {
+      async ({ body, request, server, set, cookie }) => {
+        // O mesmo limite do refresh, num contador próprio: o logout só
+        // revoga, mas é endpoint de autenticação. Com 429 nada é revogado e
+        // o app mantém a revogação pendente para reenviar
+        limit(options.limits.logout, clientIp(request, server, options), set)
         const jar = cookie[REFRESH_COOKIE] as unknown as CookieJar
         const raw = body?.refreshToken ?? fromCookie(request, jar)
         if (raw) await revokeSession(db, options.sessions, raw)
-        jar.remove()
+        clearRefreshCookie(request, jar, options.secureCookies)
         set.status = 204
         return null
       },

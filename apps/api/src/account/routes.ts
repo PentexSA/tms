@@ -3,7 +3,7 @@ import { Elysia, t } from 'elysia'
 import type { Kysely } from 'kysely'
 import { type authGuard, requireUser } from '../auth/guard'
 import { verifyPassword } from '../auth/password'
-import { REFRESH_COOKIE } from '../auth/routes'
+import { clearRefreshCookie, REFRESH_COOKIE } from '../auth/routes'
 import { ApiError } from '../http/errors'
 import { clientIp } from '../http/security'
 import { logger } from '../logger'
@@ -119,14 +119,11 @@ export function accountRoutes(
       })
 
       // Como no logout: o cookie do refresh (web) sai junto
-      ;(cookie[REFRESH_COOKIE] as unknown as CookieJar).set({
-        value: '',
-        httpOnly: true,
-        secure: options.secureCookies,
-        sameSite: 'strict',
-        path: '/auth',
-        maxAge: 0,
-      })
+      clearRefreshCookie(
+        request,
+        cookie[REFRESH_COOKIE] as unknown as CookieJar,
+        options.secureCookies
+      )
       // Sem PII: só o id (que não liga a mais nada) e contagens
       logger.info(
         { event: 'account.deleted', userId: me, ...summary },

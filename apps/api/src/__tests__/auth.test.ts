@@ -418,16 +418,173 @@ describe('POST /auth/refresh e /auth/logout', () => {
     expect((await refresh(body.refreshToken ?? '')).status).toBe(401)
   })
 
-  it('logout web revoga a sessão e apaga o cookie', async () => {
+  // T-14: o jar.remove() mandava só Max-Age=0, sem Path=/auth; a remoção
+  // dependia do default-path do navegador e o QA viu o cookie ficar
+  const expectCleared = (res: Response, secure = false) => {
+    const cleared = cookieOf(res) ?? ''
+    expect(cleared).toMatch(/^tms_refresh=;/)
+    expect(cleared).toMatch(/Max-Age=0/)
+    expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/)
+    expect(cleared).toMatch(/Path=\/auth/)
+    expect(cleared).toMatch(/HttpOnly/)
+    expect(cleared).toMatch(/SameSite=Strict/i)
+    if (secure) expect(cleared).toMatch(/Secure/)
+    else expect(cleared).not.toMatch(/Secure/)
+  }
+
+  it('logout web revoga a sessão e apaga o cookie com Path=/auth, HttpOnly, SameSite=Strict e Max-Age=0', async () => {
     const { res } = await register(ana, WEB)
     const cookie = `tms_refresh=${cookieValue(res)}`
     const out = await post('/auth/logout', undefined, { ...WEB, cookie })
     expect(out.status).toBe(204)
-    const cleared = cookieOf(out) ?? ''
-    expect(cleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/)
+    expectCleared(out)
     expect(
       (await post('/auth/refresh', undefined, { ...WEB, cookie })).status
     ).toBe(401)
+  })
+
+  it('logout web sem cookie também manda apagar', async () => {
+    const out = await post('/auth/logout', undefined, WEB)
+    expect(out.status).toBe(204)
+    expectCleared(out)
+  })
+
+  it('com secureCookies, o cookie apagado também é Secure', async () => {
+    await setup({ secureCookies: true })
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    expectCleared(
+      await post('/auth/logout', undefined, { ...WEB, cookie }),
+      true
+    )
+  })
+
+  it('refresh recusado apaga o cookie com os mesmos atributos', async () => {
+    const res = await post('/auth/refresh', undefined, {
+      ...WEB,
+      cookie: `tms_refresh=${'x'.repeat(43)}`,
+    })
+    expect(res.status).toBe(401)
+    expectCleared(res)
+  })
+
+  it('logout e refresh nativos não mexem em cookie', async () => {
+    const { body } = await register()
+    const out = await post(
+      '/auth/logout',
+      { refreshToken: body.refreshToken },
+      NATIVE
+    )
+    expect(cookieOf(out)).toBeUndefined()
+    const refused = await post(
+      '/auth/refresh',
+      { refreshToken: body.refreshToken },
+      NATIVE
+    )
+    expect(refused.status).toBe(401)
+    expect(cookieOf(refused)).toBeUndefined()
+  })
+
+  // T-14: um logout offline que não revogou deixa o cookie antigo vivo no
+  // servidor; entrar de novo no mesmo navegador o sobrescreve, e ele morreria
+  // órfão mas válido
+  it('login no web revoga a sessão do cookie anterior', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const again = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { ...WEB, cookie: old }
+    )
+    expect(again.status).toBe(200)
+    expect(cookieValue(again)).not.toBe(cookieValue(res))
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(401)
+    const fresh = `tms_refresh=${cookieValue(again)}`
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: fresh })).status
+    ).toBe(200)
+  })
+
+  it('cadastro no web revoga a sessão do cookie anterior', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const other = await post(
+      '/auth/register',
+      { ...ana, email: 'bia@example.test', username: 'bia' },
+      { ...WEB, cookie: old }
+    )
+    expect(other.status).toBe(201)
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(401)
+  })
+
+  it('login com cookie de outra origem não revoga nem é recusado', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const again = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { origin: 'https://evil.test', cookie: old }
+    )
+    expect(again.status).toBe(200)
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(200)
+  })
+
+  it('login nativo não mexe em cookie', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const native = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { ...NATIVE, cookie: old }
+    )
+    expect(native.status).toBe(200)
+    expect(cookieOf(native)).toBeUndefined()
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(200)
+  })
+
+  // Pergunta aberta 8 do plano: o logout ganha o limite do refresh, num
+  // contador próprio. O 429 não revoga: o app reenvia depois
+  it('logout tem rate limit por IP e o 429 não revoga', async () => {
+    await setup({
+      limits: {
+        ...defaultLimits(() => new Date()),
+        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+      },
+    })
+    expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
+    const { body } = await register()
+    const limited = await post(
+      '/auth/logout',
+      { refreshToken: body.refreshToken },
+      NATIVE
+    )
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('retry-after')).toMatch(/^\d+$/)
+    expect((await refresh(body.refreshToken ?? '')).status).toBe(200)
+  })
+
+  it('o limite do logout não gasta o do refresh', async () => {
+    expect(defaultLimits(() => new Date()).logout).not.toBe(
+      defaultLimits(() => new Date()).refresh
+    )
+    await setup({
+      limits: {
+        ...defaultLimits(() => new Date()),
+        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+        refresh: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+      },
+    })
+    const { body } = await register()
+    await post('/auth/logout', {}, NATIVE)
+    expect((await refresh(body.refreshToken ?? '')).status).toBe(200)
   })
 
   it('logout sem sessão é idempotente', async () => {
