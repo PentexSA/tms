@@ -27,6 +27,7 @@ async function sevenWithSireConflict() {
             body: {
               issues: [{ path: 'values.sire', message: 'conflito' }],
               current: { 'values.sire': 'Etrius' },
+              changedBy: { 'values.sire': 'storyteller' },
               sheetVersion: 2,
             },
           }
@@ -60,7 +61,7 @@ it('a faixa nomeia só o Senhor, sem "Reaplicar"; as outras 6 ficam no rascunho'
   await sevenWithSireConflict()
   expect(
     screen.getByText(
-      'Senhor foi alterado antes de a sua alteração chegar. As outras 6 continuam no rascunho.'
+      'Senhor foi alterado pelo narrador antes de a sua alteração chegar. As outras 6 continuam no rascunho.'
     )
   ).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Reaplicar' })).toBeNull()
@@ -72,7 +73,7 @@ it('"Revisar" mostra os dois valores, e escolher na mesma linha resolve', async 
   fireEvent.press(screen.getByRole('button', { name: 'Revisar' }))
   expect(
     screen.getByLabelText(
-      'Identidade › Senhor. Seu valor: Meerlinda. Valor atual: Etrius.'
+      'Identidade › Senhor. Seu valor: Meerlinda. Valor atual: Etrius · alterado pelo narrador.'
     )
   ).toBeTruthy()
   fireEvent.press(screen.getByRole('button', { name: 'Ficar com o atual' }))

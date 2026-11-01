@@ -2,7 +2,7 @@ import { jsonEqual } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { ConflictSheet, conflictLabel } from './ConflictSheet'
+import { ConflictSheet, changedByText, conflictLabel } from './ConflictSheet'
 import { useSheet, useSheetSelector } from './context'
 import type { SheetConflict } from './store/sheetStore'
 
@@ -22,6 +22,10 @@ function messageOf(
   others: number
 ): string {
   const many = labels.length > 1
+  // Quem mudou, quando é um campo só e se sabe ("pelo narrador")
+  const only = conflict.paths.length === 1 ? conflict.paths[0] : undefined
+  const by = only ? conflict.changedBy?.[only] : null
+  const who = by ? ` ${changedByText(by)}` : ''
   if (conflict.origin === 'play')
     return `${names(labels)} ${many ? 'mudaram' : 'mudou'} antes de a sua alteração chegar. A ficha mostra o valor de agora.`
   if (conflict.origin === 'recovery')
@@ -32,7 +36,7 @@ function messageOf(
       : others > 1
         ? ` As outras ${others} continuam no rascunho.`
         : ''
-  return `${names(labels)} ${many ? 'foram alterados' : 'foi alterado'} antes de a sua alteração chegar.${rest}`
+  return `${names(labels)} ${many ? 'foram alterados' : 'foi alterado'}${who} antes de a sua alteração chegar.${rest}`
 }
 
 export function ConflictBanner() {

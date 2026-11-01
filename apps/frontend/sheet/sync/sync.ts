@@ -3,7 +3,12 @@ import { type Issue, MAX_EVENTS_PER_BATCH, parsePath } from '@tms/sheet-core'
 import { chronicleKeys } from '../../lib/queries/chronicles'
 import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
-import type { ConflictDetail, SheetStore, SheetSync } from '../store/sheetStore'
+import type {
+  ChangedBy,
+  ConflictDetail,
+  SheetStore,
+  SheetSync,
+} from '../store/sheetStore'
 import { ledgerMessage } from '../xp/messages'
 import { createMemoryDraftStore, type DraftStore } from './draftStore'
 import type { Outbox, QueuedBatch } from './outbox'
@@ -87,10 +92,18 @@ export function issuesOf(body: unknown): Issue[] {
     .map(i => ({ path: i.path, message: i.message }))
 }
 
+const CHANGED_BY: ReadonlySet<unknown> = new Set([
+  'self',
+  'owner',
+  'storyteller',
+])
+
 /**
- * O corpo de um 409 (`issues` com os caminhos em conflito). A resposta é
- * input hostil: só caminhos válidos que estão no próprio lote, até 50. O
- * `current` do corpo é ignorado: o valor atual vem da ficha rebuscada.
+ * O corpo de um 409 (`issues` com os caminhos em conflito, `changedBy` com
+ * quem mudou cada um). A resposta é input hostil: só caminhos válidos que
+ * estão no próprio lote, até 50, e `changedBy` só com os valores conhecidos
+ * (o resto vira null). O `current` do corpo é ignorado: o valor atual vem da
+ * ficha rebuscada.
  */
 export function parseConflictBody(
   body: unknown,
@@ -111,7 +124,16 @@ export function parseConflictBody(
         paths.push(path)
       if (paths.length >= MAX_EVENTS_PER_BATCH) break
     }
-  return { paths }
+  const by = (body as { changedBy?: unknown } | null)?.changedBy
+  const changedBy = new Map<string, ChangedBy>()
+  for (const path of paths) {
+    const value =
+      by && typeof by === 'object' && Object.hasOwn(by, path)
+        ? (by as Record<string, unknown>)[path]
+        : null
+    changedBy.set(path, CHANGED_BY.has(value) ? (value as ChangedBy) : null)
+  }
+  return { paths, changedBy: Object.fromEntries(changedBy) }
 }
 
 /**

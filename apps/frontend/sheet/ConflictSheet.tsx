@@ -8,7 +8,7 @@ import {
 import { BottomSheet, Button, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector, useSheetStore } from './context'
-import { valueAt } from './store/sheetStore'
+import { type ChangedBy, valueAt } from './store/sheetStore'
 
 // A folha "Campos em conflito" (T-31): o seu valor e o de agora, campo a
 // campo, com a escolha na mesma linha. No rascunho, cada campo se resolve
@@ -22,6 +22,16 @@ export function conflictLabel(model: SheetModel, path: string): string {
     : path
   return parsed?.scope === 'specialties' ? `${label} (especialização)` : label
 }
+
+/** Quem mudou, pelo papel relativo; nunca o nome. */
+export const changedByText = (by: ChangedBy | undefined): string =>
+  by === 'storyteller'
+    ? 'pelo narrador'
+    : by === 'owner'
+      ? 'pelo jogador'
+      : by === 'self'
+        ? 'por você, em outro aparelho'
+        : 'em outro lugar'
 
 /** "Identidade › Senhor": onde o campo aparece na ficha. */
 function placeOf(model: SheetModel, path: string): string {
@@ -96,7 +106,7 @@ export function ConflictSheet({
         ) : null}
         {rows.map(row => {
           const mine = describeValue(model, row.path, row.mine)
-          const current = describeValue(model, row.path, row.current)
+          const current = `${describeValue(model, row.path, row.current)} · alterado ${changedByText(conflict.changedBy?.[row.path])}`
           const place = placeOf(model, row.path)
           return (
             <View key={row.path} style={styles.row} testID="conflict-row">

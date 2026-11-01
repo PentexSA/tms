@@ -419,12 +419,36 @@ describe('parseConflictBody', () => {
         },
         batch
       )
-    ).toEqual({ paths: ['values.sire'] })
+    ).toEqual({ paths: ['values.sire'], changedBy: { 'values.sire': null } })
+  })
+
+  it('changedBy só com os valores conhecidos; o resto vira null', () => {
+    const both: QueuedBatch['events'] = batch.events
+    const issues = both.map(e => ({ path: e.path, message: 'c' }))
+    expect(
+      parseConflictBody(
+        {
+          issues,
+          changedBy: {
+            'values.sire': 'storyteller',
+            'values.strength': 'admin@x.test',
+            'values.outro': 'owner',
+          },
+        },
+        batch
+      )
+    ).toEqual({
+      paths: ['values.sire', 'values.strength'],
+      changedBy: { 'values.sire': 'storyteller', 'values.strength': null },
+    })
   })
 
   it('corpo sem issues ou quebrado: nenhum caminho', () => {
     for (const body of [null, 'x', {}, { issues: 'x' }])
-      expect(parseConflictBody(body, batch)).toEqual({ paths: [] })
+      expect(parseConflictBody(body, batch)).toEqual({
+        paths: [],
+        changedBy: {},
+      })
   })
 
   it('no máximo 50', () => {

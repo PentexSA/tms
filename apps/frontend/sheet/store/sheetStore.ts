@@ -66,16 +66,26 @@ export type Draft = ReadonlyMap<string, DraftEdit>
  */
 export type ConflictOrigin = 'play' | 'draft' | 'recovery'
 
+/**
+ * Quem mudou o campo, relativo a quem pediu (o 409 da API): `self`, a mesma
+ * conta noutro aparelho; `owner`, o jogador; `storyteller`, o narrador; null
+ * quando não se sabe (ou quando dizer revelaria uma rolagem oculta).
+ */
+export type ChangedBy = 'self' | 'owner' | 'storyteller' | null
+
 /** O que o 409 disse, já validado (sync.ts, parseConflictBody). */
 export interface ConflictDetail {
   // Só os caminhos em conflito, todos do próprio lote
   readonly paths: readonly string[]
+  readonly changedBy?: Readonly<Record<string, ChangedBy>>
 }
 
 export interface SheetConflict {
   readonly batches: readonly QueuedBatch[]
   readonly paths: readonly string[]
   readonly origin: ConflictOrigin
+  // Por caminho; ausente: em outro lugar
+  readonly changedBy?: Readonly<Record<string, ChangedBy>>
 }
 
 /**
@@ -589,6 +599,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
               batches: [],
               paths: marked.length ? marked : [...inBatch],
               origin: 'draft',
+              ...(detail?.changedBy ? { changedBy: detail.changedBy } : {}),
             },
             ...derive({ ...s, pending, draft }),
           })
@@ -610,6 +621,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
                 batches,
                 paths: [...new Set([...(s.conflict?.paths ?? []), ...paths])],
                 origin: s.conflict?.origin ?? 'play',
+                changedBy: {
+                  ...(s.conflict?.changedBy ?? {}),
+                  ...(detail?.changedBy ?? {}),
+                },
               }
             : s.conflict,
           ...derive({ ...s, pending }),

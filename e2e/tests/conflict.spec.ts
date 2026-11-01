@@ -77,7 +77,7 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
 
   // A faixa culpa só o Senhor e não reaplica às cegas
   const message = page.getByText(
-    'Senhor foi alterado antes de a sua alteração chegar. As outras 6 continuam no rascunho.',
+    'Senhor foi alterado pelo narrador antes de a sua alteração chegar. As outras 6 continuam no rascunho.',
     { exact: false }
   )
   await expect(message).toBeVisible()
@@ -96,7 +96,9 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
   // "Revisar": os dois valores, e a escolha na mesma linha
   await review.click()
   await expect(page.getByText('Seu valor: Meerlinda')).toBeVisible()
-  await expect(page.getByText('Valor atual: Etrius')).toBeVisible()
+  await expect(
+    page.getByText('Valor atual: Etrius · alterado pelo narrador')
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Ficar com o atual' }).click()
   await expect(page.getByText('A ficha mudou em outro lugar')).toHaveCount(0)
 

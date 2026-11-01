@@ -18,7 +18,7 @@ import {
   writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
-import type { Kysely } from 'kysely'
+import type { Kysely, Transaction } from 'kysely'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
 import { characterAccess } from '../authz'
@@ -40,6 +40,64 @@ const notFound = () => new ApiError(404, 'não encontrado')
 
 const issuesOut = (issues: readonly { path: string; message: string }[]) =>
   issues.map(i => ({ path: i.path, message: i.message }))
+
+/**
+ * Quem mudou cada campo do 409, relativo a quem pediu (T-31): `self` (a
+ * mesma conta, noutro aparelho), `owner` (o jogador) ou `storyteller` (o
+ * narrador). Nunca id nem nome. `null` quando não se sabe (campo nunca
+ * mudado por lote) ou quando o último lote é de uma rolagem oculta e quem
+ * pede não narra: a mesma regra do Histórico, para o aviso não revelar que
+ * houve uma rolagem oculta. Não se escolhe o lote anterior, que atribuiria a
+ * mudança a outra pessoa.
+ */
+export type ChangedBy = 'self' | 'owner' | 'storyteller' | null
+
+async function changedByOf(
+  trx: Transaction<DB>,
+  characterId: string,
+  paths: readonly string[],
+  me: string,
+  storyteller: boolean
+): Promise<Record<string, ChangedBy>> {
+  const out = new Map<string, ChangedBy>(paths.map(p => [p, null]))
+  if (!paths.length) return {}
+  const rows = await trx
+    .selectFrom('character_events as e')
+    .innerJoin('character_batches as b', 'b.id', 'e.batch_id')
+    .select(eb => [
+      'e.path',
+      'b.created_by',
+      'b.by_role',
+      eb
+        .exists(
+          eb
+            .selectFrom('character_rolls as r')
+            .select('r.id')
+            .whereRef('r.batch_id', '=', 'b.id')
+            .where('r.hidden', '=', true)
+        )
+        .as('hidden'),
+    ])
+    .where('b.character_id', '=', characterId)
+    .where('e.path', 'in', [...paths])
+    .distinctOn('e.path')
+    .orderBy('e.path')
+    .orderBy('b.created_at', 'desc')
+    .orderBy('b.id', 'desc')
+    .execute()
+  for (const row of rows) {
+    if (row.hidden && !storyteller) continue
+    out.set(
+      row.path,
+      row.created_by === me
+        ? 'self'
+        : row.by_role === 'owner' || row.by_role === 'storyteller'
+          ? row.by_role
+          : null
+    )
+  }
+  return Object.fromEntries(out)
+}
 
 // text e longText entram no histórico sem conteúdo (contrato §10)
 const contentFree = (type: string | undefined) =>
@@ -148,6 +206,16 @@ export function eventRoutes(
               throw new ApiError(409, 'a ficha mudou antes deste lote', {
                 issues: issuesOut(result.issues),
                 current: now,
+                // Os caminhos já passaram por canWrite (o forbidden vem
+                // antes do conflito): ninguém recebe 409 de campo que não
+                // escreve
+                changedBy: await changedByOf(
+                  trx,
+                  params.id,
+                  result.issues.map(i => i.path),
+                  me,
+                  roles.has('storyteller')
+                ),
                 sheetVersion: character.sheetVersion,
               })
             }

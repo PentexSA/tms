@@ -224,7 +224,7 @@ describe('conflito (409)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Revisar' }))
     expect(
       screen.getByLabelText(
-        'Em jogo › Pontos de Sangue. Seu valor: atual 8. Valor atual: atual 3.'
+        'Em jogo › Pontos de Sangue. Seu valor: atual 8. Valor atual: atual 3 · alterado em outro lugar.'
       )
     ).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Reaplicar tudo' }))
