@@ -169,6 +169,107 @@ describe('POST /chronicles/:id/characters', () => {
   })
 })
 
+// T-02: dois toques em "Criar ficha" mandam a mesma chave; o servidor cria uma
+describe('POST /chronicles/:id/characters: ficha do jogador idempotente', () => {
+  const key = '6f1c2a9e-4b7d-4c1e-9a3f-2d5e8b7c1a40'
+  const send = (
+    values: Record<string, unknown>,
+    clientCommandId: string,
+    user = owner
+  ) =>
+    as(ctx, user, 'POST', `/chronicles/${chronicleId}/characters`, {
+      values,
+      clientCommandId,
+    })
+  const mine = async (user = owner) =>
+    ctx.db
+      .selectFrom('characters')
+      .select('id')
+      .where('chronicle_id', '=', chronicleId)
+      .where('user_id', '=', user.id)
+      .execute()
+
+  it('a mesma chave cria uma ficha só: 201 e depois 200 com o mesmo id', async () => {
+    const first = await send({ name: 'Isadora Vex' }, key)
+    expect(first.status).toBe(201)
+    const created = (await first.json()) as { id: string; duplicate: boolean }
+    expect(created.duplicate).toBe(false)
+    const again = await send({ name: 'Isadora Vex' }, key)
+    expect(again.status).toBe(200)
+    expect(await again.json()).toEqual({ id: created.id, duplicate: true })
+    expect(await mine()).toHaveLength(1)
+    const command = await ctx.db
+      .selectFrom('chronicle_commands')
+      .select(['kind', 'created_by'])
+      .where('client_command_id', '=', key)
+      .executeTakeFirstOrThrow()
+    expect(command).toEqual({ kind: 'character.create', created_by: owner.id })
+    // A auditoria continua só no NPC
+    const audits = await ctx.db
+      .selectFrom('chronicle_audit')
+      .select('action')
+      .where('chronicle_id', '=', chronicleId)
+      .execute()
+    expect(audits.map(a => a.action)).not.toContain('character.create')
+  })
+
+  it('a mesma chave com outros dados: 409, sem o id da ficha no corpo', async () => {
+    const first = await send({ name: 'Isadora Vex' }, key)
+    const { id } = (await first.json()) as { id: string }
+    const res = await send({ name: 'Outra' }, key)
+    expect(res.status).toBe(409)
+    const text = await res.text()
+    expect(text).toContain('IDEMPOTENCY_CONFLICT')
+    expect(text).not.toContain(id)
+    expect(await mine()).toHaveLength(1)
+  })
+
+  it('a mesma chave mandada por outro membro: 409, sem o id', async () => {
+    const first = await send({ name: 'Isadora Vex' }, key)
+    const { id } = (await first.json()) as { id: string }
+    const res = await send({ name: 'Isadora Vex' }, key, player)
+    expect(res.status).toBe(409)
+    expect(await res.text()).not.toContain(id)
+    expect(await mine(player)).toHaveLength(0)
+  })
+
+  it('a ficha do jogador e o NPC com a mesma chave não se confundem', async () => {
+    const npc = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/characters`,
+      { kind: 'npc', values: { name: 'Isadora Vex' }, clientCommandId: key }
+    )
+    expect(npc.status).toBe(201)
+    const res = await send({ name: 'Isadora Vex' }, key, storyteller)
+    expect(res.status).toBe(409)
+  })
+
+  it('repetir no limite devolve a mesma ficha; chave nova no limite é recusada', async () => {
+    for (let i = 0; i < MAX_CHARACTERS_PER_CHRONICLE - 1; i++)
+      await createCharacter(ctx, owner, chronicleId, { name: `F${i}` })
+    const first = await send({ name: 'Vigésima' }, key)
+    expect(first.status).toBe(201)
+    const { id } = (await first.json()) as { id: string }
+    const again = await send({ name: 'Vigésima' }, key)
+    expect(again.status).toBe(200)
+    expect(((await again.json()) as { id: string }).id).toBe(id)
+    const other = await send(
+      { name: 'Vigésima primeira' },
+      '0b6f7e3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b'
+    )
+    expect(other.status).toBe(422)
+    expect(await mine()).toHaveLength(MAX_CHARACTERS_PER_CHRONICLE)
+  })
+
+  it('sem chave continua criando (app antigo)', async () => {
+    expect((await create({ name: 'A' })).status).toBe(201)
+    expect((await create({ name: 'A' })).status).toBe(201)
+    expect(await mine()).toHaveLength(2)
+  })
+})
+
 describe('GET /characters/:id', () => {
   let id: string
   beforeEach(async () => {
