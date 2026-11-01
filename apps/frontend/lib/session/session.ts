@@ -1,3 +1,4 @@
+import { NO_STORE_HEADERS } from '../noStore'
 import type {
   SessionChannel,
   SessionMarker,
@@ -357,6 +358,8 @@ export class Session {
       headers: {
         'content-type': 'application/json',
         ...(this.#deps.store.refreshInBody ? { 'x-tms-client': 'native' } : {}),
+        // Só no nativo: a resposta com tokens não vai para o cache HTTP (T-13)
+        ...NO_STORE_HEADERS,
       },
       credentials: this.credentials,
       body: body === undefined ? undefined : JSON.stringify(body),

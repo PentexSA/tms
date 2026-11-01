@@ -1,3 +1,5 @@
+import { NO_STORE_HEADERS } from './noStore'
+
 export const REQUEST_TIMEOUT_MS = 10_000
 
 /**
@@ -56,6 +58,8 @@ export function createAuthFetch(
   const withSession = (init: RequestInit): RequestInit => {
     const headers = new Headers(init.headers)
     for (const [k, v] of Object.entries(session.headers())) headers.set(k, v)
+    // Só no nativo (noStore.native.ts): nada da API vai para o cache HTTP
+    for (const [k, v] of Object.entries(NO_STORE_HEADERS)) headers.set(k, v)
     return { ...init, headers, credentials: session.credentials }
   }
   return async (input: RequestInfo | URL, init: RequestInit = {}) => {
