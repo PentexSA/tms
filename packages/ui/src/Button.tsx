@@ -14,6 +14,10 @@ export interface ButtonProps {
   // Ação em andamento: anunciada como ocupada e sem novo toque.
   readonly busy?: boolean
   readonly accessibilityHint?: string
+  // Nome acessível quando o título repete o de outro botão na tela
+  // ("Escolher da lista: Natureza"). Padrão: o título. Comece pelo título
+  // inteiro (WCAG 2.5.3).
+  readonly accessibilityLabel?: string
   readonly testID?: string
 }
 
@@ -32,6 +36,7 @@ export function Button({
   disabled = false,
   busy = false,
   accessibilityHint,
+  accessibilityLabel,
   testID,
 }: ButtonProps) {
   const theme = useTheme()
@@ -40,7 +45,7 @@ export function Button({
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
       aria-busy={busy}
       disabled={disabled || busy}

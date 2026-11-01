@@ -620,3 +620,24 @@ describe('Chip: alternância e interruptor anunciados (T-42)', () => {
     }
   )
 })
+
+describe('Button: nome acessível próprio (T-61)', () => {
+  it('padrão: o título; com accessibilityLabel, ele', () => {
+    const { rerender } = render(
+      <Button title="Escolher da lista" onPress={jest.fn()} />
+    )
+    expect(screen.getByRole('button').props.accessibilityLabel).toBe(
+      'Escolher da lista'
+    )
+    rerender(
+      <Button
+        title="Escolher da lista"
+        accessibilityLabel="Escolher da lista: Natureza"
+        onPress={jest.fn()}
+      />
+    )
+    expect(screen.getByRole('button').props.accessibilityLabel).toBe(
+      'Escolher da lista: Natureza'
+    )
+  })
+})

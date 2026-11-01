@@ -94,6 +94,18 @@ describe('Nova ficha: título visível nos grupos de escolha (T-09)', () => {
   })
 })
 
+describe('Nova ficha: os dois "Escolher da lista" têm nomes distintos (T-61)', () => {
+  it('o nome começa pelo texto visível e diz qual lista abre', () => {
+    form('vtm-v20')
+    expect(
+      screen.getByRole('button', { name: 'Escolher da lista: Natureza' })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Escolher da lista: Comportamento' })
+    ).toBeTruthy()
+  })
+})
+
 describe('Prioridades no web: setas só movem o foco (T-35)', () => {
   it('a seta não grava a prioridade; o Espaço grava', () => {
     setOS('web')

@@ -64,6 +64,8 @@ export const TableRow = memo(function TableRow({
     problem,
     meta,
   ]
+    // Cada parte perde a pontuação final antes da junção: sem ".."
+    .map(part => (part ? part.replace(/[.!?…]+$/u, '') : part))
     .filter(Boolean)
     .join('. ')
 

@@ -108,7 +108,8 @@ Ação com verbo. Uma ação primária por tela.
   }
   ```
 - **Estados:** hover, pressionado, foco, desabilitado (`disabled` ou `aria-disabled`: fundo transparente, borda `border-subtle`, texto `ink-disabled`), ocupado (`aria-busy`: spinner e sem clique).
-- **A11y:** web `<button type="button">`; `aria-disabled` mantém o foco (usado no "Excluir" até digitar o nome). RN `accessibilityRole="button"` + `accessibilityState={{ disabled, busy }}`.
+- **A11y:** web `<button type="button">`; `aria-disabled` mantém o foco (usado no "Excluir" até digitar o nome). RN `accessibilityRole="button"` + `accessibilityState={{ disabled, busy }}`. `accessibilityLabel` (padrão: o título) separa botões de mesmo título na tela ("Escolher da lista: Natureza" e "…: Comportamento"); começa pelo título inteiro (WCAG 2.5.3).
+  - **Linhas "Rótulo: valor" do Editar:** no app, o rótulo é o campo e o valor vai no `accessibilityValue` (sem "Nome: X, X"); no web, que descarta o `accessibilityValue`, o rótulo fica "Nome: X" (`fieldA11y`, `apps/frontend/sheet/evolve/a11y.ts`).
 - **Multi-sistema:** os rótulos vêm do esqueleto ou do template: "Rolar no app", "Descanso longo" (D&D, `actions[]`), "Curar 1 nível de dano" (Vampiro), "Excluir". A cor é sempre `action`, nunca `accent`.
 - **Resolve:** C-14, C-21, DS-04, DS-16.
 

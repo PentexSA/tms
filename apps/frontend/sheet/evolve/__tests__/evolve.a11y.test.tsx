@@ -46,12 +46,44 @@ describe('Editar: a folha da escolha não repete o título (T-09)', () => {
   it('o título da folha já é o nome do campo', async () => {
     await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Clã: Tremere' }))
-    const group = screen.getByLabelText('Clã')
+    fireEvent.press(screen.getByRole('button', { name: 'Clã' }))
+    // A linha do Editar também se chama "Clã" no app (o valor vai à parte)
+    const group = screen
+      .getAllByLabelText('Clã')
+      .find(el => el.props.accessibilityRole === 'radiogroup')
+    if (!group) throw new Error('sem o grupo do Clã')
     expect(within(group).getByRole('radio', { name: 'Brujah' })).toBeTruthy()
     // Sem o título do Choice: o "Clã" visível é o da folha, fora do grupo
     expect(
       group.parent ? within(group.parent).queryByText('Clã') : null
     ).toBeNull()
+  })
+})
+
+describe('Editar: rótulo e valor sem repetição (T-61)', () => {
+  it('no app, o rótulo é o campo e o valor vai à parte (sem "Nome: X, X")', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    enterEvolve()
+    const name = screen.getByRole('button', { name: 'Nome' })
+    expect(name).toHaveAccessibilityValue({ text: 'Nova' })
+    expect(name.props.accessibilityLabel).toBe('Nome')
+    expect(
+      screen.getByRole('button', { name: 'Clã' })
+    ).toHaveAccessibilityValue({ text: 'Tremere' })
+    expect(
+      screen.getByRole('button', { name: 'Conceito' })
+    ).toHaveAccessibilityValue({ text: 'vazio' })
+  })
+
+  it('no web, o valor fica no rótulo (o web descarta o accessibilityValue)', async () => {
+    setOS('web')
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    fireEvent(
+      screen.getByRole('radio', { name: 'Editar' }),
+      'keyDown',
+      keyDown(' ')
+    )
+    expect(screen.getByRole('button', { name: 'Nome: Nova' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Clã: Tremere' })).toBeTruthy()
   })
 })

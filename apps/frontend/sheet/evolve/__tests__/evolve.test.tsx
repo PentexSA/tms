@@ -9,6 +9,7 @@ import type { SheetData } from '@tms/sheet-core'
 import { AccessibilityInfo, StyleSheet } from 'react-native'
 import { example, modelOf } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { textInput } from '../../../test/queries'
 import type { PostOutcome } from '../../sync/sender'
 
 // Etapa 18: o modo Evoluir na ficha viva. O rascunho vira UM lote ao salvar
@@ -257,8 +258,8 @@ describe('Editar: editores', () => {
       ['Clã', 'Geração', 'Senhor'],
     ])
     // A célula abre o mesmo editor; a Geração (derivada) só mostra o valor
-    fireEvent.press(screen.getByRole('button', { name: /^Natureza:/ }))
-    expect(screen.getByLabelText('Natureza')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Natureza' }))
+    expect(textInput('Natureza')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Geração/ })).toBeNull()
     // Nada fica repetido embaixo das colunas
     expect(screen.queryByTestId('identity-editors')).toBeNull()
@@ -279,9 +280,12 @@ describe('Editar: editores', () => {
     }
     const before = chipColor('Tremere')
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Clã: Tremere' }))
+    // No app, o rótulo é o campo e o valor vai à parte (T-61)
+    fireEvent.press(screen.getByRole('button', { name: 'Clã' }))
     fireEvent.press(screen.getByRole('radio', { name: 'Brujah' }))
-    expect(screen.getByRole('button', { name: 'Clã: Brujah' })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Clã' })
+    ).toHaveAccessibilityValue({ text: 'Brujah' })
     const after = chipColor('Brujah')
     expect(before).toBeTruthy()
     expect(after).toBeTruthy()
@@ -291,15 +295,17 @@ describe('Editar: editores', () => {
   it('texto em sheet com contador; o nome não fica vazio', async () => {
     await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Conceito: vazio' }))
-    fireEvent.changeText(screen.getByLabelText('Conceito'), 'Arquivista')
+    const concept = () => screen.getByRole('button', { name: 'Conceito' })
+    expect(concept()).toHaveAccessibilityValue({ text: 'vazio' })
+    fireEvent.press(concept())
+    fireEvent.changeText(textInput('Conceito'), 'Arquivista')
     expect(screen.getByText(/^10\//)).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(
-      screen.getByRole('button', { name: 'Conceito: Arquivista' })
-    ).toBeTruthy()
+    expect(concept()).toHaveAccessibilityValue({ text: 'Arquivista' })
 
-    fireEvent.press(screen.getByRole('button', { name: 'Nome: Nova' }))
+    const name = screen.getByRole('button', { name: 'Nome' })
+    expect(name).toHaveAccessibilityValue({ text: 'Nova' })
+    fireEvent.press(name)
     fireEvent.changeText(screen.getByLabelText('Nome (obrigatório)'), '   ')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
     expect(screen.getByText('Informe o nome')).toBeTruthy()

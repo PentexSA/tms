@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
 
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { templateJson } from '../../../test/fixtures'
@@ -12,6 +12,8 @@ import {
 import { CreationSettings } from '../CreationSettings'
 import { InviteSheet } from '../InviteSheet'
 import { RollFeed } from '../RollFeed'
+import { TableRow } from '../TableRow'
+import type { TableItem } from '../tableItems'
 
 // Acessibilidade das telas da crônica (P06 da onda 1): um teste de regressão
 // por bug.
@@ -169,5 +171,32 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
     expect(
       screen.getByLabelText(/^Criado em .*, 8 usos restantes/)
     ).toBeTruthy()
+  })
+})
+
+describe('Cartão da Mesa: sem ".." no nome acessível (T-61)', () => {
+  it('a mensagem que já termina em ponto não dobra a pontuação', () => {
+    const item = {
+      row: {
+        id: 'r1',
+        name: 'Helena Varga',
+        owner: { id: 'u2', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '9.0.0',
+        sheetVersion: 2,
+        updatedAt: new Date().toISOString(),
+        sheet: { values: {} },
+      },
+      model: null,
+      store: null,
+      alerts: [],
+      state: 'Em criação.',
+    } as unknown as TableItem
+    render(<TableRow item={item} onOpen={jest.fn()} />)
+    const label = screen.getByTestId('table-row-r1').props
+      .accessibilityLabel as string
+    expect(label).toContain('Atualize o app para ver esta ficha. dona')
+    expect(label).toContain('Em criação. Atualize')
+    expect(label).not.toContain('..')
   })
 })

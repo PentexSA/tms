@@ -2,6 +2,7 @@ import { BottomSheet, Choice, Pressable, Text, tokens, useTheme } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
+import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
 
@@ -25,8 +26,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
       <Pressable
         testID={`editor-${resolved.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`${def.label}: ${label}`}
-        accessibilityValue={current ? { text: current.label } : undefined}
+        {...fieldA11y(def.label, label)}
         accessibilityHint="Abre as opções"
         onPress={() => {
           setError(null)
