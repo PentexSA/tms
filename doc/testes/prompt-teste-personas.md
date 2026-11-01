@@ -55,13 +55,18 @@ Leia antes, para saber o que é esperado e não reportar como novo o que já é 
 ## Ambiente
 - Local, com o banco do Docker e só dados fictícios. Nada de dados de produção nem de
   pessoas reais.
-- Setup: `npx pnpm db:up`, `npx pnpm db:migrate`, `npx pnpm templates:publish --published`,
-  API com `cd apps/api && bun run dev`, frontend com `cd apps/frontend && npx expo start --web`.
-  Com a API no ar, rode `npx pnpm seed:roteiro`: ele cria as contas N, J1, J2 e N2
-  (`@roteiro.test`, a senha sai no terminal), uma crônica de criação livre e uma por pontos
-  para cada sistema, e uma crônica de Vampiro com 21 fichas.
+- Setup: `cp .env.example .env` (os comentários do arquivo dizem o que preencher),
+  `npx pnpm bootstrap` (instala pelo lockfile e compila os pacotes da API), `npx pnpm db:up`,
+  `npx pnpm db:migrate`, `npx pnpm templates:publish --published`, API com `npx pnpm dev:api`,
+  web com `npx pnpm dev:web`. Com o banco migrado, rode `npx pnpm seed:roteiro` (a API do
+  seed roda dentro dele; não precisa da API no ar nem de `TRUST_PROXY`): ele cria as contas
+  N, J1, J2 e N2 (`@roteiro.test`, a senha sai no terminal), uma crônica de criação livre e
+  uma por pontos para cada sistema, e uma crônica de Vampiro com 21 fichas.
+  Depois de atualizar o código, rode `npx pnpm bootstrap` de novo: a API e o web se recusam a
+  subir com dependências ou build desatualizados e dizem o comando.
   Se algo do setup falhar, pare e me avise em vez de contornar.
-- **App:** simulador iOS e emulador Android (`npx expo run:ios` / `npx expo run:android`).
+- **App:** simulador iOS e emulador Android (`npx pnpm -C apps/frontend ios` /
+  `npx pnpm -C apps/frontend android`).
   O scheme é `tms`, então dá para abrir telas por deep link (`xcrun simctl openurl <UDID> tms://...`).
 - **Web:** navegador em 390×844 (celular) e 1280 (desktop).
 - O que só acontece numa plataforma é problema dela; o que acontece nas duas é problema do
