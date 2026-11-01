@@ -323,20 +323,34 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     expect(tab.session.getState().status).toBe('signedOut')
   })
 
-  it('outra aba sai junto (BroadcastChannel)', async () => {
-    const listeners = new Set<() => void>()
+  // Um canal falso: guarda as mensagens até o teste entregar
+  const fakeChannel = () => {
+    const listeners = new Set<(userId: string) => void>()
+    const queued: string[] = []
     const channel: SessionChannel = {
-      post: () => {
-        for (const l of listeners) l()
+      post: userId => {
+        queued.push(userId)
       },
       subscribe: l => {
         listeners.add(l)
         return () => listeners.delete(l)
       },
     }
-    const ok = () => json(200, { ...tokens(), refreshToken: undefined })
-    const one = web(ok, null, channel)
-    const other = testSession(ok, memoryStore(false), {
+    const deliver = () => {
+      for (const userId of queued.splice(0))
+        for (const l of listeners) l(userId)
+    }
+    return { channel, deliver }
+  }
+  const ana = tokens(1).user
+  const bia = { id: '00000000-0000-4000-8000-000000000002', username: 'bia' }
+  const as = (user: typeof ana) => () =>
+    json(200, { ...tokens(), user, refreshToken: undefined })
+
+  it('outra aba do mesmo usuário sai junto (BroadcastChannel)', async () => {
+    const { channel, deliver } = fakeChannel()
+    const one = web(as(ana), null, channel)
+    const other = testSession(as(ana), memoryStore(false), {
       marker: createSessionMarker(one.storage),
       channel,
     })
@@ -344,9 +358,101 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     await other.session.restore()
     expect(other.session.getState().status).toBe('signedIn')
     await one.session.logout()
+    deliver()
     await new Promise(r => setTimeout(r, 0))
     expect(other.session.getState().status).toBe('signedOut')
     expect(other.session.accessToken).toBeNull()
+  })
+
+  // Revisão de código: a aba A sai e entra com outra pessoa antes de B
+  // processar o aviso; B já está na sessão nova e não pode sair por ele
+  it('aba A sai e entra com outro usuário antes de B processar: B, já na sessão nova, fica', async () => {
+    const { channel, deliver } = fakeChannel()
+    let user = ana
+    const responses = () =>
+      json(200, { ...tokens(), user, refreshToken: undefined })
+    const a = web(responses, null, channel)
+    const b = testSession(responses, memoryStore(false), {
+      marker: createSessionMarker(a.storage),
+      channel,
+    })
+    await a.session.restore()
+    await b.session.restore()
+    await a.session.logout()
+    user = bia
+    await a.session.login('bia@example.test', 'senha longa o bastante')
+    // B renova (cookie compartilhado) antes de o aviso chegar
+    await b.session.refresh()
+    expect(b.session.getState().user?.id).toBe(bia.id)
+    deliver()
+    await new Promise(r => setTimeout(r, 0))
+    expect(b.session.getState().status).toBe('signedIn')
+    expect(b.session.getState().user?.id).toBe(bia.id)
+  })
+
+  // Revisão de código: um 401 numa aba velha gravava signed-out depois que
+  // outra aba entrou de novo; quem recarregava aparecia deslogado
+  it('401 numa aba velha não marca signed-out sobre a sessão nova de outra aba', async () => {
+    let release: (r: Response) => void = () => undefined
+    let refreshes = 0
+    const old = web(url => {
+      if (!url.endsWith('/auth/refresh')) return noContent()
+      refreshes++
+      return refreshes === 1
+        ? json(200, { ...tokens(), refreshToken: undefined })
+        : new Promise<Response>(r => {
+            release = r
+          })
+    })
+    await old.session.restore()
+    expect(old.state()).toMatch(/^signed-in:/)
+    const renewing = old.session.refresh()
+    await new Promise(r => setTimeout(r, 0))
+    // Outra aba entra de novo (sessão nova) enquanto a renovação voa
+    const fresh = testSession(
+      () => json(200, { ...tokens(), refreshToken: undefined }),
+      memoryStore(false),
+      { marker: createSessionMarker(old.storage) }
+    )
+    await fresh.session.login('ana@example.test', 'senha longa o bastante')
+    const newMark = old.state()
+    expect(newMark).toMatch(/^signed-in:/)
+    release(json(401, {}))
+    expect(await renewing).toBe(false)
+    expect(old.session.getState().status).toBe('signedOut')
+    expect(old.state()).toBe(newMark)
+    // Recarregar renova pela sessão nova, em vez de aparecer deslogado
+    const reload = testSession(
+      () => json(200, { ...tokens(), refreshToken: undefined }),
+      memoryStore(false),
+      { marker: createSessionMarker(old.storage) }
+    )
+    await reload.session.restore()
+    expect(urls(reload.fetch)).toEqual(['/auth/refresh'])
+    expect(reload.session.getState().status).toBe('signedIn')
+  })
+
+  it('401 da sessão desta aba marca signed-out', async () => {
+    let refreshes = 0
+    const tab = web(() =>
+      ++refreshes === 1
+        ? json(200, { ...tokens(), refreshToken: undefined })
+        : json(401, {})
+    )
+    await tab.session.restore()
+    expect(await tab.session.refresh()).toBe(false)
+    expect(tab.state()).toBe('signed-out')
+  })
+
+  it('renovar mantém o id da sessão; login abre outro', async () => {
+    const tab = web(() => json(200, { ...tokens(), refreshToken: undefined }))
+    await tab.session.restore()
+    const first = tab.state()
+    await tab.session.refresh()
+    expect(tab.state()).toBe(first)
+    await tab.session.login('ana@example.test', 'senha longa o bastante')
+    expect(tab.state()).toMatch(/^signed-in:/)
+    expect(tab.state()).not.toBe(first)
   })
 
   // T-74: sem sessão, nenhum 401 de /auth/refresh no console
@@ -367,7 +473,7 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
       json(200, { ...tokens(), refreshToken: undefined })
     )
     await inside.session.restore()
-    expect(inside.state()).toBe('signed-in')
+    expect(inside.state()).toMatch(/^signed-in:/)
   })
 
   it('sem rede na abertura, o marcador não muda', async () => {
@@ -382,16 +488,26 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
       'logout-pending'
     )
     await tab.session.login('ana@example.test', 'senha longa o bastante')
-    expect(tab.state()).toBe('signed-in')
+    expect(tab.state()).toMatch(/^signed-in:/)
     expect(urls(tab.fetch)).toEqual(['/auth/login'])
   })
 
-  it('o marcador só guarda um dos três estados; lixo vira nenhum', async () => {
+  it('o marcador só guarda um dos três estados e o id da sessão; lixo vira nenhum', async () => {
     const storage = createMemoryStorage()
     const marker = createSessionMarker(storage)
-    storage.data.set(SESSION_MARKER_KEY, '{"token":"x"}')
-    expect(await marker.read()).toBeNull()
+    for (const junk of [
+      '{"token":"x"}',
+      'signed-out:x',
+      'signed-in:a:b',
+      'signed-in:<x>',
+    ]) {
+      storage.data.set(SESSION_MARKER_KEY, junk)
+      expect(await marker.read()).toBeNull()
+    }
     await marker.write('signed-out')
-    expect(await marker.read()).toBe('signed-out')
+    expect(await marker.read()).toEqual({ state: 'signed-out', id: null })
+    await marker.write('signed-in', 'abc-123')
+    expect(storage.data.get(SESSION_MARKER_KEY)).toBe('signed-in:abc-123')
+    expect(await marker.read()).toEqual({ state: 'signed-in', id: 'abc-123' })
   })
 })

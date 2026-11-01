@@ -1,6 +1,7 @@
 import { NO_STORE_HEADERS } from '../noStore'
 import type {
   SessionChannel,
+  SessionMark,
   SessionMarker,
   SessionMarkerState,
 } from './sessionMarker'
@@ -61,7 +62,15 @@ export interface SessionDeps {
   // Apaga o que sobrou do storage de um usuário (app morto no meio do
   // logout): sem sessão, ninguém abre o storage dele para apagar
   readonly purgeUserData?: (userId: string) => Promise<void>
+  // O id de cada login no marcador (sem segredo); os testes trocam
+  readonly newSessionId?: () => string
 }
+
+const randomSessionId = (): string =>
+  (
+    globalThis as { crypto?: { randomUUID?: () => string } }
+  ).crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 
 /** Ouvinte do logout: o logout espera a limpeza que ele devolver. */
 export type SignOutListener = () => void | Promise<unknown>
@@ -96,6 +105,9 @@ export class Session {
   // memória (só esta sessão grava a chave); as mudanças vão em fila
   #pending: string[] | null = null
   #pendingWrites: Promise<unknown> = Promise.resolve()
+  // Web: o id da sessão desta aba no marcador (o do último login ou
+  // renovação aceitos aqui)
+  #sessionId: string | null = null
   // O último refresh falhou por falta de rede (não por sessão inválida)
   #unreachable = false
   // Sobe a cada saída: resposta de refresh ou login iniciado antes dela é
@@ -107,9 +119,11 @@ export class Session {
 
   constructor(deps: SessionDeps) {
     this.#deps = deps
-    // Outra aba saiu: esta sai também, sem esperar o próximo 401
-    deps.channel?.subscribe(() => {
-      if (this.#state.status !== 'signedOut') void this.#clearLocal()
+    // Outra aba saiu: esta sai também, sem esperar o próximo 401, mas só
+    // se for do mesmo usuário (a outra pode já ter entrado com outro)
+    deps.channel?.subscribe(userId => {
+      if (this.#state.status !== 'signedOut' && this.#state.user?.id === userId)
+        void this.#clearLocal()
     })
   }
 
@@ -169,7 +183,7 @@ export class Session {
     }
     // Web que já saiu: nenhuma chamada, sem 401 de ruído (T-74). Sem
     // marcador (navegador novo ou versão anterior), um refresh, como antes
-    if ((await this.#readMarker()) === 'signed-out') {
+    if ((await this.#readMarker())?.state === 'signed-out') {
       this.#set({ status: 'signedOut', user: null })
       return
     }
@@ -209,6 +223,7 @@ export class Session {
    */
   async logout(): Promise<void> {
     const { store } = this.#deps
+    const userId = this.#state.user?.id
     if (store.refreshInBody) {
       const token = await store.read()
       // Antes de apagar o token ativo: se o app morrer aqui, a abertura vê
@@ -221,7 +236,7 @@ export class Session {
         )
     } else await this.#writeMarker('logout-pending')
     await this.#clearLocal()
-    this.#deps.channel?.post()
+    if (userId) this.#deps.channel?.post(userId)
     await this.#sendPendingLogout()
   }
 
@@ -235,9 +250,21 @@ export class Session {
    * recusado, conta excluída): apaga tudo do usuário.
    */
   async signOut(): Promise<void> {
-    if ((await this.#readMarker()) !== 'logout-pending')
-      await this.#writeMarker('signed-out')
+    await this.#markSignedOut(this.#sessionId)
     await this.#clearLocal()
+  }
+
+  /**
+   * Marca signed-out só se o marcador ainda for da sessão esperada
+   * (compare-and-set): um 401 numa aba velha não derruba a sessão nova que
+   * outra aba abriu nesse meio tempo, nem um logout pendente. Ler e gravar
+   * no IndexedDB não é atômico entre abas; a janela é a de uma leitura.
+   */
+  async #markSignedOut(expected: string | null): Promise<void> {
+    const mark = await this.#readMarker()
+    if (mark?.state === 'logout-pending') return
+    if (mark?.state === 'signed-in' && mark.id !== expected) return
+    await this.#writeMarker('signed-out')
   }
 
   /** Apaga tudo do usuário no aparelho e espera os ouvintes. */
@@ -262,7 +289,7 @@ export class Session {
   async #activeSessionIsPending(): Promise<boolean> {
     const { store } = this.#deps
     if (!store.refreshInBody)
-      return (await this.#readMarker()) === 'logout-pending'
+      return (await this.#readMarker())?.state === 'logout-pending'
     const pending = await this.#pendingTokens()
     if (pending.length === 0) return false
     const active = await store.read()
@@ -307,13 +334,13 @@ export class Session {
   /** true quando não sobra revogação pendente. */
   async #doSendPendingLogout(): Promise<boolean> {
     if (this.#deps.store.refreshInBody) return this.#sendNativePending()
-    if ((await this.#readMarker()) !== 'logout-pending') return true
+    if ((await this.#readMarker())?.state !== 'logout-pending') return true
     const status = await this.#postLogout({})
     // 5xx e falta de rede: fica pendente para a reconexão e a próxima
     // abertura. 2xx revogou; 4xx (por exemplo, 403 de Origin) não muda com
     // outra tentativa e encerra a pendência, sem laço
     if (status === null || !terminal(status)) return false
-    if ((await this.#readMarker()) === 'logout-pending')
+    if ((await this.#readMarker())?.state === 'logout-pending')
       await this.#writeMarker('signed-out')
     return true
   }
@@ -343,12 +370,12 @@ export class Session {
     }
   }
 
-  async #readMarker(): Promise<SessionMarkerState | null> {
+  async #readMarker(): Promise<SessionMark | null> {
     return (await this.#deps.marker?.read().catch(() => null)) ?? null
   }
 
-  async #writeMarker(state: SessionMarkerState): Promise<void> {
-    await this.#deps.marker?.write(state).catch(() => undefined)
+  async #writeMarker(state: SessionMarkerState, id?: string): Promise<void> {
+    await this.#deps.marker?.write(state, id).catch(() => undefined)
   }
 
   async #doRefresh(): Promise<boolean> {
@@ -363,6 +390,9 @@ export class Session {
       ? await this.#deps.store.read()
       : null
     if (this.#deps.store.refreshInBody && !stored) return false
+    // De qual sessão o marcador era quando a renovação saiu (compare-and-set
+    // do 401 abaixo)
+    const seen = (await this.#readMarker())?.id ?? null
     let res: Response
     try {
       res = await this.#post(
@@ -377,12 +407,15 @@ export class Session {
     this.#unreachable = false
     if (epoch !== this.#epoch) return false
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) await this.signOut()
+      if (res.status === 401 || res.status === 403) {
+        await this.#markSignedOut(seen)
+        await this.#clearLocal()
+      }
       return false
     }
     const data = (await res.json()) as TokenResponse
     if (epoch !== this.#epoch) return false
-    await this.#accept(data)
+    await this.#accept(data, 'refresh')
     return true
   }
 
@@ -401,16 +434,24 @@ export class Session {
       )
     }
     const data = (await res.json()) as TokenResponse
-    await this.#accept(data)
+    await this.#accept(data, 'login')
     return data.user
   }
 
-  async #accept(data: TokenResponse): Promise<void> {
+  async #accept(data: TokenResponse, how: 'login' | 'refresh'): Promise<void> {
     this.#accessToken = data.accessToken
     if (this.#deps.store.refreshInBody && data.refreshToken)
       await this.#deps.store.write(data.refreshToken)
-    // No web, o login já revogou no servidor o cookie anterior
-    await this.#writeMarker('signed-in')
+    // No web, o login já revogou no servidor o cookie anterior. Login abre
+    // uma sessão nova (id novo); a renovação continua a do marcador
+    if (this.#deps.marker) {
+      const mark = how === 'refresh' ? await this.#readMarker() : null
+      if (mark?.state === 'signed-in' && mark.id) this.#sessionId = mark.id
+      else {
+        this.#sessionId = (this.#deps.newSessionId ?? randomSessionId)()
+        await this.#writeMarker('signed-in', this.#sessionId)
+      }
+    }
     await this.#deps.lastUser?.write(data.user).catch(() => undefined)
     this.#set({ status: 'signedIn', user: data.user })
     // Nativo: a revogação de um logout anterior segue sem travar o login
