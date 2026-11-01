@@ -360,10 +360,12 @@ Edita qualquer número com − e +, um passo por toque.
     label: string; value: number; min: number; max: number; step?: number
     valueText?: (v: number) => string; onChange: (v: number) => void
     size?: 'lg' | 'inline'; allowInput?: boolean; disabled?: boolean
+    showLabel?: boolean // rótulo visível acima; padrão false
   }
   ```
+  `showLabel` liga o rótulo visível acima do controle quando a tela não o mostra ao lado (Dados e Dificuldade da Mesa, Quantidade, XP a conceder). Ele fica `aria-hidden`: o controle já tem o nome, e não há leitura dupla.
 - **Estados:** normal, no limite, desabilitado, digitando.
-- **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta).
+- **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta). O `aria-valuetext` vai sempre (`valueText` ou o número): sem texto, o iOS lê `now/(max−min)` como porcentagem (7 de 0 a 1000 vira "1%").
 - **Multi-sistema:** PV "27 de 134" com teclado (D&D), perícia em % (CoC), escada de −2 a +8 (Fate), dificuldade (WoD), alvo e dados de bônus na parada, quantidade de dano em qualquer trilha.
 - **Resolve:** C-01, C-02, C-03, C-17, DS-01, DS-05, DS-14.
 

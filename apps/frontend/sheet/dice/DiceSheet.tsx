@@ -140,6 +140,7 @@ export function DiceSheet({
 
         <Stepper
           label="Dificuldade"
+          showLabel
           value={dice.difficulty}
           min={roll.difficulty.min}
           max={Math.min(roll.difficulty.max, roll.die ?? 10)}
@@ -188,6 +189,7 @@ export function DiceSheet({
           <View style={styles.manual}>
             <Stepper
               label="Sucessos nos dados"
+              showLabel
               value={manual.successes}
               min={0}
               max={50}

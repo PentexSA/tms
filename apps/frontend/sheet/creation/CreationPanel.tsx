@@ -429,6 +429,7 @@ function BudgetControls() {
       <SectionHeader title="Regras da casa" level="group" />
       <Stepper
         label="Pontos de bônus desta ficha"
+        showLabel
         value={freebies}
         min={0}
         max={1000}

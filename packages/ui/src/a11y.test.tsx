@@ -7,7 +7,13 @@ import {
   screen,
 } from '@testing-library/react-native'
 import { Platform } from 'react-native'
-import { Choice, Pressable, rovingTarget, useRovingFocus } from './index'
+import {
+  Choice,
+  Pressable,
+  rovingTarget,
+  Stepper,
+  useRovingFocus,
+} from './index'
 
 const realOS = Platform.OS
 const setOS = (os: string) =>
@@ -264,5 +270,61 @@ describe('Choice: título visível, setas e disabled (T-09, T-35)', () => {
     expect(radio).toBeDisabled()
     fireEvent.press(radio)
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('Stepper: o número falado e o rótulo visível (T-34, T-09)', () => {
+  it('sem valueText, o texto é o número (o iOS não calcula porcentagem)', () => {
+    render(
+      <Stepper
+        label="Primária"
+        value={7}
+        min={0}
+        max={1000}
+        onChange={jest.fn()}
+      />
+    )
+    expect(
+      screen.getByRole('adjustable', { name: 'Primária' })
+    ).toHaveAccessibilityValue({ text: '7', min: 0, max: 1000, now: 7 })
+  })
+
+  it('com valueText, o texto dele', () => {
+    render(
+      <Stepper
+        label="Sangue"
+        value={9}
+        min={0}
+        max={13}
+        onChange={jest.fn()}
+        valueText={n => `${n} de 13`}
+      />
+    )
+    expect(
+      screen.getByRole('adjustable', { name: 'Sangue' })
+    ).toHaveAccessibilityValue({ text: '9 de 13' })
+  })
+
+  it('showLabel: rótulo visível acima, fora da árvore; o padrão não mostra', () => {
+    const { rerender } = render(
+      <Stepper label="Dados" value={3} min={1} max={50} onChange={jest.fn()} />
+    )
+    expect(
+      screen.queryByText('Dados', { includeHiddenElements: true })
+    ).toBeNull()
+    rerender(
+      <Stepper
+        label="Dados"
+        value={3}
+        min={1}
+        max={50}
+        onChange={jest.fn()}
+        showLabel
+      />
+    )
+    const title = screen.getByText('Dados', { includeHiddenElements: true })
+    expect(title.props['aria-hidden']).toBe(true)
+    expect(screen.queryByText('Dados')).toBeNull()
+    expect(screen.getByRole('adjustable', { name: 'Dados' })).toBeTruthy()
   })
 })

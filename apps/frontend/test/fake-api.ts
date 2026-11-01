@@ -44,6 +44,12 @@ export function createFakeApi() {
       async (..._args: unknown[]): Promise<unknown> =>
         ok({ items: [], nextCursor: null })
     ),
+    // Rolagens da mesa (feed e parada livre do narrador)
+    rollsGet: jest.fn(
+      async (..._args: unknown[]): Promise<unknown> =>
+        ok({ items: [], nextCursor: null })
+    ),
+    rollsPost: jest.fn(),
   }
   const calls = {
     characterGet: jest.fn(),
@@ -164,6 +170,10 @@ export function createFakeApi() {
             }
           ),
           history: { get: (...a: unknown[]) => chronicle.historyGet(id, ...a) },
+          rolls: {
+            get: (...a: unknown[]) => chronicle.rollsGet(id, ...a),
+            post: (...a: unknown[]) => chronicle.rollsPost(id, ...a),
+          },
           characters: {
             get: (...a: unknown[]) => chronicle.charactersGet(...a),
             post: (...a: unknown[]) => chronicle.charactersPost(...a),

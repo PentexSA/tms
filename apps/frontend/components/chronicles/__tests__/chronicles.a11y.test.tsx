@@ -10,6 +10,7 @@ import {
   tokens,
 } from '../../../test/session'
 import { CreationSettings } from '../CreationSettings'
+import { RollFeed } from '../RollFeed'
 
 // Acessibilidade das telas da crônica (P06 da onda 1): um teste de regressão
 // por bug.
@@ -48,10 +49,57 @@ async function renderSettings() {
   await screen.findByTestId('creation-settings-budgets')
 }
 
+const VTM = { code: 'vtm-v20', name: 'Vampiro: A Máscara', family: 'wod' }
+
+async function renderRolls() {
+  calls.chronicle.get.mockResolvedValue(
+    ok({
+      id: CHRONICLE,
+      name: 'Crônica de teste',
+      system: VTM,
+      role: 'storyteller',
+      storyteller: { id: 'u1', username: 'ana' },
+      members: [],
+    })
+  )
+  calls.chronicle.charactersGet.mockResolvedValue(ok([]))
+  const { session } = testSession(
+    () => json(200, tokens()),
+    memoryStore(true, 'r')
+  )
+  await session.restore()
+  renderWithSession(<RollFeed chronicleId={CHRONICLE} />, session)
+  await screen.findByRole('button', { name: 'Rolar' })
+}
+
 describe('Regras da crônica: título visível nos grupos de escolha (T-09)', () => {
   it('"Aprovação do narrador" e "Modo padrão" aparecem na tela', async () => {
     await renderSettings()
     expect(screen.getByText('Aprovação do narrador')).toBeTruthy()
     expect(screen.getByText('Modo padrão')).toBeTruthy()
+  })
+})
+
+describe('Stepper lê o número, não a porcentagem (T-34)', () => {
+  it('Primária 7 do orçamento (0 a 1000) tem o texto "7"', async () => {
+    await renderSettings()
+    expect(
+      screen.getByRole('adjustable', { name: 'Atributos, Primária' })
+    ).toHaveAccessibilityValue({ text: '7', min: 0, max: 1000, now: 7 })
+  })
+})
+
+describe('Mesa › Rolagens: rótulo visível nos steppers (T-09)', () => {
+  it('"Dados" e "Dificuldade" aparecem acima dos controles', async () => {
+    await renderRolls()
+    expect(
+      screen.getByText('Dados', { includeHiddenElements: true })
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Dificuldade', { includeHiddenElements: true })
+    ).toBeTruthy()
+    // O controle continua com o nome; o rótulo visível não é lido duas vezes
+    expect(screen.getByRole('adjustable', { name: 'Dificuldade' })).toBeTruthy()
+    expect(screen.queryByText('Dificuldade')).toBeNull()
   })
 })
