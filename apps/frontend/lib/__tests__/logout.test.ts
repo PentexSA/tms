@@ -1,13 +1,16 @@
 import * as SecureStore from 'expo-secure-store'
 import { createMemoryStorage } from '../../sheet/sync/kv'
 import { json, memoryStore, testSession, tokens } from '../../test/session'
-import type { SessionUser } from '../session/session'
+import { MAX_PENDING_LOGOUTS, type SessionUser } from '../session/session'
 import {
   createSessionMarker,
   SESSION_MARKER_KEY,
   type SessionChannel,
 } from '../session/sessionMarker'
-import { tokenStore as nativeStore } from '../session/tokenStore.native'
+import {
+  tokenStore as nativeStore,
+  parsePending,
+} from '../session/tokenStore.native'
 
 // T-14: o logout sem rede descartava a revogação. No web, o cookie seguia
 // válido e recarregar entrava sozinho; no nativo, a família do refresh
@@ -36,7 +39,7 @@ describe('logout no nativo: revogação pendente no keychain', () => {
     await session.logout()
     expect(session.getState().status).toBe('signedOut')
     expect(store.value()).toBeNull()
-    expect(store.pending()).toBe('refresh-1')
+    expect(store.pending()).toEqual(['refresh-1'])
     expect(urls(fetch)).toEqual(['/auth/logout'])
     // A pendência foi gravada antes de o token ativo sair
     const wrote =
@@ -46,29 +49,83 @@ describe('logout no nativo: revogação pendente no keychain', () => {
   })
 
   it('a revogação pendente vai quando a rede volta e some no 204', async () => {
-    const store = memoryStore(true, null, 'refresh-1')
+    const store = memoryStore(true, null, ['refresh-1'])
     const { session, fetch } = testSession(noContent, store)
     expect(await session.retryPendingLogout()).toBe(true)
     const [url, init] = fetch.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://api.test/auth/logout')
     expect(bodyOf(init)).toEqual({ refreshToken: 'refresh-1' })
-    expect(store.pending()).toBeNull()
+    expect(store.pending()).toEqual([])
   })
 
   it.each([
     [500, 'erro do servidor'],
-    [429, 'limite de tentativas'],
+    [503, 'servidor fora'],
   ])('%i (%s) mantém a pendência para reenviar', async status => {
-    const store = memoryStore(true, null, 'refresh-1')
+    const store = memoryStore(true, null, ['refresh-1'])
     const { session } = testSession(() => json(status, { error: 'x' }), store)
     expect(await session.retryPendingLogout()).toBe(false)
-    expect(store.pending()).toBe('refresh-1')
+    expect(store.pending()).toEqual(['refresh-1'])
+  })
+
+  // Qualquer 4xx não muda com outra tentativa: encerra, sem laço
+  it.each([400, 403, 429])('%i encerra a pendência', async status => {
+    const store = memoryStore(true, null, ['refresh-1'])
+    const { session, fetch } = testSession(
+      () => json(status, { error: 'x' }),
+      store
+    )
+    expect(await session.retryPendingLogout()).toBe(true)
+    expect(store.pending()).toEqual([])
+    expect(await session.retryPendingLogout()).toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  // Revisão de código: com uma posição só, o logout de B apagava a
+  // pendência de A, que nunca tinha chegado ao servidor
+  it('A pendente, login de B e logout de B sem rede: as duas sessões acabam revogadas', async () => {
+    let reachable = false
+    const revoked: string[] = []
+    // A saiu sem rede; B entra, mas o /auth/logout ainda não alcança
+    const store = memoryStore(true, null, ['refresh-a'])
+    const { session } = testSession((url, init) => {
+      if (!url.endsWith('/auth/logout'))
+        return json(200, { ...tokens(), refreshToken: 'refresh-b' })
+      if (!reachable) throw new TypeError('Network request failed')
+      revoked.push(bodyOf(init).refreshToken)
+      return noContent()
+    }, store)
+    await session.login('bia@example.test', 'senha longa o bastante')
+    expect(await session.retryPendingLogout()).toBe(false)
+    await session.logout()
+    expect(store.pending()).toEqual(['refresh-a', 'refresh-b'])
+    reachable = true
+    expect(await session.retryPendingLogout()).toBe(true)
+    expect(revoked).toEqual(['refresh-a', 'refresh-b'])
+    expect(store.pending()).toEqual([])
+  })
+
+  it(`guarda até ${MAX_PENDING_LOGOUTS} revogações; a mais antiga sai`, async () => {
+    const old = Array.from({ length: MAX_PENDING_LOGOUTS }, (_, n) => `r-${n}`)
+    const store = memoryStore(true, 'r-new', old)
+    const { session } = testSession(offline, store)
+    await session.logout()
+    expect(store.pending()).toEqual([...old.slice(1), 'r-new'])
+  })
+
+  it('lê o keychain uma vez, não a cada renovação', async () => {
+    const store = memoryStore(true, 'refresh-0')
+    const { session } = testSession(() => json(200, tokens(2)), store)
+    await session.restore()
+    await session.refresh()
+    await session.refresh()
+    expect(store.pendingLogout.read).toHaveBeenCalledTimes(1)
   })
 
   it('o token pendente nunca vai para /auth/refresh', async () => {
     // Saiu sem rede e entrou de novo: o token novo renova, o pendente só
     // vai para /auth/logout
-    const store = memoryStore(true, 'refresh-2', 'refresh-1')
+    const store = memoryStore(true, 'refresh-2', ['refresh-1'])
     const { session, fetch } = testSession(
       url =>
         url.endsWith('/auth/logout') ? noContent() : json(200, tokens(3)),
@@ -83,21 +140,21 @@ describe('logout no nativo: revogação pendente no keychain', () => {
     }
     expect(urls(fetch)).toContain('/auth/refresh')
     expect(session.getState().status).toBe('signedIn')
-    expect(store.pending()).toBeNull()
+    expect(store.pending()).toEqual([])
   })
 
   it('app morto entre gravar a pendência e apagar o token: a abertura não renova', async () => {
-    const store = memoryStore(true, 'refresh-1', 'refresh-1')
+    const store = memoryStore(true, 'refresh-1', ['refresh-1'])
     const { session, fetch } = testSession(offline, store)
     await session.restore()
     expect(session.getState().status).toBe('signedOut')
     expect(urls(fetch)).toEqual(['/auth/logout'])
     expect(store.value()).toBeNull()
-    expect(store.pending()).toBe('refresh-1')
+    expect(store.pending()).toEqual(['refresh-1'])
   })
 
   it('login com pendência entra e revoga a sessão antiga em segundo plano', async () => {
-    const store = memoryStore(true, null, 'refresh-1')
+    const store = memoryStore(true, null, ['refresh-1'])
     const { session, fetch } = testSession(
       url =>
         url.endsWith('/auth/logout') ? noContent() : json(200, tokens(2)),
@@ -108,17 +165,17 @@ describe('logout no nativo: revogação pendente no keychain', () => {
     await session.retryPendingLogout()
     expect(urls(fetch)).toEqual(['/auth/login', '/auth/logout'])
     expect(store.value()).toBe('refresh-2')
-    expect(store.pending()).toBeNull()
+    expect(store.pending()).toEqual([])
   })
 
   it('a pendência usa o keychain só deste aparelho, numa chave à parte', async () => {
     const options = { keychainAccessible: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY' }
-    await nativeStore.pendingLogout.write('t')
+    await nativeStore.pendingLogout.write(['t1', 't2'])
     await nativeStore.pendingLogout.read()
-    await nativeStore.pendingLogout.clear()
+    await nativeStore.pendingLogout.write([])
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'tms.pendingLogout',
-      't',
+      '["t1","t2"]',
       options
     )
     expect(SecureStore.getItemAsync).toHaveBeenCalledWith(
@@ -129,6 +186,14 @@ describe('logout no nativo: revogação pendente no keychain', () => {
       'tms.pendingLogout',
       options
     )
+  })
+
+  it('a lista do keychain é conferida', () => {
+    expect(parsePending(null)).toEqual([])
+    expect(parsePending('["a","b"]')).toEqual(['a', 'b'])
+    expect(parsePending('[1,"a",""]')).toEqual(['a'])
+    expect(parsePending('token-antigo')).toEqual(['token-antigo'])
+    expect(parsePending('[quebrado')).toEqual([])
   })
 })
 
@@ -163,7 +228,7 @@ describe('logout espera a limpeza local', () => {
     }
     const { session } = testSession(
       offline,
-      memoryStore(true, 'refresh-1', 'refresh-1'),
+      memoryStore(true, 'refresh-1', ['refresh-1']),
       { lastUser, purgeUserData }
     )
     await session.restore()
@@ -214,24 +279,27 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     expect(tab.state()).toBe('signed-out')
   })
 
-  // O 429 do logout já apaga o cookie: o reenvio vai sem cookie, recebe 204
-  // (ou 400) e encerra a pendência, sem laço
-  it('429 no logout: o reenvio sem cookie encerra a pendência uma vez só', async () => {
-    let calls = 0
-    const tab = web(() => {
-      calls++
-      return calls === 1
-        ? json(429, { error: 'muitas tentativas' })
-        : new Response(null, { status: 204 })
-    }, 'signed-in')
+  // 403 (Origin fora da allowlist) não muda com outra tentativa: o logout
+  // encerra a pendência uma vez só, sem laço. 5xx continua pendente
+  it('403 no logout encerra a pendência uma vez só', async () => {
+    const tab = web(
+      () => json(403, { error: 'origem não permitida' }),
+      'signed-in'
+    )
     await tab.session.logout()
-    expect(tab.state()).toBe('logout-pending')
-    expect(await tab.session.retryPendingLogout()).toBe(true)
     expect(tab.state()).toBe('signed-out')
     // Nada mais a enviar: outro "online" ou outra abertura não chamam a rede
     expect(await tab.session.retryPendingLogout()).toBe(true)
     await tab.session.restore()
-    expect(urls(tab.fetch)).toEqual(['/auth/logout', '/auth/logout'])
+    expect(urls(tab.fetch)).toEqual(['/auth/logout'])
+  })
+
+  it('5xx no logout mantém a pendência para a próxima tentativa', async () => {
+    const tab = web(() => json(503, { error: 'fora' }), 'signed-in')
+    await tab.session.logout()
+    expect(tab.state()).toBe('logout-pending')
+    expect(await tab.session.retryPendingLogout()).toBe(false)
+    expect(tab.state()).toBe('logout-pending')
   })
 
   it('400 no reenvio também encerra a pendência', async () => {

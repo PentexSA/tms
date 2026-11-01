@@ -17,8 +17,32 @@ export const tokenStore: TokenStore = {
   write: token => SecureStore.setItemAsync(KEY, token, OPTIONS),
   clear: () => SecureStore.deleteItemAsync(KEY, OPTIONS),
   pendingLogout: {
-    read: () => SecureStore.getItemAsync(PENDING_LOGOUT, OPTIONS),
-    write: token => SecureStore.setItemAsync(PENDING_LOGOUT, token, OPTIONS),
-    clear: () => SecureStore.deleteItemAsync(PENDING_LOGOUT, OPTIONS),
+    read: async () =>
+      parsePending(await SecureStore.getItemAsync(PENDING_LOGOUT, OPTIONS)),
+    write: tokens =>
+      tokens.length
+        ? SecureStore.setItemAsync(
+            PENDING_LOGOUT,
+            JSON.stringify(tokens),
+            OPTIONS
+          )
+        : SecureStore.deleteItemAsync(PENDING_LOGOUT, OPTIONS),
   },
+}
+
+/** A lista do keychain, conferida: só textos do tamanho de um token. */
+export function parsePending(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (Array.isArray(value))
+      return value.filter(
+        (t): t is string =>
+          typeof t === 'string' && t.length > 0 && t.length <= 200
+      )
+  } catch {
+    // Um token só, gravado como texto: vale como lista de um
+    if (raw.length <= 200 && !raw.startsWith('[')) return [raw]
+  }
+  return []
 }

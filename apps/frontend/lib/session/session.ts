@@ -74,12 +74,28 @@ interface TokenResponse {
 
 const OFFLINE = 'Não foi possível falar com o servidor. Verifique a conexão.'
 
+/**
+ * Quantas revogações pendentes o nativo guarda (sair de A e de B sem rede).
+ * Passando disso, a mais antiga sai da lista: aquela sessão não é revogada
+ * agora e vence no servidor no prazo normal (30 dias sem uso, 90 no total).
+ * O limite mantém o valor do keychain pequeno.
+ */
+export const MAX_PENDING_LOGOUTS = 5
+
+/** 2xx revogou; 4xx não vai mudar com outra tentativa. 5xx e rede, sim. */
+const terminal = (status: number) =>
+  (status >= 200 && status < 300) || (status >= 400 && status < 500)
+
 export class Session {
   #state: SessionState = { status: 'loading', user: null }
   #accessToken: string | null = null
   #refreshing: Promise<boolean> | null = null
   // Um envio da revogação pendente por vez
   #revoking: Promise<boolean> | null = null
+  // Nativo: as revogações pendentes, lidas do keychain uma vez e mantidas em
+  // memória (só esta sessão grava a chave); as mudanças vão em fila
+  #pending: string[] | null = null
+  #pendingWrites: Promise<unknown> = Promise.resolve()
   // O último refresh falhou por falta de rede (não por sessão inválida)
   #unreachable = false
   // Sobe a cada saída: resposta de refresh ou login iniciado antes dela é
@@ -196,8 +212,13 @@ export class Session {
     if (store.refreshInBody) {
       const token = await store.read()
       // Antes de apagar o token ativo: se o app morrer aqui, a abertura vê
-      // os dois iguais e revoga sem renovar
-      if (token) await store.pendingLogout.write(token)
+      // o ativo na lista e revoga sem renovar
+      if (token)
+        await this.#updatePending(tokens =>
+          [...tokens.filter(t => t !== token), token].slice(
+            -MAX_PENDING_LOGOUTS
+          )
+        )
     } else await this.#writeMarker('logout-pending')
     await this.#clearLocal()
     this.#deps.channel?.post()
@@ -242,8 +263,38 @@ export class Session {
     const { store } = this.#deps
     if (!store.refreshInBody)
       return (await this.#readMarker()) === 'logout-pending'
-    const pending = await store.pendingLogout.read().catch(() => null)
-    return pending !== null && pending === (await store.read())
+    const pending = await this.#pendingTokens()
+    if (pending.length === 0) return false
+    const active = await store.read()
+    return active !== null && pending.includes(active)
+  }
+
+  /** Nativo: a lista de revogações pendentes (do keychain, uma vez). */
+  async #pendingTokens(): Promise<readonly string[]> {
+    if (this.#pending === null) {
+      const stored = await this.#deps.store.pendingLogout
+        .read()
+        .catch(() => [] as readonly string[])
+      this.#pending ??= [...stored]
+    }
+    return this.#pending
+  }
+
+  /** Muda a lista em fila: duas mudanças nunca leem a mesma versão. */
+  #updatePending(change: (tokens: string[]) => string[]): Promise<void> {
+    const run = this.#pendingWrites.then(async () => {
+      const next = change([...(await this.#pendingTokens())])
+      this.#pending = next
+      try {
+        await this.#deps.store.pendingLogout.write(next)
+      } catch (error) {
+        // O disco pode ter ficado diferente: a próxima leitura confere
+        this.#pending = null
+        throw error
+      }
+    })
+    this.#pendingWrites = run.catch(() => undefined)
+    return run
   }
 
   #sendPendingLogout(): Promise<boolean> {
@@ -255,27 +306,41 @@ export class Session {
 
   /** true quando não sobra revogação pendente. */
   async #doSendPendingLogout(): Promise<boolean> {
-    const { store } = this.#deps
-    let body: { refreshToken?: string } = {}
-    if (store.refreshInBody) {
-      const token = await store.pendingLogout.read().catch(() => null)
-      if (!token) return true
-      body = { refreshToken: token }
-    } else if ((await this.#readMarker()) !== 'logout-pending') return true
-    let res: Response
-    try {
-      res = await this.#post('/auth/logout', body)
-    } catch {
-      // Sem rede: fica pendente para a reconexão e a próxima abertura
-      return false
-    }
-    // 2xx revogou. 400 é um token que não pode ser sessão nenhuma: não há o
-    // que reenviar. 429 e 5xx são temporários: a pendência fica
-    if (!res.ok && res.status !== 400) return false
-    if (store.refreshInBody) await store.pendingLogout.clear()
-    else if ((await this.#readMarker()) === 'logout-pending')
+    if (this.#deps.store.refreshInBody) return this.#sendNativePending()
+    if ((await this.#readMarker()) !== 'logout-pending') return true
+    const status = await this.#postLogout({})
+    // 5xx e falta de rede: fica pendente para a reconexão e a próxima
+    // abertura. 2xx revogou; 4xx (por exemplo, 403 de Origin) não muda com
+    // outra tentativa e encerra a pendência, sem laço
+    if (status === null || !terminal(status)) return false
+    if ((await this.#readMarker()) === 'logout-pending')
       await this.#writeMarker('signed-out')
     return true
+  }
+
+  /** Nativo: envia todas; cada uma sai da lista só no 2xx ou no 4xx. */
+  async #sendNativePending(): Promise<boolean> {
+    let left = false
+    for (const token of [...(await this.#pendingTokens())]) {
+      const status = await this.#postLogout({ refreshToken: token })
+      // Sem rede, as outras também não vão: tenta tudo de novo depois
+      if (status === null) return false
+      if (!terminal(status)) {
+        left = true
+        continue
+      }
+      await this.#updatePending(tokens => tokens.filter(t => t !== token))
+    }
+    return !left
+  }
+
+  /** O status do POST /auth/logout, ou null sem resposta (rede). */
+  async #postLogout(body: { refreshToken?: string }): Promise<number | null> {
+    try {
+      return (await this.#post('/auth/logout', body)).status
+    } catch {
+      return null
+    }
   }
 
   async #readMarker(): Promise<SessionMarkerState | null> {

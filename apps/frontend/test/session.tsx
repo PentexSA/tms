@@ -25,13 +25,13 @@ export const tokens = (n = 1) => ({
 export function memoryStore(
   native = true,
   initial: string | null = null,
-  pending: string | null = null
+  pending: readonly string[] = []
 ) {
   let value = initial
-  let pendingValue = pending
+  let pendingValue: readonly string[] = pending
   const store: TokenStore & {
     value(): string | null
-    pending(): string | null
+    pending(): readonly string[]
   } = {
     refreshInBody: native,
     read: jest.fn(async () => (native ? value : null)),
@@ -41,14 +41,11 @@ export function memoryStore(
     clear: jest.fn(async () => {
       value = null
     }),
-    // A revogação pendente do logout sem rede (T-14), à parte do token ativo
+    // As revogações pendentes do logout sem rede (T-14), à parte do ativo
     pendingLogout: {
-      read: jest.fn(async () => (native ? pendingValue : null)),
-      write: jest.fn(async (t: string) => {
-        pendingValue = t
-      }),
-      clear: jest.fn(async () => {
-        pendingValue = null
+      read: jest.fn(async () => (native ? [...pendingValue] : [])),
+      write: jest.fn(async (tokens: readonly string[]) => {
+        pendingValue = [...tokens]
       }),
     },
     value: () => value,

@@ -10,15 +10,16 @@ export interface TokenStore {
   write(token: string): Promise<void>
   clear(): Promise<void>
   /**
-   * A revogação que ainda não chegou ao servidor (T-14): o refresh token de
-   * quem saiu sem rede, numa chave à parte. Só o logout o lê; nunca vai para
-   * /auth/refresh. No web não há nada (o cookie fica com o navegador e o
-   * marcador de sessão diz que o logout está pendente).
+   * As revogações que ainda não chegaram ao servidor (T-14): os refresh
+   * tokens de quem saiu sem rede, numa chave à parte, em lista (sair de B
+   * não apaga a pendência de A). Só o logout as lê; nunca vão para
+   * /auth/refresh. Lista vazia apaga a chave. No web não há nada (o cookie
+   * fica com o navegador e o marcador de sessão diz que o logout está
+   * pendente).
    */
   readonly pendingLogout: {
-    read(): Promise<string | null>
-    write(token: string): Promise<void>
-    clear(): Promise<void>
+    read(): Promise<readonly string[]>
+    write(tokens: readonly string[]): Promise<void>
   }
 }
 
@@ -28,8 +29,7 @@ export const tokenStore: TokenStore = {
   write: async () => undefined,
   clear: async () => undefined,
   pendingLogout: {
-    read: async () => null,
+    read: async () => [],
     write: async () => undefined,
-    clear: async () => undefined,
   },
 }
