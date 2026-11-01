@@ -1,5 +1,6 @@
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Platform } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
@@ -124,7 +125,8 @@ describe('Nova ficha', () => {
     )
   })
 
-  it('template desconhecido: "Atualize o app"', async () => {
+  // L-02: a tela tem saída (no app, "Voltar"; no web, "Recarregar")
+  it('template desconhecido: "Atualize o app" com "Voltar", sem loja configurada', async () => {
     const t = templateJson('vtm-v20')
     t.schema = 2
     calls.templateGet.mockResolvedValue(ok(t))
@@ -132,9 +134,35 @@ describe('Nova ficha', () => {
     expect(
       await screen.findByRole('header', { name: 'Atualize o app' })
     ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Abrir a loja' })).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar' }))
+    expect(router.back).toHaveBeenCalled()
   })
 
-  it('crônica inacessível', async () => {
+  it('template desconhecido no web: "Recarregue a página" e "Recarregar"', async () => {
+    const t = templateJson('vtm-v20')
+    t.schema = 2
+    calls.templateGet.mockResolvedValue(ok(t))
+    const reload = jest.fn()
+    const page = globalThis as { location?: unknown }
+    const location = page.location
+    const os = Platform.OS
+    page.location = { reload }
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      renderWithSession(<NewCharacterScreen />, await signedIn())
+      expect(
+        await screen.findByRole('header', { name: 'Recarregue a página' })
+      ).toBeTruthy()
+      fireEvent.press(screen.getByRole('button', { name: 'Recarregar' }))
+      expect(reload).toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+      page.location = location
+    }
+  })
+
+  it('crônica inacessível, com "Tentar de novo"', async () => {
     calls.chronicle.get.mockResolvedValue(fail(404, 'não encontrado'))
     renderWithSession(<NewCharacterScreen />, await signedIn())
     expect(
@@ -142,6 +170,11 @@ describe('Nova ficha', () => {
         name: 'Não foi possível abrir a criação de ficha',
       })
     ).toBeTruthy()
+    const before = calls.chronicle.get.mock.calls.length
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }))
+    })
+    expect(calls.chronicle.get.mock.calls.length).toBeGreaterThan(before)
   })
 })
 
