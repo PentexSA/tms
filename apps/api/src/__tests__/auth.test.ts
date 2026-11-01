@@ -453,6 +453,56 @@ describe('CORS, cabeçalhos e erros', () => {
     expect(evil.headers.get('access-control-allow-origin')).not.toBe('*')
   })
 
+  // T-86: quem acrescenta o X-Forwarded-For é o proxy, nunca o navegador
+  const preflightHeaders = async (
+    extra: Parameters<typeof createTestContext>[0]
+  ) => {
+    await setup(extra)
+    const res = await makeRequest(
+      ctx.app,
+      'OPTIONS',
+      '/auth/login',
+      undefined,
+      {
+        origin: ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      }
+    )
+    return (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+  }
+
+  it('o preflight nunca libera x-forwarded-for, nem com TRUST_PROXY', async () => {
+    for (const trustProxy of [false, true]) {
+      const allowed = await preflightHeaders({ trustProxy })
+      expect(allowed).toContain('content-type')
+      expect(allowed).not.toContain('x-forwarded-for')
+      expect(allowed).not.toContain('x-tms-test-client-ip')
+    }
+  })
+
+  it('com TEST_CLIENT_IP, libera só o header de teste', async () => {
+    const allowed = await preflightHeaders({ testClientIp: true })
+    expect(allowed).toContain('x-tms-test-client-ip')
+    expect(allowed).not.toContain('x-forwarded-for')
+  })
+
+  it('sem proxy confiável, X-Forwarded-For forjado não escapa do limite de cadastro', async () => {
+    await setup({ trustProxy: false, testClientIp: false })
+    const statuses: number[] = []
+    for (let n = 1; n <= 6; n++)
+      statuses.push(
+        (
+          await post(
+            '/auth/register',
+            { ...ana, email: `f${n}@x.test`, username: `forjado${n}` },
+            { ...NATIVE, 'x-forwarded-for': `203.0.113.${n}` }
+          )
+        ).status
+      )
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 429])
+  })
+
   it.each([
     ['GET', '/health', 200],
     ['GET', '/me', 401],

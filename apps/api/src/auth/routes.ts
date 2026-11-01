@@ -94,11 +94,7 @@ export function authRoutes(
     .post(
       '/register',
       async ({ body, request, server, set, cookie }) => {
-        limit(
-          options.limits.register,
-          clientIp(request, server, options.trustProxy),
-          set
-        )
+        limit(options.limits.register, clientIp(request, server, options), set)
         const email = normalizeEmail(body.email)
         const hashed = await hashPassword(body.password)
         const user = await db
@@ -141,11 +137,7 @@ export function authRoutes(
       '/login',
       async ({ body, request, server, set, cookie }) => {
         const email = normalizeEmail(body.email)
-        limit(
-          options.limits.login,
-          clientIp(request, server, options.trustProxy),
-          set
-        )
+        limit(options.limits.login, clientIp(request, server, options), set)
         const failures = options.limits.loginFailures.check(email)
         if (!failures.allowed) {
           set.headers['retry-after'] = String(failures.retryAfterSeconds)
@@ -179,11 +171,7 @@ export function authRoutes(
     .post(
       '/refresh',
       async ({ body, request, server, set, cookie }) => {
-        limit(
-          options.limits.refresh,
-          clientIp(request, server, options.trustProxy),
-          set
-        )
+        limit(options.limits.refresh, clientIp(request, server, options), set)
         const jar = cookie[REFRESH_COOKIE] as unknown as CookieJar
         const raw = body?.refreshToken ?? fromCookie(request, jar)
         const rotated = raw

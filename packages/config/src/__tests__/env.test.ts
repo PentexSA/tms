@@ -191,10 +191,33 @@ describe('@tms/config - Environment Configuration', () => {
       expect(config.TRUST_PROXY).toBe(true)
     })
 
+    // T-86: o IP simulado do E2E é outra flag, desligada por padrão
+    it('should default TEST_CLIENT_IP to false and parse it outside production', async () => {
+      delete process.env.TEST_CLIENT_IP
+      expect((await import('../env')).config.TEST_CLIENT_IP).toBe(false)
+      process.env.NODE_ENV = 'development'
+      delete process.env.TRUST_PROXY
+      process.env.TEST_CLIENT_IP = 'true'
+      expect((await import('../env')).config.TEST_CLIENT_IP).toBe(true)
+    })
+
     it.each([
       ['JWT_SECRET curto', { JWT_SECRET: 'curto' }],
       ['CORS com *', { CORS_ORIGINS: '*' }],
       ['produção sem JWT_SECRET', { NODE_ENV: 'production' }],
+      ['TRUST_PROXY que não é true nem false', { TRUST_PROXY: '1' }],
+      [
+        'TEST_CLIENT_IP em produção',
+        {
+          NODE_ENV: 'production',
+          JWT_SECRET: 'x'.repeat(48),
+          TEST_CLIENT_IP: 'true',
+        },
+      ],
+      [
+        'TEST_CLIENT_IP junto do TRUST_PROXY',
+        { TEST_CLIENT_IP: 'true', TRUST_PROXY: 'true' },
+      ],
     ])('should reject %s', async (_, env) => {
       delete process.env.JWT_SECRET
       Object.assign(process.env, { NODE_ENV: 'test', ...env })

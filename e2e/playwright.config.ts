@@ -34,8 +34,9 @@ export default defineConfig({
         DATABASE_URL,
         CORS_ORIGINS: WEB_URL,
         NODE_ENV: 'development',
-        // O E2E simula clientes diferentes pelo X-Forwarded-For (ver support/users.ts)
-        TRUST_PROXY: 'true',
+        // O E2E simula clientes diferentes pelo header de teste (ver
+        // support/users.ts). Nunca TRUST_PROXY: aqui não há proxy (T-86)
+        TEST_CLIENT_IP: 'true',
       },
     },
     {

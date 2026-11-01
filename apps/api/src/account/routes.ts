@@ -47,10 +47,7 @@ export function accountRoutes(
       const me = requireUser(userId)
       // Força bruta na senha com um token roubado: por usuário e por IP
       limit(`user:${me}`, set as Headers)
-      limit(
-        `ip:${clientIp(request, server, options.trustProxy)}`,
-        set as Headers
-      )
+      limit(`ip:${clientIp(request, server, options)}`, set as Headers)
       // Operação sensível: pede a senha de novo, mesmo com sessão válida
       const user = await db
         .selectFrom('users')

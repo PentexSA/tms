@@ -525,7 +525,7 @@ export function chronicleRoutes(
         const me = requireUser(userId)
         for (const key of [
           `user:${me}`,
-          `ip:${clientIp(request, server, options.trustProxy)}`,
+          `ip:${clientIp(request, server, options)}`,
         ]) {
           const d = options.limits.invites.hit(key)
           if (!d.allowed) {

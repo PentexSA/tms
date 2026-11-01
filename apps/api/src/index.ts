@@ -11,7 +11,7 @@ import { operationRoutes } from './chronicles/operations'
 import { chronicleRoutes } from './chronicles/routes'
 import { tableRoutes } from './chronicles/table'
 import { onError } from './http/on-error'
-import { securityHeaders } from './http/security'
+import { securityHeaders, TEST_CLIENT_IP_HEADER } from './http/security'
 import { loggerMiddleware } from './middlewares/loggerMiddleware'
 import { type AppOptions, resolveOptions } from './options'
 import { rollRoutes } from './rolls/routes'
@@ -52,9 +52,10 @@ export const createApp = (
             'content-type',
             'authorization',
             'x-tms-client',
-            // No E2E, o navegador representa clientes distintos sem um proxy
-            // real. Em produção, o proxy confiável acrescenta este cabeçalho.
-            ...(options.trustProxy ? ['x-forwarded-for'] : []),
+            // Nunca o x-forwarded-for: quem o acrescenta é o proxy, não o
+            // navegador. No E2E, o navegador representa clientes distintos
+            // pelo header de teste, que o config recusa em produção (T-86)
+            ...(options.testClientIp ? [TEST_CLIENT_IP_HEADER] : []),
           ],
           maxAge: 600,
         })

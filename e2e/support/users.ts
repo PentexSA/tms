@@ -4,8 +4,11 @@ import { API_URL, WEB_URL } from '../env'
 
 // Cadastro direto na API, com o cookie do refresh no contexto do navegador:
 // o app abre já com a sessão (é o mesmo caminho do recarregar). Cada cadastro
-// vem de um "cliente" diferente (X-Forwarded-For, com TRUST_PROXY na API do
+// vem de um "cliente" diferente (header de teste, com TEST_CLIENT_IP na API do
 // E2E), para não esbarrar no rate limit de cadastro por IP, que continua ativo.
+// Não é o X-Forwarded-For: esse só vale atrás de proxy (TRUST_PROXY), e o CORS
+// não o libera para o navegador (T-86).
+const TEST_IP = 'x-tms-test-client-ip'
 let seq = 0
 const fakeIp = () =>
   `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${(seq % 250) + 1}`
@@ -17,14 +20,14 @@ export async function signUp(context: BrowserContext, prefix: string) {
   // Mantém o mesmo IP simulado também nas chamadas feitas pela página. Sem
   // isso, todos os navegadores do runner parecem vir de localhost e dividem
   // o limite de tentativas dos convites.
-  await context.setExtraHTTPHeaders({ 'x-forwarded-for': ip })
+  await context.setExtraHTTPHeaders({ [TEST_IP]: ip })
   const res = await context.request.post(`${API_URL}/auth/register`, {
     data: {
       email: `${username}@example.test`,
       username,
       password: 'correct horse battery staple',
     },
-    headers: { origin: WEB_URL, 'x-forwarded-for': ip },
+    headers: { origin: WEB_URL, [TEST_IP]: ip },
   })
   if (res.status() !== 201)
     throw new Error(`cadastro falhou: ${res.status()} ${await res.text()}`)
@@ -78,7 +81,7 @@ export function rawAs(
     ...(data === undefined ? {} : { data }),
     headers: {
       authorization: `Bearer ${user.accessToken}`,
-      ...(user.ip ? { 'x-forwarded-for': user.ip } : {}),
+      ...(user.ip ? { [TEST_IP]: user.ip } : {}),
     },
   })
 }

@@ -24,8 +24,15 @@ const configSchema = z
     JWT_AUDIENCE: z.string().min(1).default('tms-app'),
     // Origens do app web aceitas pelo CORS (com credenciais). Nunca "*".
     CORS_ORIGINS: csv.default(['http://localhost:8081']),
-    // Atrás de um proxy reverso: o IP do cliente vem do X-Forwarded-For.
+    // Atrás de exatamente um proxy reverso, que acrescenta o IP do cliente ao
+    // fim do X-Forwarded-For. Sem proxy, false: o IP vem da conexão.
     TRUST_PROXY: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform(v => v === 'true'),
+    // Só no E2E: o navegador simula clientes distintos pelo header
+    // x-tms-test-client-ip. Recusado em produção e junto do TRUST_PROXY (T-86).
+    TEST_CLIENT_IP: z
       .enum(['true', 'false'])
       .default('false')
       .transform(v => v === 'true'),
@@ -36,6 +43,18 @@ const configSchema = z
         code: 'custom',
         path: ['JWT_SECRET'],
         message: 'obrigatório em produção',
+      })
+    if (c.TEST_CLIENT_IP && c.NODE_ENV === 'production')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TEST_CLIENT_IP'],
+        message: 'só para o E2E; recusado em produção',
+      })
+    if (c.TEST_CLIENT_IP && c.TRUST_PROXY)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TEST_CLIENT_IP'],
+        message: 'não combina com TRUST_PROXY',
       })
     if (c.CORS_ORIGINS.includes('*'))
       ctx.addIssue({
