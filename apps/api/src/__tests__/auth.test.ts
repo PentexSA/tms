@@ -571,6 +571,30 @@ describe('POST /auth/refresh e /auth/logout', () => {
     expect((await refresh(body.refreshToken ?? '')).status).toBe(200)
   })
 
+  // Fail secure: quem esgota o contador do logout (outro atrás do mesmo NAT,
+  // num computador compartilhado) não segura o cookie no navegador de quem
+  // saiu. O 429 não revoga no servidor, mas apaga o cookie
+  it('logout web com o limite estourado: 429 que apaga o cookie mesmo assim', async () => {
+    await setup({
+      limits: {
+        ...defaultLimits(() => new Date()),
+        logout: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+      },
+    })
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    // Outro cliente no mesmo IP gasta o contador
+    expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
+    const limited = await post('/auth/logout', undefined, { ...WEB, cookie })
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('retry-after')).toMatch(/^\d+$/)
+    expectCleared(limited)
+    // Não revogou no servidor: o limite continua valendo
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie })).status
+    ).toBe(200)
+  })
+
   it('o limite do logout não gasta o do refresh', async () => {
     expect(defaultLimits(() => new Date()).logout).not.toBe(
       defaultLimits(() => new Date()).refresh

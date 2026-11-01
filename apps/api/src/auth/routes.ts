@@ -231,11 +231,19 @@ export function authRoutes(
     .post(
       '/logout',
       async ({ body, request, server, set, cookie }) => {
-        // O mesmo limite do refresh, num contador próprio: o logout só
-        // revoga, mas é endpoint de autenticação. Com 429 nada é revogado e
-        // o app mantém a revogação pendente para reenviar
-        limit(options.limits.logout, clientIp(request, server, options), set)
         const jar = cookie[REFRESH_COOKIE] as unknown as CookieJar
+        // O mesmo limite do refresh, num contador próprio: o logout só
+        // revoga, mas é endpoint de autenticação. O 429 não revoga no
+        // servidor (o app mantém a revogação pendente e reenvia), mas apaga
+        // o cookie mesmo assim: quem esgota o contador (outro na mesma rede,
+        // atrás do mesmo NAT) não segura a sessão viva no navegador de
+        // quem saiu (fail secure)
+        try {
+          limit(options.limits.logout, clientIp(request, server, options), set)
+        } catch (error) {
+          clearRefreshCookie(request, jar, options.secureCookies)
+          throw error
+        }
         const raw = body?.refreshToken ?? fromCookie(request, jar)
         if (raw) await revokeSession(db, options.sessions, raw)
         clearRefreshCookie(request, jar, options.secureCookies)

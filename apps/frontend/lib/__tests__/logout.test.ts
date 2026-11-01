@@ -214,6 +214,35 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     expect(tab.state()).toBe('signed-out')
   })
 
+  // O 429 do logout já apaga o cookie: o reenvio vai sem cookie, recebe 204
+  // (ou 400) e encerra a pendência, sem laço
+  it('429 no logout: o reenvio sem cookie encerra a pendência uma vez só', async () => {
+    let calls = 0
+    const tab = web(() => {
+      calls++
+      return calls === 1
+        ? json(429, { error: 'muitas tentativas' })
+        : new Response(null, { status: 204 })
+    }, 'signed-in')
+    await tab.session.logout()
+    expect(tab.state()).toBe('logout-pending')
+    expect(await tab.session.retryPendingLogout()).toBe(true)
+    expect(tab.state()).toBe('signed-out')
+    // Nada mais a enviar: outro "online" ou outra abertura não chamam a rede
+    expect(await tab.session.retryPendingLogout()).toBe(true)
+    await tab.session.restore()
+    expect(urls(tab.fetch)).toEqual(['/auth/logout', '/auth/logout'])
+  })
+
+  it('400 no reenvio também encerra a pendência', async () => {
+    const tab = web(
+      () => json(400, { error: 'dados inválidos' }),
+      'logout-pending'
+    )
+    expect(await tab.session.retryPendingLogout()).toBe(true)
+    expect(tab.state()).toBe('signed-out')
+  })
+
   it('uma aba aberta não renova com logout pendente', async () => {
     const tab = web(() => json(200, { ...tokens(), refreshToken: undefined }))
     await tab.session.restore()
