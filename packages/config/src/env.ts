@@ -31,7 +31,9 @@ const configSchema = z
       .default('false')
       .transform(v => v === 'true'),
     // Só no E2E: o navegador simula clientes distintos pelo header
-    // x-tms-test-client-ip. Recusado em produção e junto do TRUST_PROXY (T-86).
+    // x-tms-test-client-ip. Vale só com NODE_ENV=test (allowlist: um deploy
+    // sem NODE_ENV cai em development e recusa) e nunca junto do TRUST_PROXY
+    // (T-86).
     TEST_CLIENT_IP: z
       .enum(['true', 'false'])
       .default('false')
@@ -44,11 +46,11 @@ const configSchema = z
         path: ['JWT_SECRET'],
         message: 'obrigatório em produção',
       })
-    if (c.TEST_CLIENT_IP && c.NODE_ENV === 'production')
+    if (c.TEST_CLIENT_IP && c.NODE_ENV !== 'test')
       ctx.addIssue({
         code: 'custom',
         path: ['TEST_CLIENT_IP'],
-        message: 'só para o E2E; recusado em produção',
+        message: 'só para o E2E; exige NODE_ENV=test',
       })
     if (c.TEST_CLIENT_IP && c.TRUST_PROXY)
       ctx.addIssue({

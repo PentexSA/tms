@@ -179,13 +179,13 @@ Os testes rodam no CI:
 - **Defesa:**
   - sem proxy confiável, o IP é o da conexão e o `X-Forwarded-For` é ignorado;
   - `TRUST_PROXY=true` só atrás de exatamente um proxy reverso que acrescenta o IP do cliente: vale o último hop, validado com `isIP`; hop vazio, com porta ou inválido cai na conexão (limite mais estrito, nunca mais frouxo);
-  - o E2E simula clientes pelo header `x-tms-test-client-ip`, com `TEST_CLIENT_IP=true`, que o config recusa com `NODE_ENV=production` e junto do `TRUST_PROXY`; o CORS só libera esse header com a flag;
+  - o E2E simula clientes pelo header `x-tms-test-client-ip`, com `TEST_CLIENT_IP=true`, que o config só aceita com `NODE_ENV=test` (allowlist: um deploy sem `NODE_ENV` cai em `development` e recusa) e nunca junto do `TRUST_PROXY`; o CORS só libera esse header com a flag;
   - a subida da API loga a política ativa, sem valor de header.
 - **Testes:**
   - `api/__tests__/auth-units.test.ts`: hop inválido, IPv6, header de teste só com a flag;
   - `api/__tests__/auth.test.ts`: "sem proxy confiável, X-Forwarded-For forjado não escapa do limite de cadastro";
-  - `config/__tests__/env.test.ts`: `TEST_CLIENT_IP` recusado em produção e junto do `TRUST_PROXY`.
-- **Residual:** a trava do `TEST_CLIENT_IP` depende de o deploy definir `NODE_ENV=production` (`deploy/render/Dockerfile` define). Mais de um proxy confiável na frente da API pediria um `TRUST_PROXY_HOPS`.
+  - `config/__tests__/env.test.ts`: `TEST_CLIENT_IP` aceito só com `NODE_ENV=test` (recusado em `development`, em produção e sem `NODE_ENV`) e recusado junto do `TRUST_PROXY`.
+- **Residual:** mais de um proxy confiável na frente da API pediria um `TRUST_PROXY_HOPS`. Ligar o `TEST_CLIENT_IP` exige duas configurações deliberadas (`NODE_ENV=test` e a flag); a API do E2E sobe com `NODE_ENV=test`, que nela só deixa o log em silêncio.
 
 ### CSP do web
 
