@@ -321,11 +321,12 @@ export const MATRIX: readonly MatrixRow[] = [
     expect: { storyteller: 201, owner: 403, player: 403, ...denied },
   },
   {
+    // Membro que não é o destinatário: 200 com null, não 404 (T-74)
     method: 'GET',
     route: '/chronicles/:id/transfer',
     expect: {
       storyteller: 200,
-      owner: 404,
+      owner: 200,
       player: 200,
       ...denied,
     },
