@@ -3,10 +3,14 @@ import {
   type ChangeLabel,
   describeBatch,
   describeEvent,
+  fieldPlace,
   inactiveChanges,
   isDraftMode,
+  parsePath,
   type SheetEvent,
   type SheetMode,
+  type SheetModel,
+  withEffectiveFrom,
 } from '@tms/sheet-core'
 import {
   BottomSheet,
@@ -115,7 +119,10 @@ export function ModeBar({
     setSummary({
       next,
       finish,
-      events,
+      // Só para mostrar (T-54): o "de" efetivo da ficha salva ("Aparência
+      // 1 → 3", não "0 → 3"), como o Histórico. O lote sai do rascunho do
+      // store, com o `from` cru, que é o que o conflito compara.
+      events: withEffectiveFrom(model, s.values, events),
       inactive: after.ok ? inactiveChanges(model, s.values, after.sheet) : [],
     })
   }
@@ -352,7 +359,15 @@ function SummarySheet({
           </>
         ) : (
           <>
-            <Button title="Descartar" variant="danger" onPress={onDiscard} />
+            {/* T-78: Descartar é secundário e fica longe do Salvar */}
+            <View style={styles.discard}>
+              <Button
+                title="Descartar"
+                variant="ghost"
+                onPress={onDiscard}
+                accessibilityHint={`Descarta ${changesLabel(events.length)}`}
+              />
+            </View>
             <Button title="Salvar" onPress={onSave} />
           </>
         )
@@ -372,20 +387,29 @@ function SummarySheet({
             {events.length ? ' As alterações abaixo são salvas antes.' : ''}
           </Text>
         ) : null}
-        {events.map(e => {
-          const { label, change } = describeEvent(model, e)
-          return (
-            <View
-              key={e.path}
-              accessible
-              accessibilityLabel={`${label}, ${change}`}
-              style={styles.change}
-            >
-              <Text style={styles.flex}>{label}</Text>
-              <Text color="inkMuted">{change}</Text>
-            </View>
-          )
-        })}
+        {groupByPlace(model, events).map(group => (
+          <View key={group.key} style={styles.group}>
+            {group.title ? (
+              <Text variant="caption" color="inkMuted">
+                {group.title}
+              </Text>
+            ) : null}
+            {group.events.map(e => {
+              const { label, change } = describeEvent(model, e)
+              return (
+                <View
+                  key={e.path}
+                  accessible
+                  accessibilityLabel={`${group.spoken}${label}, ${change}`}
+                  style={styles.change}
+                >
+                  <Text style={styles.flex}>{label}</Text>
+                  <Text color="inkMuted">{change}</Text>
+                </View>
+              )
+            })}
+          </View>
+        ))}
         {inactive.length ? (
           <View testID="evolve-inactive" style={styles.summary}>
             <Text variant="caption" color="inkMuted">
@@ -410,8 +434,46 @@ function SummarySheet({
   )
 }
 
+interface PlaceGroup {
+  readonly key: string
+  // "Atributos › Sociais"; vazio para campos fora de seção
+  readonly title: string
+  // O caminho lido antes do rótulo: "Habilidades, Talentos, "
+  readonly spoken: string
+  readonly events: SheetEvent[]
+}
+
+// Os eventos já vêm na ordem da ficha (draftToEvents): os do mesmo lugar ficam
+// juntos. O caminho separa campos de mesmo nome (a Consciência Talento e a
+// Virtude) e vem das seções do template, não de nome de campo.
+function groupByPlace(
+  model: SheetModel,
+  events: readonly SheetEvent[]
+): PlaceGroup[] {
+  const groups: PlaceGroup[] = []
+  for (const e of events) {
+    const id = parsePath(e.path)?.fieldId
+    const place = id ? fieldPlace(model, id) : null
+    const parts = place ? [place.section, place.group].filter(Boolean) : []
+    const title = parts.join(' › ')
+    const last = groups[groups.length - 1]
+    // As especializações vêm depois dos valores: o mesmo lugar pode voltar
+    if (last && last.title === title) last.events.push(e)
+    else
+      groups.push({
+        key: `${groups.length}:${title}`,
+        title,
+        spoken: parts.map(p => `${p}, `).join(''),
+        events: [e],
+      })
+  }
+  return groups
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  group: { gap: tokens.space[1] },
+  discard: { flex: 1, alignItems: 'flex-start' },
   switch: {
     flexDirection: 'row',
     gap: tokens.space[2],

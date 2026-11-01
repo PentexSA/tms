@@ -7,6 +7,7 @@ import {
   checkCreation,
   checkCreationBatch,
   type FieldId,
+  fieldOrder,
   type Issue,
   invert,
   jsonEqual,
@@ -243,12 +244,13 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       return r.ok ? r.sheet : sheet
     }, snapshot)
 
-  // Ordem do template (valores, depois especializações): o resumo de
-  // "Concluir" e o lote saem na mesma ordem do diffToBatch.
+  // Ordem da ficha (seções e grupos do template; valores, depois
+  // especializações): o resumo de "Salvar"/"Concluir" e o lote saem nela, não
+  // na ordem das chaves do jsonb (T-54). O servidor não depende da ordem: os
+  // caminhos são distintos e cada `from` é conferido no seu caminho.
   const order = new Map<string, number>()
   for (const scope of ['values', 'specialties'])
-    for (const id of model.fields.keys())
-      order.set(`${scope}.${id}`, order.size)
+    for (const id of fieldOrder(model)) order.set(`${scope}.${id}`, order.size)
   const draftToEvents = (draft: Draft): SheetEvent[] =>
     [...draft]
       .sort(([a], [b]) => (order.get(a) ?? 0) - (order.get(b) ?? 0))

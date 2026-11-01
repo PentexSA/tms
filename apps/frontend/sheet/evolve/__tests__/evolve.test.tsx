@@ -76,10 +76,17 @@ describe('Editar: o rascunho e o resumo', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
     expect(screen.getByText('Salvar 3 alterações?')).toBeTruthy()
     const summary = within(screen.getByTestId('evolve-summary'))
-    expect(summary.getByLabelText('Força, 2 → 3')).toBeTruthy()
-    expect(summary.getByLabelText('Disciplinas, 0 → 1 item')).toBeTruthy()
+    // Com o caminho na ficha (T-54)
     expect(
-      summary.getByLabelText('Força · especialização, atualizada')
+      summary.getByLabelText('Atributos, Físicos, Força, 2 → 3')
+    ).toBeTruthy()
+    expect(
+      summary.getByLabelText('Vantagens, Disciplinas, Disciplinas, 0 → 1 item')
+    ).toBeTruthy()
+    expect(
+      summary.getByLabelText(
+        'Atributos, Físicos, Força · especialização, atualizada'
+      )
     ).toBeTruthy()
 
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
@@ -158,6 +165,68 @@ describe('Editar: o rascunho e o resumo', () => {
       fakeServer(model, helena).post
     )
     expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
+  })
+})
+
+// T-54: o resumo vinha na ordem das chaves do jsonb, sem caminho e com o "de"
+// cru ("Aparência 0 → 3"). T-78: "Descartar" vermelho e cheio, colado ao
+// "Salvar".
+describe('Editar: o resumo na ordem da ficha', () => {
+  it('"de" efetivo, grupos na ordem da ficha e o lote com o from cru', async () => {
+    const server = fakeServer(model, nova)
+    await renderLive({ model, sheet: nova, mode: 'evolve' }, server.post)
+    increment('Aparência')
+    increment('Aparência')
+    increment('Força de Vontade permanente')
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    const summary = within(screen.getByTestId('evolve-summary'))
+    // A Aparência do Tremere vem do clã (1), não do mínimo (0)
+    expect(
+      summary.getByLabelText('Atributos, Sociais, Aparência, 1 → 3')
+    ).toBeTruthy()
+    // A FdV permanente vem da Coragem (1), não "—"
+    expect(
+      summary.getByLabelText('Em jogo, Força de Vontade, permanente 1 → 2')
+    ).toBeTruthy()
+    // Os grupos na ordem da ficha: "Em jogo" antes de "Atributos"
+    expect(
+      summary
+        .getAllByText(/^(Em jogo|Atributos › Sociais)$/)
+        .map(t => t.props.children)
+    ).toEqual(['Em jogo', 'Atributos › Sociais'])
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
+    // O lote continua com o `from` cru: é o que o conflito compara
+    expect(server.sent[0]?.events).toEqual([
+      expect.objectContaining({ path: 'values.willpower', from: null }),
+      { path: 'values.appearance', from: null, to: 3 },
+    ])
+  })
+
+  it('"Descartar" é secundário, à esquerda; "Salvar" é a ação principal', async () => {
+    const server = fakeServer(model, nova)
+    await renderLive({ model, sheet: nova }, server.post)
+    evolveThree()
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    const discard = screen.getByRole('button', { name: 'Descartar' })
+    expect(discard.props.accessibilityHint).toBe('Descarta 3 alterações')
+    // Sem fundo (ghost), não o vermelho cheio de antes
+    expect(StyleSheet.flatten(discard.props.style).backgroundColor).toBe(
+      'transparent'
+    )
+    // Num espaço que cresce e o empurra para a borda esquerda
+    const ancestors: { props: { style?: unknown } }[] = []
+    for (let p = discard.parent; p; p = p.parent) ancestors.push(p)
+    expect(
+      ancestors.some(a => {
+        const style = StyleSheet.flatten(a.props.style as never) ?? {}
+        return style.flex === 1 && style.alignItems === 'flex-start'
+      })
+    ).toBe(true)
+    const save = screen.getByRole('button', { name: 'Salvar' })
+    expect(StyleSheet.flatten(save.props.style).backgroundColor).not.toBe(
+      'transparent'
+    )
   })
 })
 
