@@ -435,6 +435,8 @@ Navegação da ficha: **3 abas fixas, uma por zona do template** (Ficha · Poder
 - **A11y:**
   - Web: `tablist`/`tab`/`tabpanel` com `aria-controls` e `aria-labelledby`, tabindex itinerante, setas, Home e End, e ativação automática, já que trocar de aba não tem custo.
   - RN: `accessibilityRole="tab"` com `accessibilityState={{ selected }}`.
+  - iOS: o papel `tab` não tem traço no RN 0.88, então cada aba diz a posição no `accessibilityValue` ("aba 2 de 3"), em português e sem depender de traço.
+  - No `@tms/ui`: `Tabs` com `id` liga cada aba ao painel (`nativeID` `{id}-tab-{aba}`, e `aria-controls` na selecionada); `TabPanel` (`{ tabsId, tab, children }`) põe `role="tabpanel"` e `aria-labelledby` no web. Quando o contêiner já existe (os grupos da ficha), `tabPanelProps(tabsId, tab)` dá as mesmas props.
 - **Multi-sistema:** as abas saem das zonas que todo template declara. O template só troca o rótulo (`zoneLabels`, até 14 caracteres):
 
   | Sistema | Abas |
@@ -547,7 +549,7 @@ Faixa que diz em que modo a ficha está.
 - **Variantes:** Evoluindo ("N alterações não salvas" + Concluir); Leitura ("Ficha de {dono}" + "Editar como narrador" para o narrador); Narrador ("As alterações ficam assinadas no histórico" + "Voltar à leitura"); Arquivada ("Somente leitura" + Restaurar para o dono). Em Jogo não aparece.
 - **API RN:** `{ mode: 'read' | 'evolve' | 'storyteller' | 'archived'; title: string; message: string; actions?: ButtonProps[] }`.
 - **Estados:** as quatro variantes.
-- **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado.
+- **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
 - **Resolve:** C-01, C-19, DS-04.
 

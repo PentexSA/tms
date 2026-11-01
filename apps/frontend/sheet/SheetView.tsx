@@ -8,7 +8,14 @@ import {
   type SheetMode,
   type SheetModel,
 } from '@tms/sheet-core'
-import { SectionHeader, Tabs, ThemeProvider, tokens, useLayout } from '@tms/ui'
+import {
+  SectionHeader,
+  TabPanel,
+  Tabs,
+  ThemeProvider,
+  tokens,
+  useLayout,
+} from '@tms/ui'
 import { useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { useStore } from 'zustand'
@@ -178,6 +185,7 @@ function SheetBody({
               {tabs.length ? (
                 <View style={styles.tabs}>
                   <Tabs
+                    id="sheet-parts"
                     accessibilityLabel="Partes da ficha"
                     items={tabs}
                     selected={onBudget ? BUDGET_TAB : (active?.id ?? '')}
@@ -185,14 +193,19 @@ function SheetBody({
                   />
                 </View>
               ) : null}
-              {onBudget ? <CreationPanel /> : null}
-              {active?.sections.map(s => (
-                <SectionView
-                  key={s.id}
-                  section={s}
-                  hideTitle={active.sections.length === 1}
-                />
-              ))}
+              <TabPanel
+                tabsId="sheet-parts"
+                tab={onBudget ? BUDGET_TAB : (active?.id ?? '')}
+              >
+                {onBudget ? <CreationPanel /> : null}
+                {active?.sections.map(s => (
+                  <SectionView
+                    key={s.id}
+                    section={s}
+                    hideTitle={active.sections.length === 1}
+                  />
+                ))}
+              </TabPanel>
             </ScrollView>
             {docked ? <CombatDock /> : null}
             {budget ? (

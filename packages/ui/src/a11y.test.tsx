@@ -12,6 +12,8 @@ import {
   Pressable,
   rovingTarget,
   Stepper,
+  TabPanel,
+  Tabs,
   useRovingFocus,
 } from './index'
 
@@ -326,5 +328,114 @@ describe('Stepper: o número falado e o rótulo visível (T-34, T-09)', () => {
     expect(title.props['aria-hidden']).toBe(true)
     expect(screen.queryByText('Dados')).toBeNull()
     expect(screen.getByRole('adjustable', { name: 'Dados' })).toBeTruthy()
+  })
+})
+
+const ZONES = [
+  { id: 'sheet', label: 'Ficha' },
+  { id: 'powers', label: 'Poderes' },
+  { id: 'notes', label: 'Notas' },
+]
+
+describe('Tabs e TabPanel: teclado, painel e posição no iOS (T-35)', () => {
+  const renderTabs = (onSelect = jest.fn(), id?: string) =>
+    render(
+      <>
+        <Tabs
+          id={id}
+          accessibilityLabel="Partes da ficha"
+          items={ZONES}
+          selected="powers"
+          onSelect={onSelect}
+        />
+        {id ? (
+          <TabPanel tabsId={id} tab="powers" testID="panel">
+            {null}
+          </TabPanel>
+        ) : null}
+      </>
+    )
+
+  it('no web: só a aba ativa no Tab; a seta seleciona (ativação automática)', () => {
+    setOS('web')
+    const onSelect = jest.fn()
+    renderTabs(onSelect)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map(t => t.props.tabIndex)).toEqual([-1, 0, -1])
+    fireEvent(
+      screen.getByRole('tab', { name: 'Poderes' }),
+      'keyDown',
+      key('ArrowRight').event
+    )
+    expect(onSelect).toHaveBeenLastCalledWith('notes')
+    fireEvent(
+      screen.getByRole('tab', { name: 'Poderes' }),
+      'keyDown',
+      key('Home').event
+    )
+    expect(onSelect).toHaveBeenLastCalledWith('sheet')
+    // ↓ não é das abas horizontais
+    onSelect.mockClear()
+    fireEvent(
+      screen.getByRole('tab', { name: 'Poderes' }),
+      'keyDown',
+      key('ArrowDown').event
+    )
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('no web: o Espaço ativa a aba', () => {
+    setOS('web')
+    const onSelect = jest.fn()
+    renderTabs(onSelect)
+    fireEvent(
+      screen.getByRole('tab', { name: 'Notas' }),
+      'keyDown',
+      key(' ').event
+    )
+    expect(onSelect).toHaveBeenCalledWith('notes')
+  })
+
+  it('no web, com id: a aba ativa controla o painel, que é nomeado por ela', () => {
+    setOS('web')
+    renderTabs(jest.fn(), 'parts')
+    const active = screen.getByRole('tab', { name: 'Poderes' })
+    expect(active.props.nativeID).toBe('parts-tab-powers')
+    expect(active.props['aria-controls']).toBe('parts-panel')
+    expect(
+      screen.getByRole('tab', { name: 'Ficha' }).props['aria-controls']
+    ).toBeUndefined()
+    const panel = screen.getByTestId('panel')
+    expect(panel.props.role).toBe('tabpanel')
+    expect(panel.props.nativeID).toBe('parts-panel')
+    expect(panel.props['aria-labelledby']).toBe('parts-tab-powers')
+  })
+
+  it('sem id, nada de aria-controls; no app, o painel não ganha papel', () => {
+    renderTabs(jest.fn(), 'parts')
+    expect(screen.getByTestId('panel').props.role).toBeUndefined()
+    expect(
+      screen.getByRole('tab', { name: 'Poderes' }).props['aria-controls']
+    ).toBeUndefined()
+  })
+
+  it('no iOS, cada aba diz a posição ("aba 2 de 3")', () => {
+    setOS('ios')
+    renderTabs()
+    expect(
+      screen.getByRole('tab', { name: 'Poderes' })
+    ).toHaveAccessibilityValue({ text: 'aba 2 de 3' })
+    expect(screen.getByRole('tab', { name: 'Ficha' })).toHaveAccessibilityValue(
+      { text: 'aba 1 de 3' }
+    )
+  })
+
+  it('no Android, sem a posição (o papel tab já é lido)', () => {
+    setOS('android')
+    renderTabs()
+    expect(
+      screen.getByRole('tab', { name: 'Poderes' }).props.accessibilityValue
+        ?.text
+    ).toBeUndefined()
   })
 })
