@@ -54,13 +54,8 @@ export function SyncProvider({
       }),
     [outbox, userStorage, post, queryClient, toast]
   )
-  useEffect(
-    () =>
-      session.onSignOut(() => {
-        void sync.reset()
-      }),
-    [session, sync]
-  )
+  // O logout espera a fila parar e ser apagada (T-14)
+  useEffect(() => session.onSignOut(() => sync.reset()), [session, sync])
   useEffect(() => {
     void sync.start()
     const unsubscribe = onlineManager.subscribe(online => {

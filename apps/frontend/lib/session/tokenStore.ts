@@ -9,6 +9,17 @@ export interface TokenStore {
   read(): Promise<string | null>
   write(token: string): Promise<void>
   clear(): Promise<void>
+  /**
+   * A revogação que ainda não chegou ao servidor (T-14): o refresh token de
+   * quem saiu sem rede, numa chave à parte. Só o logout o lê; nunca vai para
+   * /auth/refresh. No web não há nada (o cookie fica com o navegador e o
+   * marcador de sessão diz que o logout está pendente).
+   */
+  readonly pendingLogout: {
+    read(): Promise<string | null>
+    write(token: string): Promise<void>
+    clear(): Promise<void>
+  }
 }
 
 export const tokenStore: TokenStore = {
@@ -16,4 +27,9 @@ export const tokenStore: TokenStore = {
   read: async () => null,
   write: async () => undefined,
   clear: async () => undefined,
+  pendingLogout: {
+    read: async () => null,
+    write: async () => undefined,
+    clear: async () => undefined,
+  },
 }

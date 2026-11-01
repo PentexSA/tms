@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { onlineManager, useQueryClient } from '@tanstack/react-query'
 import {
   createContext,
   type ReactNode,
@@ -25,6 +25,14 @@ export function SessionProvider({
   useEffect(
     () => session.onSignOut(() => queryClient.clear()),
     [session, queryClient]
+  )
+  // A revogação de um logout sem rede vai assim que a rede volta (T-14)
+  useEffect(
+    () =>
+      onlineManager.subscribe(online => {
+        if (online) void session.retryPendingLogout()
+      }),
+    [session]
   )
   return (
     <SessionContext.Provider value={session}>

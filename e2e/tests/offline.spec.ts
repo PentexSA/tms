@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { API_URL } from '../env'
+import { API_URL, WEB_URL } from '../env'
 import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
 
 // Etapa 20: o jogo continua sem rede e sincroniza ao voltar.
@@ -133,20 +133,111 @@ test('logout apaga o que ficou no aparelho', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Sair' }).click()
   await expect(page).toHaveURL(/\/login$/)
+  // Só sobra o marcador de sessão, sem segredo nem dado do usuário (T-14)
   await expect
-    .poll(() =>
-      page.evaluate(async () => {
-        const keys = await new Promise<string[]>(resolve => {
-          const req = indexedDB.open('tms-offline', 1)
-          req.onsuccess = () => {
-            const tx = req.result.transaction('kv', 'readonly')
-            const all = tx.objectStore('kv').getAllKeys()
-            all.onsuccess = () => resolve(all.result.map(String))
+    .poll(() => deviceEntries(page))
+    .toEqual([['session:state', 'signed-out']])
+})
+
+// O que o app guarda no IndexedDB do aparelho (chave e valor)
+function deviceEntries(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<[string, string][]>(resolve => {
+        const req = indexedDB.open('tms-offline', 1)
+        req.onsuccess = () => {
+          const entries: [string, string][] = []
+          const tx = req.result.transaction('kv', 'readonly')
+          const cursor = tx.objectStore('kv').openCursor()
+          cursor.onsuccess = () => {
+            const c = cursor.result
+            if (!c) return resolve(entries)
+            entries.push([String(c.key), String(c.value)])
+            c.continue()
           }
-          req.onerror = () => resolve([])
-        })
-        return keys
+        }
+        req.onerror = () => resolve([])
       })
-    )
-    .toEqual([])
+  )
+}
+
+const marker = async (page: Page) =>
+  new Map(await deviceEntries(page)).get('session:state')
+
+// T-14 (QAW-33): sair sem rede descartava a revogação; de volta à rede,
+// recarregar entrava sozinho com o cookie antigo
+test('logout sem rede: recarregar não entra sozinho e a revogação vai quando a rede volta', async ({
+  page,
+  request,
+}) => {
+  const context = page.context()
+  await signUp(context, 'semrede')
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Crônicas' })).toBeVisible()
+  const old = (await context.cookies(`${API_URL}/auth`)).find(
+    c => c.name === 'tms_refresh'
+  )?.value
+  expect(old).toBeTruthy()
+
+  const refreshes: string[] = []
+  page.on('request', r => {
+    if (r.url().endsWith('/auth/refresh')) refreshes.push(r.url())
+  })
+  await page.route(`${API_URL}/**`, route => route.abort())
+  await page.getByRole('button', { name: 'Sair' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => marker(page)).toBe('logout-pending')
+
+  // Recarregar ainda sem rede: continua no login, sem tentar renovar
+  await page.reload()
+  await expect(page).toHaveURL(/\/login$/)
+  expect(await marker(page)).toBe('logout-pending')
+
+  // A rede volta: a abertura revoga antes de qualquer outra coisa
+  await page.unroute(`${API_URL}/**`)
+  const revoked = page.waitForResponse(
+    r => r.url().endsWith('/auth/logout') && r.status() === 204
+  )
+  await page.reload()
+  await revoked
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => marker(page)).toBe('signed-out')
+  expect(refreshes).toEqual([])
+
+  // O cookie antigo já não renova no servidor
+  const res = await request.post(`${API_URL}/auth/refresh`, {
+    headers: { origin: WEB_URL, cookie: `tms_refresh=${old}` },
+  })
+  expect(res.status()).toBe(401)
+})
+
+test('logout sem rede, fechando a aba antes de a rede voltar', async ({
+  page,
+  request,
+}) => {
+  const context = page.context()
+  await signUp(context, 'fechaaba')
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Crônicas' })).toBeVisible()
+  const old = (await context.cookies(`${API_URL}/auth`)).find(
+    c => c.name === 'tms_refresh'
+  )?.value
+  await page.route(`${API_URL}/**`, route => route.abort())
+  await page.getByRole('button', { name: 'Sair' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => marker(page)).toBe('logout-pending')
+  await page.close()
+
+  // Outra aba, já com rede, de qualquer rota
+  const next = await context.newPage()
+  const revoked = next.waitForResponse(
+    r => r.url().endsWith('/auth/logout') && r.status() === 204
+  )
+  await next.goto('/characters/qualquer')
+  await revoked
+  await expect(next).toHaveURL(/\/login$/)
+  const res = await request.post(`${API_URL}/auth/refresh`, {
+    headers: { origin: WEB_URL, cookie: `tms_refresh=${old}` },
+  })
+  expect(res.status()).toBe(401)
 })

@@ -1,9 +1,20 @@
+import type {
+  SessionChannel,
+  SessionMarker,
+  SessionMarkerState,
+} from './sessionMarker'
 import type { TokenStore } from './tokenStore'
 
 // Sessão do app (doc/plano-v0.md, Etapa 9). O token de acesso vive só em
 // memória; o refresh token, no tokenStore (secure store no nativo, cookie
 // HttpOnly no web). Um refresh por vez (single-flight): dois em paralelo com o
 // mesmo token fariam a API revogar a sessão (reuso de token).
+//
+// Logout (T-14): registra a revogação pendente, apaga tudo do aparelho e só
+// então tenta avisar o servidor. Sem rede, a pendência fica (no keychain no
+// nativo; no marcador de sessão no web) e vai na reconexão ou na próxima
+// abertura; com ela, nada renova a sessão. Se o app morrer no meio, a
+// próxima abertura revoga antes de qualquer outra coisa (fail secure).
 
 export interface SessionUser {
   readonly id: string
@@ -42,7 +53,17 @@ export interface SessionDeps {
   readonly store: TokenStore
   readonly fetch: (input: string, init: RequestInit) => Promise<Response>
   readonly lastUser?: LastUserStore
+  // Só no web: o estado da sessão, sem segredo (sessionMarker.ts)
+  readonly marker?: SessionMarker
+  // Só no web: avisa as outras abas que esta saiu
+  readonly channel?: SessionChannel
+  // Apaga o que sobrou do storage de um usuário (app morto no meio do
+  // logout): sem sessão, ninguém abre o storage dele para apagar
+  readonly purgeUserData?: (userId: string) => Promise<void>
 }
+
+/** Ouvinte do logout: o logout espera a limpeza que ele devolver. */
+export type SignOutListener = () => void | Promise<unknown>
 
 interface TokenResponse {
   readonly accessToken: string
@@ -56,17 +77,23 @@ export class Session {
   #state: SessionState = { status: 'loading', user: null }
   #accessToken: string | null = null
   #refreshing: Promise<boolean> | null = null
+  // Um envio da revogação pendente por vez
+  #revoking: Promise<boolean> | null = null
   // O último refresh falhou por falta de rede (não por sessão inválida)
   #unreachable = false
   // Sobe a cada saída: resposta de refresh ou login iniciado antes dela é
   // descartada (sair é definitivo, mesmo com uma renovação em voo)
   #epoch = 0
   readonly #listeners = new Set<() => void>()
-  readonly #signOutListeners = new Set<() => void>()
+  readonly #signOutListeners = new Set<SignOutListener>()
   readonly #deps: SessionDeps
 
   constructor(deps: SessionDeps) {
     this.#deps = deps
+    // Outra aba saiu: esta sai também, sem esperar o próximo 401
+    deps.channel?.subscribe(() => {
+      if (this.#state.status !== 'signedOut') void this.#clearLocal()
+    })
   }
 
   getState = (): SessionState => this.#state
@@ -76,8 +103,11 @@ export class Session {
     return () => this.#listeners.delete(listener)
   }
 
-  /** Chamado ao sair: o app limpa cache e fila do usuário. */
-  onSignOut(listener: () => void): () => void {
+  /**
+   * Chamado ao sair: o app limpa cache e fila do usuário. O logout espera a
+   * promessa que o ouvinte devolver (todas, mesmo se uma falhar).
+   */
+  onSignOut(listener: SignOutListener): () => void {
     this.#signOutListeners.add(listener)
     return () => this.#signOutListeners.delete(listener)
   }
@@ -107,7 +137,22 @@ export class Session {
    * chamada com rede renova a sessão ou, se o servidor recusar, sai.
    */
   async restore(): Promise<void> {
+    // Logout que não chegou ao servidor: revoga antes de tudo e nunca renova
+    if (await this.#activeSessionIsPending()) {
+      await this.#clearLocal()
+      await this.#sendPendingLogout()
+      return
+    }
+    // Revogação de um logout anterior, com outra sessão já ativa (nativo):
+    // vai em segundo plano
+    void this.#sendPendingLogout()
     if (this.#deps.store.refreshInBody && !(await this.#deps.store.read())) {
+      this.#set({ status: 'signedOut', user: null })
+      return
+    }
+    // Web que já saiu: nenhuma chamada, sem 401 de ruído (T-74). Sem
+    // marcador (navegador novo ou versão anterior), um refresh, como antes
+    if ((await this.#readMarker()) === 'signed-out') {
       this.#set({ status: 'signedOut', user: null })
       return
     }
@@ -141,30 +186,113 @@ export class Session {
     return this.#refreshing
   }
 
+  /**
+   * "Sair": registra a revogação pendente, apaga tudo do aparelho e só então
+   * avisa o servidor. Sem rede, a revogação fica pendente e vai depois.
+   */
   async logout(): Promise<void> {
-    const token = this.#deps.store.refreshInBody
-      ? await this.#deps.store.read()
-      : null
-    try {
-      await this.#post('/auth/logout', token ? { refreshToken: token } : {})
-    } catch {
-      // Sem rede: a sessão local sai do mesmo jeito
-    }
-    await this.signOut()
+    const { store } = this.#deps
+    if (store.refreshInBody) {
+      const token = await store.read()
+      // Antes de apagar o token ativo: se o app morrer aqui, a abertura vê
+      // os dois iguais e revoga sem renovar
+      if (token) await store.pendingLogout.write(token)
+    } else await this.#writeMarker('logout-pending')
+    await this.#clearLocal()
+    this.#deps.channel?.post()
+    await this.#sendPendingLogout()
   }
 
-  /** Sai localmente (refresh recusado ou logout): apaga tudo do usuário. */
+  /** Reenvia a revogação pendente (o app chama ao voltar a rede). */
+  retryPendingLogout(): Promise<boolean> {
+    return this.#sendPendingLogout()
+  }
+
+  /**
+   * Sai localmente quando a sessão já não vale no servidor (refresh
+   * recusado, conta excluída): apaga tudo do usuário.
+   */
   async signOut(): Promise<void> {
+    if ((await this.#readMarker()) !== 'logout-pending')
+      await this.#writeMarker('signed-out')
+    await this.#clearLocal()
+  }
+
+  /** Apaga tudo do usuário no aparelho e espera os ouvintes. */
+  async #clearLocal(): Promise<void> {
     this.#epoch++
     this.#accessToken = null
     await this.#deps.store.clear()
+    const last = await this.#deps.lastUser?.read().catch(() => null)
     await this.#deps.lastUser?.clear().catch(() => undefined)
     this.#set({ status: 'signedOut', user: null })
-    for (const l of this.#signOutListeners) l()
+    await Promise.allSettled(
+      [...this.#signOutListeners].map(async listener => listener())
+    )
+    if (last) await this.#deps.purgeUserData?.(last.id).catch(() => undefined)
+  }
+
+  /**
+   * Nativo: o token ativo é o da revogação pendente (o app morreu entre
+   * gravar a pendência e apagá-lo). Web: o marcador diz que o logout não
+   * chegou ao servidor. Nos dois casos, nada pode renovar a sessão.
+   */
+  async #activeSessionIsPending(): Promise<boolean> {
+    const { store } = this.#deps
+    if (!store.refreshInBody)
+      return (await this.#readMarker()) === 'logout-pending'
+    const pending = await store.pendingLogout.read().catch(() => null)
+    return pending !== null && pending === (await store.read())
+  }
+
+  #sendPendingLogout(): Promise<boolean> {
+    this.#revoking ??= this.#doSendPendingLogout().finally(() => {
+      this.#revoking = null
+    })
+    return this.#revoking
+  }
+
+  /** true quando não sobra revogação pendente. */
+  async #doSendPendingLogout(): Promise<boolean> {
+    const { store } = this.#deps
+    let body: { refreshToken?: string } = {}
+    if (store.refreshInBody) {
+      const token = await store.pendingLogout.read().catch(() => null)
+      if (!token) return true
+      body = { refreshToken: token }
+    } else if ((await this.#readMarker()) !== 'logout-pending') return true
+    let res: Response
+    try {
+      res = await this.#post('/auth/logout', body)
+    } catch {
+      // Sem rede: fica pendente para a reconexão e a próxima abertura
+      return false
+    }
+    // 2xx revogou. 400 é um token que não pode ser sessão nenhuma: não há o
+    // que reenviar. 429 e 5xx são temporários: a pendência fica
+    if (!res.ok && res.status !== 400) return false
+    if (store.refreshInBody) await store.pendingLogout.clear()
+    else if ((await this.#readMarker()) === 'logout-pending')
+      await this.#writeMarker('signed-out')
+    return true
+  }
+
+  async #readMarker(): Promise<SessionMarkerState | null> {
+    return (await this.#deps.marker?.read().catch(() => null)) ?? null
+  }
+
+  async #writeMarker(state: SessionMarkerState): Promise<void> {
+    await this.#deps.marker?.write(state).catch(() => undefined)
   }
 
   async #doRefresh(): Promise<boolean> {
     const epoch = this.#epoch
+    // Com logout pendente nenhuma aba renova: o marcador é lido a cada
+    // renovação, não só ao abrir
+    if (await this.#activeSessionIsPending()) {
+      if (this.#state.status !== 'signedOut') await this.#clearLocal()
+      return false
+    }
     const stored = this.#deps.store.refreshInBody
       ? await this.#deps.store.read()
       : null
@@ -215,8 +343,12 @@ export class Session {
     this.#accessToken = data.accessToken
     if (this.#deps.store.refreshInBody && data.refreshToken)
       await this.#deps.store.write(data.refreshToken)
+    // No web, o login já revogou no servidor o cookie anterior
+    await this.#writeMarker('signed-in')
     await this.#deps.lastUser?.write(data.user).catch(() => undefined)
     this.#set({ status: 'signedIn', user: data.user })
+    // Nativo: a revogação de um logout anterior segue sem travar o login
+    void this.#sendPendingLogout()
   }
 
   #post(path: string, body?: unknown): Promise<Response> {
