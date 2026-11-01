@@ -5,6 +5,7 @@ import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
 import type { SheetStore, SheetSync } from '../store/sheetStore'
 import { ledgerMessage } from '../xp/messages'
+import { createMemoryDraftStore, type DraftStore } from './draftStore'
 import type { Outbox, QueuedBatch } from './outbox'
 import { createSender, type PostOutcome, type Sender } from './sender'
 
@@ -14,6 +15,9 @@ import { createSender, type PostOutcome, type Sender } from './sender'
 
 export interface SyncDeps {
   readonly outbox: Outbox
+  // Os rascunhos de Criação/Editar guardados no aparelho (T-03); sem eles,
+  // em memória
+  readonly drafts?: DraftStore
   readonly post: (
     characterId: string,
     batch: QueuedBatch
@@ -45,10 +49,16 @@ export interface Sync extends SheetSync {
   register(characterId: string, store: SheetStore): () => void
   /** Reconectou: tenta de novo o que esperava o backoff. */
   flush(): Promise<void>
-  /** Logout: para o envio e apaga a fila (nada fica para o próximo usuário). */
+  /**
+   * Logout: para o envio e apaga a fila e os rascunhos (nada fica para o
+   * próximo usuário).
+   */
   reset(): Promise<void>
-  /** Abriu o app: conta o que ficou na fila e retoma o envio. */
+  /** Abriu o app: conta o que ficou na fila, retoma o envio e varre os rascunhos vencidos. */
   start(): Promise<void>
+  /** O lote entrou no outbox (resolve) ou não pôde ser guardado (rejeita). */
+  enqueue(characterId: string, batch: QueuedBatch): Promise<void>
+  readonly drafts: DraftStore
   readonly status: SyncStatusStore
   readonly sender: Sender
 }
@@ -108,6 +118,7 @@ export function rejectionMessage(
 
 export function createSync(deps: SyncDeps): Sync {
   const { outbox, queryClient, notify } = deps
+  const drafts = deps.drafts ?? createMemoryDraftStore()
   const stores = new Map<string, SheetStore>()
   const refetch = (characterId: string) =>
     queryClient.invalidateQueries({
@@ -212,15 +223,19 @@ export function createSync(deps: SyncDeps): Sync {
         return () => listeners.delete(listener)
       },
     },
+    drafts,
     enqueue(characterId, batch) {
-      outbox.enqueue(characterId, batch).then(
+      // A Promise diz se o lote está no outbox: o rascunho persistido só some
+      // depois disso (T-03)
+      return outbox.enqueue(characterId, batch).then(
         () => {
           void recount()
-          return sender.kick(characterId)
+          void sender.kick(characterId)
         },
-        () => {
+        error => {
           stores.get(characterId)?.getState().rejected(batch.clientBatchId)
           notify(`Não foi possível guardar “${batch.label}” no aparelho.`)
+          throw error
         }
       )
     },
@@ -238,6 +253,7 @@ export function createSync(deps: SyncDeps): Sync {
     },
     flush: () => sender.flush(),
     async start() {
+      await drafts.sweep(Date.now()).catch(() => undefined)
       await recount()
       await sender.flush()
     },
@@ -246,7 +262,10 @@ export function createSync(deps: SyncDeps): Sync {
       stores.clear()
       counting++
       setStatus({ pending: 0, failure: null })
-      await outbox.clear().catch(() => undefined)
+      await Promise.all([
+        outbox.clear().catch(() => undefined),
+        drafts.clear().catch(() => undefined),
+      ])
     },
   }
 }

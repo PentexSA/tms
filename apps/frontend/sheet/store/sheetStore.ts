@@ -26,6 +26,7 @@ import { randomUUID } from 'expo-crypto'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { type CreationPhase, draftRefusal } from '../creation/creation'
 import { checkLimits, OutboxLimitError, type QueuedBatch } from '../sync/outbox'
+import type { RestorePlan } from './draftRestore'
 
 // Um store por ficha aberta (doc/arquitetura §6.5):
 //
@@ -54,17 +55,39 @@ export interface DraftEdit {
 
 export type Draft = ReadonlyMap<string, DraftEdit>
 
+/**
+ * De onde veio o conflito: `play`, um lote do Jogo recusado com 409 (reaplica
+ * tudo ou mantém); `recovery`, o rascunho recuperado do aparelho com campos
+ * que mudaram desde então (T-03): as entradas ficam no rascunho com o `from`
+ * antigo, e o "Salvar" é recusado até a pessoa escolher.
+ */
+export type ConflictOrigin = 'play' | 'recovery'
+
 export interface SheetConflict {
   readonly batches: readonly QueuedBatch[]
   readonly paths: readonly string[]
+  readonly origin: ConflictOrigin
 }
+
+/**
+ * Como o último rascunho saiu: salvo (a Promise diz se o lote entrou no
+ * outbox) ou descartado. O rascunho persistido só some depois disso (T-03).
+ */
+export type DraftExit =
+  | { readonly kind: 'saved'; readonly queued: Promise<boolean> }
+  | { readonly kind: 'discarded' }
 
 // `creation`: a avaliação parcial da criação por pontos recusou o lote
 // (doc/plano-v4.md §3.1); ele nem entra na fila
 export type CommitFailure = ApplyFailure | 'limit' | 'readonly' | 'creation'
 
 export type CommitResult =
-  | { readonly ok: true; readonly batch: QueuedBatch }
+  | {
+      readonly ok: true
+      readonly batch: QueuedBatch
+      // O lote entrou no outbox do aparelho (false: não pôde ser guardado)
+      readonly queued?: Promise<boolean>
+    }
   | {
       readonly ok: false
       readonly kind: CommitFailure
@@ -73,7 +96,7 @@ export type CommitResult =
 
 /** Para onde vão os lotes confirmados no aparelho (o SyncProvider). */
 export interface SheetSync {
-  enqueue(characterId: string, batch: QueuedBatch): void
+  enqueue(characterId: string, batch: QueuedBatch): void | Promise<void>
 }
 
 export interface SheetStoreInit {
@@ -103,6 +126,7 @@ export interface SheetState {
   readonly entries: ReadonlyMap<FieldId, FieldEntry>
   readonly mode: SheetMode
   readonly draft: Draft | null
+  readonly draftExit: DraftExit | null
   readonly undoStack: readonly QueuedBatch[]
   readonly conflict: SheetConflict | null
   // O que o servidor recusou (422), por campo: o editor mostra a mensagem.
@@ -154,6 +178,12 @@ export interface SheetActions {
   draftEvents(): SheetEvent[]
   saveDraft(label: string): CommitResult | null
   discardDraft(): void
+  /**
+   * O rascunho recuperado do aparelho (T-03), já revalidado por
+   * planDraftRestore. Entra em Criação ou Editar; os campos que mudaram desde
+   * então ficam marcados como conflito.
+   */
+  restoreDraft(plan: RestorePlan): void
   /** A conta da criação mudou (escolhas, orçamento, estado). */
   setCreation(creation: CreationInput | null): void
   /** Básicos (o grupo cheio trava) ou Bônus (passar do grupo usa o saldo). */
@@ -224,7 +254,7 @@ function issuesByField(
 
 const NO_ISSUES: ReadonlyMap<FieldId, string> = new Map()
 
-const valueAt = (sheet: SheetData, path: string): unknown => {
+export const valueAt = (sheet: SheetData, path: string): unknown => {
   const p = parsePath(path)
   if (!p) return null
   const bucket: Readonly<Record<string, unknown>> =
@@ -346,8 +376,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         creationRefusal: null,
         ...derive({ ...s, pending }, r.sheet),
       })
-      sync.enqueue(characterId, batch)
-      return { ok: true, batch }
+      const queued = Promise.resolve(sync.enqueue(characterId, batch)).then(
+        () => true,
+        () => false
+      )
+      return { ok: true, batch, queued }
     }
 
     const editDraft: SheetActions['editDraft'] = events => {
@@ -434,6 +467,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       creationPhase: 'basics',
       mode: init.mode ?? 'read',
       draft: null,
+      draftExit: null,
       undoStack: [],
       conflict: null,
       fieldIssues: NO_ISSUES,
@@ -530,7 +564,13 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         set({
           pending,
           undoStack,
-          conflict: batches.length ? { batches, paths } : s.conflict,
+          conflict: batches.length
+            ? {
+                batches,
+                paths: [...new Set([...(s.conflict?.paths ?? []), ...paths])],
+                origin: s.conflict?.origin ?? 'play',
+              }
+            : s.conflict,
           ...derive({ ...s, pending }),
         })
       },
@@ -538,6 +578,18 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       reapply() {
         const s = get()
         if (!s.conflict) return null
+        // Rascunho recuperado: o seu valor fica, sobre o valor de agora
+        if (s.conflict.origin === 'recovery' && s.draft) {
+          const draft = new Map(s.draft)
+          for (const path of s.conflict.paths) {
+            const edit = draft.get(path)
+            if (!edit) continue
+            const from = valueAt(s.values, path)
+            if (jsonEqual(from, edit.to)) draft.delete(path)
+            else draft.set(path, { from, to: edit.to })
+          }
+          set({ draft, ...derive({ ...s, draft }, s.values) })
+        }
         // O último `to` de cada caminho, com o `from` de agora
         const last = new Map<string, unknown>()
         for (const b of s.conflict.batches)
@@ -550,6 +602,18 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       },
 
       dismissConflict() {
+        const s = get()
+        // Rascunho recuperado: fica o valor de agora; a sua entrada sai
+        if (s.conflict?.origin === 'recovery' && s.draft) {
+          const draft = new Map(s.draft)
+          for (const path of s.conflict.paths) draft.delete(path)
+          set({
+            conflict: null,
+            draft,
+            ...derive({ ...s, draft }, s.values),
+          })
+          return
+        }
         set({ conflict: null })
       },
 
@@ -573,7 +637,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         if (!s.draft) return null
         const events = draftToEvents(s.draft)
         if (!events.length) {
-          set({ draft: null })
+          set({ draft: null, draftExit: { kind: 'discarded' } })
           return null
         }
         // Salvar é um lote só; com conflito, o rascunho fica para decidir
@@ -582,6 +646,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           const after = get()
           set({
             draft: null,
+            draftExit: {
+              kind: 'saved',
+              queued: result.queued ?? Promise.resolve(true),
+            },
             fieldIssues: NO_ISSUES,
             ...derive({ ...after, draft: null }, after.values),
           })
@@ -593,9 +661,29 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         const s = get()
         set({
           draft: null,
+          draftExit: { kind: 'discarded' },
+          // O conflito do rascunho recuperado sai com ele
+          conflict: s.conflict?.origin === 'recovery' ? null : s.conflict,
           fieldIssues: NO_ISSUES,
           creationRefusal: null,
           ...derive({ ...s, draft: null }, s.values),
+        })
+      },
+
+      restoreDraft(plan) {
+        const s = get()
+        const draft = new Map(
+          plan.events.map(e => [e.path, { from: e.from, to: e.to }])
+        )
+        set({
+          draft,
+          mode: s.creation ? 'create' : 'evolve',
+          conflict: plan.conflicts.length
+            ? { batches: [], paths: plan.conflicts, origin: 'recovery' }
+            : s.conflict,
+          fieldIssues: NO_ISSUES,
+          creationRefusal: null,
+          ...derive({ ...s, draft }, s.values),
         })
       },
 

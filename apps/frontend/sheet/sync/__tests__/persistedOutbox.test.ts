@@ -133,6 +133,18 @@ describe('dado adulterado no storage é descartado', () => {
     expect(await storage.getItem('outbox:../../x')).toBeNull()
   })
 
+  // T-03/T-31: o lote do "Salvar" de Criação/Editar recusado volta ao
+  // rascunho; a origem precisa sobreviver a reiniciar o app
+  it('o draft: true sobrevive ao disco; outro valor não entra', async () => {
+    const disk = createMemoryStorage()
+    await createPersistedOutbox(disk).enqueue(C1, batch(1, { draft: true }))
+    const reopened = createPersistedOutbox(disk)
+    expect(await reopened.pending(C1)).toEqual([batch(1, { draft: true })])
+    expect(
+      parseQueuedBatch({ ...batch(2), draft: 'sim' } as unknown as QueuedBatch)
+    ).toEqual(batch(2))
+  })
+
   it('o lote volta limpo: só path, from e to', () => {
     const parsed = parseQueuedBatch({
       ...batch(1),

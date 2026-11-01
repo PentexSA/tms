@@ -18,7 +18,9 @@ import { SheetProvider, useResolvedField } from '../context'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
 import { createSheetStore, type SheetStore } from '../store/sheetStore'
-import type { QueuedBatch } from '../sync/outbox'
+import { createPersistedDraftStore, type DraftStore } from '../sync/draftStore'
+import { createMemoryStorage } from '../sync/kv'
+import { createMemoryOutbox, type QueuedBatch } from '../sync/outbox'
 import { useSync } from '../sync/SyncProvider'
 import type { PostOutcome } from '../sync/sender'
 import { useCommit } from '../useCommit'
@@ -271,5 +273,164 @@ describe('SheetScreen com o store', () => {
     )
     await act(() => queryClient.invalidateQueries())
     expect(await screen.findByLabelText(/^Pontos de Sangue, 2 de/)).toBeTruthy()
+  })
+})
+
+// T-03: o rascunho de Criação/Editar só vivia na memória; fechar o app, uma
+// queda ou o F5 apagavam tudo, sem aviso nem recuperação
+describe('rascunho guardado no aparelho', () => {
+  const character = (extra: Record<string, unknown> = {}) =>
+    ok({
+      id: ID,
+      name: 'Helena Varga',
+      chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+      owner: { id: 'u1', username: 'dona' },
+      systemCode: 'vtm-v20',
+      templateVersion: '1.0.0',
+      sheetVersion: 3,
+      roles: ['owner'],
+      // Em criação (livre): Editar muda os traços direto; ativa, subir um
+      // traço passa pelo narrador
+      status: 'creating',
+      lockedAt: null,
+      member: true,
+      updatedAt: '2026-10-18T12:00:00Z',
+      sheet: example('helena').sheet,
+      ...extra,
+    })
+  const increment = (name: string) =>
+    fireEvent(screen.getByRole('adjustable', { name }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+  const saved = async (drafts: DraftStore) =>
+    (await drafts.read(ID))?.edits.length ?? 0
+
+  beforeEach(() => {
+    calls.characterGet.mockResolvedValue(character())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+  })
+
+  /** Abre a ficha em Editar e muda Força, Destreza e Raciocínio. */
+  async function editThree(drafts: DraftStore, options = {}) {
+    const view = renderWithSession(
+      <SheetScreen id={ID} initialMode="evolve" />,
+      await signedIn(),
+      { drafts, ...options }
+    )
+    expect(await screen.findByText('Editando · 0 alterações')).toBeTruthy()
+    increment('Força')
+    increment('Destreza')
+    increment('Raciocínio')
+    expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
+    await waitFor(async () => expect(await saved(drafts)).toBe(3))
+    return view
+  }
+
+  /** O "kill": um store novo, a mesma ficha, o mesmo aparelho. */
+  async function reopen(drafts: DraftStore) {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { drafts })
+    return screen.findByText(
+      /^Você tem 3 alterações não salvas nesta ficha, de \d\d\/\d\d às \d\d:\d\d\. Recuperar\?$/
+    )
+  }
+
+  it('fechar e reabrir oferece as 3; "Recuperar" volta a Editar com elas', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    const first = await editThree(drafts)
+    first.unmount()
+    expect(await reopen(drafts)).toBeTruthy()
+    // Pausado até decidir: a abertura em Jogo não apaga o registro
+    expect(await saved(drafts)).toBe(3)
+    fireEvent.press(screen.getByRole('button', { name: 'Recuperar' }))
+    expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
+    expect(
+      screen.getByRole('adjustable', { name: 'Força' })
+    ).toHaveAccessibilityValue({ now: 3 })
+    expect(await screen.findByText('3 alterações recuperadas.')).toBeTruthy()
+  })
+
+  it('"Descartar" apaga o registro', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    ;(await editThree(drafts)).unmount()
+    await reopen(drafts)
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
+    await waitFor(async () => expect(await saved(drafts)).toBe(0))
+    expect(screen.queryByText(/alterações não salvas nesta ficha/)).toBeNull()
+  })
+
+  it('fechar a oferta mantém o registro; entrar em Editar oferece de novo', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    ;(await editThree(drafts)).unmount()
+    await reopen(drafts)
+    fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByText(/alterações não salvas nesta ficha/)).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
+    expect(await saved(drafts)).toBe(3)
+    fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+    expect(
+      await screen.findByText(/^Você tem 3 alterações não salvas/)
+    ).toBeTruthy()
+    expect(await saved(drafts)).toBe(3)
+  })
+
+  it('"Salvar" só apaga o registro depois de o lote entrar no outbox', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    const memory = createMemoryOutbox()
+    let release: () => void = () => undefined
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    const outbox = {
+      ...memory,
+      enqueue: async (id: string, batch: QueuedBatch) => {
+        await gate
+        return memory.enqueue(id, batch)
+      },
+    }
+    const post = jest.fn(
+      async (): Promise<PostOutcome> => ({ status: 200, body: null })
+    )
+    await editThree(drafts, { outbox, post })
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    // O lote ainda não está no outbox: o registro fica
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(await saved(drafts)).toBe(3)
+    await act(async () => {
+      release()
+      await gate
+    })
+    await waitFor(async () => expect(await saved(drafts)).toBe(0))
+  })
+
+  it('ficha travada só oferece "Descartar", com o motivo', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    ;(await editThree(drafts)).unmount()
+    calls.characterGet.mockResolvedValue(
+      character({ status: 'active', lockedAt: '2026-11-01T15:00:00Z' })
+    )
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { drafts })
+    expect(
+      await screen.findByText('A ficha não pode ser editada agora.')
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Recuperar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Descartar' })).toBeTruthy()
+  })
+
+  it('sem acesso à ficha (404), o registro sai', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    ;(await editThree(drafts)).unmount()
+    calls.characterGet.mockResolvedValue({
+      data: null,
+      error: { status: 404, value: { error: 'não encontrado' } },
+    })
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { drafts })
+    expect(
+      await screen.findByText('Você não tem acesso a esta ficha')
+    ).toBeTruthy()
+    await waitFor(async () => expect(await saved(drafts)).toBe(0))
   })
 })

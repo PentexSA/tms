@@ -1,0 +1,253 @@
+import { isDraftMode, type SheetMode } from '@tms/sheet-core'
+import { BottomSheet, Button, Text, tokens, useToast } from '@tms/ui'
+import { useEffect, useRef, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
+import { planDraftRestore, type RestorePlan } from './store/draftRestore'
+import type { SheetActions, SheetState, SheetStore } from './store/sheetStore'
+import type { DraftRecord, DraftStore } from './sync/draftStore'
+
+// O rascunho de Criação/Editar no aparelho (T-03): grava a cada mudança e,
+// ao reabrir a ficha, oferece "Recuperar". Antes, fechar o app, uma queda ou
+// o F5 apagavam tudo, sem aviso.
+
+/** "1 alteração não salva", "3 alterações não salvas". */
+export const unsavedLabel = (n: number) =>
+  n === 1 ? '1 alteração não salva' : `${n} alterações não salvas`
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const when = (ms: number) => {
+  const d = new Date(ms)
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} às ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Uma gravação em voo e a última pendente, sem timer: a última vence
+function createRunner() {
+  let running = false
+  let next: (() => Promise<void>) | null = null
+  const pump = async () => {
+    running = true
+    while (next) {
+      const job = next
+      next = null
+      try {
+        await job()
+      } catch {
+        // O storage falhou: o registro anterior fica; nada vai para log
+      }
+    }
+    running = false
+  }
+  return (job: () => Promise<void>) => {
+    next = job
+    if (!running) void pump()
+  }
+}
+
+type Phase = 'loading' | 'paused' | 'active'
+
+export interface DraftPersistence {
+  // O registro guardado que espera a decisão da pessoa
+  readonly offer: DraftRecord | null
+  recover(): RestorePlan | null
+  discard(): void
+  // Fechar a oferta: o registro fica e o rascunho continua pausado
+  later(): void
+}
+
+/**
+ * Liga o rascunho do store ao registro do aparelho. Enquanto a leitura não
+ * volta, nada é gravado nem apagado. Com registro e o rascunho em memória
+ * vazio, oferece recuperar e fica pausado até a decisão, para não apagar o
+ * registro com o rascunho vazio que a Criação abre. Depois de "Salvar", o
+ * registro só some quando o lote está no outbox.
+ */
+export function useDraftPersistence({
+  store,
+  drafts,
+  characterId,
+  templateVersion,
+  idleMode,
+}: {
+  readonly store: SheetStore
+  readonly drafts: DraftStore
+  readonly characterId: string
+  readonly templateVersion: string
+  // O modo de "decidir depois" (o da política, ou o padrão do papel)
+  readonly idleMode: SheetMode
+}): DraftPersistence {
+  const [offer, setOffer] = useState<DraftRecord | null>(null)
+  const phase = useRef<Phase>('loading')
+  const record = useRef<DraftRecord | null>(null)
+  const run = useRef(createRunner()).current
+  const idle = useRef(idleMode)
+  idle.current = idleMode
+
+  const persist = useRef((s: SheetState & SheetActions) => {
+    if (s.draft?.size) {
+      const next: DraftRecord = {
+        v: 1,
+        characterId,
+        templateVersion,
+        baseVersion: s.sheetVersion,
+        mode: s.mode === 'create' ? 'create' : 'evolve',
+        savedAt: Date.now(),
+        edits: s.draftEvents(),
+      }
+      run(() => drafts.write(next))
+      return
+    }
+    const exit = s.draftExit
+    run(async () => {
+      // Salvo: só apaga quando o lote está no outbox. Se não entrou, o
+      // registro fica e a próxima abertura oferece recuperar
+      if (exit?.kind === 'saved' && !(await exit.queued)) return
+      if (store.getState().draft?.size) return
+      await drafts.remove(characterId)
+    })
+  }).current
+
+  useEffect(() => {
+    let alive = true
+    phase.current = 'loading'
+    drafts.read(characterId).then(
+      found => {
+        if (!alive) return
+        const s = store.getState()
+        if (found && !s.draft?.size) {
+          record.current = found
+          phase.current = 'paused'
+          setOffer(found)
+          return
+        }
+        // Sem registro, ou já há edição nesta abertura: vale a da memória
+        phase.current = 'active'
+        if (s.draft?.size) persist(s)
+      },
+      () => {
+        if (alive) phase.current = 'active'
+      }
+    )
+    const unsubscribe = store.subscribe((s, prev) => {
+      if (s.draft === prev.draft && s.draftExit === prev.draftExit) return
+      if (phase.current === 'active') persist(s)
+      // Pausado: entrar de novo em Criação/Editar oferece de novo, para não
+      // existirem dois rascunhos
+      else if (phase.current === 'paused' && s.draft && !prev.draft)
+        setOffer(record.current)
+    })
+    return () => {
+      alive = false
+      unsubscribe()
+    }
+  }, [store, drafts, characterId, persist])
+
+  return {
+    offer,
+    recover() {
+      const found = record.current
+      if (!found) return null
+      const s = store.getState()
+      const plan = planDraftRestore(s.model, s.values, s.roles, found)
+      if (plan.events.length) s.restoreDraft(plan)
+      record.current = null
+      phase.current = 'active'
+      setOffer(null)
+      persist(store.getState())
+      return plan
+    },
+    discard() {
+      record.current = null
+      phase.current = 'active'
+      setOffer(null)
+      run(() => drafts.remove(characterId))
+    },
+    later() {
+      setOffer(null)
+      // Decidir depois: a ficha sai do rascunho vazio, e o registro fica
+      const s = store.getState()
+      if (isDraftMode(s.mode) && !s.draft?.size) {
+        s.discardDraft()
+        s.setMode(idle.current)
+      }
+    },
+  }
+}
+
+/** A oferta "Alterações não salvas" ao reabrir a ficha. */
+export function DraftRecovery({
+  persistence,
+  store,
+  blocked,
+}: {
+  readonly persistence: DraftPersistence
+  readonly store: SheetStore
+  // A política não deixa editar (travada, arquivada, de quem saiu)
+  readonly blocked: boolean
+}) {
+  const toast = useToast()
+  const { offer } = persistence
+  if (!offer) return null
+  const s = store.getState()
+  const n = offer.edits.length
+  const plan = planDraftRestore(s.model, s.values, s.roles, offer)
+  // Só sobra "Descartar", com o motivo, quando não há o que recuperar
+  const reason = blocked
+    ? 'A ficha não pode ser editada agora.'
+    : offer.templateVersion !== s.model.version
+      ? 'A ficha passou para outra versão do sistema desde então.'
+      : !plan.events.length
+        ? plan.applied === n
+          ? 'Essas alterações já estão salvas.'
+          : 'Nenhuma dessas alterações vale mais para esta ficha.'
+        : null
+  const recover = () => {
+    const done = persistence.recover()
+    if (!done) return
+    const restored = done.events.length
+    const notes = [
+      done.conflicts.length
+        ? `${done.conflicts.length} ${done.conflicts.length === 1 ? 'campo mudou' : 'campos mudaram'} desde então`
+        : null,
+      done.dropped
+        ? `${done.dropped} não ${done.dropped === 1 ? 'pôde' : 'puderam'} voltar`
+        : null,
+    ].filter(Boolean)
+    toast.show({
+      message: `${restored === 1 ? '1 alteração recuperada' : `${restored} alterações recuperadas`}${notes.length ? ` (${notes.join('; ')})` : ''}.`,
+    })
+  }
+  return (
+    <BottomSheet
+      visible
+      title="Alterações não salvas"
+      onClose={persistence.later}
+      testID="draft-recovery"
+      footer={
+        <>
+          <View style={reason ? undefined : styles.secondary}>
+            <Button
+              title="Descartar"
+              variant={reason ? 'primary' : 'ghost'}
+              accessibilityHint={`Apaga ${n === 1 ? 'a alteração guardada' : `as ${n} alterações guardadas`} neste aparelho`}
+              onPress={persistence.discard}
+            />
+          </View>
+          {reason ? null : <Button title="Recuperar" onPress={recover} />}
+        </>
+      }
+    >
+      <View style={styles.body}>
+        <Text>
+          {`Você tem ${unsavedLabel(n)} nesta ficha, de ${when(offer.savedAt)}.`}
+          {reason ? '' : ' Recuperar?'}
+        </Text>
+        {reason ? <Text color="inkMuted">{reason}</Text> : null}
+      </View>
+    </BottomSheet>
+  )
+}
+
+const styles = StyleSheet.create({
+  body: { gap: tokens.space[2] },
+  secondary: { flex: 1, alignItems: 'flex-start' },
+})

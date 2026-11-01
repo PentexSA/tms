@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { sheetFor } from '../../../test/fixtures'
 import { sheetKeys } from '../../data'
 import { createSheetStore } from '../../store/sheetStore'
+import { createMemoryDraftStore } from '../draftStore'
 import { createMemoryOutbox, type Outbox, type QueuedBatch } from '../outbox'
 import type { PostOutcome } from '../sender'
 import { createSync, issuesOf, rejectionMessage } from '../sync'
@@ -281,6 +282,56 @@ it('logout: para o envio e apaga a fila', async () => {
   jest.advanceTimersByTime(60_000)
   await flush()
   expect(post).toHaveBeenCalledTimes(1)
+})
+
+// T-03: o rascunho guardado sai no logout, como a fila
+it('reset (logout) apaga os rascunhos guardados; start varre os vencidos', async () => {
+  const drafts = createMemoryDraftStore()
+  const sync = createSync({
+    outbox: createMemoryOutbox(),
+    drafts,
+    post: jest.fn(),
+    queryClient: new QueryClient(),
+    notify: jest.fn(),
+  })
+  expect(sync.drafts).toBe(drafts)
+  await drafts.write({
+    v: 1,
+    characterId: ID,
+    templateVersion: '1.0.0',
+    baseVersion: 3,
+    mode: 'evolve',
+    savedAt: Date.now(),
+    edits: [{ path: 'values.strength', from: 2, to: 3 }],
+  })
+  const sweep = jest.spyOn(drafts, 'sweep')
+  await sync.start()
+  expect(sweep).toHaveBeenCalledTimes(1)
+  expect(await drafts.characters()).toEqual([ID])
+  await sync.reset()
+  expect(await drafts.characters()).toEqual([])
+  expect(drafts.count.getSnapshot()).toBe(0)
+})
+
+it('enqueue diz se o lote entrou no outbox', async () => {
+  const { sync, store } = setup(() => ({ status: 200, body: null }))
+  const result = store.getState().commit([blood(9, 8)], 'Sangue −1')
+  expect(result.ok && (await result.queued)).toBe(true)
+  const broken: Outbox = {
+    ...createMemoryOutbox(),
+    enqueue: () => Promise.reject(new Error('disco cheio')),
+  }
+  const failing = setup(() => ({ status: 200, body: null }), broken)
+  const refused = failing.store.getState().commit([blood(9, 8)], 'Sangue −1')
+  expect(refused.ok && (await refused.queued)).toBe(false)
+  await expect(
+    failing.sync.enqueue(ID, {
+      clientBatchId: '00000000-0000-4000-8000-0000000000ff',
+      events: [blood(9, 8)],
+      label: 'x',
+    })
+  ).rejects.toThrow('disco cheio')
+  expect(sync).toBeTruthy()
 })
 
 it('flush: reconectou, tenta já', async () => {

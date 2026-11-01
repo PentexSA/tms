@@ -25,7 +25,7 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 /** O lote, se a forma bater com a que o servidor aceita; senão null. */
 export function parseQueuedBatch(raw: unknown): QueuedBatch | null {
   if (!isObject(raw)) return null
-  const { clientBatchId, events, label } = raw
+  const { clientBatchId, events, label, draft } = raw
   if (typeof clientBatchId !== 'string' || !UUID.test(clientBatchId))
     return null
   if (typeof label !== 'string' || label.length > MAX_LABEL) return null
@@ -41,7 +41,14 @@ export function parseQueuedBatch(raw: unknown): QueuedBatch | null {
       return null
     parsed.push({ path: e.path as string, from: e.from ?? null, to: e.to })
   }
-  const batch: QueuedBatch = { clientBatchId, events: parsed, label }
+  // A origem (o "Salvar" de Criação/Editar) sobrevive a reiniciar o app: o
+  // lote recusado volta ao rascunho, não some (T-03, T-31). Só `true` conta
+  const batch: QueuedBatch = {
+    clientBatchId,
+    events: parsed,
+    label,
+    ...(draft === true ? { draft: true } : {}),
+  }
   return batchBytes(batch) > MAX_BATCH_BYTES ? null : batch
 }
 

@@ -35,6 +35,7 @@ import {
   creationInfoOf,
   creationInputOf,
 } from './creation/creation'
+import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
@@ -60,6 +61,7 @@ export function SheetScreen({
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const sync = useSync()
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
@@ -71,9 +73,12 @@ export function SheetScreen({
     )
   )
   useEffect(() => {
-    if (state.status === 'error' && statusOf(state.error) === 404)
+    if (state.status === 'error' && statusOf(state.error) === 404) {
       queryClient.removeQueries({ queryKey: sheetKeys.character(id) })
-  }, [id, queryClient, state])
+      // Sem acesso à ficha: o rascunho guardado dela também sai (T-03)
+      void sync.drafts.remove(id).catch(() => undefined)
+    }
+  }, [id, queryClient, state, sync])
   const chronicle =
     state.status === 'ready' || state.status === 'viewer'
       ? state.character.chronicle
@@ -314,6 +319,14 @@ function LiveSheet({
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
+  // O rascunho guardado no aparelho, e a oferta de recuperá-lo (T-03)
+  const persistence = useDraftPersistence({
+    store,
+    drafts: sync.drafts,
+    characterId: id,
+    templateVersion: state.model.version,
+    idleMode: forced ?? defaultMode(state.roles),
+  })
   useEffect(() => {
     const s = store.getState()
     if (!jsonEqual(s.creation, creation)) s.setCreation(creation)
@@ -359,6 +372,11 @@ function LiveSheet({
           </SheetProvider>
           <SheetView store={store} editable />
           <LeaveGuard store={store} />
+          <DraftRecovery
+            persistence={persistence}
+            store={store}
+            blocked={forced !== null}
+          />
         </CreationContext.Provider>
       </LifecycleContext.Provider>
     </>

@@ -1,0 +1,42 @@
+# Rascunho recuperado (T-03; cenários QAA-03, IA-01 e EA-04). Antes, matar o
+# app com alterações em Criação perdia tudo. Agora o rascunho fica no banco
+# SQLCipher do usuário e volta com "Recuperar". A rodada descarta no fim: a
+# ficha de teste (DRAFT_CHARACTER_ID, da própria conta, em criação por pontos
+# com pontos a distribuir em Atributos) continua igual para a próxima.
+appId: com.tms.app
+name: Rascunho recuperado
+---
+- runFlow: subflows/login.yaml
+- openLink: "tms://characters/${DRAFT_CHARACTER_ID}?mode=create"
+- extendedWaitUntil:
+    visible:
+      text: "Criação · 0 alterações.*"
+    timeout: 20000
+- tapOn: "Aumentar Força"
+- tapOn: "Aumentar Destreza"
+- tapOn: "Aumentar Vigor"
+- assertVisible:
+    text: "Criação · 3 alterações.*"
+# O "kill": o processo morre sem passar pelo "Salvar" nem pelo aviso de saída
+- stopApp
+# O link inicia o processo diretamente (ver o 04)
+- openLink: "tms://characters/${DRAFT_CHARACTER_ID}"
+- extendedWaitUntil:
+    visible:
+      text: "Você tem 3 alterações não salvas nesta ficha.*"
+    timeout: 20000
+- tapOn: "Recuperar"
+- assertVisible:
+    text: "Criação · 3 alterações.*"
+- assertVisible:
+    text: "3 alterações recuperadas.*"
+# Limpa a rodada: sair da Criação passa pelo resumo, e "Descartar" apaga o
+# rascunho do aparelho
+- tapOn: "Jogo"
+- extendedWaitUntil:
+    visible:
+      text: "Salvar 3 alterações?"
+    timeout: 10000
+- tapOn: "Descartar"
+- assertNotVisible:
+    text: "Criação · 3 alterações.*"

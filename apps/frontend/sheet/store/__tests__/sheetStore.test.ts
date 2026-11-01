@@ -1,6 +1,8 @@
 import type { RoleName, SheetData } from '@tms/sheet-core'
 import { clone, example, modelOf, sheetFor } from '../../../test/fixtures'
+import type { DraftRecord } from '../../sync/draftStore'
 import { MAX_PENDING_PER_CHARACTER } from '../../sync/outbox'
+import { planDraftRestore } from '../draftRestore'
 import { createSheetStore, fieldOfIssuePath, MAX_UNDO } from '../sheetStore'
 
 // Etapa 16: o SheetStore (doc/arquitetura §6.5): otimista, confirmação,
@@ -517,5 +519,138 @@ describe('Editar (Etapa 18): setDraftValue e o 422', () => {
     ['events.0.path', null],
   ])('o caminho %s marca %s', (path, field) => {
     expect(fieldOfIssuePath(path)).toBe(field)
+  })
+})
+
+// T-03: o rascunho volta do aparelho revalidado com os papéis e a ficha de
+// agora; o que mudou desde então fica marcado, e nada sobrescreve às cegas
+describe('rascunho recuperado do aparelho', () => {
+  const strength = (from: number, to: number) => ({
+    path: 'values.strength',
+    from,
+    to,
+  })
+  const record = (edits: DraftRecord['edits']): DraftRecord => ({
+    v: 1,
+    characterId: ID,
+    templateVersion: model.version,
+    baseVersion: 2,
+    mode: 'evolve',
+    savedAt: Date.now(),
+    edits,
+  })
+
+  it('separa o que entra, o que já está salvo, o que mudou e o que o papel não escreve', () => {
+    const { s } = setup()
+    const plan = planDraftRestore(
+      model,
+      s().values,
+      s().roles,
+      record([
+        // Igual ao `from`: entra como estava
+        { path: 'values.strength', from: 2, to: 3 },
+        // Já salvo (valor atual = `to`): sai em silêncio
+        { path: 'values.dexterity', from: 1, to: 2 },
+        // Mudou desde então (atual 4, nem `from` nem `to`): conflito
+        { path: 'values.occult', from: 2, to: 3 },
+        // O dono não escreve as Notas do Narrador
+        { path: 'values.storytellerNotes', from: null, to: 'x' },
+        // Projeção do extrato de XP: nunca por evento
+        { path: 'values.xpTotal', from: null, to: 99 },
+        // Campo que o template não tem
+        { path: 'values.inexistente', from: null, to: 1 },
+      ])
+    )
+    expect(plan).toEqual({
+      events: [
+        { path: 'values.strength', from: 2, to: 3 },
+        { path: 'values.occult', from: 2, to: 3 },
+      ],
+      conflicts: ['values.occult'],
+      applied: 1,
+      dropped: 3,
+    })
+  })
+
+  it('o que não passa na validação sai; o resto volta', () => {
+    const { s } = setup()
+    const plan = planDraftRestore(
+      model,
+      s().values,
+      s().roles,
+      record([
+        { path: 'values.strength', from: 2, to: 9 },
+        { path: 'values.dexterity', from: 2, to: 3 },
+      ])
+    )
+    expect(plan.events).toEqual([{ path: 'values.dexterity', from: 2, to: 3 }])
+    expect(plan.dropped).toBe(1)
+  })
+
+  it('restoreDraft entra em Editar com o rascunho; o conflito segura o Salvar até escolher', () => {
+    const { s, enqueue } = setup()
+    s().restoreDraft(
+      planDraftRestore(
+        model,
+        s().values,
+        s().roles,
+        record([
+          { path: 'values.strength', from: 2, to: 3 },
+          { path: 'values.occult', from: 2, to: 3 },
+        ])
+      )
+    )
+    expect(s().mode).toBe('evolve')
+    expect(s().draft?.size).toBe(2)
+    expect(s().conflict).toEqual({
+      batches: [],
+      paths: ['values.occult'],
+      origin: 'recovery',
+    })
+    // A tela mostra o valor do rascunho
+    expect(value(s(), 'occult')?.value).toBe(3)
+    // Com o `from` antigo, o Salvar é recusado (o mesmo aviso do conflito)
+    expect(s().saveDraft('x')).toMatchObject({ ok: false, kind: 'conflict' })
+    expect(enqueue).not.toHaveBeenCalled()
+    // "Manter como está": fica o valor de agora; a entrada sai
+    s().dismissConflict()
+    expect(s().conflict).toBeNull()
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.strength', from: 2, to: 3 },
+    ])
+  })
+
+  it('"Reaplicar" no rascunho recuperado fica com o seu valor sobre o de agora', () => {
+    const { s } = setup()
+    s().restoreDraft(
+      planDraftRestore(
+        model,
+        s().values,
+        s().roles,
+        record([{ path: 'values.occult', from: 2, to: 3 }])
+      )
+    )
+    expect(s().reapply()).toBeNull()
+    expect(s().conflict).toBeNull()
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.occult', from: 4, to: 3 },
+    ])
+    expect(s().saveDraft('Ocultismo')).toMatchObject({ ok: true })
+  })
+
+  it('draftExit: salvo leva a Promise do outbox; descartado não', async () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().editDraft([strength(2, 3)])
+    expect(s().draftExit).toBeNull()
+    s().saveDraft('Força')
+    const exit = s().draftExit
+    expect(exit?.kind).toBe('saved')
+    expect(exit?.kind === 'saved' && (await exit.queued)).toBe(true)
+    s().startDraft()
+    s().editDraft([strength(3, 4)])
+    s().discardDraft()
+    expect(s().draftExit).toEqual({ kind: 'discarded' })
   })
 })

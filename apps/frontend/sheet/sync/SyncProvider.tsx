@@ -10,6 +10,11 @@ import {
 } from 'react'
 import { useUserStorage } from '../../lib/persist'
 import { useSession } from '../../lib/session/SessionProvider'
+import {
+  createMemoryDraftStore,
+  createPersistedDraftStore,
+  type DraftStore,
+} from './draftStore'
 import { createMemoryOutbox, type Outbox, type QueuedBatch } from './outbox'
 import { createPersistedOutbox } from './persistedOutbox'
 import { postEvents } from './post'
@@ -27,10 +32,12 @@ const SyncContext = createContext<Sync | null>(null)
 export function SyncProvider({
   children,
   outbox,
+  drafts,
   post = postEvents,
 }: {
   readonly children: ReactNode
   readonly outbox?: Outbox
+  readonly drafts?: DraftStore
   readonly post?: (
     characterId: string,
     batch: QueuedBatch
@@ -48,11 +55,18 @@ export function SyncProvider({
           (userStorage
             ? createPersistedOutbox(userStorage)
             : createMemoryOutbox()),
+        // O rascunho de Criação/Editar fica no mesmo storage do usuário
+        // (cifrado no app, IndexedDB no web) e sai com ele no logout
+        drafts:
+          drafts ??
+          (userStorage
+            ? createPersistedDraftStore(userStorage)
+            : createMemoryDraftStore()),
         post,
         queryClient,
         notify: message => toast.show({ message }),
       }),
-    [outbox, userStorage, post, queryClient, toast]
+    [outbox, drafts, userStorage, post, queryClient, toast]
   )
   useEffect(
     () =>
@@ -84,4 +98,29 @@ export function useSync(): Sync {
 export function useSyncStatus(): SyncStatus {
   const { status } = useSync()
   return useSyncExternalStore(status.subscribe, status.getSnapshot)
+}
+
+export interface LocalChanges {
+  // Lotes no outbox, esperando o servidor
+  readonly pending: number
+  // Fichas com rascunho de Criação/Editar guardado no aparelho
+  readonly drafts: number
+}
+
+/**
+ * O que só existe neste aparelho e o logout apaga: a fila e os rascunhos. É a
+ * conta do aviso de "Sair" (P02, T-14).
+ */
+export function useLocalChanges(): LocalChanges {
+  const sync = useSync()
+  const { pending } = useSyncStatus()
+  const drafts = useSyncExternalStore(
+    sync.drafts.count.subscribe,
+    sync.drafts.count.getSnapshot
+  )
+  useEffect(() => {
+    // A primeira contagem lê o disco (os rascunhos de antes de abrir o app)
+    void sync.drafts.characters().catch(() => undefined)
+  }, [sync])
+  return { pending, drafts }
 }
