@@ -65,6 +65,8 @@ export function SheetScreen({
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
+  // Alterações do rascunho aberto (T-17): o cabeçalho não diz "Salvo"
+  const [unsaved, setUnsaved] = useState(0)
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -161,6 +163,7 @@ export function SheetScreen({
           key={`${state.character.templateVersion}:${state.roles.join(',')}`}
           state={state}
           initialMode={initialMode}
+          onUnsaved={setUnsaved}
         />
       )
   }
@@ -172,7 +175,10 @@ export function SheetScreen({
         back={back}
         actions={
           <View style={styles.actions}>
-            <SyncIndicator />
+            {/* Só com a ficha aberta: nada de "Salvo" na tela sem acesso */}
+            {state.status === 'ready' ? (
+              <SyncIndicator unsaved={unsaved} />
+            ) : null}
             {state.status === 'ready' && state.roles.includes('storyteller') ? (
               <StatusMenuButton
                 characterId={id}
@@ -269,9 +275,11 @@ export function policyMode(
 function LiveSheet({
   state,
   initialMode,
+  onUnsaved,
 }: {
   readonly state: Extract<SheetState, { status: 'ready' }>
   readonly initialMode?: SheetMode
+  readonly onUnsaved?: (count: number) => void
 }) {
   const sync = useSync()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
@@ -319,6 +327,16 @@ function LiveSheet({
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
+  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero
+  useEffect(() => {
+    if (!onUnsaved) return
+    onUnsaved(store.getState().draft?.size ?? 0)
+    const unsubscribe = store.subscribe(s => onUnsaved(s.draft?.size ?? 0))
+    return () => {
+      unsubscribe()
+      onUnsaved(0)
+    }
+  }, [store, onUnsaved])
   // O rascunho guardado no aparelho, e a oferta de recuperá-lo (T-03)
   const persistence = useDraftPersistence({
     store,

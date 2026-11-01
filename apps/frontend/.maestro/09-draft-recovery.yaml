@@ -28,6 +28,9 @@ name: Rascunho recuperado
 - tapOn: "Recuperar"
 - assertVisible:
     text: "Criação · 3 alterações.*"
+# T-17: o cabeçalho diz que as 3 ainda não foram salvas
+- assertVisible:
+    text: "Sincronização: 3 alterações não salvas"
 - assertVisible:
     text: "3 alterações recuperadas.*"
 # Limpa a rodada: sair da Criação passa pelo resumo, e "Descartar" apaga o

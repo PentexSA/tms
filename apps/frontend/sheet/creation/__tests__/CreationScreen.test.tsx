@@ -175,6 +175,8 @@ describe('prioridades no grupo', () => {
         },
       })
     )
+    // T-17: a prioridade é gravada na hora; os pontos, só no "Salvar"
+    expect(await screen.findByText('Prioridades salvas')).toBeTruthy()
   })
 
   it('com a prioridade escolhida, o bloco mostra a conta e a escolha marcada', async () => {

@@ -322,6 +322,11 @@ describe('rascunho guardado no aparelho', () => {
     increment('Destreza')
     increment('Raciocínio')
     expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
+    // T-17: o cabeçalho diz a verdade, não "Salvo"
+    expect(
+      screen.getByLabelText('Sincronização: 3 alterações não salvas')
+    ).toBeTruthy()
+    expect(screen.queryByLabelText('Sincronização: Salvo')).toBeNull()
     await waitFor(async () => expect(await saved(drafts)).toBe(3))
     return view
   }
@@ -432,5 +437,24 @@ describe('rascunho guardado no aparelho', () => {
       await screen.findByText('Você não tem acesso a esta ficha')
     ).toBeTruthy()
     await waitFor(async () => expect(await saved(drafts)).toBe(0))
+    // T-17 (QAW-05): nada de "Salvo" na tela sem acesso
+    expect(screen.queryByLabelText(/^Sincronização: /)).toBeNull()
+  })
+
+  it('o cabeçalho acompanha o rascunho: Salvar volta a "Salvo"', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    const post = jest.fn(
+      async (_: string, b: QueuedBatch): Promise<PostOutcome> => ({
+        status: 200,
+        body: { sheetVersion: 4, sheet: example('helena').sheet, b },
+      })
+    )
+    await editThree(drafts, { post })
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    expect(
+      await screen.findByLabelText(/^Sincronização: (Salvando…|Salvo)$/)
+    ).toBeTruthy()
+    expect(screen.queryByLabelText(/alterações não salvas$/)).toBeNull()
   })
 })

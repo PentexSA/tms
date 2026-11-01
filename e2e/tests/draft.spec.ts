@@ -43,6 +43,10 @@ test('F5 com 3 alterações em Editar: "Recuperar" devolve as 3; o logout apaga'
       .getByRole('button', { name: `Aumentar ${trait}`, exact: true })
       .click()
   await expect(page.getByText('Editando · 3 alterações')).toBeVisible()
+  // T-17: o cabeçalho dizia "Salvo" com as 3 só no aparelho
+  await expect(page.getByLabel(/^Sincronização: /)).toHaveAccessibleName(
+    'Sincronização: 3 alterações não salvas'
+  )
   await expect.poll(() => draftKeys(page)).toBe(1)
 
   // O F5: o navegador pergunta (beforeunload) e a pessoa aceita

@@ -61,6 +61,9 @@ export function usePriorityChoice(
         },
       },
       {
+        // A prioridade é gravada na hora, à parte do rascunho dos pontos
+        // (T-17): a pessoa vê que ela está salva e os pontos ainda não
+        onSuccess: () => toast.show({ message: 'Prioridades salvas' }),
         onError: error => {
           const code = creationRefusalOf(errorBodyOf(error))
           toast.show({

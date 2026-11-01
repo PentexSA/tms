@@ -5,14 +5,11 @@ import { StyleSheet, View } from 'react-native'
 import { planDraftRestore, type RestorePlan } from './store/draftRestore'
 import type { SheetActions, SheetState, SheetStore } from './store/sheetStore'
 import type { DraftRecord, DraftStore } from './sync/draftStore'
+import { unsavedLabel } from './sync/SyncIndicator'
 
 // O rascunho de Criação/Editar no aparelho (T-03): grava a cada mudança e,
 // ao reabrir a ficha, oferece "Recuperar". Antes, fechar o app, uma queda ou
 // o F5 apagavam tudo, sem aviso.
-
-/** "1 alteração não salva", "3 alterações não salvas". */
-export const unsavedLabel = (n: number) =>
-  n === 1 ? '1 alteração não salva' : `${n} alterações não salvas`
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const when = (ms: number) => {
