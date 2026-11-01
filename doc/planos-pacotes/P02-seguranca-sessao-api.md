@@ -476,3 +476,20 @@ Os passos do "PR local" da matriz ([Como executar](../testes/2026-11-01/matriz-a
 6. **T-14, nativo:** a pendência guarda o refresh token inteiro no Keychain até o envio. A alternativa de menor privilégio é revogar pelo hash (o aparelho guarda só `sha256(token)`, que não renova nada), mas exige contrato novo em `/auth/logout`. Manter o simples?
 7. **T-13, iOS:** além do `diskCapacity: 0`, vale configurar a sessão do RN com `URLSessionConfiguration.ephemeral` pelo `RCTSetCustomNSURLSessionConfigurationProvider`? É mais forte (nada de credencial ou cookie persistente), mas o app nativo hoje não usa cookie e o provedor exige ponte C no `AppDelegate`.
 8. **T-14, `POST /auth/logout` sem rate limit:** manter (só revoga, idempotente, não serve para força bruta) ou aplicar o limite do refresh por coerência com o checklist?
+
+## 10. Desvios na implementação
+
+Registrados na implementação (branch `pacote/p02-seguranca`, commits 1 a 9 do §8, na ordem). Respostas às perguntas do §9 aplicadas como padrão da onda: 1 `null` com normalização; 2 marcador no IndexedDB; 3 o módulo nativo entra (commit 8); 4 um hop; 5 `TMS_LEGACY_APP_TZ` como no §3.5; 6 refresh inteiro no keychain; 7 só `diskCapacity: 0`; 8 rate limit no logout.
+
+1. **T-47, nove colunas, não dez.** A tabela do §3.5 já lista nove (`users` 3, `game_systems` 1, `chronicles` 2, `characters` 3); o "10" do resumo (e do `onda-1.md`) estava errado. O teste confere a lista exata depois do `down`.
+2. **Rate limit no `POST /auth/logout` (pergunta 8).** Mesmos números do refresh (60 por minuto por IP), num contador próprio (`limits.logout`), para o logout não gastar o limite do refresh. O 429 não revoga; o app mantém a pendência e reenvia.
+3. **Fim da pendência.** Além do 2xx, o 400 também encerra a revogação pendente (token que não pode ser sessão nenhuma). 429, 5xx e falta de rede a mantêm.
+4. **`DELETE /me` no nativo.** Com o helper `clearRefreshCookie`, a remoção do cookie sai só para o web, como no logout. Antes, o `DELETE /me` mandava a remoção também ao nativo, que não usa cookie.
+5. **Limpeza do que sobrou de um logout interrompido.** Implementada como dependência da sessão (`purgeUserData`, ligada ao `scopeStorage(deviceStorage, id).clear()`), pelo id do último usuário, porque sem sessão nenhum `OfflineProvider` abre o storage dele.
+6. **Login nativo com pendência.** A revogação antiga vai em segundo plano depois do login e também na abertura, quando há outra sessão ativa (token pendente diferente do ativo). Token pendente igual ao ativo é o caso do app morto no meio: a abertura revoga sem renovar.
+7. **Hook tolerante da fila.** `useOptionalSync()` novo em `SyncProvider.tsx`. O `LogoutButton` conta só o outbox; a contagem de rascunhos (`draft:`) é ligada pelo P03-C, como no acordo 4.2 do `onda-1.md`.
+8. **Onde ficaram os testes.** Os do logout no app estão em `apps/frontend/lib/__tests__/logout.test.ts` (novo), e os do T-13 no app em `apps/frontend/lib/__tests__/httpCache.test.tsx` (novo), em vez de `session.test.ts` e `nativeConfig.test.ts`. O `app/__tests__/_layout.test.tsx` ganhou o `pendingLogout` do `TokenStore` (campo obrigatório).
+9. **Fuso no Postgres real.** O `timestamps.pg.test.ts` espera 1,5 s entre a ficha nova e a edição: o relógio da VM do Docker Desktop anda centenas de ms à frente do host, e o default `now()` vem do banco. No CI (Linux) não há essa diferença.
+10. **Módulo nativo (T-13).** O iOS usa o `didFinishLaunchingWithOptions` do assinante (não o `subscriberDidRegister`) e um `URLCache` sem capacidade em memória e em disco. O nome nativo é `TmsHttpCache`. O OkHttp vem do `react-android`, sem versão própria. O autolinking resolve o pod, o módulo e o `HttpCachePackage`; o Swift e o Kotlin só compilam no build nativo da integração.
+11. **Não rodado neste pacote (integração da onda):** os E2E escritos (`headers.spec.ts`, `auth.spec.ts`, `offline.spec.ts` com o QAW-33, `chronicles.spec.ts`), o build nativo e a inspeção do QAA-02 no simulador e no emulador.
+
