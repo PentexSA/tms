@@ -19,6 +19,10 @@ jest.mock('../../lib/api', () => {
   const fake = createFakeApi()
   return { ...jest.requireActual('../../lib/api'), api: fake.api, fake }
 })
+// Uma chave de verdade por intenção (T-02)
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => require('node:crypto').randomUUID(),
+}))
 const calls = (
   apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
 ).fake.calls
@@ -65,6 +69,7 @@ describe('Nova ficha', () => {
     })
     expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
       values: { name: 'Helena Varga', clan: 'tremere' },
+      clientCommandId: expect.any(String),
     })
     // O Vampiro tem criação por pontos: a ficha nova abre na Criação
     expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
@@ -88,6 +93,7 @@ describe('Nova ficha', () => {
     })
     expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
       values: { name: 'Helena', nature: 'Arquiteto', demeanor: 'Galã' },
+      clientCommandId: expect.any(String),
     })
   })
 
@@ -142,6 +148,60 @@ describe('Nova ficha', () => {
         name: 'Não foi possível abrir a criação de ficha',
       })
     ).toBeTruthy()
+  })
+})
+
+// T-02: dois toques em "Criar ficha" criavam duas fichas
+describe('Nova ficha: um pedido por intenção', () => {
+  const keyOf = (call: number) =>
+    (
+      calls.chronicle.charactersPost.mock.calls[call]?.[0] as
+        | { clientCommandId?: string }
+        | undefined
+    )?.clientCommandId
+
+  it('dois toques seguidos antes da resposta mandam um POST, com a chave', async () => {
+    let answer: (value: unknown) => void = () => undefined
+    calls.chronicle.charactersPost.mockReturnValue(
+      new Promise(resolve => {
+        answer = resolve
+      })
+    )
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(await screen.findByTestId('editor-name'), 'Isadora')
+    const button = screen.getByRole('button', { name: 'Criar ficha' })
+    await act(async () => {
+      fireEvent.press(button)
+      fireEvent.press(button)
+    })
+    expect(calls.chronicle.charactersPost).toHaveBeenCalledTimes(1)
+    expect(keyOf(0)).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    )
+    await act(async () => {
+      answer(ok({ id: 'ch1' }))
+    })
+    expect(router.replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('depois de erro de rede a nova tentativa usa a mesma chave; depois de 422, outra', async () => {
+    calls.chronicle.charactersPost
+      .mockResolvedValueOnce({
+        data: null,
+        error: { status: 0, value: new TypeError('Network request failed') },
+      })
+      .mockResolvedValueOnce(fail(422, 'limite de fichas nesta crônica'))
+      .mockResolvedValueOnce(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.changeText(await screen.findByTestId('editor-name'), 'Isadora')
+    for (let i = 0; i < 3; i++)
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+      })
+    expect(calls.chronicle.charactersPost).toHaveBeenCalledTimes(3)
+    expect(keyOf(1)).toBe(keyOf(0))
+    expect(keyOf(2)).not.toBe(keyOf(1))
+    expect(router.replace).toHaveBeenCalledWith('/characters/ch1?mode=create')
   })
 })
 

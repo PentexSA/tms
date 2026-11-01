@@ -1,5 +1,4 @@
 import { AppBar, EmptyState, Screen, Skeleton, Text, tokens } from '@tms/ui'
-import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useRef } from 'react'
 import {
@@ -32,7 +31,10 @@ export default function NewCharacterScreen() {
   const template = useLatestTemplate(chronicle.data?.system.code)
   const model = useCompiled(template.data)
   const create = useCreateCharacter(id)
-  const commandId = useRef<string | null>(null)
+  // Trava síncrona (T-02): dois toques no mesmo quadro chamam onSubmit duas
+  // vezes antes de o `busy` chegar. Só destrava no erro; no sucesso a tela
+  // navega para a ficha nova
+  const submitting = useRef(false)
   const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
@@ -75,27 +77,22 @@ export default function NewCharacterScreen() {
               : null
           }
           serverIssues={issuesOf(create.error)}
-          onSubmit={values =>
-            create.mutate(
-              npc
-                ? {
-                    values,
-                    kind: 'npc',
-                    clientCommandId: (commandId.current ??= randomUUID()),
-                  }
-                : values,
-              {
-                // A ficha nova abre no rascunho: na Criação, quando o sistema
-                // tem criação por pontos; senão, em Evoluir
-                onSuccess: c => {
-                  commandId.current = null
-                  router.replace(
-                    `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
-                  )
-                },
-              }
-            )
-          }
+          onSubmit={values => {
+            if (submitting.current) return
+            submitting.current = true
+            create.mutate(npc ? { values, kind: 'npc' } : { values }, {
+              // A ficha nova abre no rascunho: na Criação, quando o sistema
+              // tem criação por pontos; senão, em Evoluir
+              onSuccess: c => {
+                router.replace(
+                  `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
+                )
+              },
+              onError: () => {
+                submitting.current = false
+              },
+            })
+          }}
         />
       </ScrollView>
     )

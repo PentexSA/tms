@@ -23,6 +23,10 @@ jest.mock('../../lib/api', () => {
   const fake = createFakeApi()
   return { ...jest.requireActual('../../lib/api'), api: fake.api, fake }
 })
+// Uma chave de verdade por intenção (T-02)
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => require('node:crypto').randomUUID(),
+}))
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }))
 
 const calls = (
@@ -149,6 +153,7 @@ describe('Nova crônica', () => {
     expect(calls.chroniclesPost).toHaveBeenCalledWith({
       name: 'Liberdade',
       systemCode: 'vtm-v20',
+      clientCommandId: expect.any(String),
     })
     expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
@@ -174,6 +179,68 @@ describe('Nova crônica', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'dados inválidos'
     )
+  })
+
+  // T-02: dois toques em "Criar crônica" criavam duas crônicas
+  it('dois toques seguidos antes da resposta mandam um POST, com a chave', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    let answer: (value: unknown) => void = () => undefined
+    calls.chroniclesPost.mockReturnValue(
+      new Promise(resolve => {
+        answer = resolve
+      })
+    )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    const button = screen.getByRole('button', { name: 'Criar crônica' })
+    await act(async () => {
+      fireEvent.press(button)
+      fireEvent.press(button)
+    })
+    expect(calls.chroniclesPost).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      answer(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    })
+    expect(router.replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('depois de erro de rede a nova tentativa usa a mesma chave; depois de recusa, outra', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    calls.chroniclesPost
+      .mockResolvedValueOnce({
+        data: null,
+        error: { status: 0, value: new TypeError('Network request failed') },
+      })
+      .mockResolvedValueOnce(fail(400, 'dados inválidos'))
+      .mockResolvedValueOnce(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    for (let i = 0; i < 3; i++)
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
+      })
+    const keys = calls.chroniclesPost.mock.calls.map(
+      c => (c[0] as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).not.toBe(keys[1])
   })
 
   it('com vários sistemas, escolher antes de criar', async () => {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signUp } from '../support/users'
+import { apiAs, signUp } from '../support/users'
 
 // Etapa 11: o narrador cria a crônica e o convite; o jogador entra com o
 // código; os dois veem a mesma mesa.
@@ -73,4 +73,32 @@ test('código inválido não entra em crônica nenhuma', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText(
     'convite inválido ou expirado'
   )
+})
+
+// T-02 (QAW-08): dois cliques rápidos em "Criar crônica" criavam duas crônicas
+test('clique duplo em "Criar crônica" cria uma crônica só', async ({
+  page,
+}) => {
+  const context = page.context()
+  const user = await signUp(context, 'duplo_cronica')
+  const posts: string[] = []
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/chronicles$/.test(request.url()))
+      posts.push(request.url())
+  })
+  await page.goto('/chronicles/new')
+  await page.getByLabel('Nome da crônica').fill('Crônica do clique duplo')
+  await page.getByRole('radio', { name: /Vampiro: A Máscara/ }).click()
+  await page.getByRole('button', { name: 'Criar crônica' }).dblclick()
+  await expect(
+    page.getByRole('heading', { name: 'Crônica do clique duplo' })
+  ).toBeVisible()
+  expect(posts).toHaveLength(1)
+  const list = await apiAs<{ name: string }[]>(
+    context,
+    user,
+    'GET',
+    '/chronicles'
+  )
+  expect(list.filter(c => c.name === 'Crônica do clique duplo')).toHaveLength(1)
 })

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, unwrap } from '../api'
+import { useCommandKey } from '../commandKey'
 
 // Crônicas e convites (Etapa 11). As chaves ficam aqui para a invalidação
 // depois de criar, entrar ou revogar.
@@ -36,13 +37,20 @@ export const useChronicle = (id: string) =>
       unwrap(await api.chronicles({ id }).get({ fetch: { signal } })),
   })
 
+// T-02: "Criar crônica" e "Criar ficha" levam uma chave por intenção. A
+// repetição (toque duplo, nova tentativa depois de um timeout) devolve o que
+// já foi criado, sem criar outra.
 export const useCreateChronicle = () => {
   const queryClient = useQueryClient()
+  const key = useCommandKey()
   return useMutation({
     mutationFn: async (body: { name: string; systemCode: string }) =>
-      unwrap(await api.chronicles.post(body)),
+      unwrap(
+        await api.chronicles.post({ ...body, clientCommandId: key.current() })
+      ),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
+    onSettled: (_data, error) => key.settle(error),
   })
 }
 
@@ -145,29 +153,19 @@ export const useChronicleCharacters = (id: string) =>
 
 export const useCreateCharacter = (id: string) => {
   const queryClient = useQueryClient()
+  const key = useCommandKey()
   return useMutation({
-    mutationFn: async (
-      input:
-        | Record<string, unknown>
-        | {
-            readonly values: Record<string, unknown>
-            readonly kind: 'npc'
-            readonly clientCommandId: string
-          }
-    ) => {
-      const npc =
-        'values' in input &&
-        input.kind === 'npc' &&
-        typeof input.clientCommandId === 'string'
-      const body = npc
-        ? {
-            values: input.values as Record<string, unknown>,
-            kind: 'npc' as const,
-            clientCommandId: input.clientCommandId as string,
-          }
-        : { values: input as Record<string, unknown> }
-      return unwrap(await api.chronicles({ id }).characters.post(body))
-    },
+    mutationFn: async (input: {
+      readonly values: Record<string, unknown>
+      readonly kind?: 'npc'
+    }) =>
+      unwrap(
+        await api.chronicles({ id }).characters.post({
+          values: input.values,
+          ...(input.kind === 'npc' ? { kind: 'npc' as const } : {}),
+          clientCommandId: key.current(),
+        })
+      ),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({
@@ -175,6 +173,7 @@ export const useCreateCharacter = (id: string) => {
         }),
         queryClient.invalidateQueries({ queryKey: chronicleKeys.all }),
       ]),
+    onSettled: (_data, error) => key.settle(error),
   })
 }
 

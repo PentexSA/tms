@@ -9,7 +9,7 @@ import {
   tokens,
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -27,6 +27,9 @@ export default function NewChronicleScreen() {
   const [name, setName] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
+  // Trava síncrona (T-02): o `busy` do botão chega depois do segundo toque.
+  // Só destrava no erro; no sucesso a tela navega para a crônica
+  const submitting = useRef(false)
   // Com um sistema só (a v0 tem o Vampiro), ele já vem escolhido
   const systemCode =
     picked ??
@@ -38,10 +41,16 @@ export default function NewChronicleScreen() {
       return
     }
     setNameError(null)
-    if (!systemCode) return
+    if (!systemCode || submitting.current) return
+    submitting.current = true
     create.mutate(
       { name: name.trim(), systemCode },
-      { onSuccess: c => router.replace(`/chronicles/${c.id}`) }
+      {
+        onSuccess: c => router.replace(`/chronicles/${c.id}`),
+        onError: () => {
+          submitting.current = false
+        },
+      }
     )
   }
 

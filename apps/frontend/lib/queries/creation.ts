@@ -1,32 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { randomUUID } from 'expo-crypto'
-import { useRef } from 'react'
 
 import { sheetKeys } from '../../sheet/data'
 import { api, unwrap } from '../api'
-import { isNetworkError } from '../errors'
+import { useCommandKey } from '../commandKey'
 import { chronicleKeys } from './chronicles'
 
 // Comandos da criação por pontos (doc/plano-v4.md, Etapas 4 e 5). Exigem rede
-// nesta versão. Cada intenção leva uma chave (`clientCommandId`): depois de
-// um timeout ou resposta perdida, a nova tentativa reusa a mesma chave e o
-// servidor devolve o resultado gravado, sem aplicar duas vezes. A chave só
-// muda quando a intenção termina (sucesso ou recusa com resposta).
-
-/** Uma chave por intenção, mantida enquanto o resultado é desconhecido. */
-function useCommandKey() {
-  const key = useRef<string | null>(null)
-  return {
-    current: () => {
-      key.current ??= randomUUID()
-      return key.current
-    },
-    settle: (error: unknown) => {
-      // Sem resposta: a próxima tentativa é a mesma intenção
-      if (!error || !isNetworkError(error)) key.current = null
-    },
-  }
-}
+// nesta versão. Cada intenção leva uma chave (`useCommandKey`, em
+// lib/commandKey.ts): a nova tentativa depois de um timeout reusa a chave.
 
 const useRefresh = (characterId: string, chronicleId?: string) => {
   const queryClient = useQueryClient()
