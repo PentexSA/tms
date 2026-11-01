@@ -9,7 +9,9 @@ import {
 import { Modal, Platform, Text as RNText } from 'react-native'
 import {
   BottomSheet,
+  Button,
   Choice,
+  ListItem,
   Pressable,
   rovingTarget,
   Stepper,
@@ -529,5 +531,50 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
     rerender(sheet(false))
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
     expect(screen.queryByText('conteúdo')).toBeNull()
+  })
+})
+
+/** Algum ancestral do elemento é um elemento acessível (engole os filhos no app)? */
+const insideAccessible = (el: { parent: unknown }): boolean => {
+  let node = el.parent as {
+    props?: { accessible?: boolean }
+    parent: unknown
+  } | null
+  while (node) {
+    // Só os elementos de host (View) contam: é o que vira nó nativo
+    if (
+      typeof (node as { type?: unknown }).type === 'string' &&
+      node.props?.accessible === true
+    )
+      return true
+    node = node.parent as typeof node
+  }
+  return false
+}
+
+describe('ListItem sem ação não engole o trailing (T-41)', () => {
+  it('o texto é um elemento; o botão fica fora dele', () => {
+    const onPress = jest.fn()
+    render(
+      <ListItem
+        title="Criado em 18/10"
+        subtitle="8 usos restantes"
+        trailing={<Button title="Revogar" variant="ghost" onPress={onPress} />}
+      />
+    )
+    const revoke = screen.getByRole('button', { name: 'Revogar' })
+    expect(insideAccessible(revoke)).toBe(false)
+    expect(
+      screen.getByLabelText('Criado em 18/10, 8 usos restantes')
+    ).toBeTruthy()
+    fireEvent.press(revoke)
+    expect(onPress).toHaveBeenCalled()
+  })
+
+  it('sem trailing, continua um elemento só', () => {
+    render(<ListItem title="Helena" subtitle="Tremere" testID="row" />)
+    const row = screen.getByTestId('row')
+    expect(row.props.accessible).toBe(true)
+    expect(row.props.accessibilityLabel).toBe('Helena, Tremere')
   })
 })

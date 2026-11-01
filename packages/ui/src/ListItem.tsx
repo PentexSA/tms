@@ -17,7 +17,14 @@ export interface ListItemProps {
   readonly testID?: string
 }
 
-/** Linha de lista: a linha inteira é um só alvo (crônica, personagem). */
+/**
+ * Linha de lista: a linha inteira é um só alvo (crônica, personagem).
+ *
+ * Sem `onPress`, a linha é um elemento só para o leitor de tela. Com
+ * `trailing` (Revogar, Remover), o texto vira o elemento e o `trailing` fica
+ * fora dele: senão, no app, o botão some dentro da linha. `onPress` com
+ * `trailing` interativo não é suportado (botão dentro de botão).
+ */
 export function ListItem({
   title,
   subtitle,
@@ -31,41 +38,52 @@ export function ListItem({
   const { colors } = useTheme()
   const label =
     accessibilityLabel ?? [title, subtitle, meta].filter(Boolean).join(', ')
-  const body = (
-    <>
-      {leading}
-      <View style={styles.text}>
-        <Text variant="fieldLabel" numberOfLines={2}>
-          {title}
+  const text = (
+    <View style={styles.text}>
+      <Text variant="fieldLabel" numberOfLines={2}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text variant="caption" color="inkMuted" numberOfLines={2}>
+          {subtitle}
         </Text>
-        {subtitle ? (
-          <Text variant="caption" color="inkMuted" numberOfLines={2}>
-            {subtitle}
-          </Text>
-        ) : null}
-        {meta ? (
-          <Text variant="caption" color="inkMuted">
-            {meta}
-          </Text>
-        ) : null}
-      </View>
-      {trailing}
-    </>
+      ) : null}
+      {meta ? (
+        <Text variant="caption" color="inkMuted">
+          {meta}
+        </Text>
+      ) : null}
+    </View>
   )
   const style = [styles.row, { borderBottomColor: colors.borderSubtle }]
-  return onPress ? (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={style}
-    >
-      {body}
-    </Pressable>
-  ) : (
-    <View testID={testID} accessible accessibilityLabel={label} style={style}>
-      {body}
+  if (onPress)
+    return (
+      <Pressable
+        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={onPress}
+        style={style}
+      >
+        {leading}
+        {text}
+        {trailing}
+      </Pressable>
+    )
+  if (!trailing)
+    return (
+      <View testID={testID} accessible accessibilityLabel={label} style={style}>
+        {leading}
+        {text}
+      </View>
+    )
+  return (
+    <View testID={testID} style={style}>
+      <View accessible accessibilityLabel={label} style={styles.main}>
+        {leading}
+        {text}
+      </View>
+      {trailing}
     </View>
   )
 }
@@ -79,6 +97,12 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
+  },
+  main: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[3],
   },
   text: { flex: 1, gap: tokens.space['0.5'] },
 })

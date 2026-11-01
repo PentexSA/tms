@@ -683,7 +683,7 @@ Item de lista de crônicas, personagens e mesa.
 - **ChronicleCard:** iniciais da crônica, nome, sistema, "Você narra" ou "Narrador: {nome}", número de personagens e data da última sessão.
 - **API RN:** `{ title: string; avatar: { name: string; accent?: AccentName }; chip?: string; meta?: string; stats?: { label: string; value: string }[]; onPress(): void; accessibilityLabel: string }`.
 - **Estados:** normal, pressionado.
-- **A11y:** um link por item com rótulo composto ("Helena Varga, Tremere. Vitalidade: …"); avatar e chevron ocultos.
+- **A11y:** um link por item com rótulo composto ("Helena Varga, Tremere. Vitalidade: …"); avatar e chevron ocultos. No `@tms/ui`, a linha sem `onPress` é um elemento só; com `trailing` (Revogar, Remover, Editar, Propor), o texto vira o elemento e o `trailing` fica fora dele, senão o botão some dentro da linha no app. `onPress` com `trailing` interativo não é suportado (botão dentro de botão).
 - **Multi-sistema:** uma lista mistura Vampiro, D&D e CoC, cada linha com a própria skin e accent; a linha da Mesa reaproveita o `dock` do template ([Vitalidade, Sangue, FdV] ou [PV, SAN, Sorte]).
 - **Resolve:** C-13, C-19, C-20, §7.
 

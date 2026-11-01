@@ -10,6 +10,7 @@ import {
   tokens,
 } from '../../../test/session'
 import { CreationSettings } from '../CreationSettings'
+import { InviteSheet } from '../InviteSheet'
 import { RollFeed } from '../RollFeed'
 
 // Acessibilidade das telas da crônica (P06 da onda 1): um teste de regressão
@@ -101,5 +102,57 @@ describe('Mesa › Rolagens: rótulo visível nos steppers (T-09)', () => {
     // O controle continua com o nome; o rótulo visível não é lido duas vezes
     expect(screen.getByRole('adjustable', { name: 'Dificuldade' })).toBeTruthy()
     expect(screen.queryByText('Dificuldade')).toBeNull()
+  })
+})
+
+/** Algum ancestral de host é um elemento acessível (engole os filhos no app)? */
+const insideAccessible = (el: { parent: unknown }): boolean => {
+  type Node = {
+    type?: unknown
+    props?: { accessible?: boolean }
+    parent: unknown
+  }
+  let node = el.parent as Node | null
+  while (node) {
+    if (typeof node.type === 'string' && node.props?.accessible === true)
+      return true
+    node = node.parent as Node | null
+  }
+  return false
+}
+
+describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () => {
+  it('o botão fica fora da linha acessível do convite', async () => {
+    calls.chronicle.invitesGet.mockResolvedValue(
+      ok([
+        {
+          id: 'i1',
+          createdAt: '2026-10-18T12:00:00Z',
+          expiresAt: '2026-10-25T12:00:00Z',
+          maxUses: 10,
+          uses: 2,
+          active: true,
+        },
+      ])
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(
+      <InviteSheet
+        chronicleId={CHRONICLE}
+        chronicleName="Crônica de teste"
+        visible
+        onClose={jest.fn()}
+      />,
+      session
+    )
+    const revoke = await screen.findByRole('button', { name: 'Revogar' })
+    expect(insideAccessible(revoke)).toBe(false)
+    expect(
+      screen.getByLabelText(/^Criado em .*, 8 usos restantes/)
+    ).toBeTruthy()
   })
 })
