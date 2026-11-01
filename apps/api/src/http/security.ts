@@ -10,6 +10,11 @@ const HEADERS: Readonly<Record<string, string>> = {
   'referrer-policy': 'no-referrer',
   'cross-origin-resource-policy': 'same-site',
   'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  // A API só devolve dado de sessão (tokens, ficha, NPC oculto): nada vai para
+  // cache de navegador, de proxy ou do sistema (NSURLCache no iOS, OkHttp no
+  // Android), que gravam em disco e em claro. MASVS-STORAGE; ASVS 8.2.1 (T-13)
+  'cache-control': 'no-store',
+  pragma: 'no-cache',
 }
 
 export const securityHeaders = (options: { swagger: boolean }) =>

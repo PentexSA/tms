@@ -71,6 +71,11 @@ async function register(user = ana, headers: Record<string, string> = NATIVE) {
   return { res, body: (await res.json()) as Session }
 }
 
+const expectNoStore = (res: Response) => {
+  expect(res.headers.get('cache-control')).toBe('no-store')
+  expect(res.headers.get('pragma')).toBe('no-cache')
+}
+
 const cookieOf = (res: Response) =>
   res.headers.getSetCookie().find(c => c.startsWith('tms_refresh='))
 const cookieValue = (res: Response) =>
@@ -463,8 +468,80 @@ describe('CORS, cabeçalhos e erros', () => {
         "frame-ancestors 'none'"
       )
       expect(res.headers.get('strict-transport-security')).toContain('max-age=')
+      expectNoStore(res)
     }
   )
+
+  // T-13: o cache HTTP do iOS (NSURLCache) e do Android (OkHttp) gravava em
+  // disco, em claro, as respostas com tokens e dados ocultos
+  it('toda resposta sai com no-store, inclusive erro, preflight e swagger', async () => {
+    const { body } = await register()
+    const responses: [string, Response, number][] = [
+      [
+        'login 200 com tokens',
+        await post(
+          '/auth/login',
+          { email: ana.email, password: ana.password },
+          NATIVE
+        ),
+        200,
+      ],
+      [
+        'refresh recusado',
+        await post('/auth/refresh', { refreshToken: 'x'.repeat(43) }, NATIVE),
+        401,
+      ],
+      ['validação', await post('/auth/login', { email: 'ana' }, NATIVE), 400],
+      [
+        'corpo que não é JSON',
+        await ctx.app.handle(
+          new Request('http://localhost/auth/login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: '{ não é json',
+          })
+        ),
+        400,
+      ],
+      [
+        'preflight',
+        await makeRequest(ctx.app, 'OPTIONS', '/auth/login', undefined, {
+          origin: ORIGIN,
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        }),
+        204,
+      ],
+      [
+        'logout',
+        await post('/auth/logout', { refreshToken: body.refreshToken }, NATIVE),
+        204,
+      ],
+    ]
+    for (const [name, res, status] of responses) {
+      expect({ name, status: res.status }).toEqual({ name, status })
+      expectNoStore(res)
+    }
+
+    await setup({
+      swagger: true,
+      limits: {
+        ...defaultLimits(() => new Date()),
+        login: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+      },
+    })
+    const swaggerUi = await get('/swagger')
+    expect(swaggerUi.status).toBe(200)
+    expectNoStore(swaggerUi)
+    await post('/auth/login', { email: ana.email, password: 'x' }, NATIVE)
+    const limited = await post(
+      '/auth/login',
+      { email: ana.email, password: 'x' },
+      NATIVE
+    )
+    expect(limited.status).toBe(429)
+    expectNoStore(limited)
+  })
 
   it('swagger só fora de produção', async () => {
     await setup({ swagger: false })
@@ -492,6 +569,7 @@ describe('CORS, cabeçalhos e erros', () => {
       const text = await res.text()
       expect(JSON.parse(text)).toEqual({ error: 'erro interno' })
       expect(text).not.toContain('at ')
+      expectNoStore(res)
     } finally {
       await own.destroy()
     }
