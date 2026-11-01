@@ -87,3 +87,77 @@ describe('Editar: rótulo e valor sem repetição (T-61)', () => {
     expect(screen.getByRole('button', { name: 'Clã: Tremere' })).toBeTruthy()
   })
 })
+
+describe('Digitar: aplica ao sair, um campo por vez, recusa decimal (T-25)', () => {
+  const typeIn = (name: string) =>
+    fireEvent(screen.getByRole('adjustable', { name }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    })
+  const field = (name: string) => screen.getByLabelText(`${name}, de 1 a 5`)
+  const inputs = () => screen.queryAllByLabelText(/, de 1 a 5$/)
+
+  beforeEach(async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    enterEvolve()
+  })
+
+  it('sair do campo (Tab ou clique fora) aplica', () => {
+    typeIn('Força')
+    fireEvent.changeText(field('Força'), '3')
+    fireEvent(field('Força'), 'blur', { nativeEvent: {} })
+    expect(inputs()).toHaveLength(0)
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(
+      screen.getByRole('adjustable', { name: 'Força' })
+    ).toHaveAccessibilityValue({ now: 3 })
+  })
+
+  it('abrir outro campo aplica o primeiro e fecha: um campo só', () => {
+    typeIn('Força')
+    fireEvent.changeText(field('Força'), '3')
+    typeIn('Destreza')
+    expect(inputs()).toHaveLength(1)
+    expect(field('Destreza')).toBeTruthy()
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(
+      screen.getByRole('adjustable', { name: 'Força' })
+    ).toHaveAccessibilityValue({ now: 3 })
+  })
+
+  it('"3.5" recebe a mensagem de inteiro e não muda o valor', () => {
+    typeIn('Força')
+    fireEvent.changeText(field('Força'), '3.5')
+    fireEvent(field('Força'), 'submitEditing', { nativeEvent: { text: '3.5' } })
+    expect(screen.getByText('Digite um número inteiro de 1 a 5')).toBeTruthy()
+    // Com Enter, o campo fica aberto para corrigir
+    expect(inputs()).toHaveLength(1)
+    // Ao sair, fecha sem aplicar; a mensagem fica na linha
+    fireEvent(field('Força'), 'blur', { nativeEvent: {} })
+    expect(inputs()).toHaveLength(0)
+    expect(screen.getByText('Digite um número inteiro de 1 a 5')).toBeTruthy()
+    expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
+    expect(
+      screen.getByRole('adjustable', { name: 'Força' })
+    ).toHaveAccessibilityValue({ now: 2 })
+  })
+
+  it('Esc cancela: fecha sem aplicar', () => {
+    typeIn('Força')
+    fireEvent.changeText(field('Força'), '4')
+    fireEvent(field('Força'), 'keyPress', { nativeEvent: { key: 'Escape' } })
+    expect(inputs()).toHaveLength(0)
+    expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
+  })
+
+  it('o Enter continua aplicando, uma vez só (o fim da edição vem junto)', () => {
+    typeIn('Força')
+    fireEvent.changeText(field('Força'), '4')
+    const input = field('Força')
+    fireEvent(input, 'submitEditing', { nativeEvent: { text: '4' } })
+    fireEvent(input, 'blur', { nativeEvent: {} })
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(
+      screen.getByRole('adjustable', { name: 'Força' })
+    ).toHaveAccessibilityValue({ now: 4 })
+  })
+})

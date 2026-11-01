@@ -231,7 +231,7 @@ describe('Editar: editores', () => {
     const input = screen.getByLabelText('Força, de 1 a 5')
     expect(input.props.keyboardType).toBe('number-pad')
     fireEvent(input, 'submitEditing', { nativeEvent: { text: '9' } })
-    expect(screen.getByText('Digite um número de 1 a 5')).toBeTruthy()
+    expect(screen.getByText('Digite um número inteiro de 1 a 5')).toBeTruthy()
     fireEvent(screen.getByLabelText('Força, de 1 a 5'), 'submitEditing', {
       nativeEvent: { text: '4' },
     })
