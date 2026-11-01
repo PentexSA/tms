@@ -3,7 +3,7 @@
 - Junta o que foi achado no [relatório técnico](relatorio-tecnico.md) e no [relatório de usabilidade](relatorio-usabilidade.md), organizado em **ondas → pacotes → linhas**, para criar as tarefas e correções. Versão `main`, v1.1.0 (`1db3db9`). A mesma matriz está em [`matriz-achados.csv`](matriz-achados.csv) (UTF-8, separada por vírgula, com as colunas "Onda", "Pacote", "Tipo do pacote" e "Decisão"), para importar no Azure DevOps ou abrir numa planilha.
 - **113 linhas:** 86 achados técnicos (T), 4 de setup do ambiente de desenvolvimento (S), 12 recomendações de usabilidade sem achado técnico equivalente (R), 3 observações latentes do relatório técnico, vistas só com o ambiente quebrado (L), e 8 achados do relatório de usabilidade sem recomendação nem achado técnico (U). **Fonte:** 61 Ambos, 32 QA, 20 Usabilidade. **Severidade:** 1 crítica, 21 altas, 48 médias, 43 baixas; 64 atrapalham a criação.
 - **Ondas e pacotes:** 5 ondas e 20 pacotes (onda 1: 4, onda 2: 4, onda 3: 4, onda 4: 4, onda 5: 4). **Cada pacote é um PR**, e os PRs de uma onda rodam em paralelo. Uma onda começa quando os pacotes de que ela depende estão mergeados (campo "Pré-requisito"). Cada linha está em um pacote só.
-- **Tipo do pacote:** 13 de **correção** (sem sufixo, ou **-C**), que podem começar quando a onda chega, e 7 de **decisão de produto** (**-D**), cujo PR só começa depois que o PO decide (tabela "Decisões de produto"). Uma linha é de decisão quando muda um comportamento definido por projeto ou plano, cria estado, ação ou fluxo novo, ou depende de regra do jogo, de licença ou de conteúdo do sistema. Os pacotes que misturavam os dois foram divididos (P01, P03, P04, P05, P07, P09 e P10).
+- **Tipo do pacote:** 13 de **correção** (sem sufixo, ou **-C**), que podem começar quando a onda chega, e 7 de **decisão de produto** (**-D**), que implementam o que o PO decidiu. **Todas as decisões foram tomadas em 01/11/2026** (tabela "Decisões de produto"); não há decisão pendente. Uma linha é de decisão quando muda um comportamento definido por projeto ou plano, cria estado, ação ou fluxo novo, ou depende de regra do jogo, de licença ou de conteúdo do sistema. Os pacotes que misturavam os dois foram divididos (P01, P03, P04, P05, P07, P09 e P10).
 - **Uma linha por achado técnico.** Quando uma recomendação de usabilidade resolve o achado, ela vem na mesma linha, e se repete quando resolve vários (R-20, R-23, R-24, R-27, R-29 e R-30). "ver R-xx" na coluna # aponta uma recomendação que trata só parte do problema e está em outra linha (às vezes em outro pacote).
 - **Fonte:** QA = só no relatório técnico; Usabilidade = só no de usabilidade; Ambos = o mesmo problema nos dois, pelos IDs das notas ou pelo texto.
 - **"(estimado)"** marca o que não está nos relatórios e foi preenchido nesta consolidação: nos achados só de QA, recomendação (quando o §7 do técnico não tem), causa, quem sofre, tipo, impacto × esforço e escopo; nas linhas R, L, U e S, severidade, passos, esperado × obtido e arquivo provável; e os arquivos achados pela busca do texto da tela no código. As ondas, os pacotes, as decisões e as dependências também são sugestão desta consolidação. O resto é cópia dos relatórios.
@@ -15,7 +15,7 @@
 
 | Onda | Pacote (PR) | Tipo | Itens | Severidade | Atrapalham a criação | Esforço das linhas | Pré-requisito | Decisões | IDs |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | [P01-C · Build, setup e resiliência a versão](#p01-c) | correção | 8 | 1 crítica, 2 altas, 3 médias, 2 baixas | 6 | 8 P | — | — | T-01, S-01, S-02, L-01, L-03, S-03, L-02, S-04 |
+| 1 | [P01-C · Build, setup e resiliência a versão](#p01-c) | correção | 8 | 1 crítica, 2 altas, 3 médias, 2 baixas | 6 | 8 P | — | D-00 | T-01, S-01, S-02, L-01, L-03, S-03, L-02, S-04 |
 | 1 | [P02 · Segurança, sessão e API](#p02) | correção | 5 | 2 altas, 1 média, 2 baixas | 0 | 3 P, 2 M | — | — | T-13, T-14, T-47, T-74, T-86 |
 | 1 | [P03-C · Rascunho, salvamento e conflitos](#p03-c) | correção | 8 | 3 altas, 2 médias, 3 baixas | 7 | 6 P, 2 M | — | — | T-02, T-03, T-12, T-17, T-31, T-54, T-56, T-78 |
 | 1 | [P06 · Componentes do @tms/ui e acessibilidade](#p06) | correção | 11 | 1 alta, 6 médias, 4 baixas | 6 | 10 P, 1 M | — | — | T-09, T-25, T-34, T-35, T-38, T-41, T-42, T-61, T-70, T-71, T-72 |
@@ -32,31 +32,31 @@
 | 4 | [P10-C · Template: derivados, ordem e textos](#p10-c) | correção | 5 | 1 média, 4 baixas | 3 | 5 P | — | — | T-22, T-60, U-05, T-66, T-85 |
 | 4 | [P10-D · Template: ajuda contextual e campos do Mago](#p10-d) | decisão de produto | 2 | 1 média, 1 baixa | 2 | 1 P, 1 M | — | D-11, D-12 | R-19, U-06 |
 | 5 | [P09-D · Narrador: progresso da criação e painel de regras](#p09-d) | decisão de produto | 2 | 2 médias | 2 | 1 P, 1 M | P04-D, P09-C | D-10 | T-36, R-15 |
-| 5 | [P12 · Convite, entrada e navegação](#p12) | correção | 7 | 5 médias, 2 baixas | 1 | 4 P, 3 M | P06 | — | T-30, T-43, T-44, T-45, T-51, T-73, T-82 |
+| 5 | [P12 · Convite, entrada e navegação](#p12) | correção | 7 | 5 médias, 2 baixas | 1 | 4 P, 3 M | P06 | D-14 | T-30, T-43, T-44, T-45, T-51, T-73, T-82 |
 | 5 | [P13 · Ficha em uso: XP, evolução e Jogo](#p13) | correção | 7 | 2 médias, 5 baixas | 0 | 6 P, 1 M | P04-D | — | T-50, T-53, T-77, T-79, T-84, U-01, U-02 |
 | 5 | [P01-D · Planos alinhados com a tela](#p01-d) | decisão de produto | 1 | 1 baixa | 0 | 1 P | — | D-13 | U-08 |
 
 ## Decisões de produto
 
-O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o pacote entra: a decisão precisa estar tomada antes dela. As opções são as que os relatórios e esta consolidação levantaram; nenhuma remove campo, muda regra do jogo ou afrouxa limite.
+**Todas tomadas pelo PO em 01/11/2026; não há decisão pendente.** A coluna "Decisão" é o que o PR do pacote implementa; "Descartadas" fica como histórico. Nenhuma decisão remove campo, muda regra do jogo ou afrouxa limite.
 
-| ID | Decisão | Linhas | Pacote | Até | Quem decide | Opções |
+| ID | Sobre | Linhas | Pacote | Onda | Decisão (01/11/2026) | Descartadas |
 |---|---|---|---|---|---|---|
-| D-00 | Build de iOS no CI | T-01 (parte) | P01-C | — (não bloqueia) | Time (custo de runner macOS) | Job de iOS em runner macOS a cada PR × só no merge para `main` × só o Android no CI e o iOS local antes de release. |
-| D-01 | Salvar × Concluir na barra de criação | T-04, R-05 | P03-D | Onda 3 | PO e design | Manter "um botão só" (por projeto hoje) × "Salvar" sempre disponível com "Concluir criação" ou "Enviar para aprovação" ao lado e "Salvar e sair" no aviso; o botão do modo Editar passa de "Concluir" a "Salvar alterações" (revê o DS-04). |
-| D-02 | Estados da ficha e onde aparecem | R-12 (e o selo do T-06) | P04-D | Onda 3 | PO e design | Quais estados e rótulos ("Em criação · livre/por pontos", "Aguardando aprovação", "Devolvida", "Concluída em dd/mm") e em quais telas (cabeçalho, lista, aba Fichas, Mesa, Histórico). |
-| D-03 | Próximo passo e "Avisar que terminei" | R-13 | P04-D | Onda 3 | PO | Criar a ação "Avisar que terminei" na criação livre e o aviso ao narrador (selo na Mesa agora, push depois) × só texto de orientação, sem ação nova. |
-| D-04 | Pedir ajuste sem aprovação ligada | R-14 | P04-D | Onda 3 | PO (com revisão de segurança) | Novo estado "Aguardando ajuste" na API, com motivo visível ao jogador × só um recado visível (sem estado) × exigir a aprovação ligada. Depois: "Reabrir criação" para ficha concluída? |
-| D-05 | Guia "O que falta" e fase de bônus | R-18, U-07 | P05-D | Onda 4 | PO e design | Resumo do que falta na barra e itens tocáveis; renomear a aba "Orçamento" (ex.: "Pontos"); folha "Começaram os pontos de bônus" uma vez por ficha; a alternância básicos/bônus vira indicador × mantém como está. |
-| D-06 | Qualidade na criação por pontos | T-08 | P07-D | Onda 4 | PO, conferindo o livro e `doc/regras-wod.md` | Permitir comprar com pontos de bônus (o custo sai do saldo) × bloquear, avisando antes de pedir o nome. |
-| D-07 | Dons: catálogo de nomes e nível inicial | T-24 (com a R-27) | P07-D | Onda 4 | PO (licença) | Catálogo só com nomes e nível no template, mantendo o texto livre (padrão da C-18) × seguir sem catálogo; Dom acima do nível inicial: bloquear × avisar. |
-| D-08 | −/+ na linha dos itens de lista | R-25 | P07-D | Onda 4 | PO e design | −/+ na própria linha e a folha só para nome, especialização e notas × manter a folha por ajuste. |
-| D-09 | Disciplinas do clã e Fraqueza preenchida | R-26 | P07-D | Onda 4 | PO (licença e regra) | Selo "do clã" e aviso "fora do clã" sem bloquear; Fraqueza do clã preenchida pelo template, editável, se a licença permitir × manter a lista neutra e o campo vazio. |
-| D-10 | Mesa da criação e painel de regras da crônica | R-15, T-36 | P09-D | Onda 5 | PO, ouvindo narradores | Progresso por ficha no cartão da Mesa e filtro "Em criação / Pendentes"; painel "Criação de fichas" recolhido num resumo depois de salvo × movido para Bastidores. |
-| D-11 | Ajuda contextual (glossário) | R-19 | P10-D | Onda 4 | PO (licença e quem escreve os textos) | "?" com uma frase curta por campo e opção, vinda do template e escrita pelo time (sem copiar texto protegido) × só a explicação de "Prioridade" e "pontos de bônus". |
-| D-12 | Casa do Mago | U-06 | P10-D | Onda 4 | PO, conferindo o livro | Mostrar a Casa só para a Ordem de Hermes (campo condicional no template) × para qualquer Tradição, como hoje. |
-| D-13 | Planos × tela | U-08 | P01-D | Onda 5 | PO | Para cada divergência do §8 da usabilidade: o plano muda (a tela está certa) × a tela muda (vira tarefa). |
-| — | Convite por link | Sem linha própria: parte da R-30 (T-43, T-44, T-45) | P12 | Onda 5 | PO (com revisão de segurança) | Link que abre "Entrar com convite" já preenchido, com o código no fragmento `#` × só o código com instrução de onde colar. |
+| D-00 | Build nativo no CI | T-01 (parte) | P01-C | 1 | Android e iOS compilados no CI em todo PR (o iOS em runner macOS). Com um PR por onda, são poucos PRs para a `main`. | iOS só no merge para a `main`; só Android no CI. |
+| D-01 | Salvar × Concluir na barra de criação | T-04, R-05 | P03-D | 3 | "Salvar" sempre na barra, com "Concluir criação" ou "Enviar para aprovação" ao lado; "Salvar e sair" no aviso "Sair sem salvar?"; no modo Editar, o botão "Concluir" passa a "Salvar alterações". Revê o "um botão só" e o DS-04. | Só separar, mantendo "Concluir" no Editar; manter um botão só. |
+| D-02 | Estados da ficha e onde aparecem | R-12 (e o selo do T-06) | P04-D | 3 | Estados "Em criação · livre" ou "Em criação · por pontos", "Aguardando aprovação", "Aguardando ajuste" (D-04), "Devolvida" e "Concluída em dd/mm", sob o nome da ficha, na lista da crônica, na aba Fichas e na Mesa; o Histórico registra o evento "criação concluída". | Só na ficha e na lista; só "Em criação" e "Devolvida". |
+| D-03 | Próximo passo e "Avisar que terminei" | R-13 | P04-D | 3 | Na criação livre, a ação "Avisar que terminei" mostra um selo ao narrador na Mesa (push fica para depois); em todo modo, um texto na barra diz o próximo passo e quem conclui. | Só o texto, sem ação nova. |
+| D-04 | Pedir ajuste sem aprovação ligada; reabrir criação | R-14 | P04-D | 3 | Novo estado "Aguardando ajuste": o narrador pede ajuste com motivo em qualquer ficha em criação, com a aprovação ligada ou não; o jogador vê o motivo como na devolução; a ação é só do narrador da crônica, validada no servidor. "Reabrir criação" de ficha concluída fica fora deste ciclo e é registrado em `proximas-features.md` (P01-D). | Recado sem estado novo; exigir a aprovação ligada; "Reabrir criação" neste ciclo. |
+| D-05 | Guia "O que falta" e fase de bônus | R-18, U-07 | P05-D | 4 | Resumo "Faltam: …" na barra de criação, com itens tocáveis que levam ao grupo; a aba "Orçamento" passa a "Pontos"; a folha "Começaram os pontos de bônus" aparece só na primeira passagem de cada ficha; a alternância básicos/bônus vira indicador da fase, com a troca manual como opção secundária. | Manter o nome "Orçamento"; manter a alternância; manter como está. |
+| D-06 | Qualidade na criação por pontos | T-08 | P07-D | 4 | Qualidade se compra com pontos de bônus na criação por pontos, pelo custo do item, como diz `doc/regras-wod.md`; a recusa, quando houver, aparece dentro da folha e mantém o nome digitado. O template `vtm-v20` é corrigido. | Bloquear, avisando antes de pedir o nome. |
+| D-07 | Dons: catálogo e nível inicial | T-24 (com a R-27) | P07-D | 4 | Catálogo de Dons só com nome e nível no template, sem texto do livro (padrão C-18), destacando os de Raça, Augúrio e Tribo; o texto livre continua para Dom fora do catálogo. Dom acima do nível 1 na criação gera aviso na linha e no "O que falta" ("confirme com o narrador"), sem bloquear. Revê a decisão de licença da `auditoria-fichas-wod.md` (l.162) só para os nomes. | Seguir sem catálogo; bloquear acima do nível 1. |
+| D-08 | Itens de lista com valor | R-25 | P07-D | 4 | −/+ na própria linha dos itens de lista com valor (Disciplinas, Antecedentes, Dons); a folha fica só para nome, especialização e notas. | Manter a folha por ajuste. |
+| D-09 | Disciplinas do clã e Fraqueza do clã | R-26 | P07-D | 4 | Disciplinas do clã primeiro e com selo "do clã"; escolher outra mostra "fora do clã: confirme com o narrador", sem bloquear (o mesmo mecanismo marca a Esfera da Tradição no Mago). A Fraqueza do clã já vem preenchida com um resumo fiel da regra do livro, escrito pelo time e editável na ficha, sem texto literal (regra de licença do projeto). | Bloquear fora do clã; lista neutra; texto literal do livro, com ou sem checar a licença; campo vazio com dica. |
+| D-10 | Mesa da criação e painel de regras da crônica | R-15, T-36 | P09-D | 5 | Cartão da Mesa com o progresso ("Atributos ✓ · Habilidades: faltam 4 · Bônus: restam 2 de 15"), filtro "Em criação / Pendentes", contagem na lista de crônicas e o Orçamento em leitura para o narrador dentro da ficha (inclusive em `pending`). O painel "Criação de fichas" vira um resumo de uma linha depois de salvo ("Por pontos · 7/5/3 · 15 de bônus · aprovação desligada · Editar"), e as abas sobem para o topo. | Só filtro e contagem; mover o painel para Bastidores; manter como está. |
+| D-11 | Ajuda contextual (glossário) | R-19 | P10-D | 4 | "?" em cada campo e em cada opção de lista, com uma frase curta vinda do template e escrita pelo time, pela mesma regra de fonte da Fraqueza (sem texto literal do livro). O mecanismo é genérico; os textos são por sistema. | Só "Prioridade" e "pontos de bônus"; fora deste ciclo. |
+| D-12 | Casa do Mago | U-06 | P10-D | 4 | A Casa continua em todas as Tradições, com o rótulo "Casa ou subgrupo" e a indicação de que é opcional; nenhum campo é escondido. | Só na Ordem de Hermes (campo condicional); manter como está. |
+| D-13 | Planos × tela | U-08 | P01-D | 5 | Os planos mudam nas 5 divergências: o nome do modo ("Editar"/"Criação", não "Evoluir", v0 §1.5), o Posto na identidade do W20 (v2 §1.2), prevenir em vez de recusar ao concluir com grupo incompleto (v4 §1.4), a Esfera acima do Arete bloqueada já na criação (v1) e a Geração derivada do Antecedente (v0 §1.4). Entram também "Escolher da lista", a folha de bônus, o "O que falta" e as decisões D-00 a D-14. | Decidir uma a uma. |
+| D-14 | Convite por link | T-43, T-44, T-45 (parte da R-30) | P12 | 5 | O convite vira um link que abre "Entrar com convite" já preenchido, com o código no fragmento `#` (o navegador não o envia ao servidor, então ele não chega a log de servidor nem de proxy); uso limitado e validade continuam. | Só o código, com instrução de onde colar. |
 
 ## Como executar
 
@@ -74,7 +74,7 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 
 **Integração da onda.** Merge `--no-ff` de cada pacote na branch da onda, com o ID no título ("P05-C: feedback da conta na criação por pontos"), na ordem que o campo "Conversa com" indica, e typecheck e testes depois de cada merge. Com todos dentro: testes completos, E2E (Chromium e WebKit) e build nativo; depois, push da onda e PR para a `main`.
 
-**Decisão atrasada.** Se a decisão de um pacote -D não saiu até a onda dele começar, o pacote passa para a onda seguinte, e a onda sobe sem ele.
+**Decisão revista.** Hoje não há decisão pendente (todas tomadas em 01/11/2026). Se uma for revista e o pacote -D dela não puder começar na sua onda, ele passa para a onda seguinte, e a onda sobe sem ele; a tabela de decisões registra a revisão.
 
 **Ondas empilhadas.** A onda N+1 sai da ponta da branch da onda N, sem esperar a revisão remota. Quando a onda N entra na `main`, a N+1 faz rebase nela. Ajustes pedidos na revisão remota são feitos na branch do pacote e mesclados de novo na onda; por isso as branches de pacote só são apagadas depois do merge da onda.
 
@@ -84,20 +84,22 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 
 - **Objetivo:** O app volta a compilar, a sessão fica segura, nada se perde ao salvar e os componentes compartilhados ficam acessíveis. É a base de todas as outras ondas.
 - **Pré-requisito:** Nenhum.
-- **Em paralelo:** O PO decide D-01 a D-04 (necessárias na onda 3); o time decide o build de iOS no CI (D-00).
-- **Critério de saída:** Build nativo do Android no CI e os dois builds locais passando; header `cache-control` coberto por teste; E2E verdes; os cenários do QA para T-02, T-03 e T-13 repetidos sem o defeito.
+- **Em paralelo:** —
+- **Critério de saída:** Build nativo de Android e iOS no CI (D-00); header `cache-control` coberto por teste; E2E verdes; os cenários do QA para T-02, T-03 e T-13 repetidos sem o defeito.
 - **PRs:** [P01-C](#p01-c), [P02](#p02), [P03-C](#p03-c), [P06](#p06)
 
 <a id="p01-c"></a>
 
 ### P01-C · Build, setup e resiliência a versão (correção)
 
-- **Objetivo:** O app nativo do `main` compila (e o CI prova isso no Android), o ambiente de dev sobe só com o roteiro documentado, e as telas não escondem falha de versão ou de template.
+- **Objetivo:** O app nativo do `main` compila (e o CI prova isso no Android e no iOS, D-00), o ambiente de dev sobe só com o roteiro documentado, e as telas não escondem falha de versão ou de template.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-00 (T-01): Android e iOS no CI em todo PR.
 - **Itens:** 8 (1 crítica, 2 altas, 3 médias, 2 baixas); 6 atrapalham a criação. **Fonte:** 1 Ambos, 7 QA.
 - **Esforço das linhas:** 8 P (coluna Impacto × esforço).
 - **Pré-requisito:** nenhum.
 - **Onde mexe (arquivos mais citados):** `apps/frontend/app/(app)/chronicles/[id]/new-character.tsx`, `apps/frontend/package.json`, `packages/*/package.json`, `doc/testes/prompt-teste-personas.md`, `apps/frontend/components/chronicles/CreationSettings.tsx`.
-- **Conversa com:** Vem antes de tudo: sem build nativo, nenhuma correção do app chega ao aparelho. O job de iOS no CI depende da D-00.
+- **Conversa com:** Vem antes de tudo: sem build nativo, nenhuma correção do app chega ao aparelho.
 
 | ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -180,7 +182,7 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 
 - **Objetivo:** A ficha em criação abre no modo certo, cada recusa dá o motivo certo perto do toque, a devolução aparece e a ficha cabe no celular.
 - **Pré-requisito:** P03-C (salvamento) e P06 (componentes) mergeados.
-- **Em paralelo:** O PO decide D-05 a D-09, D-11 e D-12 (necessárias na onda 4).
+- **Em paralelo:** —
 - **Critério de saída:** Os cenários do Iniciante e do Experiente (app e web) repetidos sem os achados das linhas da onda; E2E verdes.
 - **PRs:** [P04-C](#p04-c), [P05-C](#p05-c), [P07-C](#p07-c), [P08](#p08)
 
@@ -272,8 +274,8 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ## Onda 3 · Estado e próximo passo da ficha; narrador e Bastidores (4 PRs)
 
 - **Objetivo:** A ficha diz em que estado está e qual é o próximo passo, salvar e concluir viram ações separadas, o narrador consegue pedir ajuste e revisar em leitura, e os bugs altos dos Bastidores saem.
-- **Pré-requisito:** D-01 a D-04 decididas; P04-C e P08 (cabeçalho da ficha) mergeados.
-- **Em paralelo:** O PO decide D-10, D-13 e o convite por link (necessárias na onda 5).
+- **Pré-requisito:** P04-C e P08 (cabeçalho da ficha) mergeados. Aplica D-01 a D-04.
+- **Em paralelo:** —
 - **Critério de saída:** As tarefas "entregar", "devolver" e "sair e voltar", que não foram concluídas no teste, repetidas e concluídas; E2E verdes.
 - **PRs:** [P03-D](#p03-d), [P04-D](#p04-d), [P09-C](#p09-c), [P11](#p11)
 
@@ -282,7 +284,8 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P03-D · Salvar × Concluir na barra (decisão de produto)
 
 - **Objetivo:** Salvar o progresso sem concluir, em qualquer fase da criação, e um verbo por ação na barra.
-- **Decisões que destravam o PR:** D-01 (T-04, R-05). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-01 (T-04, R-05): Salvar sempre + Concluir separado; Editar com "Salvar alterações".
 - **Itens:** 2 (1 alta, 1 média); 2 atrapalham a criação. **Fonte:** 1 Ambos, 1 Usabilidade.
 - **Esforço das linhas:** 2 P (coluna Impacto × esforço).
 - **Pré-requisito:** P03-C.
@@ -299,7 +302,10 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P04-D · Estado, próximo passo e pedir ajuste (decisão de produto)
 
 - **Objetivo:** Em qualquer tela a ficha diz em que estado está e qual é o próximo passo; o jogador da criação livre avisa que terminou; o narrador pede ajuste com ou sem aprovação.
-- **Decisões que destravam o PR:** D-02 (R-12), D-03 (R-13), D-04 (R-14). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-02 (R-12): Estados da ficha em todas as telas.
+  - D-03 (R-13): "Avisar que terminei" + texto do próximo passo.
+  - D-04 (R-14): Estado "Aguardando ajuste"; "Reabrir criação" fora do ciclo.
 - **Itens:** 3 (3 altas); 3 atrapalham a criação. **Fonte:** 3 Usabilidade.
 - **Esforço das linhas:** 3 M (coluna Impacto × esforço).
 - **Pré-requisito:** P04-C, P08.
@@ -360,7 +366,7 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ## Onda 4 · Conteúdo do sistema e guia da criação (4 PRs)
 
 - **Objetivo:** Vantagens, template e o guia "O que falta" aplicam as decisões de regra, de licença e de desenho.
-- **Pré-requisito:** D-05 a D-09, D-11 e D-12 decididas; P07-C mergeado. Os três PRs de template (P07-D, P10-C, P10-D) combinam a ordem de merge.
+- **Pré-requisito:** P07-C mergeado; aplica D-05 a D-09, D-11 e D-12. Os três PRs de template (P07-D, P10-C, P10-D) combinam a ordem de merge.
 - **Em paralelo:** —
 - **Critério de saída:** A criação por pontos de Vampiro, Mago e Lobisomem repetida pelo Experiente e pelo Iniciante; E2E verdes.
 - **PRs:** [P05-D](#p05-d), [P07-D](#p07-d), [P10-C](#p10-c), [P10-D](#p10-d)
@@ -370,7 +376,8 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P05-D · Guia "O que falta" e fase de bônus (decisão de produto)
 
 - **Objetivo:** O que falta distribuir fica sempre à vista, com um nome de aba que o iniciante entende, e a fase de bônus é anunciada uma vez.
-- **Decisões que destravam o PR:** D-05 (R-18, U-07). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-05 (R-18, U-07): Resumo na barra, aba "Pontos", folha de bônus uma vez.
 - **Itens:** 2 (1 média, 1 baixa); 2 atrapalham a criação. **Fonte:** 2 Usabilidade.
 - **Esforço das linhas:** 1 P, 1 M (coluna Impacto × esforço).
 - **Pré-requisito:** P05-C, P03-D.
@@ -387,7 +394,11 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P07-D · Vantagens: regras, catálogo e interação (decisão de produto)
 
 - **Objetivo:** Qualidade e Dom seguem a regra do livro na criação, as Disciplinas do clã aparecem recomendadas, e os itens de lista sobem com −/+ na própria linha.
-- **Decisões que destravam o PR:** D-06 (T-08), D-07 (T-24), D-08 (R-25), D-09 (R-26). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-06 (T-08): Qualidade com pontos de bônus.
+  - D-07 (T-24): Catálogo de nomes e nível; aviso acima do nível 1.
+  - D-08 (R-25): −/+ na própria linha.
+  - D-09 (R-26): Selo "do clã" + aviso; Fraqueza preenchida com resumo do time.
 - **Itens:** 4 (1 alta, 3 médias); 4 atrapalham a criação. **Fonte:** 1 Ambos, 1 QA, 2 Usabilidade.
 - **Esforço das linhas:** 4 M (coluna Impacto × esforço).
 - **Pré-requisito:** P07-C.
@@ -425,7 +436,9 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P10-D · Template: ajuda contextual e campos do Mago (decisão de produto)
 
 - **Objetivo:** Cada campo e opção tem uma frase de ajuda vinda do template, respeitando a licença; a Casa do Mago aparece onde a regra pede.
-- **Decisões que destravam o PR:** D-11 (R-19), D-12 (U-06). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-11 (R-19): "?" em cada campo e opção, texto do time.
+  - D-12 (U-06): "Casa ou subgrupo", opcional, em todas as Tradições.
 - **Itens:** 2 (1 média, 1 baixa); 2 atrapalham a criação. **Fonte:** 2 Usabilidade.
 - **Esforço das linhas:** 1 P, 1 M (coluna Impacto × esforço).
 - **Pré-requisito:** nenhum.
@@ -440,7 +453,7 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ## Onda 5 · Narrador, entrada, uso e documentação (4 PRs)
 
 - **Objetivo:** O narrador acompanha a criação pela Mesa; convite, XP e Jogo sem atrito; planos alinhados com o que foi decidido.
-- **Pré-requisito:** D-10, D-13 e o convite por link decididos; P04-D mergeado (estado da ficha).
+- **Pré-requisito:** P04-D mergeado (estado da ficha); aplica D-10, D-13 e D-14.
 - **Em paralelo:** —
 - **Critério de saída:** A fase 2 do Narrador (acompanhar, ajudar, devolver, concluir) repetida no app e no web; E2E verdes.
 - **PRs:** [P09-D](#p09-d), [P12](#p12), [P13](#p13), [P01-D](#p01-d)
@@ -450,7 +463,8 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 ### P09-D · Narrador: progresso da criação e painel de regras (decisão de produto)
 
 - **Objetivo:** O narrador acompanha a criação pela Mesa (progresso, filtro, pendentes) sem abrir ficha por ficha, e o painel "Criação de fichas" deixa de ocupar o topo da crônica.
-- **Decisões que destravam o PR:** D-10 (R-15, T-36). Ver a tabela "Decisões de produto".
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-10 (R-15, T-36): Progresso na Mesa; painel de regras recolhido.
 - **Itens:** 2 (2 médias); 2 atrapalham a criação. **Fonte:** 1 Ambos, 1 Usabilidade.
 - **Esforço das linhas:** 1 P, 1 M (coluna Impacto × esforço).
 - **Pré-requisito:** P04-D, P09-C.
@@ -466,12 +480,14 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 
 ### P12 · Convite, entrada e navegação (correção)
 
-- **Objetivo:** Convidar e entrar sem atrito: retorno visível ao copiar, compartilhar em qualquer navegador, revogar com confirmação, mensagens de cadastro claras, ações principais visíveis e "voltar" que sempre funciona.
+- **Objetivo:** Convidar e entrar sem atrito: convite por link já preenchido (D-14), retorno visível ao copiar, compartilhar em qualquer navegador, revogar com confirmação, mensagens de cadastro claras, ações principais visíveis e "voltar" que sempre funciona.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-14 (T-43, T-44, T-45): Link com o código no fragmento #.
 - **Itens:** 7 (5 médias, 2 baixas); 1 atrapalham a criação. **Fonte:** 7 Ambos.
 - **Esforço das linhas:** 4 P, 3 M (coluna Impacto × esforço).
 - **Pré-requisito:** P06.
 - **Onde mexe (arquivos mais citados):** `apps/frontend/components/chronicles/InviteSheet.tsx`, `apps/frontend/app/(app)/chronicles/[id]/new-character.tsx`, `apps/frontend/app/(app)/join.tsx`, `apps/frontend/app/(app)/chronicles/new.tsx`, `packages/ui/src/Toast.tsx`.
-- **Conversa com:** A parte "convite por link" da R-30 (linhas T-43 a T-45) espera a decisão do convite por link; o código vai no fragmento `#`, nunca em query string.
+- **Conversa com:** O link de convite (D-14) leva o código no fragmento `#`, nunca em query string: passa pelo `/security-review`.
 
 | ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -508,8 +524,9 @@ O PR de um pacote -D só começa depois da decisão. "Até" é a onda em que o p
 
 ### P01-D · Planos alinhados com a tela (decisão de produto)
 
-- **Objetivo:** Os planos v0 a v5 descrevem o comportamento atual e as decisões D-01 a D-12, para a próxima validação comparar com o certo.
-- **Decisões que destravam o PR:** D-13 (U-08). Ver a tabela "Decisões de produto".
+- **Objetivo:** Os planos v0, v1, v2 e v4 descrevem o comportamento atual e as decisões D-00 a D-14 (D-13), e o `proximas-features.md` registra o "Reabrir criação" (D-04), para a próxima validação comparar com o certo.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-13 (U-08): Os planos mudam nas 5 divergências.
 - **Itens:** 1 (1 baixa); 0 atrapalham a criação. **Fonte:** 1 Usabilidade.
 - **Esforço das linhas:** 1 P (coluna Impacto × esforço).
 - **Pré-requisito:** nenhum.
