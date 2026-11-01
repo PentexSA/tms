@@ -52,7 +52,8 @@ Dá feedback de hover e pressionado a qualquer alvo tocável sem trocar o fundo 
 - **Classes:** `ds-pressable`. O `::after` recebe `state-hover` só com `@media (hover: hover)` e `state-pressed` em `:active`; fica transparente com `disabled` ou `aria-disabled="true"`.
 - **API RN:** `Pressable` com `style={({ pressed }) => pressed && { backgroundColor: t.color.statePressed }}`; `hitSlop` até 44 quando o visual for menor.
 - **Estados:** normal, hover, pressionado, desabilitado.
-- **A11y:** não muda a semântica: o elemento base continua `button` ou `a`.
+- **A11y:** não muda a semântica: o elemento base continua `button` ou `a`. No web, o Espaço ativa também os papéis `radio`, `tab`, `switch` e `checkbox` (o react-native-web só o liga a `button`), sem repetir com a tecla presa e sem rolar a página. O `ref` é prop (React 19) e chega ao elemento.
+- **Foco itinerante (`useRovingFocus`, `roving.ts`):** para grupos (abas, rádios). Só o item ativo fica no Tab (`tabIndex` 0, os outros −1); ←/→ (e ↑/↓ fora do modo `horizontal`) andam dando a volta, Home e End vão às pontas. `activate: 'focus'` seleciona com a seta (abas); `'manual'` só move o foco, e Espaço, Enter ou toque escolhem (rádios que aplicam na hora). Só no web; no app quem anda pelo grupo é o leitor de tela.
 - **Multi-sistema:** o mesmo feedback na linha de Destreza (WoD), no chip de PV (D&D) e na caixa de estresse (Fate).
 - **Resolve:** C-14, DS-04.
 
