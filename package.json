@@ -3,8 +3,11 @@
   "version": "1.1.0",
   "description": "",
   "scripts": {
-    "dev": "turbo run dev --parallel",
-    "dev:expo": "turbo run dev --filter=frontend",
+    "bootstrap": "pnpm install --frozen-lockfile && turbo run build --filter='@tms/api^...' --output-logs=errors-only",
+    "dev": "turbo run build --filter='@tms/api^...' --output-logs=errors-only && turbo run dev --parallel",
+    "dev:api": "turbo run build --filter='@tms/api^...' --output-logs=errors-only && pnpm -C apps/api dev",
+    "dev:web": "pnpm -C apps/frontend web",
+    "dev:expo": "pnpm -C apps/frontend dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "format": "biome format --write .",
