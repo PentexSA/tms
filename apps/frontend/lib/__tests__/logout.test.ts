@@ -234,6 +234,24 @@ describe('logout espera a limpeza local', () => {
     await session.restore()
     expect(purgeUserData).toHaveBeenCalledWith(user.id)
   })
+
+  it('com a sessão aberta, não apaga de novo o que o OfflineProvider apaga', async () => {
+    const user = tokens().user
+    const purgeUserData = jest.fn(async () => undefined)
+    const lastUser = {
+      read: jest.fn(async () => user),
+      write: jest.fn(async () => undefined),
+      clear: jest.fn(async () => undefined),
+    }
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'refresh-0'),
+      { lastUser, purgeUserData }
+    )
+    await session.restore()
+    await session.logout()
+    expect(purgeUserData).not.toHaveBeenCalled()
+  })
 })
 
 describe('logout no web: marcador de sessão no IndexedDB', () => {

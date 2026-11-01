@@ -271,6 +271,8 @@ export class Session {
   async #clearLocal(): Promise<void> {
     this.#epoch++
     this.#accessToken = null
+    // Com sessão aberta, o OfflineProvider apaga o storage deste usuário
+    const open = this.#state.user?.id
     await this.#deps.store.clear()
     const last = await this.#deps.lastUser?.read().catch(() => null)
     await this.#deps.lastUser?.clear().catch(() => undefined)
@@ -278,7 +280,9 @@ export class Session {
     await Promise.allSettled(
       [...this.#signOutListeners].map(async listener => listener())
     )
-    if (last) await this.#deps.purgeUserData?.(last.id).catch(() => undefined)
+    // Sem sessão aberta para ele (logout interrompido), ninguém apagou
+    if (last && last.id !== open)
+      await this.#deps.purgeUserData?.(last.id).catch(() => undefined)
   }
 
   /**
