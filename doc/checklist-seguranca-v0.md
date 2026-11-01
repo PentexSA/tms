@@ -139,6 +139,25 @@ Os testes rodam no CI:
   - `app/lib/__tests__/session.test.ts`: "login guarda só o refresh token" e "sair com um refresh em voo é definitivo".
   - `e2e/auth.spec.ts`.
 
+### Logout que revoga mesmo sem rede (ASVS 3.3.1; T-14)
+
+- **Defesa:**
+  - o logout registra a revogação pendente, apaga tudo do aparelho e só então avisa o servidor; sem rede, a pendência fica e vai na reconexão e na próxima abertura, e nada renova a sessão até ela chegar;
+  - no nativo, a pendência é o refresh token numa chave à parte do keychain (`tms.pendingLogout`, `WHEN_UNLOCKED_THIS_DEVICE_ONLY`), lida só pelo logout e nunca enviada a `/auth/refresh`;
+  - no web, um marcador sem segredo no IndexedDB (`session:state`: `signed-in`, `signed-out`, `logout-pending`), lido a cada renovação; um `BroadcastChannel` tira as outras abas;
+  - o servidor apaga o cookie com os mesmos atributos com que o gravou (`Path=/auth`, HttpOnly, Secure, SameSite=Strict), também no refresh recusado e na exclusão de conta;
+  - login e cadastro no web revogam a família do cookie anterior (filtro de `Origin`, sem recusar o login);
+  - `POST /auth/logout` tem rate limit por IP com os números do refresh, num contador próprio; o 429 não revoga e o app reenvia;
+  - antes de sair, o app tenta enviar a fila; se sobrar alteração, avisa ("Sair e descartar?");
+  - sem sessão no web (`signed-out`), abrir o app não chama `/auth/refresh` (T-74).
+- **Testes:**
+  - `api/__tests__/auth.test.ts`: atributos do cookie apagado (com e sem `secureCookies`), refresh recusado, login e cadastro web revogam o cookie anterior, login nativo não mexe em cookie, rate limit do logout;
+  - `app/lib/__tests__/logout.test.ts`: pendência no keychain, token pendente nunca vai a `/auth/refresh`, app morto no meio, marcador do web, outra aba, 429 e 5xx mantêm a pendência;
+  - `app/lib/__tests__/persist.test.tsx`: "o logout espera a limpeza do storage do usuário, inclusive chaves draft:";
+  - `app/components/session/__tests__/LogoutButton.test.tsx`;
+  - `e2e/offline.spec.ts` (QAW-33, com recarregar e com aba fechada) e `e2e/auth.spec.ts` (cookie apagado, nenhum refresh depois de sair).
+- **Residual:** um navegador que nunca mais abre o app deixa a sessão vencer no prazo do servidor (30/90 dias). No nativo, o token pendente é um refresh completo até o envio.
+
 ### Sessão offline com prazo
 
 - **Defesa:** o último usuário guarda só id e nome e vale pelo mesmo prazo do cache (7 dias); vencido, o app pede login.
@@ -147,12 +166,26 @@ Os testes rodam no CI:
 ### CORS, cabeçalhos e erros (ASVS V14)
 
 - **Defesa:**
-  - CORS por allowlist;
-  - cabeçalhos de segurança no `onRequest`;
+  - CORS por allowlist, sem `x-forwarded-for` (quem o acrescenta é o proxy, não o navegador);
+  - cabeçalhos de segurança no `onRequest`, com `cache-control: no-store` e `pragma: no-cache` em toda resposta, inclusive erro, preflight e swagger (T-13);
   - erro genérico, sem stack.
 - **Testes:**
   - `api/__tests__/api.test.ts`;
-  - `api/__tests__/auth.test.ts` (origin).
+  - `api/__tests__/auth.test.ts` (origin; "toda resposta sai com no-store, inclusive erro, preflight e swagger"; preflight sem `x-forwarded-for`);
+  - `e2e/headers.spec.ts`: "a API de verdade responde com no-store".
+
+### IP do cliente no rate limit (T-86)
+
+- **Defesa:**
+  - sem proxy confiável, o IP é o da conexão e o `X-Forwarded-For` é ignorado;
+  - `TRUST_PROXY=true` só atrás de exatamente um proxy reverso que acrescenta o IP do cliente: vale o último hop, validado com `isIP`; hop vazio, com porta ou inválido cai na conexão (limite mais estrito, nunca mais frouxo);
+  - o E2E simula clientes pelo header `x-tms-test-client-ip`, com `TEST_CLIENT_IP=true`, que o config recusa com `NODE_ENV=production` e junto do `TRUST_PROXY`; o CORS só libera esse header com a flag;
+  - a subida da API loga a política ativa, sem valor de header.
+- **Testes:**
+  - `api/__tests__/auth-units.test.ts`: hop inválido, IPv6, header de teste só com a flag;
+  - `api/__tests__/auth.test.ts`: "sem proxy confiável, X-Forwarded-For forjado não escapa do limite de cadastro";
+  - `config/__tests__/env.test.ts`: `TEST_CLIENT_IP` recusado em produção e junto do `TRUST_PROXY`.
+- **Residual:** a trava do `TEST_CLIENT_IP` depende de o deploy definir `NODE_ENV=production` (`deploy/render/Dockerfile` define). Mais de um proxy confiável na frente da API pediria um `TRUST_PROXY_HOPS`.
 
 ### CSP do web
 
@@ -173,7 +206,15 @@ Os testes rodam no CI:
   - `app/lib/__tests__/persist.test.tsx`: "o usuário B nunca vê o cache de A" e "o logout apaga";
   - `app/sheet/sync/__tests__/encryptedStorage.test.ts`;
   - `app/sheet/sync/__tests__/nativeConfig.test.ts`: SQLCipher, `allowBackup`, sem cleartext nem ATS aberto;
-  - `e2e/offline.spec.ts`: "logout apaga o que ficou no aparelho".
+  - `e2e/offline.spec.ts`: "logout apaga o que ficou no aparelho" (sobra só o marcador `session:state`, sem segredo).
+
+### Cache HTTP do aparelho (MASVS-STORAGE; T-13)
+
+- **Defesa:**
+  - a API manda `no-store` em toda resposta, e o app nativo pede `no-store` em toda requisição (no web não, para não sair do safelist do CORS);
+  - o módulo local `apps/frontend/modules/http-cache` desliga o cache HTTP em disco na abertura, antes do JS (iOS: `URLCache` sem capacidade; Android: OkHttp sem `Cache`), e apaga o que uma versão anterior gravou; o logout apaga de novo.
+- **Testes:** `app/lib/__tests__/httpCache.test.tsx` (no-store só no nativo, purga no logout, configuração do módulo para iOS e Android).
+- **Residual:** o que o Bun responde antes do Elysia (413, HTTP malformado) sai sem os cabeçalhos, sem dado. O cache de imagens do RN (retratos) não passa por aqui. A prova no aparelho (QAA-02: `Cache.db` e `cache/http-cache` sem resposta da API) depende do build nativo.
 
 ### Concorrência na escrita (ASVS V11)
 
@@ -238,7 +279,8 @@ Um sistema novo é dado: nenhuma rota, migration ou dependência nova. Revisto i
 - O que só um dev build prova:
   - o SQLCipher ativo no binário;
   - os fluxos do Maestro;
-  - o arquivo cifrado em disco.
+  - o arquivo cifrado em disco;
+  - o cache HTTP desligado e apagado pelo módulo `http-cache` (T-13).
   
   O roteiro de verificação está em `apps/frontend/.maestro/README.md` e no §7.2 da arquitetura.
 - Exportação de criptografia na App Store (`ITSAppUsesNonExemptEncryption`), antes da publicação.
