@@ -167,6 +167,7 @@ export function StateSheet({ resolved, sheet }: FieldViewProps) {
           ) : null}
           <Choice
             label={def.label}
+            showLabel={false}
             options={options}
             value={r.option.id}
             onChange={choose}

@@ -217,10 +217,14 @@ Escolha única em lista vertical; com `state`, a escolha aplica modificadores a 
   type ChoiceProps<T extends string> = {
     label: string; value: T; onChange: (id: T) => void
     options: { id: T; label: string; hint?: string }[]; disabled?: boolean
+    showLabel?: boolean // título visível acima do grupo; padrão true
   }
   ```
+  `showLabel={false}` só quando o nome já está na tela (o título da folha que abre a escolha). `disabled` tira o toque de todas as opções (pedido em andamento), sem esmaecer a marcada por ser a atual.
 - **Estados:** marcado, pressionado, somente leitura (nota "Somente leitura." e toque sem efeito).
 - **A11y:** `role="radiogroup"` com `aria-label`; opções `role="radio"` + `aria-checked`, tabindex itinerante e setas. RN `radiogroup`/`radio` + `checked`. A troca aparece no toast.
+  - **Título:** no web, o grupo aponta para ele com `aria-labelledby`; no Android fica `aria-hidden` (o TalkBack lê o nome do grupo); no iOS, onde `radiogroup` não tem traço, é o texto lido antes das opções. O estado ("botão de opção, não marcado") sai em português porque o app declara `pt-BR` no `Info.plist` (`app.json`, `ios.infoPlist`).
+  - **Teclado (web):** ativação manual: a seta só move o foco; Espaço, Enter ou toque escolhem. É um desvio consciente da APG ("a seleção segue o foco"), porque vários grupos aplicam a escolha na hora (revelar um NPC, gravar a prioridade) e a seta não pode fazer isso (WCAG 3.2.2).
 - **Multi-sistema:** formas do Garou (WoD, no dock); Forma Selvagem e Fúria do Bárbaro (D&D) e insanidade temporária (CoC) são o mesmo `state`. A lista vertical cabe em 360dp com fonte grande, o que o seletor antigo de 5 colunas não fazia.
 - **Resolve:** C-03, C-09, C-12, DS-05, DS-12.
 

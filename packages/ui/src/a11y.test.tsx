@@ -7,7 +7,7 @@ import {
   screen,
 } from '@testing-library/react-native'
 import { Platform } from 'react-native'
-import { Pressable, rovingTarget, useRovingFocus } from './index'
+import { Choice, Pressable, rovingTarget, useRovingFocus } from './index'
 
 const realOS = Platform.OS
 const setOS = (os: string) =>
@@ -165,5 +165,104 @@ describe('useRovingFocus (T-35)', () => {
     setOS('android')
     const { result } = renderHook(() => useRovingFocus({ count: 2, active: 0 }))
     expect(result.current(0)).toEqual({})
+  })
+})
+
+const CLANS = [
+  { id: 'brujah', label: 'Brujah' },
+  { id: 'tremere', label: 'Tremere' },
+  { id: 'ventrue', label: 'Ventrue' },
+]
+
+describe('Choice: título visível, setas e disabled (T-09, T-35)', () => {
+  it('mostra o título acima do grupo; com showLabel={false}, não', () => {
+    const { rerender } = render(
+      <Choice label="Clã" options={CLANS} value={null} onChange={jest.fn()} />
+    )
+    expect(screen.getByText('Clã')).toBeTruthy()
+    expect(screen.getByLabelText('Clã')).toBeTruthy()
+    rerender(
+      <Choice
+        label="Clã"
+        options={CLANS}
+        value={null}
+        onChange={jest.fn()}
+        showLabel={false}
+      />
+    )
+    expect(screen.queryByText('Clã')).toBeNull()
+    expect(screen.getByLabelText('Clã')).toBeTruthy()
+  })
+
+  it('no web, o grupo é nomeado pelo título (aria-labelledby)', () => {
+    setOS('web')
+    render(
+      <Choice label="Clã" options={CLANS} value={null} onChange={jest.fn()} />
+    )
+    const title = screen.getByText('Clã')
+    const group = screen.getByLabelText('Clã')
+    expect(title.props.nativeID).toBeTruthy()
+    expect(group.props['aria-labelledby']).toBe(title.props.nativeID)
+  })
+
+  it('no Android, o título fica fora da árvore (o TalkBack já lê o grupo)', () => {
+    setOS('android')
+    render(
+      <Choice label="Clã" options={CLANS} value={null} onChange={jest.fn()} />
+    )
+    const title = screen.getByText('Clã', { includeHiddenElements: true })
+    expect(title.props['aria-hidden']).toBe(true)
+    expect(
+      screen.getByLabelText('Clã').props['aria-labelledby']
+    ).toBeUndefined()
+  })
+
+  it('no web: tabindex itinerante; a seta não escolhe, o Espaço escolhe', () => {
+    setOS('web')
+    const onChange = jest.fn()
+    render(
+      <Choice label="Clã" options={CLANS} value="tremere" onChange={onChange} />
+    )
+    const radios = screen.getAllByRole('radio')
+    expect(radios.map(r => r.props.tabIndex)).toEqual([-1, 0, -1])
+    fireEvent(
+      screen.getByRole('radio', { name: 'Tremere' }),
+      'keyDown',
+      key('ArrowDown').event
+    )
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent(
+      screen.getByRole('radio', { name: 'Ventrue' }),
+      'keyDown',
+      key(' ').event
+    )
+    expect(onChange).toHaveBeenCalledWith('ventrue')
+  })
+
+  it('sem nada marcado, o primeiro fica no Tab', () => {
+    setOS('web')
+    render(
+      <Choice label="Clã" options={CLANS} value={null} onChange={jest.fn()} />
+    )
+    expect(screen.getAllByRole('radio').map(r => r.props.tabIndex)).toEqual([
+      0, -1, -1,
+    ])
+  })
+
+  it('disabled: as opções ficam sem toque', () => {
+    const onChange = jest.fn()
+    render(
+      <Choice
+        label="Clã"
+        options={CLANS}
+        value="brujah"
+        onChange={onChange}
+        disabled
+      />
+    )
+    const radio = screen.getByRole('radio', { name: 'Tremere' })
+    expect(radio).toBeDisabled()
+    fireEvent.press(radio)
+    expect(onChange).not.toHaveBeenCalled()
   })
 })

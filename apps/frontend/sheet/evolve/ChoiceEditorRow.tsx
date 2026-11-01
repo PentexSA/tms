@@ -65,6 +65,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
         ) : null}
         <Choice
           label={def.label}
+          showLabel={false}
           value={current?.id ?? null}
           options={def.options.map(o => ({
             id: o.id,

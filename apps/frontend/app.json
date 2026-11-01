@@ -14,7 +14,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tms.app"
+      "bundleIdentifier": "com.tms.app",
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "pt-BR",
+        "CFBundleLocalizations": ["pt-BR"]
+      }
     },
     "android": {
       "package": "com.tms.app",
