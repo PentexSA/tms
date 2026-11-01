@@ -263,6 +263,26 @@ describe('POST /chronicles/:id/characters: ficha do jogador idempotente', () => 
     expect(await mine()).toHaveLength(MAX_CHARACTERS_PER_CHRONICLE)
   })
 
+  it('membro removido repete a chave: 403 antes da repetição, sem o id', async () => {
+    const first = await send({ name: 'Isadora Vex' }, key)
+    expect(first.status).toBe(201)
+    const { id } = (await first.json()) as { id: string }
+    const removed = await as(
+      ctx,
+      storyteller,
+      'DELETE',
+      `/chronicles/${chronicleId}/members/${owner.id}`
+    )
+    expect(removed.status).toBe(204)
+    // O ex-membro (tem ficha, não tem vínculo) é barrado antes de a chave
+    // ser consultada: a repetição não devolve o id
+    const again = await send({ name: 'Isadora Vex' }, key)
+    expect(again.status).toBe(403)
+    const text = await again.text()
+    expect(text).toContain('NOT_MEMBER')
+    expect(text).not.toContain(id)
+  })
+
   it('sem chave continua criando (app antigo)', async () => {
     expect((await create({ name: 'A' })).status).toBe(201)
     expect((await create({ name: 'A' })).status).toBe(201)
