@@ -23,6 +23,7 @@ import { CharacterForm } from '../CharacterForm'
 import { RadioChips } from '../creation/RadioChips'
 import { DiceButton } from '../dice/DiceButton'
 import { SheetScreen } from '../SheetScreen'
+import { SheetView } from '../SheetView'
 import { createSheetStore } from '../store/sheetStore'
 
 // Acessibilidade da ficha (P06 da onda 1): um teste de regressão por bug.
@@ -322,5 +323,48 @@ describe('Visibilidade do NPC: rádio marcado, não botão desabilitado (T-42)',
     const hidden = await openNpc()
     fireEvent(hidden, 'keyDown', keyDown('ArrowDown'))
     expect(calls.visibilityPost).not.toHaveBeenCalled()
+  })
+})
+
+describe('Partes da ficha: painel só com as abas (T-35)', () => {
+  const hostPanels = () =>
+    screen
+      .UNSAFE_queryAllByProps({ role: 'tabpanel' })
+      .filter(el => typeof el.type === 'string')
+
+  it('com abas: o painel é nomeado pela aba selecionada', () => {
+    setOS('web')
+    render(
+      <SheetView
+        model={modelOf('vtm-v20')}
+        sheet={sheetFor('helena', ['owner']).sheet}
+        roles={['owner']}
+      />
+    )
+    const panels = hostPanels()
+    expect(panels).toHaveLength(1)
+    const selected = screen
+      .getAllByRole('tab')
+      .find(t => t.props.accessibilityState?.selected === true)
+    expect(selected?.props.nativeID).toBeTruthy()
+    expect(panels[0]?.props['aria-labelledby']).toBe(selected?.props.nativeID)
+  })
+
+  it('sem zona com aba: nada de tabpanel', () => {
+    setOS('web')
+    const model = modelOf('vtm-v20')
+    const noTabs = {
+      ...model,
+      zones: model.zones.filter(z => z.id === 'play'),
+    }
+    render(
+      <SheetView
+        model={noTabs}
+        sheet={sheetFor('helena', ['owner']).sheet}
+        roles={['owner']}
+      />
+    )
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    expect(hostPanels()).toHaveLength(0)
   })
 })

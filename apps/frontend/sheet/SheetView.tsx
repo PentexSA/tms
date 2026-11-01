@@ -135,6 +135,22 @@ function SheetBody({
     ...zones.map(z => ({ id: z.id, label: z.label ?? z.id })),
     ...(budget ? [{ id: BUDGET_TAB, label: 'Orçamento' }] : []),
   ]
+  // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
+  // conteúdo fica num contêiner comum, sem papel de painel
+  const shownTab = onBudget ? BUDGET_TAB : active?.id
+  const paneled = shownTab !== undefined && tabs.some(t => t.id === shownTab)
+  const zoneContent = (
+    <>
+      {onBudget ? <CreationPanel /> : null}
+      {active?.sections.map(s => (
+        <SectionView
+          key={s.id}
+          section={s}
+          hideTitle={active.sections.length === 1}
+        />
+      ))}
+    </>
+  )
   const play = model.zones.find(z => z.id === 'play')?.sections ?? []
   const accent = useStoreWithEqualityFn(
     store,
@@ -188,24 +204,18 @@ function SheetBody({
                     id="sheet-parts"
                     accessibilityLabel="Partes da ficha"
                     items={tabs}
-                    selected={onBudget ? BUDGET_TAB : (active?.id ?? '')}
+                    selected={shownTab ?? ''}
                     onSelect={setTab}
                   />
                 </View>
               ) : null}
-              <TabPanel
-                tabsId="sheet-parts"
-                tab={onBudget ? BUDGET_TAB : (active?.id ?? '')}
-              >
-                {onBudget ? <CreationPanel /> : null}
-                {active?.sections.map(s => (
-                  <SectionView
-                    key={s.id}
-                    section={s}
-                    hideTitle={active.sections.length === 1}
-                  />
-                ))}
-              </TabPanel>
+              {paneled && shownTab !== undefined ? (
+                <TabPanel tabsId="sheet-parts" tab={shownTab}>
+                  {zoneContent}
+                </TabPanel>
+              ) : (
+                <View>{zoneContent}</View>
+              )}
             </ScrollView>
             {docked ? <CombatDock /> : null}
             {budget ? (
