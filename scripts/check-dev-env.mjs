@@ -6,21 +6,23 @@
 //   (node_modules/.pnpm/lock.yaml, também com nodeLinker: hoisted) tem de ser
 //   igual ao pnpm-lock.yaml.
 // - Build (S-01, só para quem lê o dist: a API, as migrations e os scripts no
-//   Bun): com --dist, o arquivo mais novo de packages/<p>/src (sem testes)
-//   não pode ser mais novo que o arquivo mais novo de packages/<p>/dist. O
-//   Metro lê o src (apps/frontend/metro.config.js), então o web só checa as
-//   dependências.
+//   Bun): com --dist, o hash que o build gravou em packages/<p>/dist
+//   (scripts/src-hash.mjs) tem de ser o do src atual. É conteúdo, não data:
+//   salvar um arquivo sem mudar nada, trocar de branch e voltar ou rodar o
+//   db:codegen com a mesma saída não recusam. O Metro lê o src
+//   (apps/frontend/metro.config.js), então o web só checa as dependências.
 //
-// Comparar por data pode pedir um bootstrap à toa (arquivo tocado sem
-// mudar); o bootstrap resolve, porque o turbo restaura o dist do cache.
 // As mensagens só têm caminho e comando: nada de conteúdo de arquivo nem de
 // variável de ambiente.
 //
 // Uso: node scripts/check-dev-env.mjs [--root <dir>] [--dist <pacote>...]
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readStamp, srcHash } from './src-hash.mjs'
 
 const FIX = 'Rode: pnpm bootstrap'
+export const USAGE =
+  'Uso: node scripts/check-dev-env.mjs [--root <dir>] [--dist <pacote>...]'
 
 /**
  * @param {string} root raiz do monorepo
@@ -40,25 +42,6 @@ export function checkLockfile(root) {
 }
 
 /**
- * O arquivo mais novo da pasta (em ms), sem testes. 0 se não houver nenhum.
- * @param {string} dir
- * @param {boolean} skipTests
- */
-function newest(dir, skipTests) {
-  let latest = 0
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      if (skipTests && entry.name === '__tests__') continue
-      latest = Math.max(latest, newest(path, skipTests))
-    } else if (!(skipTests && /\.test\.[cm]?[jt]sx?$/.test(entry.name))) {
-      latest = Math.max(latest, statSync(path).mtimeMs)
-    }
-  }
-  return latest
-}
-
-/**
  * @param {string} root raiz do monorepo
  * @param {string[]} packages pastas de packages/ cujo dist é lido
  * @returns {string[]} um problema por pacote
@@ -66,13 +49,13 @@ function newest(dir, skipTests) {
 export function checkDist(root, packages) {
   const problems = []
   for (const name of packages) {
-    const src = join(root, 'packages', name, 'src')
-    const dist = join(root, 'packages', name, 'dist')
-    if (!existsSync(src)) {
+    const dir = join(root, 'packages', name)
+    if (!existsSync(join(dir, 'src'))) {
       problems.push(`packages/${name}/src não existe (pacote desconhecido?)`)
       continue
     }
-    if (!existsSync(dist) || newest(src, true) > newest(dist, false)) {
+    // Sem o carimbo (dist ausente ou de antes dele) também é build velho
+    if (readStamp(dir) !== srcHash(dir)) {
       problems.push(
         `O build de @tms/${name} está mais velho que o código. ${FIX}`
       )
@@ -99,19 +82,27 @@ export function parseArgs(argv) {
   const dist = []
   let mode = ''
   for (const arg of argv) {
-    if (arg === '--root' || arg === '--dist') mode = arg
-    else if (mode === '--root') {
+    if (mode === '--root') {
+      if (arg.startsWith('--')) throw new Error(`--root sem valor. ${USAGE}`)
       root = arg
       mode = ''
-    } else if (mode === '--dist') dist.push(arg)
-    else throw new Error(`Argumento desconhecido: ${arg}`)
+    } else if (arg === '--root' || arg === '--dist') mode = arg
+    else if (mode === '--dist' && !arg.startsWith('--')) dist.push(arg)
+    else throw new Error(`Argumento desconhecido: ${arg}. ${USAGE}`)
   }
+  if (mode === '--root') throw new Error(`--root sem valor. ${USAGE}`)
   return { root, dist }
 }
 
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
-  const { root, dist } = parseArgs(process.argv.slice(2))
-  const problems = checkDevEnv(root, { dist })
+  let args
+  try {
+    args = parseArgs(process.argv.slice(2))
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e)
+    process.exit(2)
+  }
+  const problems = checkDevEnv(args.root, { dist: args.dist })
   for (const problem of problems) console.error(problem)
   if (problems.length > 0) process.exit(1)
 }

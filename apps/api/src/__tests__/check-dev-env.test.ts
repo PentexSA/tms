@@ -19,6 +19,11 @@ import {
   checkLockfile,
   parseArgs,
 } from '../../../../scripts/check-dev-env.mjs'
+import {
+  readStamp,
+  srcHash,
+  writeStamp,
+} from '../../../../scripts/src-hash.mjs'
 
 const roots: string[] = []
 const LOCK = 'lockfileVersion: 9.0\n'
@@ -59,22 +64,62 @@ describe('checkLockfile (S-02)', () => {
   })
 })
 
-describe('checkDist (S-01)', () => {
+describe('checkDist (S-01): hash do conteúdo, não data', () => {
   const old = 1_700_000_000
   const recent = old + 60
+  const PKG = 'packages/sheet-core'
 
-  it('passa com o dist mais novo que o src', () => {
+  function built(root: string) {
+    write(root, `${PKG}/src/index.ts`, 'export const a = 1\n', old)
+    write(root, `${PKG}/tsconfig.json`, '{}', old)
+    write(root, `${PKG}/dist/index.js`, 'x', old)
+    writeStamp(join(root, PKG))
+  }
+
+  it('passa logo depois do build', () => {
     const root = fakeRoot()
-    write(root, 'packages/sheet-core/src/index.ts', 'x', old)
-    write(root, 'packages/sheet-core/dist/index.js', 'x', recent)
+    built(root)
     expect(checkDist(root, ['sheet-core'])).toEqual([])
   })
 
-  it('recusa o src mais novo que o dist, e o dist ausente', () => {
+  it('salvar sem mudar nada (data nova, mesmo conteúdo) não recusa', () => {
     const root = fakeRoot()
-    write(root, 'packages/sheet-core/src/index.ts', 'x', recent)
-    write(root, 'packages/sheet-core/dist/index.js', 'x', old)
-    write(root, 'packages/db/src/index.ts', 'x', old)
+    built(root)
+    write(root, `${PKG}/src/index.ts`, 'export const a = 1\n', recent)
+    expect(checkDist(root, ['sheet-core'])).toEqual([])
+  })
+
+  it('codegen que regrava o arquivo com a mesma saída não recusa', () => {
+    const root = fakeRoot()
+    write(root, 'packages/db/src/types.ts', 'export interface DB {}\n', old)
+    write(root, 'packages/db/dist/index.js', 'x', old)
+    writeStamp(join(root, 'packages/db'))
+    write(root, 'packages/db/src/types.ts', 'export interface DB {}\n', recent)
+    expect(checkDist(root, ['db'])).toEqual([])
+  })
+
+  it('mudança de verdade no src ou no tsconfig recusa, com o comando', () => {
+    const message =
+      'O build de @tms/sheet-core está mais velho que o código. Rode: pnpm bootstrap'
+    const root = fakeRoot()
+    built(root)
+    write(root, `${PKG}/src/index.ts`, 'export const a = 2\n', old)
+    expect(checkDist(root, ['sheet-core'])).toEqual([message])
+    const other = fakeRoot()
+    built(other)
+    write(other, `${PKG}/src/novo.ts`, 'export {}\n', old)
+    expect(checkDist(other, ['sheet-core'])).toEqual([message])
+    const config = fakeRoot()
+    built(config)
+    write(config, `${PKG}/tsconfig.json`, '{"compilerOptions":{}}', old)
+    expect(checkDist(config, ['sheet-core'])).toEqual([message])
+  })
+
+  it('sem o carimbo (dist ausente ou de antes dele) recusa', () => {
+    const root = fakeRoot()
+    write(root, `${PKG}/src/index.ts`, 'x')
+    write(root, 'packages/db/src/index.ts', 'x')
+    write(root, 'packages/db/dist/index.js', 'x')
     expect(checkDist(root, ['sheet-core', 'db'])).toEqual([
       'O build de @tms/sheet-core está mais velho que o código. Rode: pnpm bootstrap',
       'O build de @tms/db está mais velho que o código. Rode: pnpm bootstrap',
@@ -83,11 +128,15 @@ describe('checkDist (S-01)', () => {
 
   it('testes no src não contam', () => {
     const root = fakeRoot()
-    write(root, 'packages/config/src/env.ts', 'x', old)
-    write(root, 'packages/config/src/__tests__/env.test.ts', 'x', recent)
-    write(root, 'packages/config/src/env.pg.test.ts', 'x', recent)
-    write(root, 'packages/config/dist/env.js', 'x', old + 1)
+    write(root, 'packages/config/src/env.ts', 'x')
+    write(root, 'packages/config/dist/env.js', 'x')
+    writeStamp(join(root, 'packages/config'))
+    write(root, 'packages/config/src/__tests__/env.test.ts', 'novo')
+    write(root, 'packages/config/src/env.pg.test.ts', 'novo')
     expect(checkDist(root, ['config'])).toEqual([])
+    expect(readStamp(join(root, 'packages/config'))).toBe(
+      srcHash(join(root, 'packages/config'))
+    )
   })
 
   it('pacote sem src é recusado', () => {
@@ -114,5 +163,15 @@ describe('checkDevEnv e argumentos', () => {
       dist: ['db', 'config'],
     })
     expect(() => parseArgs(['--fix'])).toThrow('Argumento desconhecido')
+    expect(() => parseArgs(['--dist', 'db', '--fix'])).toThrow(
+      'Argumento desconhecido'
+    )
+  })
+
+  it('--root sem valor é erro de uso', () => {
+    expect(() => parseArgs(['--root'])).toThrow('--root sem valor. Uso:')
+    expect(() => parseArgs(['--root', '--dist', 'db'])).toThrow(
+      '--root sem valor'
+    )
   })
 })
