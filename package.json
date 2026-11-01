@@ -10,6 +10,7 @@
     "format": "biome format --write .",
     "check": "biome check --write .",
     "typecheck": "turbo run typecheck",
+    "check:native": "node scripts/check-native-versions.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down -v",
     "db:migrate": "pnpm -C packages/db migrate:up",
