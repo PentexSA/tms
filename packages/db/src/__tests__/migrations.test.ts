@@ -672,6 +672,135 @@ describe('migrations', () => {
     }
   })
 
+  // T-47: a hora da Mesa vinha 3 h no futuro e a ordem por última alteração
+  // errava, porque as colunas das migrations 0002 a 0005 não tinham fuso
+  it('0021: nenhuma coluna timestamp sem fuso no schema', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const { rows } = await sql<{ column: string }>`
+        select table_name || '.' || column_name as column
+        from information_schema.columns
+        where table_schema = 'public'
+          and data_type = 'timestamp without time zone'
+        order by 1`.execute(db)
+      expect(rows).toEqual([])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0021 converte o default no fuso do banco e o que a API gravou no fuso do processo', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    const previous = process.env.TMS_LEGACY_APP_TZ
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect(
+        (await migrator.migrateTo('0020_product_templates')).error
+      ).toBeUndefined()
+      // O banco em UTC (o default now() gravou a hora UTC) e a API em
+      // Brasília (gravou a hora de Brasília). Texto literal, não Date: o
+      // PGLite serializa o Date em UTC e a mistura não aconteceria
+      await sql`set time zone 'UTC'`.execute(db)
+      const { rows: users } = await sql<{ id: string }>`
+        insert into users (email, username, hashed_password, created_at, updated_at, deleted_at)
+        values ('t47@x.test', 't47', 'h', '2026-11-01 15:00:00', '2026-11-01 15:00:00', '2026-11-01 12:10:00')
+        returning id`.execute(db)
+      const user = users[0]?.id
+      const { rows: systems } = await sql<{ id: string }>`
+        select id from game_systems order by code limit 1`.execute(db)
+      const system = systems[0]?.id
+      const { rows: chronicles } = await sql<{ id: string }>`
+        insert into chronicles (name, storyteller_id, system_id, created_at, updated_at)
+        values ('c', ${user}, ${system}, '2026-11-01 15:20:00', '2026-11-01 12:40:00')
+        returning id`.execute(db)
+      const chronicle = chronicles[0]?.id
+      // Ficha nova (nunca tocada pela API) e ficha editada pela API depois
+      await sql`
+        insert into characters
+          (name, chronicle_id, system_id, user_id, template_version, sheet_data, created_at, updated_at)
+        values
+          ('nova', ${chronicle}, ${system}, ${user}, '1.0.0', '{}', '2026-11-01 16:04:00.123456', '2026-11-01 16:04:00.123456'),
+          ('editada', ${chronicle}, ${system}, ${user}, '1.0.0', '{}', '2026-11-01 15:50:00', '2026-11-01 13:30:00')
+      `.execute(db)
+
+      process.env.TMS_LEGACY_APP_TZ = 'America/Sao_Paulo'
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
+
+      const utc = (column: string, table: string) =>
+        sql<{ v: string }>`
+          select to_char(${sql.ref(column)} at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS') as v
+          from ${sql.table(table)} order by ${sql.ref(column)} desc`
+          .execute(db)
+          .then(r => r.rows.map(row => row.v))
+      // Default: a hora UTC continua; API: Brasília (-03) vira UTC
+      expect(await utc('created_at', 'users')).toEqual(['2026-11-01 15:00:00'])
+      expect(await utc('deleted_at', 'users')).toEqual(['2026-11-01 15:10:00'])
+      expect(await utc('updated_at', 'chronicles')).toEqual([
+        '2026-11-01 15:40:00',
+      ])
+      // A editada às 16:30 UTC, a nova às 16:04 UTC, intacta
+      expect(await utc('updated_at', 'characters')).toEqual([
+        '2026-11-01 16:30:00',
+        '2026-11-01 16:04:00',
+      ])
+      // A última alteração ordena certo: a editada vem primeiro
+      const { rows: order } = await sql<{ name: string }>`
+        select name from characters order by updated_at desc`.execute(db)
+      expect(order.map(r => r.name)).toEqual(['editada', 'nova'])
+
+      // O down volta os tipos e a hora de parede do fuso do banco
+      expect((await migrator.migrateDown()).error).toBeUndefined()
+      const { rows: types } = await sql<{ column: string }>`
+        select table_name || '.' || column_name as column
+        from information_schema.columns
+        where table_schema = 'public'
+          and data_type = 'timestamp without time zone'
+        order by 1`.execute(db)
+      expect(types.map(r => r.column)).toEqual([
+        'characters.created_at',
+        'characters.deleted_at',
+        'characters.updated_at',
+        'chronicles.created_at',
+        'chronicles.updated_at',
+        'game_systems.created_at',
+        'users.created_at',
+        'users.deleted_at',
+        'users.updated_at',
+      ])
+      const { rows: back } = await sql<{ v: string }>`
+        select deleted_at::text as v from users`.execute(db)
+      expect(back.map(r => r.v)).toEqual(['2026-11-01 15:10:00'])
+    } finally {
+      if (previous === undefined) delete process.env.TMS_LEGACY_APP_TZ
+      else process.env.TMS_LEGACY_APP_TZ = previous
+      await destroy()
+    }
+  })
+
+  it('0021 recusa um TMS_LEGACY_APP_TZ que não é fuso do Postgres', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    const previous = process.env.TMS_LEGACY_APP_TZ
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect(
+        (await migrator.migrateTo('0020_product_templates')).error
+      ).toBeUndefined()
+      process.env.TMS_LEGACY_APP_TZ = "UTC'; drop table users; --"
+      const result = await migrator.migrateToLatest()
+      expect(String(result.error)).toContain(
+        'TMS_LEGACY_APP_TZ não é um fuso do Postgres'
+      )
+      const { rows } = await sql<{ n: number }>`
+        select count(*)::int as n from information_schema.tables
+        where table_schema = 'public' and table_name = 'users'`.execute(db)
+      expect(rows[0]?.n).toBe(1)
+    } finally {
+      if (previous === undefined) delete process.env.TMS_LEGACY_APP_TZ
+      else process.env.TMS_LEGACY_APP_TZ = previous
+      await destroy()
+    }
+  })
+
   it('uma migration quebrada derruba o banco de teste', async () => {
     const broken = {
       getMigrations: async () => ({
