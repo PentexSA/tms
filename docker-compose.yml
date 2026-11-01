@@ -1,13 +1,17 @@
 services:
   postgres:
-    image: postgres
+    # Mesma tag do CI (ci.yml) e do CLAUDE.md; recebe os patches da 16.x a
+    # cada docker compose pull
+    image: postgres:16
     container_name: tms-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: tms
+    # Só no loopback: a credencial é a de dev, conhecida; a API, as
+    # migrations e o seed conectam em localhost
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
