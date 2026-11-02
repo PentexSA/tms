@@ -106,12 +106,11 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
           if (searching && tabs.bar && !ids.length) return null
           const header = Boolean(g.title) && titled && !echo
           // A lista que o título à vista (do grupo ou da seção) já nomeia
-          const headed =
-            titledList(
-              model,
-              g.fieldIds,
-              header ? g.title : echo ? section.def.title : null
-            ) ?? null
+          const headed = titledList(
+            model,
+            g.fieldIds,
+            header ? g.title : echo ? section.def.title : null
+          )
           return (
             <GroupBlock key={g.id} headed={headed}>
               {header ? (
@@ -120,10 +119,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
                     title={g.title}
                     level="group"
                     right={
-                      <CreationCounter
-                        fieldIds={g.fieldIds}
-                        items={headed ?? undefined}
-                      />
+                      <CreationCounter fieldIds={g.fieldIds} items={headed} />
                     }
                   />
                 </View>
@@ -162,7 +158,7 @@ function GroupBlock({
   headed,
   children,
 }: {
-  readonly headed: FieldId | null
+  readonly headed: FieldId | undefined
   readonly children: ReactNode
 }) {
   return (

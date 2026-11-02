@@ -1,6 +1,5 @@
 import {
   type FieldId,
-  isDraftMode,
   type PriorityBudget,
   plural,
   short,
@@ -9,6 +8,7 @@ import { Text, tokens } from '@tms/ui'
 import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
+import { drawsEditor } from '../FieldSlot'
 import type { FieldEntry } from '../store/sheetStore'
 import { useCreation } from './CreationContext'
 import { counterSpoken, counterText, findGroup, groupFor } from './creation'
@@ -34,7 +34,7 @@ export function CreationCounter({
   readonly line?: boolean
   readonly items?: FieldId
 }) {
-  const { model, mode } = useSheet()
+  const { model, mode, roles } = useSheet()
   const creation = useCreation()
   const where = useMemo(() => groupFor(model, fieldIds), [model, fieldIds])
   const group = useSheetSelector(s => findGroup(s.check, where))
@@ -51,7 +51,9 @@ export function CreationCounter({
     Boolean(budget && creation?.info) && creation?.status === 'creating'
   const list = useSheetSelector(s => (items ? s.entries.get(items) : undefined))
   if (mode !== 'create' || !creation?.active || !group)
-    return list && isDraftMode(mode) ? <ItemCount entry={list} /> : null
+    return list && items && drawsEditor(model, roles, items, mode) ? (
+      <ItemCount entry={list} />
+    ) : null
   const over = group.budget !== null && group.extra > 0
   const counter =
     pickable && group.budget === null ? (

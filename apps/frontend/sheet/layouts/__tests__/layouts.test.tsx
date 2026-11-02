@@ -364,6 +364,29 @@ describe('T-58: um título e um contador por bloco', () => {
     )
   })
 
+  it('lista que o papel não escreve no Editar: o cabeçalho dela fica e o bloco não conta de novo', async () => {
+    const json = templateJson('vtm-v20') as {
+      sections: { id: string; permissions?: unknown }[]
+    }
+    const merits = json.sections.find(x => x.id === 'merits-flaws')
+    if (merits)
+      merits.permissions = {
+        read: ['owner', 'storyteller'],
+        write: ['storyteller'],
+      }
+    const model = compileTemplate(json)
+    const { sheet } = example('helena')
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.queryByTestId('items-merits')).toBeNull()
+    expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
+    const block = within(screen.getByTestId('groups-merits-flaws'))
+    expect(block.getAllByText('Qualidades')).toHaveLength(2)
+  })
+
   it('em Jogo, o cabeçalho da lista continua (abre o detalhe) e não há "N itens"', () => {
     const { model, sheet } = sheetFor('helena', ['owner'])
     renderSheet(model, sheet)

@@ -22,21 +22,16 @@ export function titledList(
     : undefined
 }
 
-/** O título do bloco é o mesmo da seção que já está à vista. */
-export const sameTitle = (a: string, b: string): boolean => fold(a) === fold(b)
-
 /**
  * A seção de grupos com um grupo só, de mesmo nome (W20 "Dons", M20
  * "Antecedentes"): com o título da seção à vista, o grupo não o repete.
  */
 export function echoesSection(section: CompiledSection): boolean {
   const groups = section.groups ?? []
-  const [only] = groups
   return (
     section.def.layout === 'groups' &&
     groups.length === 1 &&
-    Boolean(only) &&
-    sameTitle(only?.title ?? '', section.def.title)
+    fold(groups[0]?.title ?? '') === fold(section.def.title)
   )
 }
 
@@ -50,7 +45,7 @@ export const sectionList = (
     : undefined
 
 /** A lista que o cabeçalho de fora já intitula (o GroupsLayout informa). */
-export const HeadedList = createContext<FieldId | null>(null)
+export const HeadedList = createContext<FieldId | undefined>(undefined)
 
 /** O editor desta lista deixa o cabeçalho para o bloco. */
 export const useHeadedList = (id: FieldId): boolean =>
