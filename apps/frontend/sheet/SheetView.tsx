@@ -318,7 +318,14 @@ function SheetBody({
       <SheetProvider store={store}>
         <FieldSheetProvider>
           <GroupTabsContext.Provider value={groupTabs}>
-            {writer ? <ModeBarSlots>{screen}</ModeBarSlots> : screen(null)}
+            {/* A barra de modos é da ficha viva (editable não muda numa ficha
+              montada); quem não escreve, por papel ou pela política, fica
+              sem as partes, e a ficha não remonta quando isso muda */}
+            {editable ? (
+              <ModeBarSlots>{bar => screen(writer ? bar : null)}</ModeBarSlots>
+            ) : (
+              screen(null)
+            )}
           </GroupTabsContext.Provider>
         </FieldSheetProvider>
       </SheetProvider>

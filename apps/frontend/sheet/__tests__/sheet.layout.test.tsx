@@ -589,3 +589,48 @@ describe('sub-abas sem a faixa (fora do SheetView)', () => {
     expect(screen.getByRole('adjustable', { name: 'Carisma' })).toBeTruthy()
   })
 })
+
+describe('a barra de modos não remonta a ficha quando a política muda', () => {
+  const ID = '00000000-0000-4000-8000-00000000c001'
+  it('travada pelo narrador: o seletor some e a rolagem continua a mesma', async () => {
+    jest
+      .mocked(useRouter)
+      .mockReturnValue({ push: jest.fn(), replace: jest.fn() } as never)
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const character = (lockedAt: string | null) =>
+      ok({
+        id: ID,
+        name: 'Helena Varga',
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        owner: { id: 'u1', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 3,
+        roles: ['owner'],
+        status: 'active',
+        lockedAt,
+        member: true,
+        updatedAt: '2026-10-18T12:00:00Z',
+        sheet: example('helena').sheet,
+      })
+    resize(TABLET)
+    calls.characterGet.mockResolvedValue(character(null))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    const { queryClient } = renderWithSession(<SheetScreen id={ID} />, session)
+    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    expect(screen.getByLabelText('Modo da ficha')).toBeTruthy()
+    const before = screen.UNSAFE_getByType(ScrollView).instance
+
+    calls.characterGet.mockResolvedValue(character('2026-10-18T12:00:00Z'))
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    expect(await screen.findByText('O narrador travou a ficha')).toBeTruthy()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+    expect(screen.UNSAFE_getByType(ScrollView).instance).toBe(before)
+  })
+})

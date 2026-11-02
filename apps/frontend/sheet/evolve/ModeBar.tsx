@@ -67,7 +67,8 @@ export interface ModeBarParts {
 /**
  * A lógica da barra de modos (ir, revisar, salvar, descartar e o resumo),
  * com as partes separadas: no celular, o seletor rola com a ficha e a barra
- * de ação fica fixa (T-27). Fora dele, o ModeBar monta as três juntas.
+ * de ação fica fixa (T-27). Fora dele, o SheetView monta as três juntas,
+ * fixas acima da ficha.
  */
 export function useModeBar({
   modes: only,
@@ -239,18 +240,6 @@ export function useModeBar({
     />
   )
   return { switcher, actionBar, summary: summarySheet }
-}
-
-/** A barra de modos inteira, fixa acima da ficha (fora do celular). */
-export function ModeBar(props: { readonly modes?: readonly SheetMode[] }) {
-  const { switcher, actionBar, summary } = useModeBar(props)
-  return (
-    <View>
-      {switcher}
-      {actionBar}
-      {summary}
-    </View>
-  )
 }
 
 function ModeSwitch({

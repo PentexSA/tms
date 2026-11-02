@@ -561,7 +561,7 @@ Faixa que diz em que modo a ficha está.
 - **Estados:** as quatro variantes.
 - **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
-- **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e o botão) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `ModeBar` monta as três juntas, fixas acima, como antes.
+- **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e o botão) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `SheetView` monta as três juntas, fixas acima, como antes.
 - **Resolve:** C-01, C-19, DS-04.
 
 ### CombatDock / DockChip
