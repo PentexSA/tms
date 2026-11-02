@@ -107,12 +107,21 @@ describe('T-48: cartão da Mesa', () => {
     // O dock fica fora da coluna de texto: na largura inteira do cartão
     const card = screen.getByTestId(`table-row-${HELENA}`)
     expect(flat(card).flexDirection).not.toBe('row')
-    // A linha de selos (o estado) fica entre o texto e os recursos
+    // Os selos ficam na linha do selo de identidade, que quebra quando não
+    // cabe: sem uma linha só para eles, o cartão comum fica abaixo de 170
+    // a 390 (medido no E2E)
+    const badges = screen.getByTestId(`table-badges-${HELENA}`)
+    expect(flat(badges)).toMatchObject({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    })
+    expect(within(badges).getByText('Tremere')).toBeTruthy()
+    expect(within(badges).getByText('Em criação')).toBeTruthy()
     expect(
-      within(screen.getByTestId(`table-badges-${HELENA}`)).getByText(
-        'Em criação'
+      within(screen.getByTestId(`table-row-${HELENA}`)).queryAllByTestId(
+        /^table-badges-/
       )
-    ).toBeTruthy()
+    ).toHaveLength(1)
   })
 
   it('a grade: 1 coluna a 390, 2 a 750, 3 a 1280; fonte grande, 1', () => {
