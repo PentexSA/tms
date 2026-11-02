@@ -3,6 +3,7 @@ import {
   canWrite,
   type FieldId,
   jsonEqual,
+  type SheetMode,
   type SheetModel,
 } from '@tms/sheet-core'
 import { BottomSheet, Button, Text, tokens, useTheme } from '@tms/ui'
@@ -12,6 +13,7 @@ import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { useCreation } from '../creation/CreationContext'
 import { TextEditor } from '../editors/TextEditor'
+import { useModeBarActions } from '../evolve/ModeBar'
 import { useCommit } from '../useCommit'
 import {
   ADJUST_HINT,
@@ -40,20 +42,43 @@ export function storytellerOnlyText(model: SheetModel): CompiledField[] {
 
 export const NARRATING_NOTICE = 'As alterações ficam assinadas no histórico.'
 
+/**
+ * Onde o "Editar como narrador" leva (T-33): a criação por pontos ativa
+ * (creating ou pending) abre na Criação, com a conta; a criação livre em
+ * creating, no Editar; a ficha em uso, no Jogo, para marcar dano na sessão
+ * com um toque (o seletor "Jogo · Editar" fica à vista para trocar).
+ */
+export function narratorTarget(
+  creation: { readonly active: boolean; readonly status: string } | null
+): SheetMode {
+  if (creation?.active) return 'create'
+  if (creation?.status === 'creating') return 'evolve'
+  return 'play'
+}
+
 export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
   const { model, roles, mode, store } = useSheet()
   const { colors } = useTheme()
+  const actions = useModeBarActions()
+  const creation = useCreation()
   const [editing, setEditing] = useState<FieldId | null>(null)
   const notes = useMemo(() => storytellerOnlyText(model), [model])
   // A ficha do próprio narrador é dele: vale o fluxo do dono
   if (!roles.has('storyteller') || roles.has('owner')) return null
   const narrating = mode !== 'read'
+  // Pela barra de modos (T-33): entrar abre o rascunho; voltar com alterações
+  // passa pelo resumo de salvar ou descartar
   const toggle = () => {
-    store.getState().setMode(narrating ? 'read' : 'play')
-    if (!narrating)
-      AccessibilityInfo.announceForAccessibility(
-        `Editando como narrador. ${NARRATING_NOTICE}`
-      )
+    if (narrating) {
+      if (actions) actions.go('read')
+      else store.getState().setMode('read')
+      return
+    }
+    if (!actions) return
+    AccessibilityInfo.announceForAccessibility(
+      `Editando como narrador. ${NARRATING_NOTICE}`
+    )
+    actions.go(narratorTarget(creation))
   }
   return (
     <View
@@ -81,11 +106,14 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
               />
             ))
           : null}
-        <Button
-          title={narrating ? 'Voltar à leitura' : 'Editar como narrador'}
-          variant={narrating ? 'ghost' : 'secondary'}
-          onPress={toggle}
-        />
+        {/* Sem escrita (pela política), nada a editar: sem o botão */}
+        {narrating || actions ? (
+          <Button
+            title={narrating ? 'Voltar à leitura' : 'Editar como narrador'}
+            variant={narrating ? 'ghost' : 'secondary'}
+            onPress={toggle}
+          />
+        ) : null}
       </View>
       {editing ? (
         <TextFieldSheet id={editing} onClose={() => setEditing(null)} />

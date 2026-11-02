@@ -389,6 +389,18 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(
       within(chrome).getByRole('button', { name: 'Editar como narrador' })
     ).toBeTruthy()
+    // T-33: em Leitura, o header que rola tem a barra do narrador e nenhum
+    // seletor de modo; ele aparece depois do "Editar como narrador"
+    const head = screen.getByTestId('sheet-scroll-header')
+    expect(within(head).queryByLabelText('Modo da ficha')).toBeNull()
+    fireEvent.press(
+      within(head).getByRole('button', { name: 'Editar como narrador' })
+    )
+    expect(
+      within(screen.getByTestId('sheet-scroll-header')).getByLabelText(
+        'Modo da ficha'
+      )
+    ).toBeTruthy()
     screen.unmount()
     resize(DESKTOP)
     await openSheet(['storyteller'], 'active')

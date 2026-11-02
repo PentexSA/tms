@@ -48,7 +48,7 @@ import {
 import { ReturnedBanner } from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
-import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
+import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
 import {
   GroupTabsContext,
@@ -143,7 +143,11 @@ export function SheetView(props: SheetViewProps) {
   )
 }
 
-/** As partes da barra de modos, para quem escreve (T-27). */
+/**
+ * As partes da barra de modos, para quem escreve (T-27), e o `go` dela para a
+ * barra do narrador, que fica no header (T-33). Quem não escreve fica sem o
+ * `go`: sem "Editar como narrador".
+ */
 function ModeBarSlots({
   enabled,
   children,
@@ -151,7 +155,16 @@ function ModeBarSlots({
   readonly enabled: boolean
   readonly children: (bar: ModeBarParts) => ReactNode
 }) {
-  return children(useModeBar({ enabled }))
+  const bar = useModeBar({ enabled })
+  const actions = useMemo(
+    () => (enabled ? { go: bar.go } : null),
+    [enabled, bar.go]
+  )
+  return (
+    <ModeBarActions.Provider value={actions}>
+      {children(bar)}
+    </ModeBarActions.Provider>
+  )
 }
 
 function SheetBody({
@@ -177,7 +190,13 @@ function SheetBody({
   const [tab, setTab] = useState<string>(zones[0]?.id ?? 'build')
   const mode = useStore(store, s => s.mode)
   const creating = useCreating()
-  const budget = editable && mode === 'create' && creating
+  // T-33: a conta (aba Orçamento) também em Leitura, para o narrador na ficha
+  // alheia em criação por pontos; o que é de edição (o aviso de bônus, as
+  // recusas e as "Regras da casa") continua só na Criação
+  const narrator = roles.includes('storyteller') && !roles.includes('owner')
+  const budgetEdit = editable && mode === 'create' && creating
+  const budget =
+    budgetEdit || (editable && mode === 'read' && creating && narrator)
   const onBudget = budget && tab === BUDGET_TAB
   const active: CompiledZone | undefined = onBudget
     ? undefined
@@ -358,7 +377,9 @@ function SheetBody({
           </ScrollView>
         </KeyboardArea>
         {docked ? <CombatDock /> : null}
-        {budget ? <BonusNotice onBudget={() => showTab(BUDGET_TAB)} /> : null}
+        {budgetEdit ? (
+          <BonusNotice onBudget={() => showTab(BUDGET_TAB)} />
+        ) : null}
       </View>
     )
   }
