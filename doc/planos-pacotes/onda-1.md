@@ -240,6 +240,29 @@ Os quatro pacotes foram implementados em paralelo, um agente por plano, cada um 
 | No aparelho (API local com o seed do roteiro, só dados fictícios) | Android (Pixel 3a, 393 e 360 dp): o app abre, entra e abre a ficha. Os alvos da lista e do cabeçalho da ficha têm 48 dp ("Conta" 85×48, "Sair" 71×48). iOS (iPhone SE): o app abre e mostra o login. O Info.plist tem `CFBundleLocalizations` pt-BR, e o bundle de textos do React Native tem `pt.lproj` |
 | Build nativo (local, como nos jobs do CI) | Android: `assembleDebug` em 1min47s; iOS: `xcodebuild` Debug para o simulador em 32 min (primeiro build, Pods do zero). Nos dois, compilou o módulo `http-cache` do P02 |
 
+**Navegação visual no AVD Android (Pixel 3a), com a API local e o seed do roteiro:**
+
+| Item | Conferido |
+|---|---|
+| T-09 | o título "Clã" aparece acima dos rádios na Nova ficha |
+| T-56 | a folha "Sair sem salvar?" aparece ao voltar com o nome preenchido |
+| T-71 | a folha tem um "Fechar" só na árvore de acessibilidade |
+| L-03 | aparece "Ficha criada." e a ficha abre em Editar |
+| T-17 | o cabeçalho mostra "2 alterações não salvas" |
+| T-03 | depois de matar o app, "Você tem 2 alterações não salvas… Recuperar?" devolve as duas |
+| T-54 e T-78 | o resumo agrupa por "Atributos › Físicos" e mostra 1 → 2 na ordem da ficha, com "Descartar" à esquerda |
+| T-25 | Digitar aplica o 3 e o campo só aceita dígito |
+| T-14 com P03-C | o "Sair" com rascunho guardado pergunta "Sair e descartar?" |
+| Narrador | Leitura, Jogo e Editar, Notas, Mesa e Bastidores |
+
+**Achados visuais anteriores à onda, para as próximas ondas.** O layout desses trechos não mudou nesta onda:
+
+- **Grade de identidade da ficha:** de 393 dp para baixo, o rótulo "Comportamento" quebra no meio da palavra. A 411 dp cabe.
+- **Bastidores:** o título "Diário da crônica" fica sem recuo lateral (x = 0).
+- **Cabeçalho da ficha:** transborda pela direita (T-11, P08). O texto mais longo do T-17 ("N alterações não salvas") empurra o "Experiência" ainda mais para fora.
+- **Botões de "ficar" nas folhas:** o aviso de "Sair" usa botão com borda ("Continuar conectado"), e a guarda de saída usa texto ("Continuar editando").
+- **Avisos do react-navigation sobre dois containers:** só no build de desenvolvimento, quando a Activity é recriada.
+
 **Fica para depois da integração local:**
 
 - **Os jobs nativos do CI** no primeiro PR: tempo e runner `macos-26`.
