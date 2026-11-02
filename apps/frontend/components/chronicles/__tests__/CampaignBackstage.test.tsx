@@ -524,15 +524,55 @@ describe('TransferOffer (U-03)', () => {
     )
   })
 
-  it('erro da decisão aparece no aviso', async () => {
+  it('erro da decisão aparece no aviso e rebusca a proposta e a lista', async () => {
     chronicle.transferDecision.mockResolvedValue(
       fail(409, 'A proposta não está mais disponível.')
     )
-    renderWithQueryClient(<TransferOffer chronicleId={ID} transferId="t1" />)
-    fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
+    const { queryClient } = renderWithQueryClient(
+      <TransferOffer chronicleId={ID} transferId="t1" />
+    )
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
+    fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
     expect(
       await screen.findByText('A proposta não está mais disponível.')
     ).toBeTruthy()
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ['chronicles', ID, 'transfer'],
+      })
+    )
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['chronicles'],
+      exact: true,
+    })
+    // Recusada a decisão, a próxima tentativa é outra intenção (outra chave)
+    fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
+    await waitFor(() =>
+      expect(chronicle.transferDecision).toHaveBeenCalledTimes(2)
+    )
+    const keys = chronicle.transferDecision.mock.calls.map(
+      c => (c.at(-1) as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys[0]).not.toBe(keys[1])
+  })
+
+  it('sem rede, a decisão guarda a chave para o reenvio', async () => {
+    chronicle.transferDecision.mockRejectedValue(
+      new TypeError('Network request failed')
+    )
+    renderWithQueryClient(<TransferOffer chronicleId={ID} transferId="t1" />)
+    fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
+    await waitFor(() =>
+      expect(chronicle.transferDecision).toHaveBeenCalledTimes(1)
+    )
+    fireEvent.press(await screen.findByRole('button', { name: 'Recusar' }))
+    await waitFor(() =>
+      expect(chronicle.transferDecision).toHaveBeenCalledTimes(2)
+    )
+    const keys = chronicle.transferDecision.mock.calls.map(
+      c => (c.at(-1) as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys[0]).toBe(keys[1])
   })
 })
 
