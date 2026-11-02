@@ -161,8 +161,13 @@ export function useModeBar({
   }
 
   // Depois de salvar: concluir ou avisar, cada um esperando a fila
-  const proceed = () =>
-    summary?.announce ? step.announce?.start() : finishing.start()
+  const proceed = () => {
+    if (!summary?.announce) finishing.start()
+    else if (step.announce) step.announce.start()
+    // A ficha mudou com o resumo aberto (avisou noutro aparelho, foi
+    // concluída): nada é enviado, e a pessoa fica sabendo
+    else toast.show({ message: READY_COPY.stale })
+  }
 
   const save = () => {
     if (!summary) return

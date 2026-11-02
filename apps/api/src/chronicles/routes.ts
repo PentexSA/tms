@@ -332,6 +332,10 @@ export function chronicleRoutes(
                 eb('ch.status', '=', 'pending'),
                 eb.and([
                   eb('ch.status', '=', 'creating'),
+                  // O banner da aba Fichas: PC de outra pessoa (depois de uma
+                  // transferência, a ficha do próprio narrador não conta)
+                  eb('ch.kind', '=', 'pc'),
+                  eb('ch.user_id', '<>', me),
                   // A mesma forma que o parse aceita: a data em texto
                   sql<boolean>`jsonb_typeof(ch.creation -> 'ready' -> 'at') = 'string'`,
                 ]),

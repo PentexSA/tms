@@ -1,6 +1,5 @@
 /// <reference types="bun-types" />
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
-import { creationFlags } from '../sheets/creation-state'
 import { completionRole, lifecycleRole } from '../sheets/events'
 import {
   addMember,
@@ -679,37 +678,6 @@ describe('concluir, aprovar e devolver', () => {
     expect((await listOf(storyteller)).find(c => c.id === id)?.returned).toBe(
       false
     )
-  })
-
-  it('creationFlags: a forma que a ficha guarda, nada além', () => {
-    expect(
-      creationFlags({
-        returned: { reason: 'x', at: '2026-11-02' },
-        adjust: { reason: 'y', at: '2026-11-02' },
-        ready: { at: '2026-11-02' },
-      })
-    ).toEqual({ returned: true, adjust: true, ready: true })
-    for (const creation of [
-      null,
-      undefined,
-      'x',
-      [],
-      {},
-      { returned: null, adjust: null, ready: null },
-      { returned: 'x', adjust: 'x', ready: 'x' },
-      { returned: { reason: 'x' }, adjust: { at: 'x' }, ready: {} },
-      {
-        returned: { reason: 1, at: '2026-11-02' },
-        adjust: { reason: 'x', at: 2 },
-        ready: { at: 3 },
-      },
-      { returned: [], adjust: [], ready: [] },
-    ])
-      expect(creationFlags(creation)).toEqual({
-        returned: false,
-        adjust: false,
-        ready: false,
-      })
   })
 
   it('motivo vazio ou com HTML é 422', async () => {
@@ -1508,6 +1476,7 @@ describe('estado da ficha na lista, na Mesa, no Histórico e na contagem', () =>
         adjust: false,
         ready: false,
         activatedAt: expect.any(String),
+        lockedAt: null,
       },
     }
     for (const user of [owner, storyteller]) {

@@ -148,6 +148,11 @@ export const ADJUST_INVALID =
   'Escreva o que precisa ser ajustado (até 500 caracteres, sem < nem >).'
 export const STALE_ADJUST =
   'A ficha mudou desde que você abriu. Confira e peça de novo.'
+const ADJUST_REFUSED: Readonly<Record<string, string>> = {
+  CREATION_NOT_CREATING:
+    'A ficha não está mais em criação: o pedido de ajuste não vale aqui.',
+  CREATION_ADJUST_UNAVAILABLE: 'Esta ficha não recebe pedido de ajuste.',
+}
 
 async function run(
   characterId: string,
@@ -354,7 +359,11 @@ export function StatusMenu({
       const status = statusOf(error)
       if (status === 422) setInvalid(ADJUST_INVALID)
       else if (status === 409) {
-        toast.show({ message: STALE_ADJUST })
+        const code = (errorBodyOf(error) as { code?: unknown } | null)?.code
+        toast.show({
+          message:
+            (typeof code === 'string' && ADJUST_REFUSED[code]) || STALE_ADJUST,
+        })
         onClose()
       } else setInvalid(messageOf(error, 'Não foi possível pedir o ajuste.'))
     }

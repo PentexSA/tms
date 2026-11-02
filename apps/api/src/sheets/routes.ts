@@ -347,6 +347,7 @@ export function sheetRoutes(
             'ch.status',
             'ch.creation',
             'ch.activated_at',
+            'ch.locked_at',
             'u.username',
           ])
           .where('ch.chronicle_id', '=', params.id)
@@ -424,8 +425,10 @@ export function sheetRoutes(
             // booleanos. O motivo fica no GET /characters/:id, para o dono e
             // o narrador
             ...creationStateOf(model, r.status, r.creation),
-            // "Concluída em dd/mm": a data em que a ficha entrou em jogo
+            // "Concluída em dd/mm": a data em que a ficha entrou em jogo; a
+            // trava vence a data, como na Mesa
             activatedAt: r.activated_at,
+            lockedAt: r.locked_at,
             templateVersion: r.template_version,
             updatedAt: r.updated_at,
             values: Object.fromEntries(

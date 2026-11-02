@@ -54,6 +54,7 @@ interface FullRow {
   readonly adjust?: boolean
   readonly ready?: boolean
   readonly activatedAt?: string | Date | null
+  readonly lockedAt?: string | Date | null
 }
 
 interface IdentityRow {
@@ -99,10 +100,10 @@ function CharacterRow({
   // O estado vai no selo, sob o meta, e entra no nome acessível (D-02)
   const state = partial
     ? null
-    : characterState(row, {
-        narrating,
-        deadLabel: model ? deadLabel(model) : undefined,
-      })
+    : characterState(
+        { ...row, locked: Boolean(row.lockedAt) },
+        { narrating, deadLabel: model ? deadLabel(model) : undefined }
+      )
   return (
     <ThemeProvider
       accent={

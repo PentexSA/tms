@@ -120,6 +120,35 @@ describe('characterState', () => {
       'neutral',
     ],
     ['sem estado', {}, player, null],
+    // O NPC fica sem estado de criação, mas mostra trava, arquivo e dead
+    // (achado do /code-review)
+    [
+      'NPC em jogo: nada',
+      { kind: 'npc', status: 'active', activatedAt: '2026-11-01T12:00:00Z' },
+      narrator,
+      null,
+    ],
+    [
+      'NPC travado',
+      { kind: 'npc', status: 'active', locked: true },
+      narrator,
+      'Travada',
+      'neutral',
+    ],
+    [
+      'NPC arquivado',
+      { kind: 'npc', status: 'archived' },
+      narrator,
+      'Arquivada',
+      'neutral',
+    ],
+    [
+      'NPC fora de jogo',
+      { kind: 'npc', status: 'dead' },
+      { narrating: true, deadLabel: 'Morto' },
+      'Morto',
+      'neutral',
+    ],
   ])('%s', (...[, row, options, label, tone]) => {
     // Com o resto, o Jest não passa o `done` na quinta posição das linhas
     // sem tom

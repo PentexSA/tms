@@ -5,7 +5,8 @@ import { shortDate } from '../../lib/format'
 // lista da crônica, da Mesa, do menu do narrador e do selo sob o nome. Ela só
 // mostra o que o servidor mandou: o motivo da devolução e do ajuste fica na
 // ficha, e a lista e a Mesa recebem só os booleanos. O NPC não tem estado de
-// criação: o selo dele é o de visibilidade (P11).
+// criação (o selo dele é o de visibilidade, P11), só travada, arquivada e o
+// rótulo de dead.
 
 export type CharacterStateId =
   | 'creating'
@@ -59,7 +60,11 @@ export function characterState(
   options: CharacterStateOptions
 ): CharacterState | null {
   const { narrating } = options
-  if (row.kind === 'npc') return null
+  // O NPC não tem estado de criação (o selo dele é o de visibilidade, P11),
+  // mas continua travado, arquivado ou fora de jogo, como na Mesa de antes
+  const npc = row.kind === 'npc'
+  if (npc && row.status !== 'archived' && row.status !== 'dead' && !row.locked)
+    return null
   switch (row.status) {
     case 'creating':
       if (row.adjust === true)

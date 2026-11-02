@@ -580,6 +580,14 @@ describe('Fichas na crônica', () => {
           status: 'active',
           activatedAt: '2026-11-01T12:00:00Z',
         }),
+        // A trava vence a data, como na Mesa (achado do /code-review)
+        row({
+          id: 'ch4',
+          name: 'Eva',
+          status: 'active',
+          activatedAt: '2026-11-01T12:00:00Z',
+          lockedAt: '2026-11-02T12:00:00Z',
+        }),
       ])
     )
     renderWithSession(<ChronicleScreen />, await signedIn())
@@ -601,6 +609,9 @@ describe('Fichas na crônica', () => {
     expect(screen.getByTestId('character-state-ch1')).toHaveTextContent(
       'Em criação · por pontos'
     )
+    expect(
+      screen.getByRole('button', { name: /^Eva, .*Sua ficha, Travada$/ })
+    ).toBeTruthy()
   })
 
   // P04-D (R-13): na criação livre, o narrador vê quem avisou que terminou

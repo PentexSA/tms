@@ -624,6 +624,29 @@ describe('pedir ajuste', () => {
     )
   })
 
+  it('o 409 com motivo próprio diz por que o pedido não vale', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue({
+      data: null,
+      error: {
+        status: 409,
+        value: {
+          error: 'só uma ficha em criação recebe pedido de ajuste',
+          code: 'CREATION_NOT_CREATING',
+        },
+      },
+    })
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    fireEvent.changeText(screen.getByTestId('status-adjust-reason'), 'Refaça')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'A ficha não está mais em criação: o pedido de ajuste não vale aqui.'
+      )
+    ).toBeTruthy()
+  })
+
   it.each([
     [
       'NPC',

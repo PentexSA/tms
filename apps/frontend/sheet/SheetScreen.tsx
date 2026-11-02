@@ -34,6 +34,7 @@ import {
 import { useRefetchOnFocus } from '../lib/queries/focus'
 import { CreationContext } from './creation/CreationContext'
 import {
+  type CreationInfo,
   completionFreebies,
   creationActive,
   creationInfoOf,
@@ -225,7 +226,10 @@ export function SheetScreen({
             {state.status !== 'ready' ? null : wide ? (
               <>
                 {state.roles.includes('storyteller') ? (
-                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
+                  <StatusMenuButton
+                    {...narratorOf(id, state, creation)}
+                    {...draft}
+                  />
                 ) : null}
                 {xpLedgerFields(state.model).length ? (
                   <Button
@@ -247,7 +251,7 @@ export function SheetScreen({
               <SheetMenu
                 narrator={
                   state.roles.includes('storyteller')
-                    ? narratorOf(id, state)
+                    ? narratorOf(id, state, creation)
                     : null
                 }
                 draft={draft}
@@ -304,7 +308,9 @@ export function SheetScreen({
 /** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
 function narratorOf(
   id: string,
-  state: Extract<SheetState, { status: 'ready' }>
+  state: Extract<SheetState, { status: 'ready' }>,
+  // O mesmo `creationInfoOf` da tela: uma leitura só da criação
+  info: CreationInfo | null
 ): StatusMenuTarget {
   const locked = state.character.lockedAt !== null
   return {
@@ -322,7 +328,7 @@ function narratorOf(
         status: state.character.status,
         kind: state.character.kind === 'npc' ? 'npc' : 'pc',
         locked,
-        info: creationInfoOf(state.character.creation),
+        info,
       }),
       { narrating: true, deadLabel: deadLabel(state.model), completed: false }
     ),
