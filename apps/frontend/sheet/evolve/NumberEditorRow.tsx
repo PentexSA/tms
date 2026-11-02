@@ -2,18 +2,12 @@ import { inactiveNote, modifierNote } from '@tms/sheet-core'
 import { hitTarget, Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput } from 'react-native'
-import { useStepAdvice } from '../creation/useStepAdvice'
 import type { FieldViewProps } from '../views/types'
-import { DraftNoticeText } from './DraftNoticeText'
 import { EditorShell } from './EditorShell'
-import {
-  useBlockedNote,
-  useDraftNotice,
-  useFieldIssue,
-  useSetDraft,
-} from './hooks'
+import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
 import { SpecialtyEditor } from './SpecialtyEditor'
 import { parseTyped, typingStore, useTyping } from './typing'
+import { useRowFeedback } from './useRowFeedback'
 
 // rating, number e percent em Evoluir (DS: FieldRow com Stepper inline). O
 // Stepper muda 1 por toque; tocar no valor abre o teclado numérico. O que
@@ -69,10 +63,9 @@ export function NumberEditorRow(props: FieldViewProps) {
   const blocked = useBlockedNote(resolved.id)
   const path = `values.${resolved.id}`
   // A recusa de um toque mora no store e some quando a causa some (T-55);
-  // só o erro do "Digitar" é local, porque é do campo aberto
-  const notice = useDraftNotice(path)
-  // Na criação, o que o próximo ponto faria, antes do toque (T-20, R-17)
-  const advice = useStepAdvice(path)
+  // só o erro do "Digitar" é local, porque é do campo aberto. Na criação, a
+  // previsão do próximo ponto vai no "+" (T-20, R-17)
+  const feedback = useRowFeedback(path, resolved.id)
   const [error, setError] = useState<string | null>(null)
   const instance = useId()
   const typing = useTyping(instance)
@@ -160,38 +153,12 @@ export function NumberEditorRow(props: FieldViewProps) {
         specialty={sheet.specialty(resolved.id)}
       />
     ) : null
-  // O custo ou o motivo escrito na linha, quando o cabeçalho do grupo não
-  // o diz; com o aviso aberto, o aviso fala por ele
-  const written = !notice && advice?.inline && advice.text ? advice.text : null
-  const hintID = notice
-    ? `notice-${resolved.id}`
-    : written
-      ? `advice-${resolved.id}`
-      : null
   return (
     <EditorShell
       label={def.label}
       sub={blocked}
-      note={
-        written ? (
-          <Text
-            variant="caption"
-            color="inkMuted"
-            nativeID={`advice-${resolved.id}`}
-            testID={`advice-${resolved.id}`}
-          >
-            {written}
-          </Text>
-        ) : null
-      }
-      error={
-        error ??
-        (notice ? (
-          <DraftNoticeText notice={notice} field={resolved.id} />
-        ) : (
-          issue
-        ))
-      }
+      note={feedback.note}
+      error={error ?? feedback.notice ?? issue}
       below={
         capNote || modNote || specialty ? (
           <>
@@ -270,15 +237,7 @@ export function NumberEditorRow(props: FieldViewProps) {
           disabled={blocked !== null}
           onValuePress={blocked ? undefined : open}
           valueNativeID={valueId}
-          increase={
-            advice
-              ? {
-                  blocked: advice.blocked !== null,
-                  hint: advice.text,
-                  hintID,
-                }
-              : undefined
-          }
+          increase={feedback.increase}
         />
       )}
     </EditorShell>

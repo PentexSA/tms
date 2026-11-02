@@ -31,6 +31,7 @@ import {
   freebiesBalance,
   problemText,
   REFUSAL_TEXT,
+  restam,
 } from './creation'
 import { RadioChips } from './RadioChips'
 
@@ -222,7 +223,7 @@ export function CreationPanel() {
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
           {freebies && freebies.remaining > 0
-            ? `Pontos básicos completos; ${freebies.remaining === 1 ? 'resta 1' : `restam ${freebies.remaining}`} de bônus. Gaste-os nos grupos ou conclua pela barra de cima.`
+            ? `Pontos básicos completos; ${restam(freebies.remaining)} de bônus. Gaste-os nos grupos ou conclua pela barra de cima.`
             : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
@@ -312,7 +313,7 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
       }
     >
       <Text>
-        {`Os pontos básicos de todos os grupos foram distribuídos. A partir de agora, cada ponto a mais gasta os pontos de bônus: ${remaining === 1 ? 'resta 1' : `restam ${remaining}`}.`}
+        {`Os pontos básicos de todos os grupos foram distribuídos. A partir de agora, cada ponto a mais gasta os pontos de bônus: ${restam(remaining)}.`}
       </Text>
     </BottomSheet>
   )

@@ -1,16 +1,10 @@
 import { stored } from '@tms/sheet-core'
 import { Stepper, type StepperIncrease, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
-import { useStepAdvice } from '../creation/useStepAdvice'
 import type { FieldViewProps } from '../views/types'
-import { DraftNoticeText } from './DraftNoticeText'
 import { EditorShell } from './EditorShell'
-import {
-  useClassNote,
-  useDraftNotice,
-  useFieldIssue,
-  useSetDraft,
-} from './hooks'
+import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
+import { useRowFeedback } from './useRowFeedback'
 
 // resource em Evoluir: o permanente (FdV do WoD), o máximo guardado (PV do
 // D&D, Sanidade inicial) e o atual. O jogo do dia a dia (gastar, recuperar)
@@ -22,10 +16,9 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   // O permanente e o máximo são evolução; o atual, jogo (doc/plano-v3.md, Etapa 4)
   const advance = useClassNote('advance')
   const play = useClassNote('play')
-  // A recusa do toque mora no store e some quando a causa some (T-55)
-  const notice = useDraftNotice(`values.${resolved.id}`)
-  // O permanente na criação (FdV): o custo do próximo ponto (R-17)
-  const advice = useStepAdvice(`values.${resolved.id}`)
+  // A recusa do toque mora no store e some quando a causa some (T-55); na
+  // criação, o custo do próximo ponto do permanente (FdV, R-17)
+  const feedback = useRowFeedback(`values.${resolved.id}`, resolved.id)
   if (resolved.type !== 'resource') return null
   const r = resolved
   const def = r.field.def
@@ -44,7 +37,6 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     blocked: string | null
     increase?: StepperIncrease
   }[] = []
-  const written = !notice && advice?.inline && advice.text ? advice.text : null
   if (def.permanent && r.permanent !== null)
     rows.push({
       key: 'permanent',
@@ -60,19 +52,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
             : { permanent: n }
         ),
       blocked: advance,
-      ...(advice
-        ? {
-            increase: {
-              blocked: advice.blocked !== null,
-              hint: advice.text,
-              hintID: notice
-                ? `notice-${r.id}`
-                : written
-                  ? `advice-${r.id}`
-                  : null,
-            },
-          }
-        : {}),
+      increase: feedback.increase,
     })
   const storedMax =
     def.max && typeof def.max === 'object' && 'stored' in def.max
@@ -102,19 +82,8 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     <EditorShell
       label={def.label}
       sub={note}
-      note={
-        written ? (
-          <Text
-            variant="caption"
-            color="inkMuted"
-            nativeID={`advice-${r.id}`}
-            testID={`advice-${r.id}`}
-          >
-            {written}
-          </Text>
-        ) : null
-      }
-      error={notice ? <DraftNoticeText notice={notice} field={r.id} /> : issue}
+      note={feedback.note}
+      error={feedback.notice ?? issue}
       testID={`editor-${r.id}`}
       below={
         <View style={styles.rows}>
