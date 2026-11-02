@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { ToastProvider } from '@tms/ui'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
@@ -445,7 +446,9 @@ describe('jogador', () => {
     expect(chronicle.historyGet).not.toHaveBeenCalled()
   })
 
-  it('destinatário aceita a narração; aceitar limpa o cache', async () => {
+  // T-40 (P09-C): aceitar volta as queries ao estado inicial (as montadas
+  // rebuscam com o papel novo, sem remontar a tela) e avisa
+  it('destinatário aceita a narração; as queries recomeçam e o aviso aparece', async () => {
     chronicle.transferGet.mockResolvedValue(
       ok({
         id: 't1',
@@ -457,14 +460,21 @@ describe('jogador', () => {
     )
     chronicle.transferDecision.mockResolvedValue(ok({ status: 'accepted' }))
     const { queryClient } = renderWithQueryClient(
-      <CampaignBackstage chronicle={info()} narrating={false} />
+      <ToastProvider>
+        <CampaignBackstage chronicle={info()} narrating={false} />
+      </ToastProvider>
     )
     expect(await screen.findByText('Convite para narrar')).toBeTruthy()
     const clear = jest.spyOn(queryClient, 'clear')
+    const reset = jest.spyOn(queryClient, 'resetQueries')
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
     })
-    await waitFor(() => expect(clear).toHaveBeenCalled())
+    await waitFor(() => expect(reset).toHaveBeenCalled())
+    expect(clear).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText('Agora você narra esta crônica.')
+    ).toBeTruthy()
     expect(chronicle.transferDecision).toHaveBeenCalledWith(
       ID,
       't1',
@@ -487,7 +497,9 @@ describe('jogador', () => {
     )
     chronicle.transferDecision.mockResolvedValue(ok({ status: 'rejected' }))
     renderWithQueryClient(
-      <CampaignBackstage chronicle={info()} narrating={false} />
+      <ToastProvider>
+        <CampaignBackstage chronicle={info()} narrating={false} />
+      </ToastProvider>
     )
     fireEvent.press(await screen.findByRole('button', { name: 'Recusar' }))
     await waitFor(() =>

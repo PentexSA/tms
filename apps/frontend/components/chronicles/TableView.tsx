@@ -207,6 +207,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const table = useChronicleTable(chronicleId, true, scope)
   useRefetchOnFocus(() => {
     void queryClient.invalidateQueries({ queryKey: rollKeys.feed(chronicleId) })
+    // T-40: o pedido de XP feito com a crônica aberta aparece na volta
+    void xpRequests.refetch({ cancelRefetch: false })
     return table.refetch({ cancelRefetch: false })
   })
   const rows = (table.data ?? NO_ROWS) as TableRowData[]

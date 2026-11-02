@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import * as Clipboard from 'expo-clipboard'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Share } from 'react-native'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { FlatList, Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { createMemoryDraftStore } from '../../sheet/sync/draftStore'
@@ -87,6 +87,72 @@ describe('Crônicas (lista)', () => {
     ).toBeTruthy()
     fireEvent.press(mine)
     expect(router.push).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
+  })
+
+  // T-40 (P09-C): a lista rebusca ao ganhar foco e ao puxar; o
+  // "aguarda revisão" acompanha
+  it('rebusca no foco e ao puxar, com o indicador só durante o puxão', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => void)
+    })
+    try {
+      const list = (pendingReview: number) =>
+        ok([
+          {
+            id: CHRONICLE_ID,
+            name: 'Crônica da Liberdade',
+            system: VTM,
+            role: 'storyteller',
+            storyteller: { username: 'ana' },
+            characterCount: 3,
+            pendingReview,
+          },
+        ])
+      calls.chroniclesGet.mockResolvedValue(list(1))
+      renderWithSession(<ChroniclesScreen />, await signedIn())
+      expect(
+        await screen.findByRole('button', {
+          name: `Crônica da Liberdade, ${VTM.name}, Você narra · 3 personagens · 1 ficha aguarda revisão`,
+        })
+      ).toBeTruthy()
+      // Aprovada em outra tela: a volta à lista traz o número atual
+      calls.chroniclesGet.mockResolvedValue(list(0))
+      const before = calls.chroniclesGet.mock.calls.length
+      act(() => {
+        focus.at(-1)?.()
+      })
+      expect(
+        await screen.findByRole('button', {
+          name: `Crônica da Liberdade, ${VTM.name}, Você narra · 3 personagens`,
+        })
+      ).toBeTruthy()
+      expect(calls.chroniclesGet.mock.calls.length).toBe(before + 1)
+      // Puxar: refreshing liga até a resposta e desliga depois
+      let resolve: (v: unknown) => void = () => undefined
+      calls.chroniclesGet.mockImplementation(
+        () => new Promise(r => (resolve = r))
+      )
+      const flat = screen.UNSAFE_getByType(FlatList)
+      expect(flat.props.refreshing).toBe(false)
+      let pulled: Promise<void> | undefined
+      act(() => {
+        pulled = flat.props.onRefresh()
+      })
+      expect(screen.UNSAFE_getByType(FlatList).props.refreshing).toBe(true)
+      await act(async () => {
+        resolve(list(2))
+        await pulled
+      })
+      expect(screen.UNSAFE_getByType(FlatList).props.refreshing).toBe(false)
+      expect(
+        await screen.findByRole('button', {
+          name: `Crônica da Liberdade, ${VTM.name}, Você narra · 3 personagens · 2 fichas aguardam revisão`,
+        })
+      ).toBeTruthy()
+    } finally {
+      jest.mocked(useFocusEffect).mockReset()
+    }
   })
 
   it('vazio: criar ou entrar com convite', async () => {

@@ -5,6 +5,8 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import { useToast } from '@tms/ui'
+
 import { api, unwrap } from '../api'
 import { chronicleKeys } from './chronicles'
 
@@ -112,6 +114,7 @@ export const useProposeTransfer = (id: string) => {
 
 export const useAcceptTransfer = (id: string, transferId: string) => {
   const queryClient = useQueryClient()
+  const toast = useToast()
   return useMutation({
     mutationFn: async (clientCommandId: string) =>
       unwrap(
@@ -121,7 +124,11 @@ export const useAcceptTransfer = (id: string, transferId: string) => {
           .accept.post({ clientCommandId })
       ),
     onSuccess: () => {
-      queryClient.clear()
+      // T-40: as queries voltam ao estado inicial e as montadas rebuscam com
+      // o papel novo, sem remontar a tela (o clear() deixava o dado antigo na
+      // tela). O logout continua com clear()
+      void queryClient.resetQueries()
+      toast.show({ message: 'Agora você narra esta crônica.' })
     },
   })
 }

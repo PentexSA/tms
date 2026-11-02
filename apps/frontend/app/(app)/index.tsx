@@ -11,17 +11,22 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
-import { FlatList, StyleSheet, View } from 'react-native'
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
 
 import { LogoutButton } from '../../components/session/LogoutButton'
 import { messageOf } from '../../lib/errors'
 import { plural } from '../../lib/format'
 import { useChronicles } from '../../lib/queries/chronicles'
+import { usePullRefresh, useRefetchOnFocus } from '../../lib/queries/focus'
 
 // Crônicas (design/telas/cronicas.html): as que eu narro e as de que participo.
 export default function ChroniclesScreen() {
   const router = useRouter()
   const chronicles = useChronicles()
+  // T-40: a volta à lista e o puxar trazem a contagem e o "aguarda revisão"
+  // atuais (no Android, a lista ficava com o dado de antes)
+  useRefetchOnFocus(() => chronicles.refetch({ cancelRefetch: false }))
+  const pull = usePullRefresh(() => chronicles.refetch())
 
   const actions = (
     <View style={styles.actions}>
@@ -62,6 +67,14 @@ export default function ChroniclesScreen() {
       <FlatList
         data={chronicles.data}
         keyExtractor={c => c.id}
+        refreshing={pull.refreshing}
+        onRefresh={pull.onRefresh}
+        refreshControl={
+          <RefreshControl
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
+          />
+        }
         ListHeaderComponent={
           <View style={styles.header}>
             <SectionHeader title="Suas crônicas" />

@@ -292,6 +292,50 @@ describe('Mesa do narrador', () => {
     jest.mocked(useFocusEffect).mockReset()
   })
 
+  // T-40 (P09-C): o pedido de XP feito com a crônica aberta aparece na volta
+  it('voltar para a Mesa também rebusca os pedidos de XP', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => void)
+    })
+    try {
+      calls.chronicle.tableGet.mockResolvedValue(ok([]))
+      await openTable()
+      await waitFor(() =>
+        expect(calls.chronicle.xpRequestsGet).toHaveBeenCalled()
+      )
+      expect(screen.queryByTestId('table-xp-requests')).toBeNull()
+      calls.chronicle.xpRequestsGet.mockResolvedValue(
+        ok({
+          items: [
+            {
+              id: 'r1',
+              characterId: HELENA,
+              characterName: 'Helena Varga',
+              field: 'strength',
+              item: null,
+              name: null,
+              label: 'Força',
+              from: 2,
+              to: 3,
+              cost: 4,
+              status: 'pending',
+              reason: null,
+            },
+          ],
+        }) as never
+      )
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      expect(
+        await screen.findByRole('button', { name: 'Pedidos de XP (1)' })
+      ).toBeTruthy()
+    } finally {
+      jest.mocked(useFocusEffect).mockReset()
+    }
+  })
+
   // T-48 (P09-C): a Mesa em grade nas telas largas, na ordem da lista
   it('a 1280, a Mesa vira uma grade de 3 colunas, linha a linha', async () => {
     const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
@@ -455,6 +499,41 @@ describe('a crônica volta na mesma aba e no mesmo ponto', () => {
       jest.mocked(useFocusEffect).mockReset()
       clearChronicleScroll()
     }
+  })
+})
+
+// T-40 (P09-C): aceitar a narração atualiza a tela que está aberta
+describe('aceitar a narração', () => {
+  it('a tela passa a "Você narra esta crônica.", com as abas do narrador, sem sair', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('player'))
+    calls.chronicle.transferGet.mockResolvedValue(
+      ok({
+        id: 't1',
+        status: 'pending',
+        recipient: { id: 'u2', username: 'dona' },
+        expiresAt: '2099-10-30T00:00:00Z',
+        available: true,
+      })
+    )
+    calls.chronicle.transferDecision.mockResolvedValue(
+      ok({ status: 'accepted' })
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(await screen.findByText('Narrador: ana')).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Diário' }))
+    const accept = await screen.findByRole('button', {
+      name: 'Aceitar narração',
+    })
+    // O servidor já responde com o papel novo
+    calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+    calls.chronicle.tableGet.mockResolvedValue(ok([]))
+    await act(async () => {
+      fireEvent.press(accept)
+    })
+    expect(await screen.findByText('Você narra esta crônica.')).toBeTruthy()
+    expect(screen.getByText('Agora você narra esta crônica.')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Mesa' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Bastidores' })).toBeTruthy()
   })
 })
 

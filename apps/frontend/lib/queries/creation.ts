@@ -27,6 +27,12 @@ const useRefresh = (characterId: string, chronicleId?: string) => {
             }),
           ]
         : []),
+      // A lista de crônicas conta as fichas que aguardam revisão (T-40):
+      // só ela, não tudo o que começa com 'chronicles'
+      queryClient.invalidateQueries({
+        queryKey: chronicleKeys.all,
+        exact: true,
+      }),
     ])
 }
 

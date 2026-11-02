@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AppBar,
   Avatar,
@@ -16,6 +17,7 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -42,9 +44,15 @@ import { rememberScroll, scrollOf } from '../../../../lib/chronicleScroll'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
 import {
+  chronicleKeys,
   useChronicle,
   useChronicleCharacters,
 } from '../../../../lib/queries/chronicles'
+import {
+  usePullRefresh,
+  useRefetchOnFocus,
+} from '../../../../lib/queries/focus'
+import { xpKeys } from '../../../../lib/queries/xp'
 
 export type ChronicleView = 'sheets' | 'table' | 'backstage'
 
@@ -64,7 +72,23 @@ export default function ChronicleScreen() {
   const params = useLocalSearchParams<{ id: string; view?: string }>()
   const { id } = params
   const router = useRouter()
+  const queryClient = useQueryClient()
   const chronicle = useChronicle(id)
+  // T-40: o foco e o puxar rebuscam a crônica e o que a aba aberta mostra
+  // (só as queries montadas; nada duplica o que já está em voo). Sem
+  // intervalo novo
+  const refreshChronicle = () =>
+    queryClient.invalidateQueries(
+      { queryKey: chronicleKeys.one(id) },
+      { cancelRefetch: false }
+    )
+  useRefetchOnFocus(refreshChronicle)
+  const pull = usePullRefresh(refreshChronicle, () =>
+    queryClient.invalidateQueries(
+      { queryKey: xpKeys.table(id) },
+      { cancelRefetch: false }
+    )
+  )
   const [inviting, setInviting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -141,6 +165,12 @@ export default function ChronicleScreen() {
           ref={scrollRef}
           contentContainerStyle={styles.content}
           testID="chronicle-scroll"
+          refreshControl={
+            <RefreshControl
+              refreshing={pull.refreshing}
+              onRefresh={pull.onRefresh}
+            />
+          }
           scrollEventThrottle={64}
           onScroll={e =>
             rememberScroll(id, showing, e.nativeEvent.contentOffset.y)
