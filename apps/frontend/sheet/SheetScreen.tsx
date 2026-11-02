@@ -651,6 +651,16 @@ function NpcVisibilityBar({
   useEffect(() => {
     setPortraitUrl(character.identity.portraitUrl ?? '')
   }, [character.identity.portraitUrl])
+  // A folha aberta sobre dado velho (o 409 rebuscou a ficha): se a
+  // visibilidade já chegou ao alvo ou passou dele, confirmar baixaria o NPC
+  // com o texto de "Revelar". A folha fecha, sem enviar, e o erro fica sob
+  // o rádio
+  const current = npcVisibilityOf(character.visibility)
+  const pending = change.isPending
+  useEffect(() => {
+    if (reveal?.open && !pending && !revealsMore(current, reveal.target))
+      setReveal({ target: reveal.target, open: false })
+  }, [current, pending, reveal])
   if (character.kind !== 'npc' || !state.roles.includes('storyteller'))
     return null
   const send = (visibility: NpcVisibility, done: () => void) => {
@@ -703,7 +713,7 @@ function NpcVisibilityBar({
         onChange={id => {
           const choice = choices.find(c => c.id === id)
           if (!choice || character.visibility === choice.id) return
-          if (revealsMore(npcVisibilityOf(character.visibility), choice.id)) {
+          if (revealsMore(current, choice.id)) {
             // O erro de uma tentativa anterior não abre a folha nova
             change.reset()
             setReveal({ target: choice.id, open: true })
@@ -724,12 +734,17 @@ function NpcVisibilityBar({
           name={character.name}
           busy={change.isPending}
           error={change.isError ? messageOf(change.error) : null}
-          onConfirm={() =>
+          onConfirm={() => {
+            // Só sobe: a revelação nunca baixa a visibilidade
+            if (!revealsMore(current, reveal.target)) {
+              setReveal({ target: reveal.target, open: false })
+              return
+            }
             send(reveal.target, () => {
               revealed.current = REVEAL_COPY[reveal.target].done
               setReveal({ target: reveal.target, open: false })
             })
-          }
+          }}
           // Com o envio em curso, fechar não desfaria a revelação: espera
           onClose={() => {
             if (!change.isPending)

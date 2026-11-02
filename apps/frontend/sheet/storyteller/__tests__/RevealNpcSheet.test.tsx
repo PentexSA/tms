@@ -225,4 +225,28 @@ describe('Visibilidade do NPC: confirmar antes de revelar (T-46)', () => {
     expect(radio(/^Oculto/)).toBeChecked()
     await act(async () => undefined)
   })
+
+  it('se a ficha rebuscada já passou do alvo, a folha fecha e nunca baixa a visibilidade', async () => {
+    // O cache dizia oculto; no servidor o NPC já está em "Ficha"
+    calls.visibilityPost.mockResolvedValue(
+      fail(409, 'Os dados mudaram. Atualize para continuar.')
+    )
+    await open('hidden')
+    fireEvent.press(radio(/^Identidade/))
+    calls.characterGet.mockResolvedValue(npc('full', 5))
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar identidade' }))
+    await waitFor(() => expect(radio(/^Ficha/)).toBeChecked())
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Revelar identidade' })
+      ).toBeNull()
+    )
+    // Um envio só (o recusado); o erro fica sob o rádio
+    expect(calls.visibilityPost).toHaveBeenCalledTimes(1)
+    expect(
+      screen.getByText('Os dados mudaram. Atualize para continuar.')
+    ).toBeTruthy()
+    await sheetsDismissed()
+    expect(screen.queryByText('Identidade revelada aos jogadores.')).toBeNull()
+  })
 })
