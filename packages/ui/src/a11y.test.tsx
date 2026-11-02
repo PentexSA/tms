@@ -7,12 +7,19 @@ import {
   screen,
 } from '@testing-library/react-native'
 import { useLayoutEffect } from 'react'
-import { Modal, Platform, Text as RNText } from 'react-native'
+import {
+  Modal,
+  Platform,
+  Text as RNText,
+  StyleSheet,
+  type ViewStyle,
+} from 'react-native'
 import {
   BottomSheet,
   Button,
   Chip,
   Choice,
+  hitTarget,
   ListItem,
   Pressable,
   rovingTarget,
@@ -20,6 +27,8 @@ import {
   Stepper,
   TabPanel,
   Tabs,
+  TextField,
+  tokens,
   useRovingFocus,
 } from './index'
 
@@ -777,5 +786,45 @@ describe('Skeleton: carregamento anunciado no web (T-72)', () => {
     expect(s.props.accessible).toBe(true)
     expect(s.props.accessibilityLabel).toBe('Carregando a mesa')
     expect(screen.queryByText('Carregando a mesa')).toBeNull()
+  })
+})
+
+describe('Alvo mínimo por plataforma: 48 dp no Android (T-70)', () => {
+  const minHeight = (el: { props: { style?: unknown } }) =>
+    (StyleSheet.flatten(el.props.style as ViewStyle) ?? {}).minHeight
+
+  it.each([
+    ['android', 48],
+    ['ios', 44],
+    ['web', 44],
+  ] as const)('%s: Pressable e TextField com %i', (os, size) => {
+    setOS(os)
+    expect(hitTarget()).toBe(size)
+    render(
+      <>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Ok"
+          onPress={jest.fn()}
+        />
+        <TextField
+          label="Nome"
+          value=""
+          onChangeText={jest.fn()}
+          testID="field"
+        />
+      </>
+    )
+    const button = screen.getByLabelText('Ok')
+    expect(minHeight(button)).toBe(size)
+    expect(
+      (StyleSheet.flatten(button.props.style as ViewStyle) ?? {}).minWidth
+    ).toBe(size)
+    expect(minHeight(screen.getByTestId('field'))).toBe(size)
+  })
+
+  it('o token do Android vem do tokens.json; o hit-size continua 44', () => {
+    expect(tokens.size.hitSizeAndroid).toBe(48)
+    expect(tokens.size.hitSize).toBe(44)
   })
 })

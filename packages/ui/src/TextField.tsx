@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native'
+import { hitTarget } from './metrics'
 import { Text } from './Text'
 import { textStyle, useTheme } from './theme'
 import { tokens } from './tokens'
@@ -49,6 +50,7 @@ export function TextField({
         style={[
           textStyle(theme, 'body'),
           styles.input,
+          { minHeight: hitTarget() },
           multiline && styles.multiline,
           {
             color: colors.ink,
@@ -91,7 +93,6 @@ export function TextArea(props: TextFieldProps) {
 const styles = StyleSheet.create({
   root: { gap: tokens.space[1] },
   input: {
-    minHeight: tokens.size.hitSize,
     borderWidth: tokens.borderWidth.control,
     borderRadius: tokens.radius.md,
     paddingHorizontal: tokens.space[3],

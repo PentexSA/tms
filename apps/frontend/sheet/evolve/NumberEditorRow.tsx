@@ -1,5 +1,5 @@
 import { inactiveNote, modifierNote } from '@tms/sheet-core'
-import { Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
+import { hitTarget, Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
@@ -212,6 +212,7 @@ export function NumberEditorRow(props: FieldViewProps) {
           }}
           style={[
             styles.input,
+            { minHeight: hitTarget() },
             textStyle(theme, 'number'),
             { borderColor: colors.borderControl, color: colors.ink },
           ]}
@@ -236,7 +237,6 @@ export function NumberEditorRow(props: FieldViewProps) {
 const styles = StyleSheet.create({
   input: {
     minWidth: 72,
-    minHeight: tokens.size.hitSize,
     borderWidth: tokens.borderWidth.control,
     borderRadius: tokens.radius.md,
     paddingHorizontal: tokens.space[3],

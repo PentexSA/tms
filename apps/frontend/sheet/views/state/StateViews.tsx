@@ -8,6 +8,7 @@ import {
 import {
   Choice,
   type ChoiceOption,
+  hitTarget,
   Pressable,
   Text,
   tokens,
@@ -137,6 +138,7 @@ export function StateSheet({ resolved, sheet }: FieldViewProps) {
               testID={`state-cost-${r.id}`}
               style={[
                 styles.toggle,
+                { minHeight: hitTarget() },
                 {
                   borderColor: paying ? colors.action : colors.borderControl,
                   backgroundColor: paying
@@ -217,7 +219,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.space[3],
-    minHeight: tokens.size.hitSize,
     paddingHorizontal: tokens.space[3],
     borderRadius: tokens.radius.md,
     borderWidth: tokens.borderWidth.control,

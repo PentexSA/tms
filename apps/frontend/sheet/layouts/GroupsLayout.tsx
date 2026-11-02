@@ -1,6 +1,7 @@
 import { type CompiledGroup, isDraftMode, jsonEqual } from '@tms/sheet-core'
 import {
   Button,
+  hitTarget,
   Pressable,
   SectionHeader,
   Text,
@@ -204,6 +205,7 @@ function FilterBar({
           maxLength={60}
           style={[
             styles.search,
+            { minHeight: hitTarget() },
             textStyle(theme, 'body'),
             { borderColor: colors.borderControl, color: colors.ink },
           ]}
@@ -234,7 +236,6 @@ const styles = StyleSheet.create({
   search: {
     flex: 1,
     minWidth: 160,
-    minHeight: tokens.size.hitSize,
     borderWidth: tokens.borderWidth.control,
     borderRadius: tokens.radius.md,
     paddingHorizontal: tokens.space[3],

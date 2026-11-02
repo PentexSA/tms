@@ -291,6 +291,7 @@ export const tokens = {
   },
   "size": {
     "hitSize": 44,
+    "hitSizeAndroid": 48,
     "rowMin": 48,
     "pipSize": 16,
     "pipSizeSm": 12,

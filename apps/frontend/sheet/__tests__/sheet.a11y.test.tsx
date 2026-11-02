@@ -7,7 +7,12 @@ import {
 } from '@testing-library/react-native'
 import type { RoleName } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
-import { AccessibilityInfo, Platform } from 'react-native'
+import {
+  AccessibilityInfo,
+  Platform,
+  StyleSheet,
+  type ViewStyle,
+} from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
@@ -25,6 +30,7 @@ import { DiceButton } from '../dice/DiceButton'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
 import { createSheetStore } from '../store/sheetStore'
+import { SyncIndicator } from '../sync/SyncIndicator'
 
 // Acessibilidade da ficha (P06 da onda 1): um teste de regressão por bug.
 
@@ -366,5 +372,19 @@ describe('Partes da ficha: painel só com as abas (T-35)', () => {
     )
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
     expect(hostPanels()).toHaveLength(0)
+  })
+})
+
+describe('Cabeçalho da ficha: a sincronização acompanha a altura dos controles (T-70)', () => {
+  it.each([
+    ['android', 48],
+    ['ios', 44],
+  ] as const)('%s: altura mínima %i', async (os, size) => {
+    setOS(os)
+    renderWithSession(<SyncIndicator />, await signedIn())
+    const row = await screen.findByTestId(/^sync-/)
+    expect(
+      (StyleSheet.flatten(row.props.style as ViewStyle) ?? {}).minHeight
+    ).toBe(size)
   })
 })

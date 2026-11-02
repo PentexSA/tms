@@ -9,13 +9,14 @@ import {
   StyleSheet,
   type ViewStyle,
 } from 'react-native'
+import { hitTarget } from './metrics'
 import { fromSelf, keyOf } from './roving'
 import { useTheme } from './theme'
-import { tokens } from './tokens'
 
 export interface PressableProps extends Omit<RNPressableProps, 'style'> {
   readonly style?: StyleProp<ViewStyle>
-  // Alvo mínimo de 44×44 (hit-size). Desligue só quando o pai já é o alvo.
+  // Alvo mínimo (hitTarget: 48 dp no Android, 44 no resto). Desligue só
+  // quando o pai já é o alvo.
   readonly minTarget?: boolean
   // Com o React 19 o ref é prop: o foco itinerante (roving.ts) move o foco por ele.
   readonly ref?: ComponentProps<typeof RNPressable>['ref']
@@ -26,7 +27,7 @@ export interface PressableProps extends Omit<RNPressableProps, 'style'> {
 // valer também para estes, como no HTML (rádio, aba, interruptor, caixa).
 const SPACE_ROLES = new Set(['radio', 'tab', 'switch', 'checkbox'])
 
-/** Área tocável com o estado pressionado do design system e alvo de 44. */
+/** Área tocável com o estado pressionado do design system e alvo mínimo. */
 export function Pressable({
   style,
   minTarget = true,
@@ -35,6 +36,7 @@ export function Pressable({
   ...rest
 }: PressableProps) {
   const theme = useTheme()
+  const hit = hitTarget()
   const role = (rest.role ?? rest.accessibilityRole) as string | undefined
   const space = Platform.OS === 'web' && role != null && SPACE_ROLES.has(role)
   const keyDown = space
@@ -56,7 +58,7 @@ export function Pressable({
       aria-disabled={!!disabled}
       style={({ pressed }) =>
         StyleSheet.flatten([
-          minTarget && styles.target,
+          minTarget && { minHeight: hit, minWidth: hit },
           style,
           pressed &&
             !disabled && { backgroundColor: theme.colors.statePressed },
@@ -70,6 +72,5 @@ export function Pressable({
 }
 
 const styles = StyleSheet.create({
-  target: { minHeight: tokens.size.hitSize, minWidth: tokens.size.hitSize },
   disabled: { opacity: 0.5 },
 })

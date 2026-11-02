@@ -1,4 +1,4 @@
-import { Banner, Text, tokens, useTheme } from '@tms/ui'
+import { Banner, hitTarget, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useOnline } from '../../lib/network'
 import { useSyncStatus } from './SyncProvider'
@@ -43,7 +43,8 @@ export function SyncIndicator() {
       accessibilityLabel={`Sincronização: ${text}`}
       aria-live="polite"
       testID={`sync-${state}`}
-      style={styles.row}
+      // Mesma altura dos controles do cabeçalho, que crescem no Android
+      style={[styles.row, { minHeight: hitTarget() }]}
     >
       <View style={[styles.dot, { backgroundColor: dot }]} />
       <Text variant="caption" color="inkMuted">
@@ -73,7 +74,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.space[1],
-    minHeight: 44,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   banner: {
