@@ -22,7 +22,15 @@ import {
   useTheme,
   useToast,
 } from '@tms/ui'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
 import { CompletionMessage } from '../creation/CompletionMessage'
@@ -49,12 +57,27 @@ export const MODE_LABELS: Readonly<Record<SheetMode, string>> = {
 }
 
 // O dono não tem Leitura: Jogo já mostra a ficha inteira. Quem escreve sem
-// ser dono (o narrador) começa em Leitura e precisa do botão para voltar
+// ser dono (o narrador, na ficha alheia) começa em Leitura, sem seletor: a
+// edição abre só pelo "Editar como narrador" (T-33, DS: ModeBar), e então
+// vale a mesma lista do dono. A volta à Leitura é o "Voltar à leitura"
 const OWNER_MODES: readonly SheetMode[] = ['play', 'evolve']
-const OTHER_MODES: readonly SheetMode[] = ['read', 'play', 'evolve']
 // Na criação por pontos, o Editar vira Criação: o mesmo rascunho, com a conta
 const OWNER_CREATE: readonly SheetMode[] = ['play', 'create']
-const OTHER_CREATE: readonly SheetMode[] = ['read', 'play', 'create']
+
+/**
+ * O `go` da barra de modos para quem fica fora dela (T-33): a barra do
+ * narrador entra na edição e volta à Leitura pelo mesmo caminho dos chips
+ * (rascunho, resumo ao sair com alterações). Null para quem não escreve,
+ * pelo papel ou pela política: sem ele, não há "Editar como narrador".
+ */
+export interface ModeBarActionsValue {
+  readonly go: (next: SheetMode) => void
+}
+
+export const ModeBarActions = createContext<ModeBarActionsValue | null>(null)
+
+export const useModeBarActions = (): ModeBarActionsValue | null =>
+  useContext(ModeBarActions)
 
 export const changesLabel = (n: number): string =>
   n === 1 ? '1 alteração' : `${n} alterações`
@@ -67,6 +90,8 @@ export interface ModeBarParts {
   readonly actionBar: ReactNode
   /** O resumo antes de salvar (folha). */
   readonly summary: ReactNode
+  /** Ir a um modo: com alterações, passa pelo resumo (estável entre renders). */
+  readonly go: (next: SheetMode) => void
 }
 
 /**
@@ -86,16 +111,9 @@ export function useModeBar({
 } = {}): ModeBarParts {
   const { model, mode, roles } = useSheet()
   const creating = useCreation()?.active === true
-  const owner = roles.has('owner')
-  const modes =
-    only ??
-    (creating
-      ? owner
-        ? OWNER_CREATE
-        : OTHER_CREATE
-      : owner
-        ? OWNER_MODES
-        : OTHER_MODES)
+  // Quem escreve sem ser dono: o narrador na ficha alheia (T-33)
+  const narrator = !roles.has('owner')
+  const modes = only ?? (creating ? OWNER_CREATE : OWNER_MODES)
   const store = useSheetStore()
   const toast = useToast()
   const count = useDraftCount()
@@ -117,9 +135,12 @@ export function useModeBar({
   useEffect(() => {
     if (!enabled) setSummary(null)
   }, [enabled])
-  // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
+  // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor; o
+  // narrador que entrou pela Leitura volta a ela
   const back = (m: SheetMode): SheetMode =>
-    !isDraftMode(m) && modes.includes(m) ? m : (modes[0] ?? 'read')
+    !isDraftMode(m) && (modes.includes(m) || (narrator && m === 'read'))
+      ? m
+      : (modes[0] ?? 'read')
   const returnTo = useRef<SheetMode>(back(mode))
 
   const switchTo = (next: SheetMode) => {
@@ -212,7 +233,17 @@ export function useModeBar({
     switchTo(next)
   }
 
-  const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
+  // O mesmo `go` para quem o recebe pelo contexto: a referência não muda, e a
+  // chamada usa o estado do render atual
+  const latest = useRef(go)
+  latest.current = go
+  const stableGo = useCallback((next: SheetMode) => latest.current(next), [])
+
+  // T-33: o narrador em Leitura não tem seletor; a edição abre pelo botão
+  const switcher =
+    narrator && mode === 'read' ? null : (
+      <ModeSwitch modes={modes} mode={mode} onChange={go} />
+    )
   // O próximo passo (D-03), sob a contagem. Muda pouco e não é região viva:
   // o banner da ficha anuncia o pedido do narrador
   const nextStepNote = step.copy ? (
@@ -312,7 +343,7 @@ export function useModeBar({
       onClose={() => setSummary(null)}
     />
   )
-  return { switcher, actionBar, summary: summarySheet }
+  return { switcher, actionBar, summary: summarySheet, go: stableGo }
 }
 
 function ModeSwitch({

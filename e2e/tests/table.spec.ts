@@ -77,7 +77,7 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
   await page
     .getByRole('textbox', { name: 'Notas do Narrador', exact: true })
     .fill('O Regente vai cobrar.')
-  await page.getByRole('button', { name: 'Salvar' }).click()
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Desfazer' })).toBeVisible()
   // Geração foi o primeiro lote; as notas do narrador são o segundo.
   // O lote sai em segundo plano: espera o servidor confirmar.
@@ -116,6 +116,20 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
   await expect(
     page.getByText(`${storyteller.username} (narrador)`, { exact: false })
   ).toHaveCount(3)
+  await page.getByRole('button', { name: 'Fechar' }).last().click()
+
+  // T-83 e T-39 (P09-C): de volta à Mesa (a mesma aba), o cartão diz que a
+  // última alteração foi do narrador, sem o nome de mais ninguém
+  await page
+    .getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
+    .click()
+  await expect(page.getByRole('tab', { name: 'Mesa' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  await expect(
+    page.getByRole('button', { name: /^Helena Varga, Tremere\./ })
+  ).toHaveAccessibleName(/alterada por você às \d\d:\d\d$/)
 
   // A jogadora volta para a ficha (sai e entra): a ficha é rebuscada
   await sheet

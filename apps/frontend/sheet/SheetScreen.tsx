@@ -21,7 +21,6 @@ import {
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
-import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -47,6 +46,7 @@ import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
+import { useSheetBack } from './navigation'
 import {
   blockedBy,
   deadLabel,
@@ -89,7 +89,6 @@ export function SheetScreen({
   // conta por pontos vale (v4)
   readonly initialMode?: SheetMode
 }) {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const sync = useSync()
   const state = useSheetData(id)
@@ -146,12 +145,8 @@ export function SheetScreen({
     state.status === 'identity'
       ? (state.character.chronicle ?? null)
       : null
-  const back = chronicle
-    ? {
-        label: chronicle.name,
-        onPress: () => router.replace(`/chronicles/${chronicle.id}`),
-      }
-    : { label: 'Crônicas', onPress: () => router.replace('/') }
+  // T-39: o "‹" volta à crônica de baixo, com a aba e a rolagem dela
+  const back = useSheetBack(chronicle)
   const title =
     state.status === 'ready'
       ? state.character.name
@@ -432,6 +427,7 @@ function LiveSheet({
 }) {
   const sync = useSync()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
   const kind: 'pc' | 'npc' = state.character.kind === 'npc' ? 'npc' : 'pc'
   const lifecycle = useMemo<SheetLifecycle>(
@@ -621,6 +617,13 @@ function LiveSheet({
           <SheetView
             store={store}
             editable
+            // T-40: puxar rebusca a ficha; a resposta passa pelo received
+            onRefresh={() =>
+              queryClient.invalidateQueries(
+                { queryKey: sheetKeys.character(id) },
+                { cancelRefetch: false }
+              )
+            }
             header={
               <>
                 <NpcVisibilityBar state={state} />

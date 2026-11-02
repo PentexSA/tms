@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { purgeHttpCache as purgeNativeHttpCache } from '../../modules/http-cache'
+import { clearChronicleScroll } from '../chronicleScroll'
 import type { Session, SessionState } from './session'
 
 const SessionContext = createContext<Session | null>(null)
@@ -27,7 +28,12 @@ export function SessionProvider({
     session.restore()
   }, [session])
   useEffect(
-    () => session.onSignOut(() => queryClient.clear()),
+    () =>
+      session.onSignOut(() => {
+        queryClient.clear()
+        // A rolagem guardada de cada crônica (T-39) também é da sessão
+        clearChronicleScroll()
+      }),
     [session, queryClient]
   )
   // Sair apaga as respostas HTTP gravadas no aparelho (a abertura também

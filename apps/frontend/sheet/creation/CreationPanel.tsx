@@ -182,7 +182,7 @@ export function CreationAlerts() {
 /** A aba Orçamento: o que os pontos gastam, o saldo e o que falta. */
 export function CreationPanel() {
   const creation = useCreation()
-  const { model, roles, store } = useSheet()
+  const { model, roles, store, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
   const phase = useSheetSelector(s => s.creationPhase)
   if (
@@ -250,7 +250,8 @@ export function CreationPanel() {
             : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
-      {storyteller ? <BudgetControls /> : null}
+      {/* As "Regras da casa" gravam: só na Criação, nunca na Leitura (T-33) */}
+      {storyteller && mode === 'create' ? <BudgetControls /> : null}
     </View>
   )
 }

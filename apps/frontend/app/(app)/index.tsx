@@ -18,6 +18,7 @@ import { LogoutButton } from '../../components/session/LogoutButton'
 import { messageOf } from '../../lib/errors'
 import { civilDate, plural } from '../../lib/format'
 import { useChronicles } from '../../lib/queries/chronicles'
+import { usePullRefresh, useRefetchOnFocus } from '../../lib/queries/focus'
 
 /**
  * "Narrador: ana · 2 personagens · Última sessão: 01/11 · Convite para
@@ -56,6 +57,10 @@ function chronicleMeta(item: {
 export default function ChroniclesScreen() {
   const router = useRouter()
   const chronicles = useChronicles()
+  // T-40: a volta à lista e o puxar trazem a contagem e o "aguarda revisão"
+  // atuais (no Android, a lista ficava com o dado de antes)
+  useRefetchOnFocus(() => chronicles.refetch({ cancelRefetch: false }))
+  const pull = usePullRefresh(() => chronicles.refetch())
 
   const actions = (
     <View style={styles.actions}>
@@ -96,6 +101,8 @@ export default function ChroniclesScreen() {
       <FlatList
         data={chronicles.data}
         keyExtractor={c => c.id}
+        refreshing={pull.refreshing}
+        onRefresh={pull.onRefresh}
         ListHeaderComponent={
           <View style={styles.header}>
             {/* U-03: a proposta de narrar, para quem a recebeu */}

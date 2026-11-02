@@ -5,6 +5,8 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import { useToast } from '@tms/ui'
+
 import { api, unwrap } from '../api'
 import { chronicleKeys } from './chronicles'
 
@@ -121,6 +123,7 @@ export const useProposeTransfer = (id: string) => {
 
 export const useAcceptTransfer = (id: string, transferId: string) => {
   const queryClient = useQueryClient()
+  const toast = useToast()
   return useMutation({
     mutationFn: async (clientCommandId: string) =>
       unwrap(
@@ -130,7 +133,14 @@ export const useAcceptTransfer = (id: string, transferId: string) => {
           .accept.post({ clientCommandId })
       ),
     onSuccess: () => {
-      queryClient.clear()
+      // T-40: tudo fica velho e as queries montadas rebuscam com o papel
+      // novo; a tela continua com o dado de agora até a resposta, sem voltar
+      // ao esqueleto (o clear() deixava o dado antigo na tela para sempre, e
+      // o resetQueries() derrubava a crônica para o esqueleto). É o mesmo
+      // usuário, e o dado de jogador é o de menos acesso. O logout continua
+      // com clear()
+      void queryClient.invalidateQueries()
+      toast.show({ message: 'Agora você narra esta crônica.' })
     },
   })
 }

@@ -5,6 +5,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 
+import { whenLabel } from '../../lib/format'
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
 import {
@@ -16,6 +17,13 @@ import {
 // O que cada linha da Mesa mostra, calculado uma vez por ficha (doc/plano-v3.md,
 // Etapa 9). Puro: o mesmo item enquanto a linha e o modelo não mudam, para
 // que filtrar e ordenar não redesenhem as linhas que continuam na tela.
+
+// Quem fez a última alteração (P09-C, T-83), calculado no servidor contra quem
+// pede: a resposta não leva id nem nome de quem fez
+export interface TableLastChange {
+  readonly at: string | Date
+  readonly by: 'you' | 'owner' | 'other'
+}
 
 export interface TableRowData {
   readonly id: string
@@ -34,6 +42,7 @@ export interface TableRowData {
   readonly activatedAt?: string | Date | null
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
+  readonly lastChange?: TableLastChange | null
   readonly sheet: unknown
   // A visibilidade do NPC (T-52): a Mesa separa os NPCs (pelo `kind`) e
   // mostra o selo dela. A API já manda os dois
@@ -53,6 +62,32 @@ export interface TableItem {
   // O selo de visibilidade do NPC ("Oculto", "Identidade revelada", "Ficha
   // revelada"); null no PC (T-52). Não passa pelo characterState
   readonly visibility: string | null
+}
+
+/**
+ * A meta do cartão: quem alterou por último e quando (T-83). O nome do dono
+ * aparece uma vez. Sem `lastChange` (ficha sem lote, ou a API antiga) ou com
+ * um `by` desconhecido, fica o texto de antes, pelo `updatedAt` e sem autor
+ * (fail secure).
+ */
+export function changeLabel(row: TableRowData, now = new Date()): string {
+  const owner = row.owner.username
+  const change = row.lastChange
+  if (!change) return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
+  const when = whenLabel(change.at, now)
+  switch (change.by) {
+    case 'you':
+      // O NPC é do próprio narrador: o nome dele não diz nada
+      return row.kind === 'npc'
+        ? `alterada por você ${when}`
+        : `${owner} · alterada por você ${when}`
+    case 'owner':
+      return `alterada por ${owner} ${when}`
+    case 'other':
+      return `${owner} · alterada ${when}`
+    default:
+      return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
+  }
 }
 
 export function buildItem(

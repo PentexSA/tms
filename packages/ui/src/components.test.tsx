@@ -46,10 +46,12 @@ import {
   TextField,
   ThemeProvider,
   TOAST_MS,
+  TOAST_RESUME_MIN_MS,
   TOAST_SCREEN_READER_MS,
   ToastProvider,
   tokens,
   useToast,
+  useToastOffset,
 } from './index'
 
 const HIT = tokens.size.hitSize
@@ -654,6 +656,161 @@ describe('Toast', () => {
     expect(screen.getByText('Sangue 10 → 9')).toBeTruthy()
     act(() => jest.advanceTimersByTime(TOAST_SCREEN_READER_MS))
     expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+  })
+
+  // T-76 (P09-C): um "Desfazer" que dá tempo de tocar
+  describe('pausa, prazo e deslocamento', () => {
+    function Custom({ durationMs }: { durationMs?: number }) {
+      const toast = useToast()
+      return (
+        <Button
+          title="Aplicar"
+          onPress={() =>
+            toast.show({
+              message: 'Dano aplicado em 3 personagens.',
+              action: { label: 'Desfazer', onPress: () => undefined },
+              durationMs,
+            })
+          }
+        />
+      )
+    }
+    const TEXT = 'Dano aplicado em 3 personagens.'
+    const open = async (durationMs?: number, reader = false) => {
+      jest
+        .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+        .mockResolvedValue(reader)
+      render(
+        <ToastProvider>
+          <Custom durationMs={durationMs} />
+        </ToastProvider>
+      )
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    }
+    const advance = (ms: number) => act(() => jest.advanceTimersByTime(ms))
+    const visible = () => screen.queryByText(TEXT) !== null
+
+    it('durationMs de 10 s: visível aos 9,9 s, some aos 10 s', async () => {
+      await open(10_000)
+      advance(9_900)
+      expect(visible()).toBe(true)
+      advance(100)
+      expect(visible()).toBe(false)
+    })
+
+    it('o toque pausa; ao soltar, volta com o que faltava', async () => {
+      await open(10_000)
+      advance(3_000)
+      fireEvent(screen.getByTestId('toast'), 'touchStart')
+      advance(60_000)
+      expect(visible()).toBe(true)
+      fireEvent(screen.getByTestId('toast'), 'touchEnd')
+      advance(6_999)
+      expect(visible()).toBe(true)
+      advance(1)
+      expect(visible()).toBe(false)
+    })
+
+    it(`ao soltar perto do fim, fica pelo menos ${TOAST_RESUME_MIN_MS / 1000} s`, async () => {
+      await open()
+      advance(TOAST_MS - 100)
+      fireEvent(screen.getByTestId('toast'), 'touchStart')
+      fireEvent(screen.getByTestId('toast'), 'touchEnd')
+      advance(TOAST_RESUME_MIN_MS - 1)
+      expect(visible()).toBe(true)
+      advance(1)
+      expect(visible()).toBe(false)
+    })
+
+    it('o ponteiro em cima e o foco dentro também pausam (web e teclado)', async () => {
+      await open()
+      const toast = screen.getByTestId('toast')
+      fireEvent(toast, 'pointerEnter')
+      fireEvent(toast, 'focus')
+      advance(TOAST_MS * 3)
+      expect(visible()).toBe(true)
+      // Só volta a contar quando os dois soltam
+      fireEvent(toast, 'pointerLeave')
+      advance(TOAST_MS * 3)
+      expect(visible()).toBe(true)
+      fireEvent(toast, 'blur')
+      advance(TOAST_MS)
+      expect(visible()).toBe(false)
+    })
+
+    it('tocar em "Desfazer" fecha, e o soltar depois não reabre o prazo', async () => {
+      await open()
+      const toast = screen.getByTestId('toast')
+      fireEvent(toast, 'touchStart')
+      fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
+      fireEvent(toast, 'touchEnd')
+      expect(visible()).toBe(false)
+      advance(TOAST_MS)
+      expect(visible()).toBe(false)
+    })
+
+    it('o aviso que passa a um modal com o foco nele não fica preso', async () => {
+      const content = (modal: boolean) => (
+        <ToastProvider>
+          <Custom />
+          <BottomSheet visible={modal} title="Folha" onClose={() => undefined}>
+            <RNText>Folha aberta</RNText>
+          </BottomSheet>
+        </ToastProvider>
+      )
+      const { rerender } = render(content(false))
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      advance(1_000)
+      // O foco no "Desfazer" segura o prazo; o modal abre e o aviso muda de
+      // camada sem o blur
+      fireEvent(screen.getByTestId('toast'), 'focus')
+      rerender(content(true))
+      expect(
+        within(screen.UNSAFE_getByType(Modal)).getByText(TEXT)
+      ).toBeTruthy()
+      // Volta a contar com o que faltava (4 s)
+      advance(TOAST_MS - 1_000 - 1)
+      expect(visible()).toBe(true)
+      advance(1)
+      expect(visible()).toBe(false)
+    })
+
+    it('com leitor de tela, durationMs menor dura os 10 s', async () => {
+      await open(3_000, true)
+      advance(TOAST_SCREEN_READER_MS - 1)
+      expect(visible()).toBe(true)
+      advance(1)
+      expect(visible()).toBe(false)
+    })
+
+    it('useToastOffset ergue o aviso; com vários, vale o maior', async () => {
+      function Bar({ height }: { height: number }) {
+        useToastOffset(height)
+        return null
+      }
+      const tree = (bars: number[]) => (
+        <ToastProvider>
+          {bars.map(h => (
+            <Bar key={h} height={h} />
+          ))}
+          <Custom />
+        </ToastProvider>
+      )
+      const { rerender } = render(tree([64]))
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      const bottom = () =>
+        StyleSheet.flatten(screen.getByTestId('toast-host').props.style).bottom
+      const base = 16
+      expect(bottom()).toBe(base + 64)
+      rerender(tree([64, 120]))
+      expect(bottom()).toBe(base + 120)
+      // A barra sai da tela: o aviso volta ao fundo
+      rerender(tree([]))
+      expect(bottom()).toBe(base)
+    })
   })
 
   it('useToast fora do provider é erro de programação', () => {

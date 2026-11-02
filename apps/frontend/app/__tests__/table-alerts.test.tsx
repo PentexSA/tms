@@ -37,7 +37,13 @@ const calls = (
 ).fake.calls
 const renders = (rowModule as unknown as { renders: Map<string, number> })
   .renders
-const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+const router = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  setParams: jest.fn(),
+  canGoBack: jest.fn(),
+}
 const CHRONICLE_ID = '00000000-0000-4000-8000-0000000000c1'
 const HELENA = '00000000-0000-4000-8000-00000000c001'
 const CAIO = '00000000-0000-4000-8000-00000000c002'

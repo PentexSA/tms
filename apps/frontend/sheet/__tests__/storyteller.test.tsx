@@ -19,7 +19,11 @@ import {
   tokens,
 } from '../../test/session'
 import { SheetScreen } from '../SheetScreen'
-import { storytellerOnlyText } from '../storyteller/StorytellerBar'
+import { hiddenFromOwner } from '../storyteller/privacy'
+import {
+  narratorTarget,
+  storytellerOnlyText,
+} from '../storyteller/StorytellerBar'
 import type { QueuedBatch } from '../sync/outbox'
 import type { PostOutcome } from '../sync/sender'
 
@@ -98,6 +102,38 @@ const openHistory = async () => {
   await sheetsDismissed()
 }
 
+// A ficha em criação vista pelo narrador; `points` liga a conta da V20
+const creating = (values: Record<string, unknown> | null, points = true) =>
+  ok({
+    ...character(['storyteller']).data,
+    status: 'creating',
+    lockedAt: null,
+    member: true,
+    sheet: {
+      values: values ?? { name: 'Nova', clan: 'tremere' },
+      specialties: {},
+    },
+    ...(points
+      ? {
+          creation: {
+            revision: 1,
+            mode: 'points',
+            accounting: true,
+            choices: {
+              priorities: {
+                attributes: ['physical', 'social', 'mental'],
+                abilities: ['talents', 'skills', 'knowledges'],
+              },
+            },
+            config: {},
+            effective: effectiveCreationConfig(modelOf('vtm-v20')),
+            returned: null,
+            approval: false,
+          },
+        }
+      : {}),
+  })
+
 describe('Editar como narrador', () => {
   it('a ficha do jogador abre em Leitura; editar é explícito e avisado', async () => {
     await open(['storyteller'])
@@ -105,6 +141,8 @@ describe('Editar como narrador', () => {
     expect(
       screen.queryByRole('button', { name: 'Editar Notas do Narrador' })
     ).toBeNull()
+    // T-33: em Leitura, sem seletor de modo
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     fireEvent.press(
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
@@ -114,8 +152,13 @@ describe('Editar como narrador', () => {
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
       'Editando como narrador. As alterações ficam assinadas no histórico.'
     )
+    // A ficha em uso vai ao Jogo, como antes; o seletor aparece para trocar
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: 'Leitura' })).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
   })
 
   it('o narrador edita as Notas do Narrador; o lote sai com o from atual', async () => {
@@ -196,6 +239,173 @@ describe('Editar como narrador', () => {
         expect(canWrite(model, f.id, ['owner'])).toBe(false)
       }
     }
+  })
+})
+
+// R-09 (P09-C): as Notas do Narrador dizem que são privadas, na Leitura e na
+// folha de edição; na ficha em criação, a folha aponta o "Pedir ajuste"
+describe('Notas do Narrador privadas (R-09)', () => {
+  it('hiddenFromOwner vem das permissões, nos três sistemas', () => {
+    for (const system of ['vtm-v20', 'mta-m20', 'wta-w20']) {
+      const model = modelOf(system)
+      expect(hiddenFromOwner(model, 'storytellerNotes')).toBe(true)
+      expect(hiddenFromOwner(model, 'notes')).toBe(false)
+    }
+  })
+
+  it('na Leitura, a legenda e o nome acessível dizem que são privadas', async () => {
+    await open(['storyteller'])
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    expect(
+      screen.getByText('Notas do Narrador · privadas: o jogador não vê')
+    ).toBeTruthy()
+    expect(screen.getByLabelText(/Privadas: o jogador não vê$/)).toBeTruthy()
+    // As Notas do jogador não ganham o rótulo
+    expect(screen.queryByText(/^Notas · privadas/)).toBeNull()
+  })
+
+  it('a folha de edição diz que o jogador não vê; o botão também avisa', async () => {
+    await open(['storyteller'])
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Editar como narrador' })
+    )
+    const edit = screen.getByRole('button', {
+      name: 'Editar Notas do Narrador',
+    })
+    expect(edit.props.accessibilityHint).toBe('Privadas: o jogador não vê')
+    fireEvent.press(edit)
+    expect(
+      screen.getByText('Privadas: o jogador não vê estas notas.')
+    ).toBeTruthy()
+    // A ficha em uso não tem o "Pedir ajuste"
+    expect(screen.queryByText(/Pedir ajuste/)).toBeNull()
+    // O título e o nome do campo continuam (o E2E os usa)
+    expect(screen.getByLabelText('Notas do Narrador')).toBeTruthy()
+  })
+
+  it('na ficha em criação, a folha aponta o "Pedir ajuste"', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({
+        name: 'Nova',
+        clan: 'tremere',
+        storytellerNotes: 'corrija a Força',
+      })
+    )
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Editar como narrador' })
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+    )
+    expect(
+      screen.getByText('Privadas: o jogador não vê estas notas.')
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Para pedir uma correção ao jogador, use 'Pedir ajuste' em Ações do narrador."
+      )
+    ).toBeTruthy()
+  })
+})
+
+// T-33 (P09-C): o narrador revisa em Leitura, com a conta, e só edita pelo
+// "Editar como narrador", que abre a edição de fato
+describe('Leitura do narrador com a conta (T-33)', () => {
+  const pointsSheet = () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere', strength: 3 })
+    )
+  }
+  const render = async (post?: () => Promise<PostOutcome>) => {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { post })
+    return screen.findByRole('button', { name: 'Editar como narrador' })
+  }
+
+  it('em criação por pontos, abre em Leitura com o Orçamento, sem editar', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    pointsSheet()
+    await render(post as never)
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    // A conta: o saldo e o que falta, sem as "Regras da casa" (que gravam)
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies')).toBeTruthy()
+    expect(screen.queryByTestId('creation-budget')).toBeNull()
+    expect(screen.queryByText('Regras da casa')).toBeNull()
+    // Nada editável: nenhum controle de pontos, e nenhum lote na fila
+    expect(screen.queryAllByRole('adjustable')).toHaveLength(0)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('"Editar como narrador" abre a Criação; voltar com alteração pergunta', async () => {
+    pointsSheet()
+    fireEvent.press(await render())
+    expect(screen.getByRole('radio', { name: 'Criação' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeTruthy()
+    expect(
+      screen.getByLabelText('Editando como narrador', { exact: true })
+    ).toBeTruthy()
+    // As "Regras da casa" voltam na Criação
+    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    expect(screen.getByTestId('creation-budget')).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Destreza' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
+    expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
+    await sheetsDismissed()
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+  })
+
+  it('sem alterações, "Voltar à leitura" volta direto', async () => {
+    pointsSheet()
+    fireEvent.press(await render())
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
+    expect(screen.queryByText(/^Salvar \d/)).toBeNull()
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+  })
+
+  it('salvar no Editar volta à Leitura, de onde o narrador entrou', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere' }, false)
+    )
+    fireEvent.press(await render(post as never))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Destreza' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    // O botão de salvar do Editar (P03-D, D-01)
+    fireEvent.press(screen.getByRole('button', { name: /^Salvar alterações$/ }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await sheetsDismissed()
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+  })
+
+  it('na criação livre, "Editar como narrador" vai ao Editar', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere' }, false)
+    )
+    fireEvent.press(await render())
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
+    // Sem conta, sem Orçamento, em qualquer modo
+    expect(screen.queryByRole('tab', { name: 'Orçamento' })).toBeNull()
+  })
+
+  it('narratorTarget: Criação, Editar ou Jogo', () => {
+    expect(narratorTarget({ active: true, status: 'creating' })).toBe('create')
+    expect(narratorTarget({ active: true, status: 'pending' })).toBe('create')
+    expect(narratorTarget({ active: false, status: 'creating' })).toBe('evolve')
+    expect(narratorTarget({ active: false, status: 'active' })).toBe('play')
+    expect(narratorTarget(null)).toBe('play')
   })
 })
 
@@ -443,36 +653,6 @@ describe('sobra de bônus na confirmação do narrador (T-18)', () => {
     selfControl: 3,
     courage: 3,
   }
-  const creating = (values: Record<string, unknown> | null, points = true) =>
-    ok({
-      ...character(['storyteller']).data,
-      status: 'creating',
-      lockedAt: null,
-      member: true,
-      sheet: {
-        values: values ?? { name: 'Nova', clan: 'tremere' },
-        specialties: {},
-      },
-      ...(points
-        ? {
-            creation: {
-              revision: 1,
-              mode: 'points',
-              accounting: true,
-              choices: {
-                priorities: {
-                  attributes: ['physical', 'social', 'mental'],
-                  abilities: ['talents', 'skills', 'knowledges'],
-                },
-              },
-              config: {},
-              effective: effectiveCreationConfig(modelOf('vtm-v20')),
-              returned: null,
-              approval: false,
-            },
-          }
-        : {}),
-    })
   const confirm = async () => {
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     // Abaixo de 900, as ações do narrador ficam no "Mais opções" (T-11)

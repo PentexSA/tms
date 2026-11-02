@@ -1,10 +1,16 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { ToastProvider } from '@tms/ui'
+import type { ReactElement } from 'react'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
 import { renderWithQueryClient } from '../../../test/utils'
 import { CampaignBackstage } from '../CampaignBackstage'
 import { TransferOffer } from '../TransferOffer'
+
+// A proposta usa o aviso ("Agora você narra esta crônica.", T-40)
+const renderOffer = (ui: ReactElement) =>
+  renderWithQueryClient(<ToastProvider>{ui}</ToastProvider>)
 
 // v5, entrega 12: diário, apresentação, transferência e auditoria. Comandos
 // novos guardam a chave enquanto a intenção é a mesma (reenvio seguro) e o
@@ -468,9 +474,11 @@ describe('narrador', () => {
 })
 
 describe('TransferOffer (U-03)', () => {
-  it('destinatário aceita a narração; aceitar limpa o cache', async () => {
+  // T-40 (P09-C): aceitar invalida tudo (as telas montadas rebuscam com o
+  // papel novo, sem voltar ao esqueleto) e avisa
+  it('destinatário aceita a narração; tudo é rebuscado e o aviso aparece', async () => {
     chronicle.transferDecision.mockResolvedValue(ok({ status: 'accepted' }))
-    const { queryClient } = renderWithQueryClient(
+    const { queryClient } = renderOffer(
       <TransferOffer chronicleId={ID} transferId="t1" />
     )
     expect(screen.getByText('Convite para narrar')).toBeTruthy()
@@ -480,10 +488,17 @@ describe('TransferOffer (U-03)', () => {
       )
     ).toBeTruthy()
     const clear = jest.spyOn(queryClient, 'clear')
+    const reset = jest.spyOn(queryClient, 'resetQueries')
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
     })
-    await waitFor(() => expect(clear).toHaveBeenCalled())
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith())
+    expect(clear).not.toHaveBeenCalled()
+    expect(reset).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText('Agora você narra esta crônica.')
+    ).toBeTruthy()
     expect(chronicle.transferDecision).toHaveBeenCalledWith(
       ID,
       't1',
@@ -496,7 +511,7 @@ describe('TransferOffer (U-03)', () => {
 
   it('destinatário recusa; a lista de crônicas é rebuscada', async () => {
     chronicle.transferDecision.mockResolvedValue(ok({ status: 'rejected' }))
-    const { queryClient } = renderWithQueryClient(
+    const { queryClient } = renderOffer(
       <TransferOffer
         chronicleId={ID}
         transferId="t1"
@@ -528,7 +543,7 @@ describe('TransferOffer (U-03)', () => {
     chronicle.transferDecision.mockResolvedValue(
       fail(409, 'A proposta não está mais disponível.')
     )
-    const { queryClient } = renderWithQueryClient(
+    const { queryClient } = renderOffer(
       <TransferOffer chronicleId={ID} transferId="t1" />
     )
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
@@ -560,7 +575,7 @@ describe('TransferOffer (U-03)', () => {
     chronicle.transferDecision.mockRejectedValue(
       new TypeError('Network request failed')
     )
-    renderWithQueryClient(<TransferOffer chronicleId={ID} transferId="t1" />)
+    renderOffer(<TransferOffer chronicleId={ID} transferId="t1" />)
     fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
     await waitFor(() =>
       expect(chronicle.transferDecision).toHaveBeenCalledTimes(1)

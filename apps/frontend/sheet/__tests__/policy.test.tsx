@@ -351,6 +351,24 @@ describe('a tela da ficha com o estado', () => {
     expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
   })
 
+  // T-33: travada ou arquivada, o narrador continua escrevendo (o servidor
+  // aceita), mas o seletor só aparece depois do "Editar como narrador"
+  it.each([
+    ['travada', 'active', '2026-10-18T12:00:00Z'],
+    ['arquivada', 'archived', null],
+  ] as const)(
+    '%s, o narrador abre em Leitura, sem o seletor',
+    async (_, status, locked) => {
+      await open(['storyteller'], status, locked ?? undefined)
+      expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Editar como narrador' })
+      )
+      expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'Editar' })).toBeTruthy()
+    }
+  )
+
   // T-32: o menu confirma, com o texto de quem lê, e manda a chave, a
   // revisão e a versão da ficha, como a barra
   it('o narrador conclui a criação pelo menu ⋯, depois de confirmar', async () => {
@@ -387,7 +405,13 @@ describe('a tela da ficha com o estado', () => {
 
   it('com alterações não salvas, concluir pelo menu fica desabilitado', async () => {
     await open(['storyteller'], 'creating')
-    fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+    // T-33: em Leitura, o narrador não tem seletor; a edição abre pelo botão,
+    // e na criação livre ela é o Editar
+    expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Editar como narrador' })
+    )
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
     for (const name of ['Força', 'Destreza'])
       fireEvent(
         screen.getByRole('adjustable', { name }),

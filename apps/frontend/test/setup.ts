@@ -16,6 +16,9 @@ jest.mock('expo-router', () => ({
     push: jest.fn(),
     replace: jest.fn(),
     back: jest.fn(),
+    // T-39: a aba da crônica na URL e o "‹" pela pilha
+    setParams: jest.fn(),
+    canGoBack: jest.fn(() => false),
   })),
   useLocalSearchParams: jest.fn(() => ({})),
   // Saída com rascunho (LeaveGuard): o teste pega o callback

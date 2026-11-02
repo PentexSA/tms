@@ -277,6 +277,35 @@ for (const system of MATRIX_SYSTEMS) {
       expect(res.status).toBe(403)
       expect(await res.text()).not.toContain(SECRET)
     })
+
+    // P09-C (T-83): a Mesa diz quem alterou por último sem dizer o id de
+    // ninguém além do dono de cada linha, e o NPC oculto vem só ao narrador
+    it('a Mesa do narrador: lastChange é um enum, sem id de autor', async () => {
+      const res = await as(
+        shared.ctx,
+        shared.users.storyteller,
+        'GET',
+        `/chronicles/${shared.chronicleId}/table`
+      )
+      const rows = (await res.json()) as {
+        id: string
+        owner: { id: string }
+        lastChange: { at: string; by: string } | null
+      }[]
+      const sheet = rows.find(r => r.id === shared.characterId)
+      // As notas do narrador foram o último lote da ficha da dona
+      expect(sheet?.lastChange).toEqual({ at: expect.any(String), by: 'you' })
+      expect(rows.find(r => r.id === shared.npcId)?.lastChange).toBeNull()
+      for (const row of rows) {
+        expect(Object.keys(row.lastChange ?? {}).sort()).toEqual(
+          row.lastChange ? ['at', 'by'] : []
+        )
+        expect(['you', 'owner', 'other', undefined]).toContain(
+          row.lastChange?.by
+        )
+      }
+      expect(JSON.stringify(rows)).not.toContain('created_by')
+    })
   })
 
   describe(`matriz de AuthZ: ${system}, linhas que mudam o estado`, () => {

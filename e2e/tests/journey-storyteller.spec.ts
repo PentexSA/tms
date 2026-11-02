@@ -161,6 +161,9 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
     await page
       .getByRole('checkbox', { name: 'Selecionar Caio Ventura' })
       .click()
+    // T-49 e T-75 (P09-C): a contagem e as ações na barra fixa
+    const bar = page.getByRole('toolbar', { name: 'Ações da seleção' })
+    await expect(bar.getByText('2 selecionados (máx. 20)')).toBeVisible()
     await page
       .getByRole('button', { name: 'Aplicar dano', exact: true })
       .click()
@@ -193,6 +196,14 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
       }>(desk, storyteller, 'GET', `/characters/${id}`)
       expect(c.sheet.values.health?.lethal ?? 0).toBe(0)
     }
+    // A seleção continua depois da operação, e o aviso fica acima da barra:
+    // não cobre "Nova noite" (useToastOffset, T-76)
+    await expect(bar.getByText('2 selecionados (máx. 20)')).toBeVisible()
+    const notice = await page.getByText('Alteração desfeita.').boundingBox()
+    const fixed = await bar.boundingBox()
+    expect((notice?.y ?? 0) + (notice?.height ?? 0)).toBeLessThanOrEqual(
+      fixed?.y ?? 0
+    )
     await privateSheets()
 
     // O período do template usa a mesma prévia, operação e reversão.
