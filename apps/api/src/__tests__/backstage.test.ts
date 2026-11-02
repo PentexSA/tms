@@ -429,6 +429,58 @@ describe('transferência: validade, decisões e autoridade', () => {
         .executeTakeFirstOrThrow()
     ).storyteller_id
 
+  // T-74: "nenhuma transferência" era 404, um erro de recurso no console a
+  // cada crônica aberta
+  const transferOf = (user: TestUser) =>
+    as(ctx, user, 'GET', `/chronicles/${chronicleId}/transfer`)
+
+  it('sem transferência: 200 com null para narrador e membro', async () => {
+    for (const user of [storyteller, player]) {
+      const res = await transferOf(user)
+      expect(res.status).toBe(200)
+      // O Elysia manda null como corpo vazio; o app normaliza
+      expect(await res.text()).toBe('')
+    }
+  })
+
+  it('membro que não é o destinatário recebe null, nunca a transferência de outro', async () => {
+    expect((await propose()).status).toBe(201)
+    const seen = (await (await transferOf(player)).json()) as {
+      recipient: { id: string }
+    }
+    expect(seen.recipient.id).toBe(player.id)
+    expect(
+      ((await (await transferOf(storyteller)).json()) as typeof seen).recipient
+        .id
+    ).toBe(player.id)
+    const third = await transferOf(other)
+    expect(third.status).toBe(200)
+    expect(await third.text()).toBe('')
+  })
+
+  it('ex-membro e estranho: 404, com ou sem transferência', async () => {
+    await createCharacter(ctx, other, chronicleId)
+    expect((await propose(crypto.randomUUID(), other.id)).status).toBe(201)
+    await ctx.db
+      .deleteFrom('chronicle_members')
+      .where('chronicle_id', '=', chronicleId)
+      .where('user_id', '=', other.id)
+      .execute()
+    const stranger = await createUser(ctx, 'estranha-v5')
+    for (const user of [other, stranger])
+      expect((await transferOf(user)).status).toBe(404)
+    expect(
+      (
+        await as(
+          ctx,
+          stranger,
+          'GET',
+          `/chronicles/${crypto.randomUUID()}/transfer`
+        )
+      ).status
+    ).toBe(404)
+  })
+
   it('pedido vencido não é aceito nem trava a próxima proposta', async () => {
     const first = (await (await propose()).json()) as { id: string }
     ctx.clock.advance(7 * 24 * 60 * 60 * 1000)

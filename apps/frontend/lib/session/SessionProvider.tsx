@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { onlineManager, useQueryClient } from '@tanstack/react-query'
 import {
   createContext,
   type ReactNode,
@@ -6,6 +6,7 @@ import {
   useEffect,
   useSyncExternalStore,
 } from 'react'
+import { purgeHttpCache as purgeNativeHttpCache } from '../../modules/http-cache'
 import type { Session, SessionState } from './session'
 
 const SessionContext = createContext<Session | null>(null)
@@ -14,9 +15,12 @@ const SessionContext = createContext<Session | null>(null)
 export function SessionProvider({
   session,
   children,
+  purgeHttpCache = purgeNativeHttpCache,
 }: {
   readonly session: Session
   readonly children: ReactNode
+  // O cache HTTP em disco do aparelho (T-13); os testes injetam
+  readonly purgeHttpCache?: () => Promise<void>
 }) {
   const queryClient = useQueryClient()
   useEffect(() => {
@@ -25,6 +29,20 @@ export function SessionProvider({
   useEffect(
     () => session.onSignOut(() => queryClient.clear()),
     [session, queryClient]
+  )
+  // Sair apaga as respostas HTTP gravadas no aparelho (a abertura também
+  // apaga, no nativo, antes do JS)
+  useEffect(
+    () => session.onSignOut(() => purgeHttpCache()),
+    [session, purgeHttpCache]
+  )
+  // A revogação de um logout sem rede vai assim que a rede volta (T-14)
+  useEffect(
+    () =>
+      onlineManager.subscribe(online => {
+        if (online) void session.retryPendingLogout()
+      }),
+    [session]
   )
   return (
     <SessionContext.Provider value={session}>

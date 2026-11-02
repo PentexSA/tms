@@ -78,13 +78,24 @@ export const useUpdateChronicle = (id: string) => {
   })
 }
 
+/**
+ * "Sem transferência" é 200 com null (T-74). O Elysia manda o null como corpo
+ * vazio, e o Eden entrega "" ao app: os dois viram null aqui.
+ */
+export const transferOrNull = <T extends object>(
+  data: T | '' | null | undefined
+): T | null => (data && typeof data === 'object' ? data : null)
+
 export const useTransfer = (id: string, enabled = true) =>
   useQuery({
     queryKey: backstageKeys.transfer(id),
     enabled,
+    // Agora só para erro de verdade: "sem transferência" não é erro
     retry: false,
     queryFn: async ({ signal }) =>
-      unwrap(await api.chronicles({ id }).transfer.get({ fetch: { signal } })),
+      transferOrNull(
+        unwrap(await api.chronicles({ id }).transfer.get({ fetch: { signal } }))
+      ),
   })
 
 export const useProposeTransfer = (id: string) => {

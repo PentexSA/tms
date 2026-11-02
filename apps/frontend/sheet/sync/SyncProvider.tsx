@@ -54,13 +54,8 @@ export function SyncProvider({
       }),
     [outbox, userStorage, post, queryClient, toast]
   )
-  useEffect(
-    () =>
-      session.onSignOut(() => {
-        void sync.reset()
-      }),
-    [session, sync]
-  )
+  // O logout espera a fila parar e ser apagada (T-14)
+  useEffect(() => session.onSignOut(() => sync.reset()), [session, sync])
   useEffect(() => {
     void sync.start()
     const unsubscribe = onlineManager.subscribe(online => {
@@ -79,6 +74,11 @@ export function useSync(): Sync {
   const sync = useContext(SyncContext)
   if (!sync) throw new Error('useSync precisa de um SyncProvider')
   return sync
+}
+
+/** A fila, se houver SyncProvider (telas e testes que montam só a sessão). */
+export function useOptionalSync(): Sync | null {
+  return useContext(SyncContext)
 }
 
 export function useSyncStatus(): SyncStatus {

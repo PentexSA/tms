@@ -41,3 +41,22 @@ test('o app abre sem violar a CSP', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible()
   expect(violations).toEqual([])
 })
+
+// T-13: no aparelho, o NSURLCache (iOS) e o OkHttp (Android) gravavam em
+// disco as respostas da API com tokens e dados ocultos. No servidor Bun de
+// verdade (não no app.handle dos testes da API), toda resposta pede no-store,
+// inclusive o erro de login.
+test('a API de verdade responde com no-store', async ({ request }) => {
+  const health = await request.get(`${API_URL}/health`)
+  const login = await request.post(`${API_URL}/auth/login`, {
+    headers: { 'x-tms-client': 'native' },
+    data: { email: 'ninguem@example.test', password: 'senha errada e longa' },
+  })
+  expect(health.status()).toBe(200)
+  expect(login.status()).toBe(401)
+  for (const res of [health, login])
+    expect(res.headers()).toMatchObject({
+      'cache-control': 'no-store',
+      pragma: 'no-cache',
+    })
+})

@@ -9,7 +9,8 @@ import { logger } from './logger'
 // segredo por aqui, sem mexer em variável de ambiente.
 
 export interface Limits {
-  // Por IP: login, cadastro e refresh.
+  // Por IP: login, cadastro e refresh. O logout não tem limite: só revoga
+  // com posse do token, e um 429 nele deixaria a sessão viva (falha aberta).
   readonly login: RateLimiter
   readonly register: RateLimiter
   readonly refresh: RateLimiter
@@ -31,6 +32,8 @@ export interface AppOptions {
   readonly sessions: SessionConfig
   readonly corsOrigins: readonly string[]
   readonly trustProxy: boolean
+  // Só no E2E: IP simulado pelo header x-tms-test-client-ip (http/security.ts)
+  readonly testClientIp: boolean
   readonly swagger: boolean
   readonly secureCookies: boolean
   readonly limits: Limits
@@ -106,6 +109,7 @@ export function resolveOptions(
     },
     corsOrigins: overrides.corsOrigins ?? config.CORS_ORIGINS,
     trustProxy: overrides.trustProxy ?? config.TRUST_PROXY,
+    testClientIp: overrides.testClientIp ?? config.TEST_CLIENT_IP,
     swagger: overrides.swagger ?? !production,
     secureCookies: overrides.secureCookies ?? production,
     limits: overrides.limits ?? defaultLimits(now),
