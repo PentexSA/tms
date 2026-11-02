@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
-import { completionRole } from '../sheets/events'
-import { isReturned } from '../sheets/routes'
+import { creationFlags } from '../sheets/creation-state'
+import { completionRole, lifecycleRole } from '../sheets/events'
 import {
   addMember,
   as,
@@ -681,21 +681,35 @@ describe('concluir, aprovar e devolver', () => {
     )
   })
 
-  it('isReturned: a forma que a ficha guarda, nada além', () => {
-    expect(isReturned({ returned: { reason: 'x', at: '2026-11-02' } })).toBe(
-      true
-    )
+  it('creationFlags: a forma que a ficha guarda, nada além', () => {
+    expect(
+      creationFlags({
+        returned: { reason: 'x', at: '2026-11-02' },
+        adjust: { reason: 'y', at: '2026-11-02' },
+        ready: { at: '2026-11-02' },
+      })
+    ).toEqual({ returned: true, adjust: true, ready: true })
     for (const creation of [
       null,
       undefined,
       'x',
+      [],
       {},
-      { returned: null },
-      { returned: 'x' },
-      { returned: { reason: 'x' } },
-      { returned: { reason: 1, at: '2026-11-02' } },
+      { returned: null, adjust: null, ready: null },
+      { returned: 'x', adjust: 'x', ready: 'x' },
+      { returned: { reason: 'x' }, adjust: { at: 'x' }, ready: {} },
+      {
+        returned: { reason: 1, at: '2026-11-02' },
+        adjust: { reason: 'x', at: 2 },
+        ready: { at: 3 },
+      },
+      { returned: [], adjust: [], ready: [] },
     ])
-      expect(isReturned(creation)).toBe(false)
+      expect(creationFlags(creation)).toEqual({
+        returned: false,
+        adjust: false,
+        ready: false,
+      })
   })
 
   it('motivo vazio ou com HTML é 422', async () => {
@@ -1378,5 +1392,294 @@ describe('pedir ajuste e avisar que terminei', () => {
     expect(
       (await auditOf(id)).filter(a => a.action === 'character.creation.ready')
     ).toEqual([])
+  })
+})
+
+// P04-D (R-12, R-13): a lista, a Mesa, o Histórico e a contagem dizem o
+// estado da ficha, sem o motivo
+describe('estado da ficha na lista, na Mesa, no Histórico e na contagem', () => {
+  interface Row {
+    id: string
+    status?: string
+    creationMode?: string | null
+    returned?: boolean
+    adjust?: boolean
+    ready?: boolean
+    activatedAt?: string | null
+    projection?: string
+  }
+  const listOf = async (user: TestUser, secret: string) => {
+    const res = await as(
+      ctx,
+      user,
+      'GET',
+      `/chronicles/${chronicleId}/characters`
+    )
+    expect(res.status).toBe(200)
+    const text = await res.text()
+    expect(text).not.toContain(secret)
+    return JSON.parse(text) as Row[]
+  }
+  const tableOf = async (secret: string) => {
+    const res = await as(
+      ctx,
+      storyteller,
+      'GET',
+      `/chronicles/${chronicleId}/table`
+    )
+    expect(res.status).toBe(200)
+    const text = await res.text()
+    expect(text).not.toContain(secret)
+    return JSON.parse(text) as Row[]
+  }
+  const adjust = (id: string, reason: string) =>
+    as(ctx, storyteller, 'POST', `/characters/${id}/creation/adjust`, {
+      reason,
+    })
+  const ready = (id: string) =>
+    as(ctx, owner, 'POST', `/characters/${id}/creation/ready`)
+  const pendingReview = async (user: TestUser) =>
+    (
+      (await (await as(ctx, user, 'GET', '/chronicles')).json()) as {
+        pendingReview: number
+      }[]
+    )[0]?.pendingReview
+
+  it('a lista e a Mesa mandam o modo, os marcadores e a data de ativação, sem o motivo', async () => {
+    const secret = 'motivo-do-estado-58'
+    const points = await character({ ...COMPLETE, name: 'Por pontos' })
+    const free = await character({ name: 'Livre' })
+    await freeCreation(ctx, free)
+    const asked = await character({ ...COMPLETE, name: 'Com ajuste' })
+    const active = await character({ ...COMPLETE, name: 'Ativa' })
+    const pending = await character({ ...COMPLETE, name: 'Enviada' })
+    expect((await ready(free)).status).toBe(200)
+    expect((await adjust(asked, `Refaça: ${secret}`)).status).toBe(200)
+    await choose(active)
+    expect(await json(await complete(active))).toMatchObject({
+      status: 'active',
+    })
+    await approval(true)
+    await choose(pending)
+    expect(await json(await complete(pending))).toMatchObject({
+      status: 'pending',
+    })
+    const expected = {
+      [points]: {
+        status: 'creating',
+        creationMode: 'points',
+        returned: false,
+        adjust: false,
+        ready: false,
+        activatedAt: null,
+      },
+      [free]: {
+        status: 'creating',
+        creationMode: 'free',
+        ready: true,
+        adjust: false,
+      },
+      [asked]: { creationMode: 'points', adjust: true, ready: false },
+      [pending]: {
+        status: 'pending',
+        creationMode: 'points',
+        activatedAt: null,
+      },
+      [active]: {
+        status: 'active',
+        creationMode: null,
+        returned: false,
+        adjust: false,
+        ready: false,
+        activatedAt: expect.any(String),
+      },
+    }
+    for (const user of [owner, storyteller]) {
+      const list = await listOf(user, secret)
+      for (const [id, fields] of Object.entries(expected))
+        expect(list.find(r => r.id === id)).toMatchObject(fields)
+    }
+    const table = await tableOf(secret)
+    for (const [id, fields] of Object.entries(expected))
+      expect(table.find(r => r.id === id)).toMatchObject(fields)
+    // O outro jogador não tem as linhas
+    const other = await listOf(player, secret)
+    expect(other.filter(r => r.id in expected)).toEqual([])
+    // A projeção do NPC revelado não ganha campo
+    const npc = await createCharacter(ctx, storyteller, chronicleId, {
+      name: 'Sentinela',
+    })
+    await ctx.db
+      .updateTable('characters')
+      .set({ kind: 'npc', visibility: 'identity' })
+      .where('id', '=', npc)
+      .execute()
+    const seen = (await listOf(player, secret)).find(r => r.id === npc)
+    expect(Object.keys(seen ?? {}).sort()).toEqual([
+      'id',
+      'identity',
+      'kind',
+      'projection',
+      'visibility',
+    ])
+  })
+
+  it('a contagem do narrador soma as enviadas e as que avisaram (R-13)', async () => {
+    const free = await character({ name: 'Livre' })
+    await freeCreation(ctx, free)
+    expect(await pendingReview(storyteller)).toBe(0)
+    expect((await ready(free)).status).toBe(200)
+    expect(await pendingReview(storyteller)).toBe(1)
+    expect(await pendingReview(owner)).toBe(0)
+    await approval(true)
+    const sent = await character({ ...COMPLETE, name: 'Enviada' })
+    await choose(sent)
+    expect((await complete(sent)).status).toBe(200)
+    expect(await pendingReview(storyteller)).toBe(2)
+    // Concluída, sai da conta; o aviso em ficha arquivada não conta
+    expect((await complete(free, storyteller)).status).toBe(200)
+    expect(await pendingReview(storyteller)).toBe(1)
+    const archived = await character({ name: 'Arquivada' })
+    await freeCreation(ctx, archived)
+    expect((await ready(archived)).status).toBe(200)
+    await setStatus(ctx, archived, 'archived')
+    expect(await pendingReview(storyteller)).toBe(1)
+  })
+
+  it('o Histórico mostra enviar, devolver, pedir ajuste e avisar, sem o motivo (R-12)', async () => {
+    const secret = 'motivo-do-historico-71'
+    const tick = () => ctx.clock.advance(1000)
+    await approval(true)
+    const id = await character()
+    await choose(id)
+    tick()
+    expect((await adjust(id, `Antes: ${secret}`)).status).toBe(200)
+    tick()
+    expect((await complete(id, owner)).status).toBe(200)
+    tick()
+    expect(
+      (
+        await as(
+          ctx,
+          storyteller,
+          'POST',
+          `/characters/${id}/creation/return`,
+          {
+            reason: `Devolvida: ${secret}`,
+          }
+        )
+      ).status
+    ).toBe(200)
+    tick()
+    expect((await complete(id, storyteller)).status).toBe(200)
+    // Livre: avisar
+    const free = await character({ name: 'Livre' })
+    await freeCreation(ctx, free)
+    expect((await ready(free)).status).toBe(200)
+    for (const by of [owner, storyteller]) {
+      const res = await as(ctx, by, 'GET', `/characters/${id}/history`)
+      const text = await res.text()
+      expect(text).not.toContain(secret)
+      const { items } = JSON.parse(text) as {
+        items: {
+          event?: string
+          byRole: string
+          by: { username: string } | null
+          reversible: boolean
+          changes: unknown[]
+        }[]
+      }
+      const steps = items.filter(i => i.event)
+      expect(steps.map(i => [i.event, i.byRole])).toEqual([
+        ['creation.completed', 'storyteller'],
+        ['creation.returned', 'storyteller'],
+        ['creation.submitted', 'owner'],
+        ['creation.adjust', 'storyteller'],
+      ])
+      for (const s of steps) {
+        expect(s.reversible).toBe(false)
+        expect(s.changes).toEqual([])
+        expect(s).not.toHaveProperty('payload')
+      }
+      const { items: told } = (await (
+        await as(ctx, by, 'GET', `/characters/${free}/history`)
+      ).json()) as { items: { event?: string; byRole: string }[] }
+      expect(told.map(i => [i.event, i.byRole])).toEqual([
+        ['creation.ready', 'owner'],
+      ])
+    }
+    // O outro jogador continua sem Histórico
+    expect(
+      (await as(ctx, player, 'GET', `/characters/${id}/history`)).status
+    ).toBe(404)
+  })
+
+  it('paginação com os passos do ciclo: nada repete nem some', async () => {
+    const id = await character({ ...COMPLETE, str: 2 })
+    await freeCreation(ctx, id)
+    const tick = () => ctx.clock.advance(1000)
+    expect((await send(id, owner, 'str', 2, 3)).status).toBe(200)
+    tick()
+    expect((await adjust(id, 'Refaça')).status).toBe(200)
+    tick()
+    expect((await send(id, owner, 'name', 'Teste', 'Antes')).status).toBe(200)
+    tick()
+    expect(
+      (
+        await as(ctx, owner, 'POST', `/characters/${id}/creation/ready`, {
+          revision: 1,
+        })
+      ).status
+    ).toBe(200)
+    tick()
+    expect((await send(id, owner, 'name', 'Antes', 'Depois')).status).toBe(200)
+    const ids: string[] = []
+    let next: string | null = null
+    let pages = 0
+    do {
+      const query: string = next
+        ? `?limit=2&before=${encodeURIComponent(next)}`
+        : '?limit=2'
+      const res = await as(
+        ctx,
+        owner,
+        'GET',
+        `/characters/${id}/history${query}`
+      )
+      const page = (await res.json()) as {
+        items: { id: string }[]
+        next: string | null
+      }
+      ids.push(...page.items.map(i => i.id))
+      next = page.next
+      pages++
+    } while (next && pages < 10)
+    expect(new Set(ids).size).toBe(ids.length)
+    const all = (await (
+      await as(ctx, owner, 'GET', `/characters/${id}/history?limit=50`)
+    ).json()) as { items: { id: string; event?: string }[] }
+    expect(ids).toEqual(all.items.map(i => i.id))
+    expect(all.items.map(i => i.event ?? 'lote')).toEqual([
+      'lote',
+      'creation.ready',
+      'lote',
+      'creation.adjust',
+      'lote',
+    ])
+  })
+
+  it('lifecycleRole: o papel sai da ação, nunca do corpo', () => {
+    const row = (
+      action: Parameters<typeof lifecycleRole>[0]['action'],
+      payload: unknown = {}
+    ) => ({ action, payload, actor_id: 'a', target_user_id: 'b' })
+    expect(lifecycleRole(row('character.creation.submit'))).toBe('owner')
+    expect(lifecycleRole(row('character.creation.ready'))).toBe('owner')
+    expect(lifecycleRole(row('character.creation.return'))).toBe('storyteller')
+    expect(lifecycleRole(row('character.creation.adjust'))).toBe('storyteller')
+    expect(
+      lifecycleRole(row('character.creation.complete', { approved: false }))
+    ).toBe('owner')
+    expect(lifecycleRole(row('character.creation.approve'))).toBe('storyteller')
   })
 })

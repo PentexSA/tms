@@ -38,6 +38,11 @@ interface TableRow {
   templateVersion: string
   sheetVersion: number
   status: string
+  creationMode: 'free' | 'points' | null
+  returned: boolean
+  adjust: boolean
+  ready: boolean
+  activatedAt: string | null
   lockedAt: string | null
   updatedAt: string
   sheet: { values: Record<string, unknown>; specialties?: unknown }
@@ -84,6 +89,12 @@ describe('GET /chronicles/:id/table', () => {
       templateVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
       sheetVersion: 0,
       status: 'creating',
+      // O estado da criação (P04-D): o modo e os marcadores, sem motivo
+      creationMode: 'points',
+      returned: false,
+      adjust: false,
+      ready: false,
+      activatedAt: null,
       lockedAt: null,
       updatedAt: expect.any(String),
       sheet: {
