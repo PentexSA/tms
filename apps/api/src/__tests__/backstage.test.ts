@@ -133,6 +133,61 @@ describe('NPCs e projeções', () => {
       (await as(ctx, player, 'GET', `/characters/${id}/rolls`)).status
     ).toBe(404)
   })
+
+  it('a identidade revelada traz só o id e o nome da crônica; ex-membro e estranho, 404 (T-81)', async () => {
+    const created = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/characters`,
+      {
+        kind: 'npc',
+        clientCommandId: crypto.randomUUID(),
+        values: { name: 'Figura Velada', clan: 'tremere' },
+      }
+    )
+    const { id } = (await created.json()) as { id: string }
+    await as(ctx, storyteller, 'POST', `/characters/${id}/visibility`, {
+      clientCommandId: crypto.randomUUID(),
+      visibility: 'identity',
+      revision: 0,
+    })
+
+    const res = await as(ctx, player, 'GET', `/characters/${id}`)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual([
+      'chronicle',
+      'id',
+      'identity',
+      'kind',
+      'projection',
+      'visibility',
+    ])
+    expect(body.chronicle).toEqual({
+      id: chronicleId,
+      name: 'Crônica da Liberdade',
+    })
+
+    // Quem não é membro atual continua sem a projeção (nem a crônica)
+    const left = await as(
+      ctx,
+      other,
+      'DELETE',
+      `/chronicles/${chronicleId}/members/me`
+    )
+    expect(left.status).toBe(204)
+    expect((await as(ctx, other, 'GET', `/characters/${id}`)).status).toBe(404)
+    const stranger = await createUser(ctx, 'estranha-v5')
+    expect((await as(ctx, stranger, 'GET', `/characters/${id}`)).status).toBe(
+      404
+    )
+    const otherStoryteller = await createUser(ctx, 'outro-narrador-v5')
+    await createChronicle(ctx, otherStoryteller)
+    expect(
+      (await as(ctx, otherStoryteller, 'GET', `/characters/${id}`)).status
+    ).toBe(404)
+  })
 })
 
 describe('rolagens de bastidores', () => {

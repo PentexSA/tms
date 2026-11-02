@@ -49,6 +49,9 @@ useTestDb()
 // Marca única nas Notas do Narrador: nenhuma resposta a quem não é narrador
 // pode trazê-la, nem o 200 da dona nem o 404 do outro jogador.
 const SECRET = 'marca-secreta-do-narrador-7f3a'
+// O nome do NPC oculto do cenário: nenhuma resposta a quem não narra o traz
+// (lista, Mesa, auditoria, identidade)
+const HIDDEN_NPC = 'NPC oculto'
 
 interface Scenario {
   readonly ctx: TestContext
@@ -92,7 +95,7 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   // A matriz é de AuthZ, não da conta da criação
   await freeCreation(ctx, characterId)
   const npcId = await createCharacter(ctx, users.storyteller, chronicleId, {
-    name: 'NPC oculto',
+    name: HIDDEN_NPC,
   })
   await ctx.db
     .updateTable('characters')
@@ -226,7 +229,10 @@ async function check(
   const res = await request(sc, s, row, actor)
   expect(res.status).toBe(status)
   const text = await res.text()
-  if (actor !== 'storyteller') expect(text).not.toContain(SECRET)
+  if (actor !== 'storyteller') {
+    expect(text).not.toContain(SECRET)
+    expect(text).not.toContain(HIDDEN_NPC)
+  }
   // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
   if (actor === 'former')
     for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])

@@ -495,6 +495,9 @@ export function sheetRoutes(
           resolve(model, row.sheet_data as unknown as SheetData),
           row.portrait_url
         )
+        // A crônica (só id e nome) leva o "‹" de volta a ela (T-81). Quem
+        // recebe esta projeção é membro atual com o NPC revelado, e já vê a
+        // crônica na lista dele
         if (access.projection === 'identity')
           return {
             projection: 'identity' as const,
@@ -502,6 +505,7 @@ export function sheetRoutes(
             kind: 'npc' as const,
             visibility: 'identity' as const,
             identity: publicIdentity,
+            chronicle: { id: row.chronicleId, name: row.chronicleName },
           }
 
         // Viewer recebe um envelope de leitura separado. Em especial, não
