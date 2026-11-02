@@ -72,4 +72,18 @@ describe('T-10: Enter aplica na folha de uma linha', () => {
     expect(input.props.onSubmitEditing).toBeUndefined()
     expect(input.props.returnKeyType).toBeUndefined()
   })
+
+  it('Cancelar e Fechar não aplicam', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    enterEvolve()
+    for (const close of ['Cancelar', 'Fechar']) {
+      fireEvent.press(screen.getByRole('button', { name: 'Conceito' }))
+      fireEvent.changeText(textInput('Conceito'), 'Arquivista')
+      fireEvent.press(screen.getByRole('button', { name: close }))
+      expect(screen.queryByRole('header', { name: 'Conceito' })).toBeNull()
+      expect(
+        screen.getByRole('button', { name: 'Conceito' })
+      ).toHaveAccessibilityValue({ text: 'vazio' })
+    }
+  })
 })

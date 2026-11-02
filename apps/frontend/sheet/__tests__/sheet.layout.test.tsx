@@ -22,10 +22,13 @@ import {
   tokens,
 } from '../../test/session'
 import { CharacterForm } from '../CharacterForm'
+import { SheetProvider } from '../context'
 import { identityColumnsPerRow } from '../IdentityBlock'
 import { currentSection } from '../layouts/groupTabsState'
+import { SectionView } from '../SectionView'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
+import { createSheetStore } from '../store/sheetStore'
 
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(),
@@ -294,6 +297,16 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(screen.getByTestId('status-complete')).toBeTruthy()
   })
 
+  it('sem rótulo de estado (ativa, destravada), o item diz só "Ações do narrador"', async () => {
+    resize(PHONE)
+    await openSheet(['storyteller'], 'active')
+    fireEvent.press(menu())
+    fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador$/ }))
+    expect(screen.getByTestId('status-lock')).toBeTruthy()
+    fireEvent.press(screen.getAllByRole('button', { name: 'Fechar' })[0]!)
+    expect(screen.queryByTestId('status-lock')).toBeNull()
+  })
+
   it('a 1280: os botões no cabeçalho, como antes, sem o "Mais opções"', async () => {
     resize(DESKTOP)
     await openSheet(['owner'], 'active')
@@ -538,5 +551,33 @@ describe('groupTabsState: a seção atual', () => {
     expect(currentSection(list, 950)).toBe('b')
     expect(currentSection([{ id: 'a', y: 400 }], 10)).toBe('a')
     expect(currentSection([], 10)).toBeNull()
+  })
+})
+
+describe('sub-abas sem a faixa (fora do SheetView)', () => {
+  it('cada seção guarda a própria aba, com a barra no corpo', () => {
+    resize(PHONE)
+    const store = createSheetStore({
+      characterId: 'c1',
+      model: vtm,
+      sheet: helena(),
+      sheetVersion: 1,
+      roles: ['owner'],
+      mode: 'evolve',
+    })
+    store.getState().startDraft()
+    const section = vtm.zones
+      .flatMap(z => z.sections)
+      .find(s => s.id === 'attributes')!
+    render(
+      <SheetProvider store={store}>
+        <SectionView section={section} />
+      </SheetProvider>
+    )
+    const bar = within(screen.getByTestId('group-tabs-attributes'))
+    expect(bar.getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    expect(screen.queryByRole('adjustable', { name: 'Carisma' })).toBeNull()
+    fireEvent.press(bar.getByRole('tab', { name: 'Sociais' }))
+    expect(screen.getByRole('adjustable', { name: 'Carisma' })).toBeTruthy()
   })
 })
