@@ -654,3 +654,118 @@ describe('ajuste pedido', () => {
     expect(screen.queryByTestId('creation-returned')).toBeNull()
   })
 })
+
+// P04-D (D-03, R-13): a barra diz o próximo passo; na criação livre, a dona
+// avisa que terminou
+describe('próximo passo e "Avisar que terminei"', () => {
+  const render = async (
+    creation: Record<string, unknown>,
+    roles = ['owner']
+  ) => {
+    const base = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({
+        ...base.data,
+        roles,
+        creation: { ...base.data.creation, ...creation },
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+  }
+
+  it('por pontos, a dona lê que conclui quando a conta fechar', async () => {
+    await open(PRIORITIES)
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+  })
+
+  it('livre: a linha e o botão; com 1 alteração, salva, espera a fila e só então avisa', async () => {
+    calls.eventsPost.mockResolvedValue({
+      ...ok({
+        sheetVersion: 2,
+        sheet: {
+          values: { name: 'Nova', clan: 'tremere', strength: 2 },
+          specialties: {},
+        },
+      }),
+      status: 200,
+      response: {} as Response,
+      headers: {},
+    })
+    calls.creationReadyPost.mockResolvedValue(ok({ revision: 2 }))
+    await render({ mode: 'free' })
+    // A ficha livre da dona abre no Editar (T-05)
+    expect(await screen.findByTestId('next-step')).toHaveTextContent(
+      'Quando terminar, avise: o narrador conclui.'
+    )
+    const button = screen.getByTestId('creation-ready')
+    expect(button).toHaveTextContent('Avisar que terminei')
+    expect(button).toBeEnabled()
+    step('Força')
+    fireEvent.press(screen.getByTestId('creation-ready'))
+    expect(screen.getByText('Avisar que terminei?')).toBeTruthy()
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      'O narrador vê na Mesa que você terminou e conclui a criação. Até lá, você ainda pode editar. As alterações abaixo são salvas antes.'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-ready-confirm'))
+    })
+    await waitFor(() =>
+      expect(calls.creationReadyPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({ revision: 1 })
+      )
+    )
+    // O lote sai antes do aviso
+    expect(calls.eventsPost.mock.invocationCallOrder[0]).toBeLessThan(
+      calls.creationReadyPost.mock.invocationCallOrder[0]!
+    )
+    expect(
+      await screen.findByText('Pronto: o narrador foi avisado.')
+    ).toBeTruthy()
+  })
+
+  it('depois de avisar: sem o botão, e a linha muda', async () => {
+    await render({ mode: 'free', ready: { at: '2026-11-02T10:00:00Z' } })
+    expect(await screen.findByTestId('next-step')).toHaveTextContent(
+      'Você avisou. O narrador conclui a criação.'
+    )
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Você avisou que terminou'
+    )
+  })
+
+  it('um 409 diz que a ficha mudou', async () => {
+    calls.creationReadyPost.mockResolvedValue({
+      data: null,
+      error: {
+        status: 409,
+        value: {
+          error: 'a configuração da criação mudou',
+          code: 'CREATION_REVISION_CONFLICT',
+        },
+      },
+    })
+    await render({ mode: 'free' })
+    fireEvent.press(await screen.findByTestId('creation-ready'))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-ready-confirm'))
+    })
+    expect(
+      await screen.findByText(
+        'A ficha mudou desde que você abriu. Confira e avise de novo.'
+      )
+    ).toBeTruthy()
+  })
+})

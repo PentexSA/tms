@@ -22,7 +22,12 @@ import {
 import { useSheet, useSheetSelector } from '../context'
 import { CompletionMessage } from './CompletionMessage'
 import { useCreation } from './CreationContext'
-import { completionBy, completionCopy } from './completion'
+import {
+  completionBy,
+  completionCopy,
+  isStaleCompletion,
+  STALE_COMPLETION,
+} from './completion'
 import {
   basicsDone,
   type CreationPhase,
@@ -122,12 +127,17 @@ export function useFinishCreation() {
               action: 'complete',
             }).done,
           }),
+        // Um pedido de ajuste no meio sobe a revisão (P04-D): a mesma
+        // frase do menu do narrador, e a rebusca traz o banner do pedido
         onError: error => {
-          const code = creationRefusalOf(errorBodyOf(error))
+          const body = errorBodyOf(error)
+          const code = creationRefusalOf(body)
           toast.show({
-            message: code
-              ? REFUSAL_TEXT[code]
-              : messageOf(error, 'Não foi possível concluir a criação.'),
+            message: isStaleCompletion(body)
+              ? STALE_COMPLETION
+              : code
+                ? REFUSAL_TEXT[code]
+                : messageOf(error, 'Não foi possível concluir a criação.'),
           })
         },
       }

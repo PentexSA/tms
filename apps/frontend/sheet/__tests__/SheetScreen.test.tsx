@@ -507,6 +507,29 @@ describe('devolução na ficha aberta (T-06)', () => {
     [{ status: 'active', roles: ['owner'] }, false],
     [{ status: 'pending' }, false],
     [null, false],
+    // D-03 (P04-D): quem avisou que terminou espera o narrador
+    [
+      {
+        status: 'creating',
+        roles: ['owner'],
+        creation: { ready: { at: 'x' } },
+      },
+      true,
+    ],
+    [
+      {
+        status: 'creating',
+        roles: ['storyteller'],
+        creation: { ready: { at: 'x' } },
+      },
+      false,
+    ],
+    [
+      { status: 'creating', roles: ['owner'], creation: { ready: null } },
+      false,
+    ],
+    [{ status: 'creating', roles: ['owner'], creation: null }, false],
+    [{ status: 'creating', roles: ['owner'] }, false],
   ])('awaitsStoryteller(%j) = %s', (data, expected) => {
     expect(awaitsStoryteller(data)).toBe(expected)
   })

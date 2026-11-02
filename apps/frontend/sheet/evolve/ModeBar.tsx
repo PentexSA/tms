@@ -30,6 +30,8 @@ import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
 import { completionBy, completionCopy } from '../creation/completion'
 import { REFUSAL_TEXT } from '../creation/creation'
+import { READY_COPY } from '../creation/nextStep'
+import { useNextStep } from '../creation/useNextStep'
 import { useDraftCount } from './hooks'
 
 // Modos da ficha (DS: ModeBar). O modo é UX: o que cada um libera vem de
@@ -97,11 +99,15 @@ export function useModeBar({
   const toast = useToast()
   const count = useDraftCount()
   const finishing = useFinishCreation()
+  // O próximo passo (D-03): a linha da barra e o "Avisar que terminei"
+  const step = useNextStep()
   const freebies = useFreebiesText()
   const [summary, setSummary] = useState<{
     readonly next: SheetMode
     // Concluir a criação depois de salvar
     readonly finish: boolean
+    // Avisar que terminou (criação livre) depois de salvar
+    readonly announce?: boolean
     readonly events: readonly SheetEvent[]
     // Pontos que ficam inativos (ou voltam a valer) com o teto novo
     readonly inactive: readonly ChangeLabel[]
@@ -137,7 +143,7 @@ export function useModeBar({
   }
 
   // O resumo antes de salvar; `next` é o modo depois (na criação, ela mesma)
-  const review = (next: SheetMode, finish = false) => {
+  const review = (next: SheetMode, finish = false, announce = false) => {
     const s = store.getState()
     setError(null)
     const events = s.draftEvents()
@@ -145,6 +151,7 @@ export function useModeBar({
     setSummary({
       next,
       finish,
+      announce,
       // Só para mostrar (T-54): o "de" efetivo da ficha salva ("Aparência
       // 1 → 3", não "0 → 3"), como o Histórico. O lote sai do rascunho do
       // store, com o `from` cru, que é o que o conflito compara.
@@ -153,11 +160,15 @@ export function useModeBar({
     })
   }
 
+  // Depois de salvar: concluir ou avisar, cada um esperando a fila
+  const proceed = () =>
+    summary?.announce ? step.announce?.start() : finishing.start()
+
   const save = () => {
     if (!summary) return
-    if (summary.finish && !summary.events.length) {
+    if ((summary.finish || summary.announce) && !summary.events.length) {
       setSummary(null)
-      finishing.start()
+      proceed()
       return
     }
     const label = describeBatch(model, summary.events)
@@ -176,9 +187,10 @@ export function useModeBar({
     const next = summary.next
     setSummary(null)
     switchTo(next)
-    // Concluir: espera a fila confirmar o lote; sem Desfazer no meio
-    if (summary.finish) {
-      if (result?.ok) finishing.start()
+    // Concluir ou avisar: espera a fila confirmar o lote; sem Desfazer no
+    // meio
+    if (summary.finish || summary.announce) {
+      if (result?.ok) proceed()
       return
     }
     if (result?.ok) {
@@ -205,13 +217,32 @@ export function useModeBar({
   const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
   const actionBar =
     mode === 'evolve' ? (
-      <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
+      <EvolveBar
+        count={count}
+        onFinish={() => go(returnTo.current)}
+        note={step.copy}
+        next={
+          step.announce
+            ? {
+                title: step.announce.waitingSync
+                  ? 'Sincronizando…'
+                  : step.announce.label,
+                busy: step.announce.busy,
+                disabled: step.announce.busy,
+                testID: 'creation-ready',
+                // O resumo confirma e salva antes; a ficha fica no Editar
+                onPress: () => review('evolve', false, true),
+              }
+            : null
+        }
+      />
     ) : mode === 'create' ? (
       // Um botão só: com a conta fechada, conclui (salvando antes)
       <EvolveBar
         count={count}
         label="Criação"
         detail={freebies}
+        note={step.copy}
         finish={
           finishing.waitingSync
             ? 'Sincronizando…'
@@ -236,17 +267,23 @@ export function useModeBar({
     <SummarySheet
       visible={summary !== null}
       finish={
-        summary?.finish
+        summary?.announce
           ? {
-              label: finishing.label,
-              body: completionCopy({
-                by: completionBy(roles),
-                approval: finishing.approval,
-                action: 'complete',
-              }).body,
-              notes: finishing.notes,
+              label: READY_COPY.label,
+              body: READY_COPY.body,
+              testID: 'creation-ready-confirm',
             }
-          : null
+          : summary?.finish
+            ? {
+                label: finishing.label,
+                body: completionCopy({
+                  by: completionBy(roles),
+                  approval: finishing.approval,
+                  action: 'complete',
+                }).body,
+                notes: finishing.notes,
+              }
+            : null
       }
       events={summary?.events ?? []}
       inactive={summary?.inactive ?? []}
@@ -309,6 +346,16 @@ function ModeSwitch({
   )
 }
 
+/** A ação seguinte ao lado do botão da barra (P03-D define o lugar). */
+interface BarAction {
+  readonly title: string
+  readonly onPress: () => void
+  readonly primary?: boolean
+  readonly busy?: boolean
+  readonly disabled?: boolean
+  readonly testID?: string
+}
+
 function EvolveBar({
   count,
   onFinish,
@@ -319,6 +366,8 @@ function EvolveBar({
   busy = false,
   disabled = false,
   testID,
+  next = null,
+  note = null,
 }: {
   readonly count: number
   readonly onFinish: () => void
@@ -330,6 +379,10 @@ function EvolveBar({
   readonly busy?: boolean
   readonly disabled?: boolean
   readonly testID?: string
+  // A ação seguinte (D-03: "Avisar que terminei") e a linha do próximo
+  // passo, sob a contagem (P04-D)
+  readonly next?: BarAction | null
+  readonly note?: string | null
 }) {
   const { colors } = useTheme()
   return (
@@ -343,19 +396,46 @@ function EvolveBar({
         },
       ]}
     >
-      <Text variant="caption" aria-live="polite" style={styles.flex}>
-        {[label === 'Editar' ? 'Editando' : label, changesLabel(count), detail]
-          .filter(Boolean)
-          .join(' · ')}
-      </Text>
-      <Button
-        title={finish}
-        variant={primary ? 'primary' : 'secondary'}
-        busy={busy}
-        disabled={disabled || busy}
-        testID={testID}
-        onPress={onFinish}
-      />
+      <View style={styles.barText}>
+        <Text variant="caption" aria-live="polite">
+          {[
+            label === 'Editar' ? 'Editando' : label,
+            changesLabel(count),
+            detail,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+        {/* Muda pouco e não é região viva: o banner da ficha anuncia o
+            pedido do narrador */}
+        {note ? (
+          <Text variant="caption" color="inkMuted" testID="next-step">
+            {note}
+          </Text>
+        ) : null}
+      </View>
+      {/* Sem espaço, os botões descem para a linha de baixo, à direita,
+          sem transbordar a 360 dp */}
+      <View style={styles.barActions}>
+        <Button
+          title={finish}
+          variant={primary ? 'primary' : 'secondary'}
+          busy={busy}
+          disabled={disabled || busy}
+          testID={testID}
+          onPress={onFinish}
+        />
+        {next ? (
+          <Button
+            title={next.title}
+            variant={next.primary ? 'primary' : 'secondary'}
+            busy={next.busy}
+            disabled={next.disabled || next.busy}
+            testID={next.testID}
+            onPress={next.onPress}
+          />
+        ) : null}
+      </View>
     </View>
   )
 }
@@ -377,6 +457,7 @@ function SummarySheet({
     readonly label: string
     readonly body: string
     readonly notes?: readonly string[]
+    readonly testID?: string
   } | null
   readonly events: readonly SheetEvent[]
   readonly inactive: readonly ChangeLabel[]
@@ -399,7 +480,7 @@ function SummarySheet({
             <Button title="Voltar" variant="ghost" onPress={onClose} />
             <Button
               title={finish.label}
-              testID="creation-confirm"
+              testID={finish.testID ?? 'creation-confirm'}
               onPress={onSave}
             />
           </>
@@ -519,6 +600,16 @@ function groupByPlace(
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  // A contagem e o próximo passo; não encolhem abaixo de ~140 dp: os
+  // botões descem antes
+  barText: { flex: 1, minWidth: 140, gap: tokens.space['0.5'] },
+  barActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: tokens.space[2],
+    marginLeft: 'auto',
+  },
   group: { gap: tokens.space[1] },
   discard: { flex: 1, alignItems: 'flex-start' },
   switch: {
@@ -536,6 +627,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: tokens.space[3],
     paddingHorizontal: tokens.layout.gutter,
