@@ -233,7 +233,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await expect(
     page.getByRole('button', { name: /^Vitalidade: .*1 contusivo/ })
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Histórico' }).click()
+  // A 390, o Histórico fica no "Mais opções" (T-11)
+  await page.getByRole('button', { name: 'Mais opções' }).click()
+  await page.getByRole('button', { name: 'Histórico', exact: true }).click()
   await expect(
     page.getByText(`${storyteller.username} (narrador)`, { exact: false })
   ).toHaveCount(1)

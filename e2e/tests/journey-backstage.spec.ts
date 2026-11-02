@@ -299,6 +299,10 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
     await expect(
       playerPage.getByRole('button', { name: 'Experiência', exact: true })
     ).toHaveCount(0)
+    // Nem pelo "Mais opções" do celular (T-11)
+    await expect(
+      playerPage.getByRole('button', { name: 'Mais opções' })
+    ).toHaveCount(0)
     for (const path of ['/rolls', '/history', '/creation', '/xp-ledger'])
       expect(
         (
