@@ -15,12 +15,10 @@ import { StyleSheet, View } from 'react-native'
 import { messageOf } from '../../lib/errors'
 import { civilDate } from '../../lib/format'
 import {
-  useAcceptTransfer,
   useCancelTransfer,
   useChronicleHistory,
   useCreateSession,
   useProposeTransfer,
-  useRejectTransfer,
   useSessions,
   useTransfer,
   useUpdateChronicle,
@@ -111,12 +109,9 @@ export function CampaignBackstage({
           />
           <History chronicleId={chronicle.id} />
         </>
-      ) : transfer.data?.available ? (
-        <AcceptTransfer
-          chronicleId={chronicle.id}
-          transferId={transfer.data.id}
-        />
       ) : null}
+      {/* A proposta de narrar do jogador fica no topo da crônica e na lista
+          de crônicas (TransferOffer, U-03), não aqui */}
     </View>
   )
 }
@@ -484,39 +479,6 @@ function TransferPanel({
           Convide um membro antes de transferir.
         </Text>
       )}
-    </View>
-  )
-}
-
-function AcceptTransfer({
-  chronicleId,
-  transferId,
-}: {
-  chronicleId: string
-  transferId: string
-}) {
-  const accept = useAcceptTransfer(chronicleId, transferId)
-  const reject = useRejectTransfer(chronicleId, transferId)
-  const key = useRef<string | null>(null)
-  const rejectKey = useRef<string | null>(null)
-  return (
-    <View style={styles.form}>
-      <Text variant="fieldLabel">Convite para narrar</Text>
-      <Text>
-        Ao aceitar, você assume NPCs, notas privadas e o histórico
-        administrativo desta crônica.
-      </Text>
-      <Button
-        title="Aceitar narração"
-        busy={accept.isPending}
-        onPress={() => accept.mutate((key.current ??= randomUUID()))}
-      />
-      <Button
-        title="Recusar"
-        variant="secondary"
-        busy={reject.isPending}
-        onPress={() => reject.mutate((rejectKey.current ??= randomUUID()))}
-      />
     </View>
   )
 }

@@ -89,6 +89,113 @@ describe('Crônicas (lista)', () => {
     expect(router.push).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
 
+  it('mostra a última sessão como data civil, sem fuso (U-04)', async () => {
+    calls.chroniclesGet.mockResolvedValue(
+      ok([
+        {
+          id: CHRONICLE_ID,
+          name: 'Crônica da Liberdade',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'ana' },
+          characterCount: 1,
+          lastSession: '2026-11-01',
+        },
+        {
+          id: 'c2',
+          name: 'Noites de São Paulo',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'beto' },
+          characterCount: 1,
+          lastSession: null,
+        },
+      ])
+    )
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: `Crônica da Liberdade, ${VTM.name}, Narrador: ana · 1 personagem · Última sessão: 01/11`,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: `Noites de São Paulo, ${VTM.name}, Narrador: beto · 1 personagem`,
+      })
+    ).toBeTruthy()
+  })
+
+  it('a proposta de narrar aparece para quem a recebeu, com as duas ações (U-03)', async () => {
+    const TRANSFER = '00000000-0000-4000-8000-0000000000f1'
+    calls.chroniclesGet.mockResolvedValue(
+      ok([
+        {
+          id: CHRONICLE_ID,
+          name: 'Crônica da Liberdade',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'ana' },
+          characterCount: 1,
+          transferOffer: { id: TRANSFER, expiresAt: '2026-11-08T12:00:00Z' },
+        },
+        {
+          id: 'c2',
+          name: 'Noites de São Paulo',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'beto' },
+          characterCount: 1,
+          transferOffer: null,
+        },
+      ])
+    )
+    calls.chronicle.transferDecision.mockResolvedValue(
+      ok({ status: 'rejected', duplicate: false })
+    )
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    expect(
+      await screen.findByText('Convite para narrar Crônica da Liberdade')
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: `Crônica da Liberdade, ${VTM.name}, Narrador: ana · 1 personagem · Convite para narrar`,
+      })
+    ).toBeTruthy()
+    // Uma proposta, um aviso
+    expect(
+      screen.getAllByRole('button', { name: 'Aceitar narração' })
+    ).toHaveLength(1)
+
+    // Recusar manda a chave e rebusca a lista: o aviso some
+    calls.chroniclesGet.mockResolvedValue(
+      ok([
+        {
+          id: CHRONICLE_ID,
+          name: 'Crônica da Liberdade',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'ana' },
+          characterCount: 1,
+          transferOffer: null,
+        },
+      ])
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
+    await waitFor(() =>
+      expect(calls.chronicle.transferDecision).toHaveBeenCalledWith(
+        CHRONICLE_ID,
+        TRANSFER,
+        'reject',
+        expect.objectContaining({ clientCommandId: expect.any(String) })
+      )
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Aceitar narração' })
+      ).toBeNull()
+    )
+  })
+
   it('vazio: criar ou entrar com convite', async () => {
     calls.chroniclesGet.mockResolvedValue(ok([]))
     renderWithSession(<ChroniclesScreen />, await signedIn())
@@ -369,6 +476,51 @@ describe('Crônica (detalhe)', () => {
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Convidar' })).toBeNull()
     expect(calls.chronicleIds).toContain(CHRONICLE_ID)
+  })
+
+  const pendingTransfer = (available: boolean) =>
+    ok({
+      id: 't1',
+      status: 'pending',
+      recipient: { id: 'u2', username: 'beto' },
+      expiresAt: '2026-11-08T00:00:00Z',
+      available,
+    })
+
+  it('a proposta de narrar aparece no topo da crônica, uma vez, mesmo no Diário (U-03)', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('player'))
+    calls.chronicle.transferGet.mockResolvedValue(pendingTransfer(true))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(await screen.findByText('Convite para narrar')).toBeTruthy()
+    expect(
+      screen.getAllByRole('button', { name: 'Aceitar narração' })
+    ).toHaveLength(1)
+    // Na aba Diário, continua uma só (saiu do Diário)
+    fireEvent.press(screen.getByRole('tab', { name: 'Diário' }))
+    await screen.findByText('Diário da crônica')
+    expect(
+      screen.getAllByRole('button', { name: 'Aceitar narração' })
+    ).toHaveLength(1)
+  })
+
+  it('sem proposta disponível, ou para o narrador, nada no topo (U-03)', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('player'))
+    calls.chronicle.transferGet.mockResolvedValue(pendingTransfer(false))
+    const session = await signedIn()
+    const first = renderWithSession(<ChronicleScreen />, session)
+    await screen.findByText('Narrador: ana')
+    await waitFor(() => expect(calls.chronicle.transferGet).toHaveBeenCalled())
+    expect(screen.queryByText('Convite para narrar')).toBeNull()
+    first.unmount()
+
+    calls.chronicle.transferGet.mockClear()
+    calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+    calls.chronicle.transferGet.mockResolvedValue(pendingTransfer(true))
+    renderWithSession(<ChronicleScreen />, session)
+    await screen.findByText('Você narra esta crônica.')
+    expect(screen.queryByText('Convite para narrar')).toBeNull()
+    // A consulta da proposta é do jogador; o narrador a lê nos Bastidores
+    expect(calls.chronicle.transferGet).not.toHaveBeenCalled()
   })
 
   it('jogador não vê "Excluir crônica"', async () => {

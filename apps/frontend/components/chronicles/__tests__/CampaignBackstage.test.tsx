@@ -4,6 +4,7 @@ import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
 import { renderWithQueryClient } from '../../../test/utils'
 import { CampaignBackstage } from '../CampaignBackstage'
+import { TransferOffer } from '../TransferOffer'
 
 // v5, entrega 12: diário, apresentação, transferência e auditoria. Comandos
 // novos guardam a chave enquanto a intenção é a mesma (reenvio seguro) e o
@@ -439,6 +440,75 @@ describe('narrador', () => {
   })
 })
 
+describe('TransferOffer (U-03)', () => {
+  it('destinatário aceita a narração; aceitar limpa o cache', async () => {
+    chronicle.transferDecision.mockResolvedValue(ok({ status: 'accepted' }))
+    const { queryClient } = renderWithQueryClient(
+      <TransferOffer chronicleId={ID} transferId="t1" />
+    )
+    expect(screen.getByText('Convite para narrar')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Ao aceitar, você assume NPCs, notas privadas e o histórico administrativo desta crônica.'
+      )
+    ).toBeTruthy()
+    const clear = jest.spyOn(queryClient, 'clear')
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
+    })
+    await waitFor(() => expect(clear).toHaveBeenCalled())
+    expect(chronicle.transferDecision).toHaveBeenCalledWith(
+      ID,
+      't1',
+      'accept',
+      {
+        clientCommandId: expect.any(String),
+      }
+    )
+  })
+
+  it('destinatário recusa; a lista de crônicas é rebuscada', async () => {
+    chronicle.transferDecision.mockResolvedValue(ok({ status: 'rejected' }))
+    const { queryClient } = renderWithQueryClient(
+      <TransferOffer
+        chronicleId={ID}
+        transferId="t1"
+        chronicleName="Crônica da Liberdade"
+      />
+    )
+    expect(
+      screen.getByText('Convite para narrar Crônica da Liberdade')
+    ).toBeTruthy()
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
+    fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
+    await waitFor(() =>
+      expect(chronicle.transferDecision).toHaveBeenCalledWith(
+        ID,
+        't1',
+        'reject',
+        { clientCommandId: expect.any(String) }
+      )
+    )
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ['chronicles'],
+        exact: true,
+      })
+    )
+  })
+
+  it('erro da decisão aparece no aviso', async () => {
+    chronicle.transferDecision.mockResolvedValue(
+      fail(409, 'A proposta não está mais disponível.')
+    )
+    renderWithQueryClient(<TransferOffer chronicleId={ID} transferId="t1" />)
+    fireEvent.press(screen.getByRole('button', { name: 'Recusar' }))
+    expect(
+      await screen.findByText('A proposta não está mais disponível.')
+    ).toBeTruthy()
+  })
+})
+
 describe('jogador', () => {
   it('lê só o diário público, sem controles do narrador', async () => {
     chronicle.sessionsGet.mockResolvedValue(
@@ -467,7 +537,7 @@ describe('jogador', () => {
     expect(chronicle.historyGet).not.toHaveBeenCalled()
   })
 
-  it('destinatário aceita a narração; aceitar limpa o cache', async () => {
+  it('a proposta disponível não aparece no Diário: ela fica no topo da crônica (U-03)', async () => {
     chronicle.transferGet.mockResolvedValue(
       ok({
         id: 't1',
@@ -477,49 +547,15 @@ describe('jogador', () => {
         available: true,
       })
     )
-    chronicle.transferDecision.mockResolvedValue(ok({ status: 'accepted' }))
-    const { queryClient } = renderWithQueryClient(
-      <CampaignBackstage chronicle={info()} narrating={false} />
-    )
-    expect(await screen.findByText('Convite para narrar')).toBeTruthy()
-    const clear = jest.spyOn(queryClient, 'clear')
-    await act(async () => {
-      fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
-    })
-    await waitFor(() => expect(clear).toHaveBeenCalled())
-    expect(chronicle.transferDecision).toHaveBeenCalledWith(
-      ID,
-      't1',
-      'accept',
-      {
-        clientCommandId: expect.any(String),
-      }
-    )
-  })
-
-  it('destinatário recusa', async () => {
-    chronicle.transferGet.mockResolvedValue(
-      ok({
-        id: 't1',
-        status: 'pending',
-        recipient: BRUNO,
-        expiresAt: '2026-10-30T00:00:00Z',
-        available: true,
-      })
-    )
-    chronicle.transferDecision.mockResolvedValue(ok({ status: 'rejected' }))
     renderWithQueryClient(
       <CampaignBackstage chronicle={info()} narrating={false} />
     )
-    fireEvent.press(await screen.findByRole('button', { name: 'Recusar' }))
-    await waitFor(() =>
-      expect(chronicle.transferDecision).toHaveBeenCalledWith(
-        ID,
-        't1',
-        'reject',
-        { clientCommandId: expect.any(String) }
-      )
-    )
+    await waitFor(() => expect(chronicle.transferGet).toHaveBeenCalled())
+    await screen.findByText('Diário da crônica')
+    expect(screen.queryByText(/Convite para narrar/)).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Aceitar narração' })
+    ).toBeNull()
   })
 
   it('pedido vencido não oferece aceite', async () => {
