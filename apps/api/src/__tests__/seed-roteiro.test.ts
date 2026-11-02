@@ -213,7 +213,9 @@ describe('seed-roteiro (S-04)', () => {
       .select(['status', 'target_field'])
       .execute()
     expect(requests).toEqual([{ status: 'pending', target_field: 'strength' }])
-  })
+    // Uma rodada inteira do seed e mais ~30 chamadas à API em processo:
+    // passa dos 5 s padrão do Bun numa máquina mais lenta
+  }, 30_000)
 })
 
 // O seed apaga e recria dados: em processo, só no banco local
