@@ -32,6 +32,7 @@ import {
   tokens,
   useRovingFocus,
 } from './index'
+import { markSoftDisabled } from './Stepper'
 
 const realOS = Platform.OS
 const setOS = (os: string) =>
@@ -463,8 +464,9 @@ describe('Stepper: "+" indisponível e dica (T-20)', () => {
     setOS('web')
     const onChange = renderBlocked()
     const more = screen.getByRole('button', { name: 'Aumentar Raciocínio' })
-    // Vira aria-disabled="true" no DOM (createDOMProps), sem o `disabled`
-    expect(more.props.accessibilityDisabled).toBe(true)
+    // Nenhuma prop que o react-native-web transforme em `disabled` no
+    // <button>: o aria-disabled vai direto no elemento (markSoftDisabled)
+    expect(more.props.accessibilityDisabled).toBeUndefined()
     expect(more.props.accessibilityState).toMatchObject({ disabled: false })
     expect(more.props['aria-describedby']).toBe('notice-wits')
     expect(flat(more).opacity).toBe(0.5)
@@ -550,6 +552,33 @@ describe('Stepper: "+" indisponível e dica (T-20)', () => {
 })
 
 // T-21 (P05-C): com o React 19, o ref é prop; o TextField o leva ao campo
+describe('Stepper: o "+" bloqueado continua tocável no web (R-20)', () => {
+  // Elemento falso com a API do DOM que o markSoftDisabled usa
+  const element = () => {
+    const attrs = new Map<string, string>()
+    return {
+      attrs,
+      setAttribute: (name: string, value: string) => attrs.set(name, value),
+      removeAttribute: (name: string) => attrs.delete(name),
+    }
+  }
+
+  it('põe aria-disabled no elemento sem o `disabled` e tira quando a trava sai', () => {
+    const el = element()
+    markSoftDisabled(el, true)
+    expect(el.attrs.get('aria-disabled')).toBe('true')
+    // O `disabled` do <button> (que tiraria o toque e o foco) nunca entra
+    expect(el.attrs.has('disabled')).toBe(false)
+    markSoftDisabled(el, false)
+    expect(el.attrs.has('aria-disabled')).toBe(false)
+  })
+
+  it('sem elemento do DOM (app, teste), não faz nada', () => {
+    expect(() => markSoftDisabled(null, true)).not.toThrow()
+    expect(() => markSoftDisabled({}, true)).not.toThrow()
+  })
+})
+
 describe('TextField: ref até o campo (T-21)', () => {
   it('quem chama recebe o TextInput e pode focá-lo', () => {
     const ref = createRef<TextInputInstance>()

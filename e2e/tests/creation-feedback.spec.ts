@@ -122,6 +122,13 @@ const tab = (page: Page, name: string) =>
   page.getByRole('tab', { name, exact: true }).click()
 const plus = (page: Page, trait: string) =>
   page.getByRole('button', { name: `Aumentar ${trait}`, exact: true })
+// O "+" bloqueado pela previsão é aria-disabled e continua tocável (R-20):
+// sem o `disabled` do <button>, a pessoa clica. O Playwright não clica num
+// elemento aria-disabled sem `force`
+const pressBlocked = async (page: Page, trait: string) => {
+  await expect(plus(page, trait)).not.toHaveAttribute('disabled')
+  await plus(page, trait).click({ force: true })
+}
 
 test('Nova ficha: Criar ficha leva ao nome (T-21)', async ({ page }) => {
   const context = page.context()
@@ -152,7 +159,7 @@ test('Pontos básicos: motivo certo, ao lado do toque, e some com a causa (T-07,
   await page.goto(`/characters/${character.id}?mode=create`)
 
   // Sem prioridade: o aviso pede a escolha, ao lado da Força
-  await plus(page, 'Força').click()
+  await pressBlocked(page, 'Força')
   await expect(page.getByTestId('notice-strength')).toContainText(
     'Físicos: escolha a prioridade antes de distribuir os pontos.'
   )
@@ -172,7 +179,7 @@ test('Pontos básicos: motivo certo, ao lado do toque, e some com a causa (T-07,
     'aria-disabled',
     'true'
   )
-  await plus(page, 'Raciocínio').click()
+  await pressBlocked(page, 'Raciocínio')
   const wits = page.getByTestId('notice-wits')
   await expect(wits).toContainText('Mentais: os 3 pontos básicos')
   await expect(wits).toBeInViewport()
@@ -184,7 +191,7 @@ test('Pontos básicos: motivo certo, ao lado do toque, e some com a causa (T-07,
     .getByRole('radio', { name: 'Talentos, Primária, 13 pontos', exact: true })
     .click()
   for (let i = 0; i < 3; i++) await plus(page, 'Prontidão').click()
-  await plus(page, 'Prontidão').click()
+  await pressBlocked(page, 'Prontidão')
   const alert = page.getByTestId('notice-alertness')
   await expect(alert).toContainText('vai até 3')
   await expect(alert).not.toContainText('já foram usados')
@@ -249,7 +256,7 @@ test('Bônus: o custo do toque e o extrato (T-57, R-17)', async ({
     '13/13 · +1 = 2 bônus'
   )
   await expect(plus(page, 'Briga')).toHaveAttribute('aria-disabled', 'true')
-  await plus(page, 'Briga').click()
+  await pressBlocked(page, 'Briga')
   await expect(page.getByTestId('notice-brawl')).toContainText(
     'Faltaria 1 de bônus: custa 2, resta 1.'
   )

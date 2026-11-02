@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import {
   type AccessibilityActionEvent,
   Platform,
@@ -58,6 +58,30 @@ export interface StepperIncrease {
 
 const HOLD_DELAY_MS = 400
 const REPEAT_MS = 100
+
+/**
+ * O "+" bloqueado no web: `aria-disabled="true"` direto no elemento. O
+ * react-native-web 0.21 transforma `aria-disabled` e `accessibilityDisabled`
+ * em `disabled` e `tabIndex=-1` num `<button>` (createDOMProps), e o "+"
+ * ficaria morto, sem toque e sem foco: o que a trava "tocável" evita. Só vale
+ * com o botão habilitado; desabilitado de verdade (no máximo), quem cuida do
+ * atributo é o react-native-web.
+ */
+export function markSoftDisabled(node: unknown, soft: boolean): void {
+  const el = node as {
+    setAttribute?: unknown
+    removeAttribute?: unknown
+  } | null
+  if (
+    !el ||
+    typeof el.setAttribute !== 'function' ||
+    typeof el.removeAttribute !== 'function'
+  )
+    return
+  const dom = el as Pick<Element, 'setAttribute' | 'removeAttribute'>
+  if (soft) dom.setAttribute('aria-disabled', 'true')
+  else dom.removeAttribute('aria-disabled')
+}
 
 export function Stepper({
   label,
@@ -128,6 +152,13 @@ export function Stepper({
   const big = size === 'sheet'
   const web = Platform.OS === 'web'
   const spoken = valueText ? valueText(display) : String(display)
+  // O "+" bloqueado pela previsão, não pelo controle (ver markSoftDisabled)
+  const plusOff = disabled || display >= max
+  const softPlus = !plusOff && increase?.blocked === true
+  const plusRef = useRef<ComponentRef<typeof View>>(null)
+  useEffect(() => {
+    if (web && !plusOff) markSoftDisabled(plusRef.current, softPlus)
+  }, [web, plusOff, softPlus])
   const button = (delta: 1 | -1) => {
     const off = disabled || (delta < 0 ? display <= min : display >= max)
     // Bloqueado pela previsão, não pelo controle: tocável, com cara de
@@ -137,15 +168,12 @@ export function Stepper({
       web && delta > 0 && increase?.hintID
         ? { 'aria-describedby': increase.hintID }
         : {}
-    // No web, o "aria-disabled" do Pressable do react-native-web vem do
-    // `disabled` e sobrescreve o nosso; o `accessibilityDisabled` chega ao
-    // DOM como aria-disabled="true" sem tirar o toque nem o foco
-    // (createDOMProps 0.21). No app, os botões ficam fora do leitor de tela:
-    // quem diz a trava é a dica do controle ajustável.
-    const softWeb =
-      soft && web ? ({ accessibilityDisabled: true } as object) : {}
+    // No web, o aria-disabled do "+" bloqueado vai direto no elemento
+    // (markSoftDisabled), sem o `disabled`. No app, os botões ficam fora do
+    // leitor de tela: quem diz a trava é a dica do controle ajustável.
     return (
       <Pressable
+        ref={delta > 0 ? plusRef : undefined}
         testID={testID ? `${testID}-${delta > 0 ? 'inc' : 'dec'}` : undefined}
         {...(web
           ? {
@@ -155,7 +183,6 @@ export function Stepper({
           : { accessible: false, 'aria-hidden': true })}
         {...describedBy}
         disabled={off}
-        {...softWeb}
         onPress={() => commit(value + delta)}
         // Segurar repetiria números que não vão valer
         onLongPress={soft ? undefined : () => longPress(delta)}
