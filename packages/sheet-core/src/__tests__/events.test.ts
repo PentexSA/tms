@@ -12,7 +12,7 @@ import {
   parsePath,
   type SheetEvent,
 } from '../events'
-import { describeBatch, describeEvent } from '../labels'
+import { describeBatch, describeEvent, describeValue } from '../labels'
 import { character, clone, type Json, templates } from './fixtures'
 
 const model = compileTemplate(templates['vtm-v20'])
@@ -540,5 +540,82 @@ describe('jsonEqual', () => {
     [{ a: 1 }, null, false],
   ])('%p = %p → %p', (a, b, expected) => {
     expect(jsonEqual(a, b)).toBe(expected)
+  })
+})
+
+// T-31: a folha de conflito mostra os dois valores para a pessoa escolher
+describe('describeValue (só a tela de conflito)', () => {
+  const show = (path: string, value: unknown) =>
+    describeValue(model, path, value)
+
+  it('números, recursos, escolhas e listas', () => {
+    expect(show('values.strength', 3)).toBe('3')
+    expect(show('values.strength', null)).toBe('—')
+    expect(show('values.willpower', { current: 5, permanent: 7 })).toBe(
+      'permanente 7, atual 5'
+    )
+    expect(show('values.clan', 'tremere')).toBe('Tremere')
+    expect(show('values.clan', null)).toBe('—')
+    expect(show('values.disciplines', [{ id: 'a', name: 'x', value: 1 }])).toBe(
+      '1 item'
+    )
+    expect(show('values.health', { lethal: 2, bashing: 1 })).toMatch(/2 letal/)
+  })
+
+  it('texto livre aparece (a escolha exige vê-lo), cortado em 80', () => {
+    expect(show('values.sire', '  Etrius ')).toBe('Etrius')
+    const long = show('values.sire', 'x'.repeat(200))
+    expect(long).toHaveLength(80)
+    expect(long.endsWith('…')).toBe(true)
+    expect(show('values.sire', '')).toBe('—')
+    expect(show('specialties.strength', 'Pegada firme')).toBe('Pegada firme')
+  })
+
+  it('caminho desconhecido não quebra', () => {
+    expect(show('values.inexistente', 1)).toBe('—')
+    expect(show('lixo', 1)).toBe('—')
+  })
+
+  // Os outros tipos de campo, nos templates que os têm (genérico: não é só
+  // o WoD que chega à folha de conflito)
+  it('caixas, marcas, etiquetas, relógio e o tipo sem descrição própria', () => {
+    const fate = compileTemplate(templates['fate-core'])
+    const mage = compileTemplate(templates['mta-m20'])
+    expect(
+      describeValue(fate, 'values.stress', { physical: [true, false, true] })
+    ).toBe('2 marcadas')
+    expect(describeValue(fate, 'values.stress', null)).toMatch(/marcada/)
+
+    const states = dndModel.template.markStates?.proficiency2 ?? []
+    const first = states[0]
+    if (!first) throw new Error('template sem estados de proficiência')
+    expect(describeValue(dndModel, 'values.saveStr', first.id)).toBe(
+      first.label
+    )
+    expect(describeValue(dndModel, 'values.saveStr', null)).toBe('—')
+    expect(
+      describeValue(dndModel, 'values.conditions', ['poisoned', 'prone'])
+    ).toBe('2 marcadas')
+
+    const wheel = mage.fields.get('wheel')?.def
+    if (wheel?.type !== 'clock') throw new Error('roda do Mago sem clock')
+    const [a, b] = wheel.fills
+    if (!a || !b) throw new Error('roda do Mago sem os dois preenchimentos')
+    expect(describeValue(mage, 'values.wheel', { [a.id]: 3 })).toBe(
+      `${a.label} 3, ${b.label} 0`
+    )
+
+    // spellSlots (slots) não tem descrição própria: só diz que mudou
+    expect(describeValue(dndModel, 'values.spellSlots', { 1: 2 })).toBe(
+      'definido'
+    )
+    expect(describeValue(dndModel, 'values.spellSlots', null)).toBe('—')
+  })
+
+  it('o resto do motor continua sem conteúdo: describeEvent não muda', () => {
+    expect(
+      describeEvent(model, { path: 'values.sire', from: 'A', to: 'Etrius' })
+        .change
+    ).toBe('atualizado')
   })
 })

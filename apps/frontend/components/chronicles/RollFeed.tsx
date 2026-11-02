@@ -90,6 +90,7 @@ export function RollFeed({ chronicleId }: { readonly chronicleId: string }) {
           <View style={styles.steppers}>
             <Stepper
               label="Dados"
+              showLabel
               value={dice}
               min={1}
               max={50}
@@ -97,6 +98,7 @@ export function RollFeed({ chronicleId }: { readonly chronicleId: string }) {
             />
             <Stepper
               label="Dificuldade"
+              showLabel
               value={difficulty}
               min={roll.difficulty.min}
               max={roll.difficulty.max}
@@ -106,6 +108,7 @@ export function RollFeed({ chronicleId }: { readonly chronicleId: string }) {
           <View style={styles.chips}>
             {roll.specialty === 'tenCountsDouble' ? (
               <Chip
+                kind="switch"
                 label="Especialização"
                 selected={specialty}
                 onPress={() => {
@@ -115,6 +118,7 @@ export function RollFeed({ chronicleId }: { readonly chronicleId: string }) {
               />
             ) : null}
             <Chip
+              kind="switch"
               label="Oculta"
               selected={hidden}
               onPress={() => {

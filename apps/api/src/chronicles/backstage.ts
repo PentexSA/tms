@@ -639,6 +639,11 @@ export function backstageRoutes(
       '/chronicles/:id/transfer',
       async ({ params, userId }) => {
         const me = requireUser(userId)
+        // Sem vínculo ou ex-membro: 404, como o POST (sem oráculo de
+        // existência). Membro ou narrador sem transferência visível: 200 com
+        // null, e não um 404 que o console mostra como erro (T-74)
+        const role = await chronicleAccess(db, me, params.id)
+        if (role === null || role === 'former') throw notFound()
         const row = await db
           .selectFrom('chronicle_transfers as tr')
           .innerJoin('chronicles as c', 'c.id', 'tr.chronicle_id')
@@ -662,7 +667,10 @@ export function backstageRoutes(
           )
           .orderBy('tr.requested_at', 'desc')
           .executeTakeFirst()
-        if (!row) throw notFound()
+        // O filtro narrador-ou-destinatário continua: outro membro recebe
+        // null, nunca a transferência de outra pessoa. No Elysia, null sai
+        // como 200 de corpo vazio (o app normaliza)
+        if (!row) return null
         return {
           id: row.id,
           status: row.status,

@@ -62,6 +62,20 @@ describe('Session (nativo: refresh no corpo, secure store)', () => {
     expect(session.getState().status).toBe('signedOut')
   })
 
+  it('restore com o armazenamento seguro falhando pede login, sem ficar carregando', async () => {
+    // iOS sem o direito do Keychain (errSecMissingEntitlement) ou Keystore
+    // indisponível: antes, a promessa era rejeitada e a tela ficava no
+    // esqueleto para sempre
+    const store = memoryStore(true, 'refresh-0')
+    jest
+      .mocked(store.read)
+      .mockRejectedValue(new Error('Um direito exigido não está presente.'))
+    const { session, fetch } = testSession(() => json(200, tokens(2)), store)
+    await expect(session.restore()).resolves.toBeUndefined()
+    expect(session.getState().status).toBe('signedOut')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('restore com token guardado renova a sessão', async () => {
     const store = memoryStore(true, 'refresh-0')
     const { session, fetch } = testSession(() => json(200, tokens(2)), store)

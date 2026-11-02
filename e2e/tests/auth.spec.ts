@@ -44,8 +44,25 @@ test('cadastro, recarregar, sair e entrar de novo', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Sair' }).click()
   await expect(page).toHaveURL(/\/login$/)
+  // T-14: o servidor apaga o cookie com o Path=/auth em que ele foi gravado
+  await expect
+    .poll(async () =>
+      (await page.context().cookies('http://localhost:3101/auth')).map(
+        c => c.name
+      )
+    )
+    .not.toContain('tms_refresh')
+  // T-74: depois de sair, abrir o app não chama /auth/refresh (o 401 aparecia
+  // como erro no console)
+  const refreshes: string[] = []
+  page.on('request', r => {
+    if (r.url().endsWith('/auth/refresh')) refreshes.push(r.url())
+  })
   await page.reload()
   await expect(page).toHaveURL(/\/login$/)
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/login$/)
+  expect(refreshes).toEqual([])
 
   await page.getByLabel('E-mail').fill(user.email.toUpperCase())
   await page.getByLabel('Senha').fill(user.password)

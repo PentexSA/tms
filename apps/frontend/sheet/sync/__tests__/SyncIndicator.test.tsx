@@ -53,6 +53,34 @@ describe('describeSync', () => {
   ] as const)('%j online=%s: %s', (status, online, state, text) => {
     expect(describeSync(status, online)).toEqual({ state, text })
   })
+
+  // T-17: "Salvo" verde com alterações que só existiam no aparelho
+  it.each([
+    [{ pending: 0, failure: null }, true, 3, '3 alterações não salvas'],
+    [{ pending: 0, failure: null }, true, 1, '1 alteração não salva'],
+    [
+      { pending: 2, failure: null },
+      false,
+      3,
+      '3 alterações não salvas · offline',
+    ],
+  ] as const)(
+    'com rascunho, %j online=%s, %i: %s',
+    (status, online, n, text) => {
+      expect(describeSync(status, online, n)).toEqual({
+        state: 'unsaved',
+        text,
+      })
+    }
+  )
+
+  // Achado do /code-review: o erro do servidor ficava escondido
+  it('erro ao salvar com rascunho: o erro primeiro, com as alterações junto', () => {
+    expect(describeSync({ pending: 1, failure: 'server' }, true, 2)).toEqual({
+      state: 'error',
+      text: 'Erro ao salvar · tentando de novo · 2 alterações não salvas',
+    })
+  })
 })
 
 function signedInSession() {

@@ -15,6 +15,7 @@ SQLCipher, dock com toque longo e modo avião.
 | `06-werewolf-form` | a Forma do Lobisomem no dock: Crinos com a mudança instantânea e Desfazer (v2) |
 | `07-storyteller-table` | Mesa do narrador: dano e Nova noite em duas fichas, prévia e reversão no servidor (v3) |
 | `08-backstage` | Bastidores: criar NPC oculto, revelar só a identidade, parada livre oculta na Mesa e sessão no diário (v5) |
+| `09-draft-recovery` | rascunho da Criação sobrevive a matar o app: "Recuperar" devolve as 3 alterações, o cabeçalho diz "3 alterações não salvas" e a rodada termina descartando (T-03, T-17) |
 
 ## Preparar
 
@@ -27,6 +28,8 @@ SQLCipher, dock com toque longo e modo avião.
    capazes de levar 1 nível letal; ambas devem estar em criação ou ativas.
    O `08` usa a mesma crônica narrada: cada rodada cria um NPC "NPC Nativo",
    uma rolagem livre oculta e uma sessão (dados de teste, nunca de produção).
+   Para o `09`, uma ficha da conta em criação por pontos, com pontos a
+   distribuir em Força, Destreza e Vigor. A rodada descarta o que fez.
 2. O dev build apontando para esse servidor:
 
    ```bash
@@ -48,7 +51,8 @@ maestro test apps/frontend/.maestro \
   -e WEREWOLF_CHARACTER="<ficha de Lobisomem fora de Crinos>" \
   -e STORYTELLER_CHRONICLE="<crônica narrada pela conta>" \
   -e STORYTELLER_CHARACTER_A="<nome da primeira ficha>" \
-  -e STORYTELLER_CHARACTER_B="<nome da segunda ficha>"
+  -e STORYTELLER_CHARACTER_B="<nome da segunda ficha>" \
+  -e DRAFT_CHARACTER_ID=<uuid da ficha em criação por pontos>
 ```
 
 No iOS, exclua o fluxo de modo avião: `--exclude-tags android`.

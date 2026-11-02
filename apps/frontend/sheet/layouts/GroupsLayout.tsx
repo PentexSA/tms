@@ -1,6 +1,7 @@
 import { type CompiledGroup, isDraftMode, jsonEqual } from '@tms/sheet-core'
 import {
   Button,
+  hitTarget,
   Pressable,
   SectionHeader,
   Text,
@@ -90,44 +91,46 @@ export function GroupsLayout({ section }: LayoutProps) {
           />
         </View>
       ) : null}
-      {tabs.groups.map(g => {
-        const ids = g.fieldIds.filter(id => shown.has(id))
-        if (searching && tabs.bar && !ids.length) return null
-        return (
-          <View key={g.id}>
-            {g.title && titled ? (
-              <View style={styles.title}>
-                <SectionHeader
-                  title={g.title}
-                  level="group"
-                  right={<CreationCounter fieldIds={g.fieldIds} />}
-                />
-              </View>
-            ) : null}
-            {titled ? null : <CreationCounter fieldIds={g.fieldIds} line />}
-            {ids.length && filtered && ids.every(id => !isList(id)) ? (
-              <ChipFlow ids={ids} />
-            ) : ids.length ? (
-              ids.map(id =>
-                badge && id === badged ? (
-                  <View key={id}>
-                    <FieldSlot id={id} variant="row" />
-                    <RowBadge id={id} label={badge.label} />
-                  </View>
-                ) : (
-                  <FieldSlot key={id} id={id} variant="row" />
+      <View {...tabs.panelProps}>
+        {tabs.groups.map(g => {
+          const ids = g.fieldIds.filter(id => shown.has(id))
+          if (searching && tabs.bar && !ids.length) return null
+          return (
+            <View key={g.id}>
+              {g.title && titled ? (
+                <View style={styles.title}>
+                  <SectionHeader
+                    title={g.title}
+                    level="group"
+                    right={<CreationCounter fieldIds={g.fieldIds} />}
+                  />
+                </View>
+              ) : null}
+              {titled ? null : <CreationCounter fieldIds={g.fieldIds} line />}
+              {ids.length && filtered && ids.every(id => !isList(id)) ? (
+                <ChipFlow ids={ids} />
+              ) : ids.length ? (
+                ids.map(id =>
+                  badge && id === badged ? (
+                    <View key={id}>
+                      <FieldSlot id={id} variant="row" />
+                      <RowBadge id={id} label={badge.label} />
+                    </View>
+                  ) : (
+                    <FieldSlot key={id} id={id} variant="row" />
+                  )
                 )
-              )
-            ) : (
-              <Text color="inkMuted" style={styles.empty}>
-                {g.title
-                  ? `Nada para mostrar em ${g.title}.`
-                  : 'Nada para mostrar.'}
-              </Text>
-            )}
-          </View>
-        )
-      })}
+              ) : (
+                <Text color="inkMuted" style={styles.empty}>
+                  {g.title
+                    ? `Nada para mostrar em ${g.title}.`
+                    : 'Nada para mostrar.'}
+                </Text>
+              )}
+            </View>
+          )
+        })}
+      </View>
     </View>
   )
 }
@@ -202,6 +205,7 @@ function FilterBar({
           maxLength={60}
           style={[
             styles.search,
+            { minHeight: hitTarget() },
             textStyle(theme, 'body'),
             { borderColor: colors.borderControl, color: colors.ink },
           ]}
@@ -232,7 +236,6 @@ const styles = StyleSheet.create({
   search: {
     flex: 1,
     minWidth: 160,
-    minHeight: tokens.size.hitSize,
     borderWidth: tokens.borderWidth.control,
     borderRadius: tokens.radius.md,
     paddingHorizontal: tokens.space[3],

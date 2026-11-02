@@ -92,6 +92,7 @@ export function GrantForm({
     <View style={styles.form}>
       <Stepper
         label="XP a conceder"
+        showLabel
         value={amount}
         min={1}
         max={1000}
@@ -180,6 +181,7 @@ export function AdjustForm({
     <View style={styles.form}>
       <Stepper
         label="Ajuste no total"
+        showLabel
         value={delta}
         min={-1000}
         max={1000}

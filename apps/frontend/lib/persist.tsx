@@ -283,7 +283,8 @@ export function OfflineProvider({
       session.onSignOut(() => {
         if (!userStorage) return
         userStorage.close()
-        void userStorage.clear()
+        // O logout espera a limpeza (T-14): cache, fila e rascunhos
+        return userStorage.clear()
       }),
     [session, userStorage]
   )

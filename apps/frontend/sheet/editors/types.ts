@@ -11,6 +11,9 @@ export interface EditorProps<V = unknown> {
   readonly onChange: (next: V) => void
   readonly error?: string | null
   readonly required?: boolean
+  // Nome próprio (o nome do personagem): sem corretor nem sugestão do
+  // teclado, que trocava "PO" por "PÔ" (T-38)
+  readonly properName?: boolean
 }
 
 export type Editor = ComponentType<EditorProps>

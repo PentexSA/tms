@@ -50,9 +50,10 @@ Regras que valem para todos: alvo tocável ≥ 44 com `.ds-pressable`; texto só
 Dá feedback de hover e pressionado a qualquer alvo tocável sem trocar o fundo do componente.
 
 - **Classes:** `ds-pressable`. O `::after` recebe `state-hover` só com `@media (hover: hover)` e `state-pressed` em `:active`; fica transparente com `disabled` ou `aria-disabled="true"`.
-- **API RN:** `Pressable` com `style={({ pressed }) => pressed && { backgroundColor: t.color.statePressed }}`; `hitSlop` até 44 quando o visual for menor.
+- **API RN:** `Pressable` com `style={({ pressed }) => pressed && { backgroundColor: t.color.statePressed }}`; `hitSlop` até 44 quando o visual for menor. O alvo mínimo é `hitTarget()` (`metrics.ts`): 48 dp no Android (`hit-size-android`, Material) e 44 no iOS e no web (`hit-size`), lido no render. Estilos de app que fixam `minHeight` depois do alvo usam o mesmo `hitTarget()`.
 - **Estados:** normal, hover, pressionado, desabilitado.
-- **A11y:** não muda a semântica: o elemento base continua `button` ou `a`.
+- **A11y:** não muda a semântica: o elemento base continua `button` ou `a`. No web, o Espaço ativa também os papéis `radio`, `tab`, `switch` e `checkbox` (o react-native-web só o liga a `button`), sem repetir com a tecla presa e sem rolar a página (nem com a tecla presa). Só o Espaço do próprio elemento conta: o de um descendente focável é dele. O `ref` é prop (React 19) e chega ao elemento.
+- **Foco itinerante (`useRovingFocus`, `roving.ts`):** para grupos (abas, rádios). Só o item ativo fica no Tab (`tabIndex` 0, os outros −1); ←/→ (e ↑/↓ fora do modo `horizontal`) andam dando a volta, Home e End vão às pontas. Teclas com Alt, Ctrl ou Meta (Alt+← volta a página, Cmd+← vai ao início da linha), Shift+seta e teclas que sobem de um descendente ficam com o navegador, sem `preventDefault`. `activate: 'focus'` seleciona com a seta (abas); `'manual'` só move o foco, e Espaço, Enter ou toque escolhem (rádios que aplicam na hora). Só no web; no app quem anda pelo grupo é o leitor de tela.
 - **Multi-sistema:** o mesmo feedback na linha de Destreza (WoD), no chip de PV (D&D) e na caixa de estresse (Fate).
 - **Resolve:** C-14, DS-04.
 
@@ -107,7 +108,8 @@ Ação com verbo. Uma ação primária por tela.
   }
   ```
 - **Estados:** hover, pressionado, foco, desabilitado (`disabled` ou `aria-disabled`: fundo transparente, borda `border-subtle`, texto `ink-disabled`), ocupado (`aria-busy`: spinner e sem clique).
-- **A11y:** web `<button type="button">`; `aria-disabled` mantém o foco (usado no "Excluir" até digitar o nome). RN `accessibilityRole="button"` + `accessibilityState={{ disabled, busy }}`.
+- **A11y:** web `<button type="button">`; `aria-disabled` mantém o foco (usado no "Excluir" até digitar o nome). RN `accessibilityRole="button"` + `accessibilityState={{ disabled, busy }}`. `accessibilityLabel` (padrão: o título) separa botões de mesmo título na tela ("Escolher da lista: Natureza" e "…: Comportamento"); começa pelo título inteiro (WCAG 2.5.3).
+  - **Linhas "Rótulo: valor" do Editar:** no app, o rótulo é o campo e o valor vai no `accessibilityValue` (sem "Nome: X, X"); no web, que descarta o `accessibilityValue`, o rótulo fica "Nome: X" (`fieldA11y`, `apps/frontend/sheet/evolve/a11y.ts`).
 - **Multi-sistema:** os rótulos vêm do esqueleto ou do template: "Rolar no app", "Descanso longo" (D&D, `actions[]`), "Curar 1 nível de dano" (Vampiro), "Excluir". A cor é sempre `action`, nunca `accent`.
 - **Resolve:** C-14, C-21, DS-04, DS-16.
 
@@ -141,6 +143,7 @@ Rótulo curto tocável: seção, filtro, atalho.
 - **API RN:** `{ label: string; selected?: boolean; kind?: 'toggle' | 'current' | 'action'; onPress(): void }`.
 - **Estados:** normal, ativo, pressionado.
 - **A11y:** alternância com `aria-pressed`; seção ativa com `aria-current="true"`. RN `accessibilityState={{ selected }}` ou `{ checked }`.
+  - **No `@tms/ui`:** `kind: 'toggle'` (padrão) põe `aria-pressed` no web (o `aria-selected` não vale em botão e o web não anunciava nada) e mantém o "selecionado" no app. `kind: 'switch'` é para ligar e desligar um estado (Rolagem oculta, Especialização, Oculta na parada livre): `role="switch"` com `aria-checked` nas três plataformas, lido como "interruptor, ativado/desativado". Um estado só alimenta o visual, o anúncio e o pedido. Os filtros de escolha única (Todas/Ocultas/Visíveis, Nome/Última alteração) continuam `toggle` por enquanto (pendência para `radiogroup`, P09-C).
 - **Multi-sistema:** rótulos do template: filtro "Só com pontos" (WoD) e "Só proficientes" (D&D), preset "Conjurar efeito" (Mago) e "Teste de Sanidade" (CoC), perícias na pirâmide (Fate).
 - **Resolve:** C-04, C-07.
 
@@ -216,10 +219,14 @@ Escolha única em lista vertical; com `state`, a escolha aplica modificadores a 
   type ChoiceProps<T extends string> = {
     label: string; value: T; onChange: (id: T) => void
     options: { id: T; label: string; hint?: string }[]; disabled?: boolean
+    showLabel?: boolean // título visível acima do grupo; padrão true
   }
   ```
+  `showLabel={false}` só quando o nome já está na tela (o título da folha que abre a escolha). `disabled` tira o toque de todas as opções (pedido em andamento), sem esmaecer a marcada por ser a atual.
 - **Estados:** marcado, pressionado, somente leitura (nota "Somente leitura." e toque sem efeito).
 - **A11y:** `role="radiogroup"` com `aria-label`; opções `role="radio"` + `aria-checked`, tabindex itinerante e setas. RN `radiogroup`/`radio` + `checked`. A troca aparece no toast.
+  - **Título:** no web, o grupo aponta para ele com `aria-labelledby`; no Android fica `aria-hidden` (o TalkBack lê o nome do grupo); no iOS, onde `radiogroup` não tem traço, é o texto lido antes das opções. O estado ("botão de opção, não marcado") sai em português porque o app declara `pt-BR` no `Info.plist` (`app.json`, `ios.infoPlist`).
+  - **Teclado (web):** ativação manual: a seta só move o foco; Espaço, Enter ou toque escolhem. É um desvio consciente da APG ("a seleção segue o foco"), porque vários grupos aplicam a escolha na hora (revelar um NPC, gravar a prioridade) e a seta não pode fazer isso (WCAG 3.2.2).
 - **Multi-sistema:** formas do Garou (WoD, no dock); Forma Selvagem e Fúria do Bárbaro (D&D) e insanidade temporária (CoC) são o mesmo `state`. A lista vertical cabe em 360dp com fonte grande, o que o seletor antigo de 5 colunas não fazia.
 - **Resolve:** C-03, C-09, C-12, DS-05, DS-12.
 
@@ -347,7 +354,7 @@ Edita qualquer número com − e +, um passo por toque.
 
 - **Classes:** `ds-stepper`, `__btn` (56, redondo), `__value` (`number-lg`), `__input` (campo numérico com borda `action`), `--inline` (botões de 44 e valor `number`).
 - **`ui.js`:** `stepper({ label, value, min, max, step, valueText, onChange, inline, allowInput, disabled, key })`, com `setValue(v)` para atualizar de fora.
-- **Comportamento:** 1 passo por toque, nunca salta; limita a `[min, max]` e desabilita − ou + no limite; segurar repete (depois de 400 ms, a cada 90 ms); com `allowInput`, tocar no número abre o teclado numérico (Enter confirma, Esc cancela); `data-key` devolve o foco depois de redesenhar.
+- **Comportamento:** 1 passo por toque, nunca salta; limita a `[min, max]` e desabilita − ou + no limite; segurar repete (depois de 400 ms, a cada 90 ms); com `allowInput`, tocar no número abre o teclado numérico (Enter confirma, Esc cancela; sair do campo também confirma, e abrir outro campo fecha este, que aplica o que foi digitado: um campo aberto por vez; só inteiro na faixa, e decimal recebe "Digite um número inteiro de {min} a {max}"; ao sair com valor inválido, o campo fecha sem aplicar e a mensagem fica; o Esc fecha sem aplicar e tira a mensagem; no web, Enter e Esc devolvem o foco ao botão "Digitar", via `valueNativeID`); `data-key` devolve o foco depois de redesenhar.
 - **API RN:**
 
   ```ts
@@ -355,10 +362,12 @@ Edita qualquer número com − e +, um passo por toque.
     label: string; value: number; min: number; max: number; step?: number
     valueText?: (v: number) => string; onChange: (v: number) => void
     size?: 'lg' | 'inline'; allowInput?: boolean; disabled?: boolean
+    showLabel?: boolean // rótulo visível acima; padrão false
   }
   ```
+  `showLabel` liga o rótulo visível acima do controle quando a tela não o mostra ao lado (Dados e Dificuldade da Mesa, Quantidade, XP a conceder). Ele fica `aria-hidden`: o controle já tem o nome, e não há leitura dupla.
 - **Estados:** normal, no limite, desabilitado, digitando.
-- **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta).
+- **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta). O `aria-valuetext` vai sempre (`valueText` ou o número): sem texto, o iOS lê `now/(max−min)` como porcentagem (7 de 0 a 1000 vira "1%").
 - **Multi-sistema:** PV "27 de 134" com teclado (D&D), perícia em % (CoC), escada de −2 a +8 (Fate), dificuldade (WoD), alvo e dados de bônus na parada, quantidade de dano em qualquer trilha.
 - **Resolve:** C-01, C-02, C-03, C-17, DS-01, DS-05, DS-14.
 
@@ -428,6 +437,8 @@ Navegação da ficha: **3 abas fixas, uma por zona do template** (Ficha · Poder
 - **A11y:**
   - Web: `tablist`/`tab`/`tabpanel` com `aria-controls` e `aria-labelledby`, tabindex itinerante, setas, Home e End, e ativação automática, já que trocar de aba não tem custo.
   - RN: `accessibilityRole="tab"` com `accessibilityState={{ selected }}`.
+  - iOS: o papel `tab` não tem traço no RN 0.88, então cada aba diz a posição no `accessibilityValue` ("aba 2 de 3"), em português e sem depender de traço.
+  - No `@tms/ui`: `Tabs` com `id` liga cada aba ao painel (`nativeID` `{id}-tab-{aba}`, e `aria-controls` na selecionada); `TabPanel` (`{ tabsId, tab, children }`) põe `role="tabpanel"` e `aria-labelledby` no web. Quando o contêiner já existe (os grupos da ficha), `tabPanelProps(tabsId, tab)` dá as mesmas props.
 - **Multi-sistema:** as abas saem das zonas que todo template declara. O template só troca o rótulo (`zoneLabels`, até 14 caracteres):
 
   | Sistema | Abas |
@@ -540,7 +551,7 @@ Faixa que diz em que modo a ficha está.
 - **Variantes:** Evoluindo ("N alterações não salvas" + Concluir); Leitura ("Ficha de {dono}" + "Editar como narrador" para o narrador); Narrador ("As alterações ficam assinadas no histórico" + "Voltar à leitura"); Arquivada ("Somente leitura" + Restaurar para o dono). Em Jogo não aparece.
 - **API RN:** `{ mode: 'read' | 'evolve' | 'storyteller' | 'archived'; title: string; message: string; actions?: ButtonProps[] }`.
 - **Estados:** as quatro variantes.
-- **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado.
+- **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
 - **Resolve:** C-01, C-19, DS-04.
 
@@ -608,6 +619,9 @@ Folha que hospeda detalhe, editores, dano, parada e menu.
 - **API RN:** `{ title: string; open: boolean; onClose(): void; footer?: ReactNode; initialFocus?: 'title' | RefObject<View>; children: ReactNode }`.
 - **Estados:** abrindo (`ds-slide` ou `ds-fade`), aberto, empilhado. Arrastar para fechar: proposta (nativo no `formSheet` do Expo Router).
 - **A11y:** `role="dialog"`, `aria-modal`, `aria-labelledby`; foco preso; Esc fecha o do topo; foco inicial no título; foco volta a quem abriu. RN `Modal` + `onRequestClose` (voltar do Android) + `accessibilityViewIsModal`.
+  - **Um "Fechar" só:** o fundo fecha no toque, mas fica fora da árvore (`aria-hidden`, `accessible={false}`); no web é um `View` sem tabindex (um Pressable sempre é focável, e o trap do modal focava o fundo oculto ao entrar), e o react-native-web não esconde os irmãos do modal.
+  - **Esc no web:** tratado na fase de captura da raiz da folha, a qualquer momento em que o foco esteja nela (o Modal do react-native-web só aceitava o Esc depois da animação de entrada, e o TextInput não deixa o keydown subir). É o único caminho no web; o `onRequestClose` fica para o voltar do Android. Como o fundo sai do alcance do VoiceOver, a folha fecha com o gesto de escape (`onAccessibilityEscape`, o "Z" do iOS).
+  - **Foco de volta (web, `@tms/ui`):** a folha guarda o elemento focado ao abrir (num insertion effect, antes do autoFocus de qualquer campo da folha; se o foco já estiver no body, como no botão que ficou ocupado e foi desabilitado, vale o último elemento focado; o ModalFocusTrap do react-native-web lê o foco depois e, com autoFocus, guarda o campo de dentro, que some ao fechar) e o devolve depois que o modal sai (`onDismiss`) ou quando a folha desmonta aberta, se ele ainda estiver na tela e nenhum outro elemento tiver pego o foco.
 - **Multi-sistema:** o mesmo sheet edita Vitalidade (WoD), PV com temporários (D&D), SAN (CoC) e estresse (Fate), e hospeda a parada de qualquer modelo.
 - **Resolve:** C-01, C-02, C-04, C-18, DS-05, DS-07.
 
@@ -655,7 +669,7 @@ Carregamento com a forma da ficha.
 - **Forma:** título no header, bloco de identidade (64), grade (196) e 12 linhas de larguras variadas.
 - **API RN:** `{ width: number | string; height: number; radius?: number }` + `<SheetSkeleton />` (proposta).
 - **Estados:** animado, estático (reduzir movimento).
-- **A11y:** contêiner com `aria-busy="true"` e "Carregando a ficha" em `role="status"`; peças `aria-hidden`.
+- **A11y:** contêiner com `aria-busy="true"` e "Carregando a ficha" em `role="status"`; peças `aria-hidden`. No `@tms/ui`: no web, o contêiner é `role="status"` (sem `aria-busy`, que impediria o anúncio) com o rótulo num texto visualmente oculto, que entra depois da montagem (o `accessible` não existe no web e um `aria-label` num `div` sem papel não é exposto); no app, um elemento `accessible` com o rótulo e `aria-busy`. Na restauração da sessão, a tela de carregamento tem a app bar "TMS" (título fixo, sem dado do usuário).
 - **Multi-sistema:** a forma é do esqueleto (header, identidade, grade, linhas), a mesma para Vampiro, D&D, CoC e Fate.
 - **Resolve:** C-08, DS-07.
 
@@ -672,7 +686,7 @@ Item de lista de crônicas, personagens e mesa.
 - **ChronicleCard:** iniciais da crônica, nome, sistema, "Você narra" ou "Narrador: {nome}", número de personagens e data da última sessão.
 - **API RN:** `{ title: string; avatar: { name: string; accent?: AccentName }; chip?: string; meta?: string; stats?: { label: string; value: string }[]; onPress(): void; accessibilityLabel: string }`.
 - **Estados:** normal, pressionado.
-- **A11y:** um link por item com rótulo composto ("Helena Varga, Tremere. Vitalidade: …"); avatar e chevron ocultos.
+- **A11y:** um link por item com rótulo composto ("Helena Varga, Tremere. Vitalidade: …"); avatar e chevron ocultos. No `@tms/ui`, a linha sem `onPress` é um elemento só; com `trailing` (Revogar, Remover, Editar, Propor), o texto vira o elemento e o `trailing` fica fora dele, senão o botão some dentro da linha no app. `onPress` com `trailing` interativo não é suportado (botão dentro de botão).
 - **Multi-sistema:** uma lista mistura Vampiro, D&D e CoC, cada linha com a própria skin e accent; a linha da Mesa reaproveita o `dock` do template ([Vitalidade, Sangue, FdV] ou [PV, SAN, Sorte]).
 - **Resolve:** C-13, C-19, C-20, §7.
 

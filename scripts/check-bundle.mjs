@@ -37,14 +37,28 @@ if (!maps.length) {
   process.exit(1)
 }
 
+// O Metro do SDK 58 grava index maps (`sections`, cada uma com o próprio
+// map); os antigos têm `sources` na raiz. Os dois formatos contam
+const sourcesOf = map =>
+  Array.isArray(map.sections)
+    ? map.sections.flatMap(section => sourcesOf(section.map ?? {}))
+    : (map.sources ?? [])
+
 const found = new Set()
 let sources = 0
 for (const map of maps) {
-  const { sources: list = [] } = JSON.parse(readFileSync(map, 'utf8'))
+  const list = sourcesOf(JSON.parse(readFileSync(map, 'utf8')))
   sources += list.length
   for (const s of list)
     if (FORBIDDEN.some(re => re.test(s)))
       found.add(s.replace(/^.*node_modules\//, 'node_modules/'))
+}
+// Falha segura: sem nenhum módulo lido, a checagem não provaria nada
+if (sources === 0) {
+  console.error(
+    `Nenhum módulo nos source maps de ${dir}: o formato mudou? Atualize scripts/check-bundle.mjs`
+  )
+  process.exit(1)
 }
 if (found.size) {
   console.error(`Módulos de servidor no bundle do app (${found.size}):`)

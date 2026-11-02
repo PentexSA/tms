@@ -306,8 +306,9 @@ describe('a tela da ficha com o estado', () => {
   it('na tela larga, o menu do narrador diz de quem é e o estado da ficha', async () => {
     Dimensions.set({ window: TABLET, screen: TABLET })
     await open(['storyteller'], 'active', '2026-10-18T12:00:00Z')
-    const trigger = screen.getByLabelText('Ações do narrador')
-    expect(trigger.props.accessibilityHint).toBe('Ficha travada')
+    // O nome acessível começa pelo texto visível (WCAG 2.5.3, T-42)
+    const trigger = screen.getByRole('button', { name: 'Narrador, Travada' })
+    expect(trigger.props.accessibilityHint).toBe('Abre as ações do narrador')
     expect(screen.getByText('Narrador')).toBeTruthy()
     expect(screen.getByText('Travada')).toBeTruthy()
     fireEvent.press(trigger)

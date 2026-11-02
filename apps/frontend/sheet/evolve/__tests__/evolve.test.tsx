@@ -9,6 +9,7 @@ import type { SheetData } from '@tms/sheet-core'
 import { AccessibilityInfo, StyleSheet } from 'react-native'
 import { example, modelOf } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { textInput } from '../../../test/queries'
 import type { PostOutcome } from '../../sync/sender'
 
 // Etapa 18: o modo Evoluir na ficha viva. O rascunho vira UM lote ao salvar
@@ -76,10 +77,17 @@ describe('Editar: o rascunho e o resumo', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
     expect(screen.getByText('Salvar 3 alterações?')).toBeTruthy()
     const summary = within(screen.getByTestId('evolve-summary'))
-    expect(summary.getByLabelText('Força, 2 → 3')).toBeTruthy()
-    expect(summary.getByLabelText('Disciplinas, 0 → 1 item')).toBeTruthy()
+    // Com o caminho na ficha (T-54)
     expect(
-      summary.getByLabelText('Força · especialização, atualizada')
+      summary.getByLabelText('Atributos, Físicos, Força, 2 → 3')
+    ).toBeTruthy()
+    expect(
+      summary.getByLabelText('Vantagens, Disciplinas, Disciplinas, 0 → 1 item')
+    ).toBeTruthy()
+    expect(
+      summary.getByLabelText(
+        'Atributos, Físicos, Força · especialização, atualizada'
+      )
     ).toBeTruthy()
 
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
@@ -161,6 +169,68 @@ describe('Editar: o rascunho e o resumo', () => {
   })
 })
 
+// T-54: o resumo vinha na ordem das chaves do jsonb, sem caminho e com o "de"
+// cru ("Aparência 0 → 3"). T-78: "Descartar" vermelho e cheio, colado ao
+// "Salvar".
+describe('Editar: o resumo na ordem da ficha', () => {
+  it('"de" efetivo, grupos na ordem da ficha e o lote com o from cru', async () => {
+    const server = fakeServer(model, nova)
+    await renderLive({ model, sheet: nova, mode: 'evolve' }, server.post)
+    increment('Aparência')
+    increment('Aparência')
+    increment('Força de Vontade permanente')
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    const summary = within(screen.getByTestId('evolve-summary'))
+    // A Aparência do Tremere vem do clã (1), não do mínimo (0)
+    expect(
+      summary.getByLabelText('Atributos, Sociais, Aparência, 1 → 3')
+    ).toBeTruthy()
+    // A FdV permanente vem da Coragem (1), não "—"
+    expect(
+      summary.getByLabelText('Em jogo, Força de Vontade, permanente 1 → 2')
+    ).toBeTruthy()
+    // Os grupos na ordem da ficha: "Em jogo" antes de "Atributos"
+    expect(
+      summary
+        .getAllByText(/^(Em jogo|Atributos › Sociais)$/)
+        .map(t => t.props.children)
+    ).toEqual(['Em jogo', 'Atributos › Sociais'])
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
+    // O lote continua com o `from` cru: é o que o conflito compara
+    expect(server.sent[0]?.events).toEqual([
+      expect.objectContaining({ path: 'values.willpower', from: null }),
+      { path: 'values.appearance', from: null, to: 3 },
+    ])
+  })
+
+  it('"Descartar" é secundário, à esquerda; "Salvar" é a ação principal', async () => {
+    const server = fakeServer(model, nova)
+    await renderLive({ model, sheet: nova }, server.post)
+    evolveThree()
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    const discard = screen.getByRole('button', { name: 'Descartar' })
+    expect(discard.props.accessibilityHint).toBe('Descarta 3 alterações')
+    // Sem fundo (ghost), não o vermelho cheio de antes
+    expect(StyleSheet.flatten(discard.props.style).backgroundColor).toBe(
+      'transparent'
+    )
+    // Num espaço que cresce e o empurra para a borda esquerda
+    const ancestors: { props: { style?: unknown } }[] = []
+    for (let p = discard.parent; p; p = p.parent) ancestors.push(p)
+    expect(
+      ancestors.some(a => {
+        const style = StyleSheet.flatten(a.props.style as never) ?? {}
+        return style.flex === 1 && style.alignItems === 'flex-start'
+      })
+    ).toBe(true)
+    const save = screen.getByRole('button', { name: 'Salvar' })
+    expect(StyleSheet.flatten(save.props.style).backgroundColor).not.toBe(
+      'transparent'
+    )
+  })
+})
+
 describe('Editar: o servidor recusa (422)', () => {
   it('marca o campo indicado no path e volta para Editar com o rascunho', async () => {
     const post = jest.fn(
@@ -230,7 +300,7 @@ describe('Editar: editores', () => {
     const input = screen.getByLabelText('Força, de 1 a 5')
     expect(input.props.keyboardType).toBe('number-pad')
     fireEvent(input, 'submitEditing', { nativeEvent: { text: '9' } })
-    expect(screen.getByText('Digite um número de 1 a 5')).toBeTruthy()
+    expect(screen.getByText('Digite um número inteiro de 1 a 5')).toBeTruthy()
     fireEvent(screen.getByLabelText('Força, de 1 a 5'), 'submitEditing', {
       nativeEvent: { text: '4' },
     })
@@ -257,8 +327,8 @@ describe('Editar: editores', () => {
       ['Clã', 'Geração', 'Senhor'],
     ])
     // A célula abre o mesmo editor; a Geração (derivada) só mostra o valor
-    fireEvent.press(screen.getByRole('button', { name: /^Natureza:/ }))
-    expect(screen.getByLabelText('Natureza')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Natureza' }))
+    expect(textInput('Natureza')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Geração/ })).toBeNull()
     // Nada fica repetido embaixo das colunas
     expect(screen.queryByTestId('identity-editors')).toBeNull()
@@ -279,9 +349,12 @@ describe('Editar: editores', () => {
     }
     const before = chipColor('Tremere')
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Clã: Tremere' }))
+    // No app, o rótulo é o campo e o valor vai à parte (T-61)
+    fireEvent.press(screen.getByRole('button', { name: 'Clã' }))
     fireEvent.press(screen.getByRole('radio', { name: 'Brujah' }))
-    expect(screen.getByRole('button', { name: 'Clã: Brujah' })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Clã' })
+    ).toHaveAccessibilityValue({ text: 'Brujah' })
     const after = chipColor('Brujah')
     expect(before).toBeTruthy()
     expect(after).toBeTruthy()
@@ -291,15 +364,17 @@ describe('Editar: editores', () => {
   it('texto em sheet com contador; o nome não fica vazio', async () => {
     await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Conceito: vazio' }))
-    fireEvent.changeText(screen.getByLabelText('Conceito'), 'Arquivista')
+    const concept = () => screen.getByRole('button', { name: 'Conceito' })
+    expect(concept()).toHaveAccessibilityValue({ text: 'vazio' })
+    fireEvent.press(concept())
+    fireEvent.changeText(textInput('Conceito'), 'Arquivista')
     expect(screen.getByText(/^10\//)).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(
-      screen.getByRole('button', { name: 'Conceito: Arquivista' })
-    ).toBeTruthy()
+    expect(concept()).toHaveAccessibilityValue({ text: 'Arquivista' })
 
-    fireEvent.press(screen.getByRole('button', { name: 'Nome: Nova' }))
+    const name = screen.getByRole('button', { name: 'Nome' })
+    expect(name).toHaveAccessibilityValue({ text: 'Nova' })
+    fireEvent.press(name)
     fireEvent.changeText(screen.getByLabelText('Nome (obrigatório)'), '   ')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
     expect(screen.getByText('Informe o nome')).toBeTruthy()

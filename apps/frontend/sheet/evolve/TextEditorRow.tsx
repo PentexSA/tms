@@ -11,8 +11,10 @@ import {
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
+import { properNameInput } from '../editors/properName'
 import { SuggestionChips } from '../editors/Suggestions'
 import type { FieldViewProps } from '../views/types'
+import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
 
@@ -51,8 +53,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
       <Pressable
         testID={`editor-${resolved.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`${def.label}: ${value || 'vazio'}`}
-        accessibilityValue={value ? { text: value } : undefined}
+        {...fieldA11y(def.label, value || 'vazio')}
         accessibilityHint="Abre o editor de texto"
         onPress={() => {
           setText(value)
@@ -106,6 +107,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           hint={def.help}
           placeholder={def.placeholder}
           autoFocus
+          {...(required ? properNameInput : {})}
         />
         {def.type === 'text' && def.suggestions?.length ? (
           <View style={styles.suggestions}>

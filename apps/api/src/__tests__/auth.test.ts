@@ -71,6 +71,11 @@ async function register(user = ana, headers: Record<string, string> = NATIVE) {
   return { res, body: (await res.json()) as Session }
 }
 
+const expectNoStore = (res: Response) => {
+  expect(res.headers.get('cache-control')).toBe('no-store')
+  expect(res.headers.get('pragma')).toBe('no-cache')
+}
+
 const cookieOf = (res: Response) =>
   res.headers.getSetCookie().find(c => c.startsWith('tms_refresh='))
 const cookieValue = (res: Response) =>
@@ -413,16 +418,182 @@ describe('POST /auth/refresh e /auth/logout', () => {
     expect((await refresh(body.refreshToken ?? '')).status).toBe(401)
   })
 
-  it('logout web revoga a sessão e apaga o cookie', async () => {
+  // T-14: o jar.remove() mandava só Max-Age=0, sem Path=/auth; a remoção
+  // dependia do default-path do navegador e o QA viu o cookie ficar
+  const expectCleared = (res: Response, secure = false) => {
+    const cleared = cookieOf(res) ?? ''
+    expect(cleared).toMatch(/^tms_refresh=;/)
+    expect(cleared).toMatch(/Max-Age=0/)
+    expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/)
+    expect(cleared).toMatch(/Path=\/auth/)
+    expect(cleared).toMatch(/HttpOnly/)
+    expect(cleared).toMatch(/SameSite=Strict/i)
+    if (secure) expect(cleared).toMatch(/Secure/)
+    else expect(cleared).not.toMatch(/Secure/)
+  }
+
+  it('logout web revoga a sessão e apaga o cookie com Path=/auth, HttpOnly, SameSite=Strict e Max-Age=0', async () => {
     const { res } = await register(ana, WEB)
     const cookie = `tms_refresh=${cookieValue(res)}`
     const out = await post('/auth/logout', undefined, { ...WEB, cookie })
     expect(out.status).toBe(204)
-    const cleared = cookieOf(out) ?? ''
-    expect(cleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/)
+    expectCleared(out)
     expect(
       (await post('/auth/refresh', undefined, { ...WEB, cookie })).status
     ).toBe(401)
+  })
+
+  it('logout web sem cookie também manda apagar', async () => {
+    const out = await post('/auth/logout', undefined, WEB)
+    expect(out.status).toBe(204)
+    expectCleared(out)
+  })
+
+  it('com secureCookies, o cookie apagado também é Secure', async () => {
+    await setup({ secureCookies: true })
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    expectCleared(
+      await post('/auth/logout', undefined, { ...WEB, cookie }),
+      true
+    )
+  })
+
+  it('refresh recusado apaga o cookie com os mesmos atributos', async () => {
+    const res = await post('/auth/refresh', undefined, {
+      ...WEB,
+      cookie: `tms_refresh=${'x'.repeat(43)}`,
+    })
+    expect(res.status).toBe(401)
+    expectCleared(res)
+  })
+
+  it('logout e refresh nativos não mexem em cookie', async () => {
+    const { body } = await register()
+    const out = await post(
+      '/auth/logout',
+      { refreshToken: body.refreshToken },
+      NATIVE
+    )
+    expect(cookieOf(out)).toBeUndefined()
+    const refused = await post(
+      '/auth/refresh',
+      { refreshToken: body.refreshToken },
+      NATIVE
+    )
+    expect(refused.status).toBe(401)
+    expect(cookieOf(refused)).toBeUndefined()
+  })
+
+  // T-14: um logout offline que não revogou deixa o cookie antigo vivo no
+  // servidor; entrar de novo no mesmo navegador o sobrescreve, e ele morreria
+  // órfão mas válido
+  it('login no web revoga a sessão do cookie anterior', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const again = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { ...WEB, cookie: old }
+    )
+    expect(again.status).toBe(200)
+    expect(cookieValue(again)).not.toBe(cookieValue(res))
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(401)
+    const fresh = `tms_refresh=${cookieValue(again)}`
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: fresh })).status
+    ).toBe(200)
+  })
+
+  it('cadastro no web revoga a sessão do cookie anterior', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const other = await post(
+      '/auth/register',
+      { ...ana, email: 'bia@example.test', username: 'bia' },
+      { ...WEB, cookie: old }
+    )
+    expect(other.status).toBe(201)
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(401)
+  })
+
+  it('login com cookie de outra origem não revoga nem é recusado', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const again = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { origin: 'https://evil.test', cookie: old }
+    )
+    expect(again.status).toBe(200)
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(200)
+  })
+
+  it('login nativo não mexe em cookie', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const native = await post(
+      '/auth/login',
+      { email: ana.email, password: ana.password },
+      { ...NATIVE, cookie: old }
+    )
+    expect(native.status).toBe(200)
+    expect(cookieOf(native)).toBeUndefined()
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: old })).status
+    ).toBe(200)
+  })
+
+  // Sem rate limit no logout (revisão do padrão 8): ele só revoga com posse
+  // do token, de alta entropia, e não serve para força bruta. Um 429 ali
+  // deixava a família viva no servidor (falha aberta). Quem esgota os limites
+  // de autenticação do IP não impede ninguém de sair
+  it('logout não tem rate limit: com os limites de autenticação esgotados, revoga e apaga o cookie', async () => {
+    const exhausted = () => createRateLimiter({ limit: 0, windowMs: MINUTE })
+    await setup({
+      limits: {
+        ...defaultLimits(() => new Date()),
+        login: exhausted(),
+        refresh: exhausted(),
+      },
+    })
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    for (let n = 0; n < 30; n++)
+      expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
+    const out = await post('/auth/logout', undefined, { ...WEB, cookie })
+    expect(out.status).toBe(204)
+    expectCleared(out)
+    expect(Object.keys(defaultLimits(() => new Date()))).not.toContain('logout')
+    // Revogou a família do cookie no servidor
+    const alive = await ctx.db
+      .selectFrom('refresh_tokens')
+      .select('id')
+      .where('revoked_at', 'is', null)
+      .execute()
+    expect(alive).toEqual([])
+  })
+
+  // T-14 e CSRF: com Origin fora da allowlist, o logout recusa (403) e não
+  // mexe no cookie de ninguém
+  it('logout web com Origin fora da allowlist: 403, sem apagar o cookie', async () => {
+    const { res } = await register(ana, WEB)
+    const cookie = `tms_refresh=${cookieValue(res)}`
+    const evil = await post('/auth/logout', undefined, {
+      origin: 'https://evil.test',
+      cookie,
+    })
+    expect(evil.status).toBe(403)
+    expect(cookieOf(evil)).toBeUndefined()
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie })).status
+    ).toBe(200)
   })
 
   it('logout sem sessão é idempotente', async () => {
@@ -448,6 +619,56 @@ describe('CORS, cabeçalhos e erros', () => {
     expect(evil.headers.get('access-control-allow-origin')).not.toBe('*')
   })
 
+  // T-86: quem acrescenta o X-Forwarded-For é o proxy, nunca o navegador
+  const preflightHeaders = async (
+    extra: Parameters<typeof createTestContext>[0]
+  ) => {
+    await setup(extra)
+    const res = await makeRequest(
+      ctx.app,
+      'OPTIONS',
+      '/auth/login',
+      undefined,
+      {
+        origin: ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      }
+    )
+    return (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+  }
+
+  it('o preflight nunca libera x-forwarded-for, nem com TRUST_PROXY', async () => {
+    for (const trustProxy of [false, true]) {
+      const allowed = await preflightHeaders({ trustProxy })
+      expect(allowed).toContain('content-type')
+      expect(allowed).not.toContain('x-forwarded-for')
+      expect(allowed).not.toContain('x-tms-test-client-ip')
+    }
+  })
+
+  it('com TEST_CLIENT_IP, libera só o header de teste', async () => {
+    const allowed = await preflightHeaders({ testClientIp: true })
+    expect(allowed).toContain('x-tms-test-client-ip')
+    expect(allowed).not.toContain('x-forwarded-for')
+  })
+
+  it('sem proxy confiável, X-Forwarded-For forjado não escapa do limite de cadastro', async () => {
+    await setup({ trustProxy: false, testClientIp: false })
+    const statuses: number[] = []
+    for (let n = 1; n <= 6; n++)
+      statuses.push(
+        (
+          await post(
+            '/auth/register',
+            { ...ana, email: `f${n}@x.test`, username: `forjado${n}` },
+            { ...NATIVE, 'x-forwarded-for': `203.0.113.${n}` }
+          )
+        ).status
+      )
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 429])
+  })
+
   it.each([
     ['GET', '/health', 200],
     ['GET', '/me', 401],
@@ -463,8 +684,80 @@ describe('CORS, cabeçalhos e erros', () => {
         "frame-ancestors 'none'"
       )
       expect(res.headers.get('strict-transport-security')).toContain('max-age=')
+      expectNoStore(res)
     }
   )
+
+  // T-13: o cache HTTP do iOS (NSURLCache) e do Android (OkHttp) gravava em
+  // disco, em claro, as respostas com tokens e dados ocultos
+  it('toda resposta sai com no-store, inclusive erro, preflight e swagger', async () => {
+    const { body } = await register()
+    const responses: [string, Response, number][] = [
+      [
+        'login 200 com tokens',
+        await post(
+          '/auth/login',
+          { email: ana.email, password: ana.password },
+          NATIVE
+        ),
+        200,
+      ],
+      [
+        'refresh recusado',
+        await post('/auth/refresh', { refreshToken: 'x'.repeat(43) }, NATIVE),
+        401,
+      ],
+      ['validação', await post('/auth/login', { email: 'ana' }, NATIVE), 400],
+      [
+        'corpo que não é JSON',
+        await ctx.app.handle(
+          new Request('http://localhost/auth/login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: '{ não é json',
+          })
+        ),
+        400,
+      ],
+      [
+        'preflight',
+        await makeRequest(ctx.app, 'OPTIONS', '/auth/login', undefined, {
+          origin: ORIGIN,
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        }),
+        204,
+      ],
+      [
+        'logout',
+        await post('/auth/logout', { refreshToken: body.refreshToken }, NATIVE),
+        204,
+      ],
+    ]
+    for (const [name, res, status] of responses) {
+      expect({ name, status: res.status }).toEqual({ name, status })
+      expectNoStore(res)
+    }
+
+    await setup({
+      swagger: true,
+      limits: {
+        ...defaultLimits(() => new Date()),
+        login: createRateLimiter({ limit: 1, windowMs: MINUTE }),
+      },
+    })
+    const swaggerUi = await get('/swagger')
+    expect(swaggerUi.status).toBe(200)
+    expectNoStore(swaggerUi)
+    await post('/auth/login', { email: ana.email, password: 'x' }, NATIVE)
+    const limited = await post(
+      '/auth/login',
+      { email: ana.email, password: 'x' },
+      NATIVE
+    )
+    expect(limited.status).toBe(429)
+    expectNoStore(limited)
+  })
 
   it('swagger só fora de produção', async () => {
     await setup({ swagger: false })
@@ -492,6 +785,7 @@ describe('CORS, cabeçalhos e erros', () => {
       const text = await res.text()
       expect(JSON.parse(text)).toEqual({ error: 'erro interno' })
       expect(text).not.toContain('at ')
+      expectNoStore(res)
     } finally {
       await own.destroy()
     }

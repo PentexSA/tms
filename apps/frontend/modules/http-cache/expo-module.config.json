@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["HttpCacheModule"],
+    "appDelegateSubscribers": ["HttpCacheAppDelegateSubscriber"]
+  },
+  "android": {
+    "modules": ["expo.modules.tmshttpcache.HttpCacheModule"]
+  }
+}

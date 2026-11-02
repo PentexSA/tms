@@ -224,6 +224,15 @@ export interface TraitTemplates {
   version: string
 }
 
+export interface UserCommands {
+  client_command_id: string
+  created_at: Generated<Timestamp>
+  kind: string
+  request_hash: string
+  result: Json
+  user_id: string
+}
+
 export interface Users {
   created_at: Generated<Timestamp | null>
   deleted_at: Timestamp | null
@@ -288,6 +297,7 @@ export interface DB {
   game_systems: GameSystems
   refresh_tokens: RefreshTokens
   trait_templates: TraitTemplates
+  user_commands: UserCommands
   users: Users
   xp_entries: XpEntries
   xp_requests: XpRequests

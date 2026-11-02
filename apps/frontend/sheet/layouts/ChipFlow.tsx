@@ -1,5 +1,5 @@
 import { describe, type FieldId, short } from '@tms/sheet-core'
-import { Text, tokens, useTheme } from '@tms/ui'
+import { hitTarget, Text, tokens, useTheme } from '@tms/ui'
 import { memo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useFieldEntry } from '../context'
@@ -32,7 +32,10 @@ const ValueChip = memo(function ValueChip({ id }: { readonly id: FieldId }) {
       id={id}
       label={describe(resolved, sheet)}
       value={value}
-      style={[styles.chip, { borderColor: colors.borderSubtle }]}
+      style={[
+        styles.chip,
+        { minHeight: hitTarget(), borderColor: colors.borderSubtle },
+      ]}
     >
       <Text numberOfLines={1}>{resolved.field.def.label}</Text>
       <Text variant="number">{value}</Text>
@@ -52,7 +55,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.space[2],
-    minHeight: tokens.size.hitSize,
     paddingHorizontal: tokens.space[3],
     borderRadius: tokens.radius.pill,
     borderWidth: tokens.borderWidth.hair,

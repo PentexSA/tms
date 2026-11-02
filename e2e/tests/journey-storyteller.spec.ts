@@ -128,9 +128,7 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
 
     // 2. A conclusão fecha a evolução, mas mantém o gasto de FdV temporária.
     await page.goto(`/characters/${idA}`)
-    await page
-      .getByRole('button', { name: 'Ações do narrador', exact: true })
-      .click()
+    await page.getByRole('button', { name: /^Narrador/ }).click()
     await page
       .getByRole('button', { name: 'Concluir criação', exact: true })
       .click()
@@ -222,9 +220,7 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
     await rollPage.goto(`/characters/${idA}`)
     await dice(rollPage, true)
     await page.goto(`/characters/${idA}`)
-    await page
-      .getByRole('button', { name: 'Ações do narrador', exact: true })
-      .click()
+    await page.getByRole('button', { name: /^Narrador/ }).click()
     await page.getByRole('button', { name: 'Travar', exact: true }).click()
     await expect(page.getByText('Ficha travada.')).toBeVisible()
     const lockedRoll = response(rollPage, `/characters/${idA}/rolls`, 403)
@@ -252,9 +248,7 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
     await privateSheets()
 
     // 5. Retoma, abre as duas páginas e remove a jogadora sem recarregá-las.
-    await page
-      .getByRole('button', { name: 'Ações do narrador', exact: true })
-      .click()
+    await page.getByRole('button', { name: /^Narrador/ }).click()
     await page.getByRole('button', { name: 'Destravar', exact: true }).click()
     await expect(page.getByText('Ficha destravada.')).toBeVisible()
     await a.reload()

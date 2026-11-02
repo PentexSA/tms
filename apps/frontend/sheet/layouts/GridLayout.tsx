@@ -28,24 +28,26 @@ export function GridLayout({ section }: LayoutProps) {
     return (
       <View testID={`grid-${section.id}`}>
         {tabs.bar}
-        {tabs.groups.map(g => (
-          <View key={g.id}>
-            {/* Com abas, o título do grupo é a própria aba */}
-            {g.title && !tabs.bar ? (
-              <View style={styles.title}>
-                <SectionHeader
-                  title={g.title}
-                  level="group"
-                  right={<CreationCounter fieldIds={g.fieldIds} />}
-                />
-              </View>
-            ) : null}
-            {tabs.bar ? <CreationCounter fieldIds={g.fieldIds} line /> : null}
-            {g.fieldIds.map(id => (
-              <FieldSlot key={id} id={id} variant="row" />
-            ))}
-          </View>
-        ))}
+        <View {...tabs.panelProps}>
+          {tabs.groups.map(g => (
+            <View key={g.id}>
+              {/* Com abas, o título do grupo é a própria aba */}
+              {g.title && !tabs.bar ? (
+                <View style={styles.title}>
+                  <SectionHeader
+                    title={g.title}
+                    level="group"
+                    right={<CreationCounter fieldIds={g.fieldIds} />}
+                  />
+                </View>
+              ) : null}
+              {tabs.bar ? <CreationCounter fieldIds={g.fieldIds} line /> : null}
+              {g.fieldIds.map(id => (
+                <FieldSlot key={id} id={id} variant="row" />
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
     )
 

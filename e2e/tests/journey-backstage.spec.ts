@@ -106,7 +106,7 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
     await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}/)
     const npcId = /characters\/([0-9a-f-]{36})/.exec(page.url())![1]!
     await expect(page.getByText('Visibilidade do NPC')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Oculto' })).toBeDisabled()
+    await expect(page.getByRole('radio', { name: 'Oculto' })).toBeChecked()
 
     await apiAs(
       storytellerContext,

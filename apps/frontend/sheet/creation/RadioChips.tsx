@@ -1,4 +1,4 @@
-import { Pressable, Text, tokens, useTheme } from '@tms/ui'
+import { Pressable, Text, tokens, useRovingFocus, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 
 export interface RadioChip {
@@ -29,6 +29,12 @@ export function RadioChips({
   readonly testID?: string
 }) {
   const { colors } = useTheme()
+  // Setas só movem o foco: a escolha grava na hora (Espaço ou Enter)
+  const roving = useRovingFocus({
+    count: options.length,
+    active: options.findIndex(o => o.id === value),
+    activate: 'manual',
+  })
   return (
     <View
       accessibilityRole="radiogroup"
@@ -36,11 +42,12 @@ export function RadioChips({
       style={styles.row}
       testID={testID}
     >
-      {options.map(o => {
+      {options.map((o, i) => {
         const on = o.id === value
         return (
           <Pressable
             key={o.id}
+            {...roving(i)}
             accessibilityRole="radio"
             accessibilityLabel={o.spoken ?? o.label}
             aria-checked={on}

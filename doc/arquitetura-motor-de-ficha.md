@@ -317,11 +317,13 @@ Quando algo dá errado:
 | Resposta | O que o app faz |
 |---|---|
 | sem rede, 5xx, 408, 429 | mantém o lote no outbox e tenta de novo com backoff |
-| 409 (o `from` não bate: alguém mudou antes) | descarta o lote, rebusca a ficha e mostra o aviso de conflito ("a narradora alterou a Vitalidade enquanto você estava offline"), com a opção de reaplicar, que gera um lote novo com o `from` atualizado |
+| 409 (o `from` não bate: alguém mudou antes) | tira o lote da fila e rebusca a ficha. O corpo traz só os caminhos em conflito (`issues`) e quem mudou cada um (`changedBy`: `self`, `owner`, `storyteller` ou `null`, nunca id nem nome; `null` também quando o último lote é de uma rolagem oculta e quem pede não narra). O app valida o corpo como input hostil. **Lote do "Salvar" de Criação/Editar:** volta inteiro ao rascunho; os campos do 409 ficam marcados e o "Salvar" é recusado até a pessoa escolher, campo a campo, em "Revisar" ("Seu valor" × "Valor atual · alterado pelo narrador"; "Ficar com o atual" ou "Usar o meu"). **Lote do Jogo:** volta inteiro ("Reaplicar tudo", com o `from` atualizado) ou não volta, porque uma ação mexe em campos ligados (T-31) |
 | 400, 403, 422 (inválido ou sem permissão) | descarta o lote e reverte o otimista, sem tentar de novo |
 | 401 | renova a sessão e tenta de novo; sem sessão, pausa a fila e pede login |
 
 **Sem tempo real** (decisão do §2): a ficha é rebuscada ao **focar a tela**, ao **reconectar** e depois de cada lote confirmado. A mesa do narrador faz o mesmo, sem WebSocket.
+
+**O rascunho de Criação/Editar também fica no aparelho** (T-03). A cada mudança, o registro `draft:<characterId>` é gravado no storage do usuário (§7.1), com uma gravação em voo e a última pendente. Ao reabrir a ficha, com registro e o rascunho em memória vazio, a ficha oferece "Alterações não salvas" e fica pausada até a decisão: "Recuperar" revalida cada alteração com os papéis e a ficha de agora (o que mudou desde então volta marcado como conflito), "Descartar" apaga, e fechar deixa para depois. Depois de "Salvar", o registro só sai quando o lote está no outbox. O cabeçalho diz "N alterações não salvas" enquanto há rascunho, não "Salvo" (T-17).
 
 ### 6.7 App primeiro, web sempre
 
@@ -344,6 +346,7 @@ Quando algo dá errado:
 |---|---|---|
 | Cache de leitura | templates (por `system@version`, longa duração) e fichas | TanStack Query (já no projeto) com `@tanstack/react-query-persist-client` |
 | Outbox | lotes de eventos ainda não confirmados | módulo próprio e pequeno (§7.3) |
+| Rascunho | o rascunho de Criação/Editar de cada ficha, até salvar ou descartar (T-03) | `sheet/sync/draftStore.ts`, no mesmo storage do usuário; prazo de 7 dias |
 | Storage | onde as duas peças gravam | `storage.native.ts` → `expo-sqlite/kv-store` (confira na versão do SDK em uso); `storage.web.ts` → IndexedDB |
 | Rede | online e offline | `onlineManager` do TanStack Query ligado ao `@react-native-community/netinfo` |
 
@@ -351,7 +354,8 @@ Quando algo dá errado:
 
 - **Tokens nunca vão para o cache nem para o outbox.** No nativo, ficam no `expo-secure-store`. No web, em cookie `httpOnly` + `Secure` + `SameSite`, fora do `localStorage`.
 - **Seções restritas nunca chegam** ao aparelho de quem não pode lê-las, porque o servidor as remove antes de responder (contrato §11).
-- **Tudo é separado por usuário.** A chave do storage leva o id do usuário, e o logout apaga o cache e o outbox.
+- **Tudo é separado por usuário.** A chave do storage leva o id do usuário, e o logout apaga o cache, o outbox e os rascunhos.
+- **O rascunho guarda só a ficha.** Lista fechada de campos (versão, ficha, versão do template e da ficha, modo, data e as alterações `{ path, from, to }`); nada de token, credencial ou texto da tela. Do disco, é input hostil: forma errada, caminho inválido ou repetido, mais de 50 alterações ou 64 KiB, vencido (7 dias) ou do futuro é descartado e apagado, sem log.
 - **O que vem do disco é input hostil.** Ao reidratar, o template passa por `compileTemplate` e a ficha por `validateSheet`. Se falhar, o dado é descartado e rebuscado.
 - **Criptografia em repouso no nativo** (Etapa 22, `apps/frontend/sheet/sync/encryptedStorage.ts`):
   - **Banco:** o storage é uma tabela num banco SQLCipher próprio (`tms-offline.db`, plugin `expo-sqlite` com `useSQLCipher` no `app.json`). A interface `KeyValueStorage` não mudou. Exige dev build.
@@ -382,6 +386,8 @@ export interface Outbox {
 - **FIFO por ficha.** Um lote só sai depois que o anterior foi confirmado, porque o `from` de um lote depende do anterior.
 - **Idempotência.** O servidor guarda `(character_id, client_batch_id)`. Reenviar o mesmo lote não o aplica duas vezes.
 - **Limites** de lotes por ficha e de tamanho por lote, iguais aos do servidor.
+- **A origem do lote sobrevive ao disco.** O `draft: true` do "Salvar" de Criação/Editar é guardado: o lote recusado (422) ou em conflito (409) volta ao rascunho mesmo depois de reiniciar o app.
+- **`enqueue` diz se o lote entrou.** O `Sync.enqueue` devolve a Promise do outbox; o rascunho persistido só some depois dela.
 
 ### 7.4 Por que não WatermelonDB (para a ficha)
 
@@ -414,6 +420,8 @@ O WatermelonDB é ótimo para muitos registros relacionais com consulta local. A
 | `GET /characters/:id` | ficha | AuthZ por crônica; remove seções com `read` restrito |
 | `POST /characters/:id/events` | aplica um lote | AuthZ; escrita por seção; idempotência; rate limit; limite de corpo e de eventos por lote |
 | `GET /chronicles/:id/characters` | mesa: lista com os campos do `dock` | AuthZ; só narrador e membros; mesmas remoções |
+| `POST /chronicles/:id/characters` | Nova ficha (jogador) e NPC (narrador) | AuthZ; trava da crônica; `clientCommandId` em `chronicle_commands` (obrigatório no NPC, opcional na ficha do jogador): a repetição do mesmo autor e pedido devolve a mesma ficha antes do limite de 20; chave com outro pedido ou de outra pessoa, 409 sem o id (T-02) |
+| `POST /chronicles` | Nova crônica | `clientCommandId` opcional em `user_commands` (por usuário, sob a trava da linha do usuário): a repetição devolve a mesma crônica, 404 se ela foi excluída (T-02) |
 | `POST/GET /chronicles/:id/rolls` | parada livre e feed | só narrador; resultado no servidor; chave por crônica |
 | `GET/POST/PATCH /chronicles/:id/sessions` | diário público e notas privadas | membro lê projeção pública; narrador administra |
 | `POST/GET /chronicles/:id/transfer` | transferência com aceite | narrador propõe; destinatário membro decide |

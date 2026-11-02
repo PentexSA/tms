@@ -1,4 +1,4 @@
-import { Banner, Text, tokens, useTheme } from '@tms/ui'
+import { Banner, hitTarget, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useOnline } from '../../lib/network'
 import { useSyncStatus } from './SyncProvider'
@@ -6,15 +6,34 @@ import type { SyncStatus } from './sync'
 
 // O estado da fila no header (doc/plano-v0.md, Etapa 20): salvo, salvando,
 // offline · N pendentes, ou erro. Anunciado ao leitor de tela quando muda.
+// Com rascunho em Criação/Editar, "N alterações não salvas" vence tudo (T-17):
+// antes, o "Salvo" verde aparecia com alterações que só existiam no aparelho.
 
-export type SyncState = 'saved' | 'saving' | 'offline' | 'error'
+export type SyncState = 'unsaved' | 'saved' | 'saving' | 'offline' | 'error'
 
 const pendentes = (n: number) => (n === 1 ? '1 pendente' : `${n} pendentes`)
 
+/** "1 alteração não salva", "3 alterações não salvas". */
+export const unsavedLabel = (n: number) =>
+  n === 1 ? '1 alteração não salva' : `${n} alterações não salvas`
+
 export function describeSync(
   status: SyncStatus,
-  online: boolean
+  online: boolean,
+  unsaved = 0
 ): { readonly state: SyncState; readonly text: string } {
+  // O erro do servidor vem primeiro, com o rascunho junto: um não esconde o
+  // outro
+  if (status.failure === 'server' && status.pending)
+    return {
+      state: 'error',
+      text: `Erro ao salvar · tentando de novo${unsaved > 0 ? ` · ${unsavedLabel(unsaved)}` : ''}`,
+    }
+  if (unsaved > 0)
+    return {
+      state: 'unsaved',
+      text: `${unsavedLabel(unsaved)}${online ? '' : ' · offline'}`,
+    }
   if (!online || status.failure === 'network')
     return {
       state: 'offline',
@@ -28,10 +47,16 @@ export function describeSync(
   return { state: 'saved', text: 'Salvo' }
 }
 
-export function SyncIndicator() {
+export function SyncIndicator({
+  unsaved = 0,
+}: {
+  // Alterações do rascunho de Criação/Editar, ainda não salvas
+  readonly unsaved?: number
+}) {
   const { colors } = useTheme()
-  const { state, text } = describeSync(useSyncStatus(), useOnline())
+  const { state, text } = describeSync(useSyncStatus(), useOnline(), unsaved)
   const dot = {
+    unsaved: colors.action,
     saved: colors.success,
     saving: colors.inkMuted,
     offline: colors.action,
@@ -43,7 +68,8 @@ export function SyncIndicator() {
       accessibilityLabel={`Sincronização: ${text}`}
       aria-live="polite"
       testID={`sync-${state}`}
-      style={styles.row}
+      // Mesma altura dos controles do cabeçalho, que crescem no Android
+      style={[styles.row, { minHeight: hitTarget() }]}
     >
       <View style={[styles.dot, { backgroundColor: dot }]} />
       <Text variant="caption" color="inkMuted">
@@ -73,7 +99,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.space[1],
-    minHeight: 44,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   banner: {

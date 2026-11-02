@@ -18,6 +18,10 @@ jest.mock('../../lib/session', () => {
         read: async () => null,
         write: async () => undefined,
         clear: async () => undefined,
+        pendingLogout: {
+          read: async () => [],
+          write: async () => undefined,
+        },
       },
       fetch: async () => new Response(null, { status: 401 }),
     }),

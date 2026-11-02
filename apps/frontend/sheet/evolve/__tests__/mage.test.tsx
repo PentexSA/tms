@@ -6,6 +6,7 @@ import {
 } from '@testing-library/react-native'
 import { example, modelOf } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { textInput } from '../../../test/queries'
 
 // v1, Etapa 5: o teto não destrutivo (Esferas ≤ Arete), o selo da afinidade
 // e as rotinas (lista sem valor) no Editar do Mago. Nada aqui é código do
@@ -96,7 +97,7 @@ describe('rotinas (lista sem valor)', () => {
   it('adiciona pelo nome, sem stepper, e o lote leva só id e nome', async () => {
     const server = await evolveSpheres()
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Rotina' }))
-    fireEvent.changeText(screen.getByLabelText('Nome'), 'Escudo de estática')
+    fireEvent.changeText(textInput('Nome'), 'Escudo de estática')
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Escudo de estática”' })
     )

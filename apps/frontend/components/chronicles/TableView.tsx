@@ -1,6 +1,6 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
-import { Button, Chip, Skeleton, Tabs, Text, tokens } from '@tms/ui'
+import { Button, Chip, Skeleton, TabPanel, Tabs, Text, tokens } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -172,6 +172,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     <View>
       <View style={styles.controls}>
         <Tabs
+          id="table-scope"
           size="sm"
           accessibilityLabel="Fichas da Mesa"
           items={[
@@ -274,37 +275,39 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           </View>
         ) : null}
       </View>
-      {table.isPending ? (
-        <Skeleton lines={3} label="Carregando a mesa" />
-      ) : table.isError ? (
-        <View style={styles.hint}>
-          <Text color="danger">{messageOf(table.error)}</Text>
-          <Button
-            title="Tentar de novo"
-            variant="secondary"
-            onPress={() => table.refetch()}
-          />
-        </View>
-      ) : shown.length === 0 ? (
-        <Text color="inkMuted" style={styles.hint}>
-          {onlyAlerts && rows.length
-            ? 'Ninguém com alerta agora.'
-            : scope === 'out'
-              ? 'Nenhuma ficha arquivada ou fora de jogo.'
-              : 'Nenhuma ficha na crônica ainda.'}
-        </Text>
-      ) : (
-        shown.map(item => (
-          <TableRow
-            key={item.row.id}
-            item={item}
-            onOpen={open}
-            selecting={selecting}
-            selected={selected.has(item.row.id)}
-            onSelect={select}
-          />
-        ))
-      )}
+      <TabPanel tabsId="table-scope" tab={scope}>
+        {table.isPending ? (
+          <Skeleton lines={3} label="Carregando a mesa" />
+        ) : table.isError ? (
+          <View style={styles.hint}>
+            <Text color="danger">{messageOf(table.error)}</Text>
+            <Button
+              title="Tentar de novo"
+              variant="secondary"
+              onPress={() => table.refetch()}
+            />
+          </View>
+        ) : shown.length === 0 ? (
+          <Text color="inkMuted" style={styles.hint}>
+            {onlyAlerts && rows.length
+              ? 'Ninguém com alerta agora.'
+              : scope === 'out'
+                ? 'Nenhuma ficha arquivada ou fora de jogo.'
+                : 'Nenhuma ficha na crônica ainda.'}
+          </Text>
+        ) : (
+          shown.map(item => (
+            <TableRow
+              key={item.row.id}
+              item={item}
+              onOpen={open}
+              selecting={selecting}
+              selected={selected.has(item.row.id)}
+              onSelect={select}
+            />
+          ))
+        )}
+      </TabPanel>
       {xpSheet === 'grant' ? (
         <GrantXpSheet
           chronicleId={chronicleId}

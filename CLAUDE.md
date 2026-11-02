@@ -56,9 +56,9 @@ packages/
 ### Initial Setup
 
 ```bash
-npx pnpm install                    # Install all dependencies
-cp .env.example .env           # Copy environment template
-npx pnpm db:up                     # Start PostgreSQL via Docker
+npx pnpm bootstrap                  # Install from the lockfile and build the API packages
+cp .env.example .env           # Copy environment template (works as is in dev)
+npx pnpm db:up                     # Start PostgreSQL 16 via Docker (loopback only)
 npx pnpm db:migrate                # Run migrations
 npx pnpm db:codegen                # Generate TypeScript types from DB schema
 ```
@@ -66,13 +66,18 @@ npx pnpm db:codegen                # Generate TypeScript types from DB schema
 ### Development
 
 ```bash
-npx pnpm dev                       # Start all apps in parallel
-npx pnpm dev:expo                  # Start only frontend
+npx pnpm dev                       # Build the API packages, then start all apps in parallel
+npx pnpm dev:api                   # API only (builds its packages first, hot reload)
+npx pnpm dev:web                   # Web only (Metro reads @tms/sheet-core and @tms/ui from src)
+npx pnpm dev:expo                  # Expo dev server (tunnel)
+npx pnpm seed:roteiro              # Test-script accounts and chronicles (API in process)
 
 # Individual apps
 cd apps/api && bun run dev     # API only (hot reload)
 cd apps/frontend && npx expo start  # Frontend only
 ```
+
+The API, web and app scripts check the environment first (`scripts/check-dev-env.mjs`): they refuse to start with `node_modules` different from `pnpm-lock.yaml` or, for the API, a package `dist` older than its `src`, and say `pnpm bootstrap`. Metro resolves `@tms/sheet-core` and `@tms/ui` from `src` (`apps/frontend/metro.config.js`), like Jest; the API, migrations and Bun scripts still read `dist`.
 
 ### Database Operations
 
@@ -134,6 +139,15 @@ E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C
 ```
 
 `journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1), e `journey-storyteller.spec.ts`, a da v3 (doc/plano-v3.md §1): concluir, dano em grupo, Nova noite, desfazer, travar e remover, e `journey-backstage.spec.ts`, a da v5 (doc/plano-v5.md §1): NPC oculto, revelação, rolagem oculta, parada livre, sessão, auditoria e transferência. O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
+
+#### Build nativo no CI (D-00)
+
+Os jobs `native-android` (Linux: `expo export` de iOS e Android, `expo prebuild` e `assembleDebug` x86_64) e `native-ios` (`macos-26`, Xcode 26.6: prebuild, `pod install` e `xcodebuild` Debug para simulador) rodam em todo PR, sem assinatura e sem segredo; `workflow_dispatch` roda o mesmo na integração de uma onda. O job `check` confere as versões nativas contra o SDK do Expo:
+
+```bash
+npx pnpm check:native                                        # transitivos nativos (bundledNativeModules.json)
+EXPO_OFFLINE=1 npx pnpm -C apps/frontend exec expo install --check   # dependências diretas do app
+```
 
 #### Concorrência em Postgres real
 
@@ -210,7 +224,7 @@ npx pnpm codegen                   # Generate types
 - **Monorepo Tool**: Turborepo v2.5+
 - **Runtime**: Bun (API only), Node.js (other packages)
 - **API Framework**: Elysia v1.2+ with @elysiajs/cors and @elysiajs/swagger
-- **Frontend**: Expo ~57.0 + Expo Router ~57.0 + React 19.2 (React Native 0.86)
+- **Frontend**: Expo SDK 58 + Expo Router 58.0.26 + React 19.3 (React Native 0.88)
 - **Database**: PostgreSQL 16 via Docker
 - **Query Builder**: Kysely v0.28 with kysely-codegen
 - **TypeScript**: v5.7+ across all packages
@@ -226,3 +240,7 @@ npx pnpm codegen                   # Generate types
 **Database connection errors**: Verify Docker container is running and DATABASE_URL matches docker-compose.yml credentials
 
 **Port conflicts**: Default ports are 3001 (API) and 5432 (PostgreSQL). Change in `.env` if needed.
+
+**"Atualize o app" / "Recarregue a página" with a current template, "criação livre" on a points system, or `usePreventRemove is not a function`**: stale build or dependencies. Run `npx pnpm bootstrap` and start again.
+
+**Native build fails after an SDK upgrade**: run `npx pnpm check:native`; it names the native package outside the SDK range and the `expo install` command that aligns it.

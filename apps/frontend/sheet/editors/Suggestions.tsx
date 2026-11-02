@@ -67,6 +67,8 @@ export function SuggestionPicker({
       <View style={styles.open}>
         <Button
           title="Escolher da lista"
+          // Dois na tela (Natureza e Comportamento): o nome diz qual
+          accessibilityLabel={`Escolher da lista: ${label}`}
           variant="ghost"
           accessibilityHint={`Abre a lista de ${label}`}
           testID={testID}

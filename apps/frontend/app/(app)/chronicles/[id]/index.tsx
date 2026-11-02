@@ -8,6 +8,7 @@ import {
   Screen,
   SectionHeader,
   Skeleton,
+  TabPanel,
   Tabs,
   Text,
   tokens,
@@ -112,6 +113,7 @@ export default function ChronicleScreen() {
 
         {!former ? (
           <Tabs
+            id="chronicle-view"
             accessibilityLabel="Visão da crônica"
             items={
               narrating
@@ -130,17 +132,30 @@ export default function ChronicleScreen() {
           />
         ) : null}
 
-        {showing === 'table' ? (
-          <TableView chronicleId={c.id} />
-        ) : showing === 'backstage' ? (
-          <CampaignBackstage chronicle={c} narrating={narrating} />
-        ) : (
+        {/* O ex-membro não tem as abas: sem tablist, nada de tabpanel (o
+            aria-labelledby ficaria apontando para uma aba que não existe) */}
+        {former ? (
           <SheetsPanel
             chronicle={c}
             narrating={narrating}
             former={former}
             onInvite={() => setInviting(true)}
           />
+        ) : (
+          <TabPanel tabsId="chronicle-view" tab={showing}>
+            {showing === 'table' ? (
+              <TableView chronicleId={c.id} />
+            ) : showing === 'backstage' ? (
+              <CampaignBackstage chronicle={c} narrating={narrating} />
+            ) : (
+              <SheetsPanel
+                chronicle={c}
+                narrating={narrating}
+                former={former}
+                onInvite={() => setInviting(true)}
+              />
+            )}
+          </TabPanel>
         )}
         {c.role === 'player' ? (
           <View style={styles.danger}>

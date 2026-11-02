@@ -21,6 +21,8 @@ import { StyleSheet, View } from 'react-native'
 import { messageOf } from '../../lib/errors'
 import { useChronicleCreationSettings } from '../../lib/queries/creation'
 import { useCompiled, useLatestTemplate } from '../../sheet/data'
+import { ReloadButton, unsupportedShort } from '../../sheet/UnsupportedTemplate'
+import { UnsavedChangesGuard } from '../UnsavedChangesGuard'
 
 const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quinta']
 
@@ -68,6 +70,17 @@ export function CreationSettings({
   const changed =
     approval !== creation.approval ||
     JSON.stringify(defaults) !== JSON.stringify(layerOf(creation.defaults))
+  // L-01: "não carregou" e "não suportado" não são "criação livre". Sem as
+  // regras do sistema, o narrador não salva (nem a aprovação): decidiria sem
+  // ver as regras, e os padrões voltariam sem ele ter visto. O servidor
+  // continua sendo quem valida
+  const loadFailed = latest.isError && latest.data === undefined
+  const rulesKnown = Boolean(model)
+  // T-56: "Descartar e sair" volta ao que está salvo
+  const reset = () => {
+    setApproval(creation.approval)
+    setDefaults(layerOf(creation.defaults))
+  }
 
   const setBudget = (id: string, value: number | readonly number[]) =>
     setDefaults(current => ({
@@ -87,6 +100,11 @@ export function CreationSettings({
 
   return (
     <View style={styles.panel} testID="creation-settings">
+      <UnsavedChangesGuard
+        when={changed}
+        message="As regras da criação mudaram e não foram salvas."
+        onDiscard={reset}
+      />
       <SectionHeader
         title="Criação de fichas"
         subtitle="Valem para as fichas criadas a partir de agora. Para mudar uma ficha que já existe, use as Regras da casa dentro dela."
@@ -106,9 +124,29 @@ export function CreationSettings({
               { id: 'on', label: 'Ligada' },
             ]}
           />
-          {model === undefined ? (
+          {loadFailed ? (
+            <View style={styles.rules}>
+              <Text color="danger" accessibilityRole="alert">
+                Não foi possível carregar as regras deste sistema.
+              </Text>
+              <View style={styles.start}>
+                <Button
+                  title="Tentar de novo"
+                  variant="secondary"
+                  onPress={() => latest.refetch()}
+                />
+              </View>
+            </View>
+          ) : model === undefined ? (
             <Text color="inkMuted">Carregando as regras do sistema…</Text>
-          ) : model === null || !model.template.creation || !effective ? (
+          ) : model === null ? (
+            <View style={styles.rules}>
+              <Text color="inkMuted">{unsupportedShort('regras')}</Text>
+              <View style={styles.start}>
+                <ReloadButton variant="secondary" />
+              </View>
+            </View>
+          ) : !model.template.creation || !effective ? (
             <Text color="inkMuted">
               Este sistema usa criação livre; não há orçamento por pontos para
               configurar.
@@ -190,7 +228,12 @@ export function CreationSettings({
           title="Salvar regras da criação"
           testID="creation-settings-save"
           busy={mutation.isPending}
-          disabled={!changed || mutation.isPending}
+          disabled={!changed || mutation.isPending || !rulesKnown}
+          accessibilityHint={
+            rulesKnown
+              ? undefined
+              : 'Disponível quando as regras do sistema carregarem'
+          }
           onPress={() =>
             mutation.mutate(
               {
@@ -306,4 +349,5 @@ const styles = StyleSheet.create({
   },
   flex: { flex: 1 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end' },
+  start: { flexDirection: 'row' },
 })

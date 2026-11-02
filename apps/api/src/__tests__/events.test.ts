@@ -168,6 +168,91 @@ describe('POST /characters/:id/events', () => {
     expect((await row()).sheet_version).toBe(1)
   })
 
+  // T-31: o 409 diz quem mudou, pelo papel relativo; nunca id nem nome
+  describe('changedBy no 409', () => {
+    const conflictOn = async (user: TestUser) => {
+      const res = await send(user, [
+        { path: 'values.blood', from: { current: 9 }, to: { current: 7 } },
+      ])
+      expect(res.status).toBe(409)
+      const text = await res.text()
+      return {
+        text,
+        body: JSON.parse(text) as { changedBy: Record<string, unknown> },
+      }
+    }
+
+    it('o narrador mudou: "storyteller" para a dona', async () => {
+      await send(storyteller, [spendBlood])
+      const { body, text } = await conflictOn(owner)
+      expect(body.changedBy).toEqual({ 'values.blood': 'storyteller' })
+      // Nada que identifique a pessoa
+      expect(text).not.toContain(storyteller.id)
+      expect(text).not.toContain('narradora')
+    })
+
+    it('a dona mudou: "owner" para o narrador e "self" para ela mesma', async () => {
+      await send(owner, [spendBlood])
+      expect((await conflictOn(storyteller)).body.changedBy).toEqual({
+        'values.blood': 'owner',
+      })
+      expect((await conflictOn(owner)).body.changedBy).toEqual({
+        'values.blood': 'self',
+      })
+    })
+
+    it('o último lote é de uma rolagem oculta: null para a dona, papel para o narrador', async () => {
+      const res = await send(storyteller, [spendBlood])
+      const { clientBatchId } = (await res.json()) as BatchResponse
+      const batch = await ctx.db
+        .selectFrom('character_batches')
+        .select('id')
+        .where('client_batch_id', '=', clientBatchId)
+        .executeTakeFirstOrThrow()
+      await ctx.db
+        .insertInto('character_rolls')
+        .values({
+          batch_id: batch.id,
+          by_role: 'storyteller',
+          character_id: characterId,
+          chronicle_id: chronicleId,
+          client_roll_id: crypto.randomUUID(),
+          created_by: storyteller.id,
+          hidden: true,
+          label: 'Rolagem oculta',
+          request: JSON.stringify({}),
+          result: JSON.stringify({}),
+        })
+        .execute()
+      const { body, text } = await conflictOn(owner)
+      expect(body.changedBy).toEqual({ 'values.blood': null })
+      expect(text).not.toContain('Rolagem oculta')
+      expect((await conflictOn(storyteller)).body.changedBy).toEqual({
+        'values.blood': 'self',
+      })
+    })
+
+    it('campo nunca mudado por lote: null', async () => {
+      const res = await send(owner, [
+        { path: 'values.clan', from: 'ventrue', to: 'brujah' },
+      ])
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({
+        changedBy: { 'values.clan': null },
+      })
+    })
+
+    it('as Notas do Narrador dão 403 à dona, não 409, e sem valor', async () => {
+      const res = await send(owner, [
+        { path: 'values.storytellerNotes', from: 'x', to: 'y' },
+      ])
+      expect(res.status).toBe(403)
+      const text = await res.text()
+      expect(text).not.toContain('Regente')
+      expect(text).not.toContain('changedBy')
+    })
+  })
+
   it('lote com um evento inválido não grava nada (422)', async () => {
     const res = await send(owner, [
       spendBlood,

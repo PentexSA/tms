@@ -33,9 +33,14 @@ export default defineConfig({
         API_PORT: String(API_PORT),
         DATABASE_URL,
         CORS_ORIGINS: WEB_URL,
-        NODE_ENV: 'development',
-        // O E2E simula clientes diferentes pelo X-Forwarded-For (ver support/users.ts)
-        TRUST_PROXY: 'true',
+        // test: o único NODE_ENV em que o config aceita o TEST_CLIENT_IP.
+        // Na API, além disso, ele só deixa o log em silêncio (a saída do
+        // webServer já é ignorada pelo Playwright) e não muda segurança:
+        // swagger e cookie sem Secure são iguais aos de development
+        NODE_ENV: 'test',
+        // O E2E simula clientes diferentes pelo header de teste (ver
+        // support/users.ts). Nunca TRUST_PROXY: aqui não há proxy (T-86)
+        TEST_CLIENT_IP: 'true',
       },
     },
     {
