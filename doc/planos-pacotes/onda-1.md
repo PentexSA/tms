@@ -145,7 +145,7 @@ Os planos também trazem as causas da matriz corrigidas pela leitura do código.
 - **T-31:** o 409 da API já devolve só os caminhos em conflito; quem culpa o lote inteiro é o cliente.
 - **T-54:** a ordem errada vem do `jsonb` do `template_data`.
 - **T-72:** o `Skeleton` já tem o rótulo; no web falta o papel.
-- **T-47:** são 10 colunas sem fuso, em 4 tabelas.
+- **T-47:** são 9 colunas sem fuso, em 4 tabelas (o "10" deste resumo estava errado; a tabela do plano do P02 já tinha 9).
 - **T-86:** o furo é de configuração, não do `clientIp`.
 
 ## 7. Perguntas técnicas abertas
@@ -175,3 +175,75 @@ A lista completa está na seção 9 de cada plano. Estas cruzam pacotes ou mudam
   - P06: commit 13, o T-70.
 - **`@tms/sheet-core` muda no P03-C.** Até o S-01 do P01-C entrar, o Metro e a API usam o `dist`, que precisa ser reconstruído antes de testar o app.
 - **Recursos locais.** O E2E usa portas fixas e roda uma vez por vez, só na integração. Os `*.pg.test` usam um banco `_test` por worktree. O build nativo roda uma vez por onda.
+
+## 9. Integração (01/11/2026)
+
+Os quatro pacotes foram implementados em paralelo, um agente por plano, cada um no seu worktree, e integrados em série na `onda/1-fundacao`. Cada pacote passou pelo `/code-review`; P02 e P03-C, também pelo `/security-review`. O P03-C e o P06 receberam a onda na própria branch antes do merge, e os conflitos foram resolvidos lá.
+
+| Ordem | Pacote | Merge na onda | Revisão |
+|---|---|---|---|
+| 1 | P01-C | `f2897c6` | `/code-review`: 6 achados corrigidos, 1 falso |
+| 2 | P02 | `29d83da` (e `7c3c649`) | `/security-review`: nenhuma vulnerabilidade; `/code-review`: 10 corrigidos |
+| 3 | P03-C | `5c1ab1d` | `/security-review`: nenhuma vulnerabilidade, `changedBy` aceito; `/code-review`: 9 corrigidos, 1 falso |
+| 4 | P06 | `67f6f51` (e `3f0b496`, T-71) | `/code-review`: 9 corrigidos, 1 falso |
+
+**Perguntas técnicas da seção 7 e da seção 9 dos planos: o que foi aplicado.** Sem resposta do time, cada pacote seguiu a proposta do próprio plano, com estas escolhas:
+
+- **P01-C:**
+  - o runner do iOS é o `macos-26` com Xcode 26.6, que o expo-router 58 exige;
+  - sem filtro de caminho;
+  - boundary só na ficha;
+  - Dependabot e digest ficaram fora.
+- **P02:**
+  - o módulo nativo do T-13 entrou;
+  - o marcador `session:state` fica no IndexedDB;
+  - `null` no `/transfer`;
+  - um hop de proxy;
+  - `TMS_LEGACY_APP_TZ` opcional: a migration roda no mesmo container da API (`deploy/render/start.sh`), em UTC;
+  - o refresh token inteiro fica no keychain até a revogação.
+- **P02, rate limit no logout:** chegou a entrar e saiu na revisão. Um 429 ali deixava, no web, a sessão sem revogação (falha aberta). O logout só revoga com o token e não serve para força bruta, como na base.
+- **P02, `TEST_CLIENT_IP`:** passou de "recusado em produção" para "só com `NODE_ENV=test`".
+- **P03-C:**
+  - a migration é `0022_user_commands`;
+  - a chave continua opcional;
+  - o rascunho expira em 7 dias e fica sem cifra no web, igual ao outbox;
+  - o `changedBy` passou na revisão.
+- **P06:**
+  - "aba N de M";
+  - `CFBundleLocalizations` pt-BR;
+  - ativação manual nos rádios;
+  - `toggle` nos filtros;
+  - T-70 em todos os alvos, inclusive a `AppBar`, como último commit de código do pacote. A reversão sozinha foi conferida.
+
+**Achados da integração (commits na onda):**
+
+- **E2E escritos nos pacotes e rodados pela primeira vez aqui** (`b7c26f6`, `3441c55`): abas de Atributos a 390 px, o aviso de "Sair" com rascunho e seletores exatos depois do T-61. O T-12 passou a medir o que importa: texto com 200 px ou mais e a ação sem espremê-lo. Depois do T-31 sobra só "Revisar", que cabe ao lado.
+- **T-71:** o Esc não fechava a folha durante a animação de entrada do Modal do react-native-web, e o foco não voltava ao gatilho. A correção foi feita no P06 e mesclada de novo (`3f0b496`).
+- **Teste da migration 0021:** com a 0022 depois dela, o teste passou a descer até a 0020 (no merge do P03-C).
+
+**Resultado na onda com os quatro pacotes:**
+
+| Verificação | Resultado |
+|---|---|
+| typecheck | 16/16 |
+| lint | verde |
+| sheet-core | 973 testes |
+| config | 36 testes |
+| db | 33 testes |
+| api | 1646 testes |
+| ui | 153 testes |
+| frontend | 854 testes |
+| `*.pg.test` | 43 testes |
+| E2E Chromium e WebKit | 84 testes |
+| Build nativo (local, como nos jobs do CI) | Android: `assembleDebug` em 1min47s; iOS: `xcodebuild` Debug para o simulador em 32 min (primeiro build, Pods do zero). Nos dois, compilou o módulo `http-cache` do P02 |
+
+**Fica para depois da integração local:**
+
+- **Os jobs nativos do CI** no primeiro PR: tempo e runner `macos-26`.
+- **As conferências ⚙ da seção 7:**
+  - VoiceOver em pt-BR e "aba N de M";
+  - TalkBack nos −/+;
+  - cabeçalho a 48 dp no Android;
+  - QAA-02 no simulador.
+- **Os fluxos Maestro `08` e `09`:** o Maestro não está instalado nesta máquina, então vão para o roteiro manual antes do release.
+- **Os pontos para o PO da seção 6:** continuam sem decisão.
