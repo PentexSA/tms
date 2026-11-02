@@ -552,7 +552,7 @@ function LiveSheet({
               </>
             }
           />
-          <LeaveGuard store={store} />
+          <LeaveGuard store={store} model={state.model} />
           <DraftRecovery
             persistence={persistence}
             store={store}

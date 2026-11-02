@@ -1,12 +1,21 @@
-import { BottomSheet, Button, Text } from '@tms/ui'
+import { BottomSheet, Button, Text, tokens, useLayout } from '@tms/ui'
 import { usePreventRemove } from 'expo-router'
-import { type ReactNode, type RefObject, useState } from 'react'
+import { type RefObject, useRef, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
 
 // Sair com alterações não salvas pede confirmação (T-56): a ficha em
 // Criação/Editar, a Nova ficha e as regras da criação da crônica. O
 // usePreventRemove segura a navegação (voltar, replace, gesto, o Voltar do
 // Android) e, no web, o `beforeunload` do navegador (F5, fechar a aba). O
 // evento `beforeRemove` não existe mais na navegação do Expo Router 58.
+//
+// A saída ("Descartar e sair", "Salvar e sair") acontece depois que a folha
+// sai da tela (onClosed): no iOS, mexer na navegação enquanto um Modal
+// ainda sai falha (a lição do P08 para a folha seguinte vale para sair).
+
+export type SaveBeforeLeave =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string }
 
 export interface UnsavedChangesGuardProps {
   // Há o que perder
@@ -17,8 +26,10 @@ export interface UnsavedChangesGuardProps {
   readonly onDiscard?: () => void
   // A saída já é o resultado de salvar (a ficha criada abre): passa direto
   readonly allowLeave?: RefObject<boolean>
-  // Espaço para uma ação a mais na folha ("Salvar e sair", D-01)
-  readonly extraAction?: ReactNode
+  // "Salvar e sair" (D-01): grava e então sai. Recusado, a folha fica aberta
+  // com a frase, e nada sai (fail secure). Sem ele, a folha tem duas ações
+  readonly onSave?: () => SaveBeforeLeave
+  readonly saveLabel?: string
 }
 
 export function UnsavedChangesGuard({
@@ -26,47 +37,118 @@ export function UnsavedChangesGuard({
   message,
   onDiscard,
   allowLeave,
-  extraAction,
+  onSave,
+  saveLabel = 'Salvar e sair',
 }: UnsavedChangesGuardProps) {
-  const [leave, setLeave] = useState<(() => void) | null>(null)
+  // A navegação segurada; null com a folha fechada
+  const [held, setHeld] = useState<(() => void) | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  // A saída combinada, feita quando a folha termina de sair
+  const exit = useRef<(() => void) | null>(null)
+  // Dois toques no mesmo quadro gravam uma vez só
+  const saving = useRef(false)
+  const { breakpoint, stacked } = useLayout()
+  const column = breakpoint === 'compact' || stacked
 
   usePreventRemove(when, ({ repeat }) => {
     if (allowLeave?.current) {
       repeat()
       return
     }
-    setLeave(() => () => {
-      onDiscard?.()
-      repeat()
-    })
+    exit.current = null
+    saving.current = false
+    setError(null)
+    setHeld(() => repeat)
   })
 
+  const stay = () => {
+    setHeld(null)
+    setError(null)
+  }
+  // Fecha a folha; a navegação segurada volta no onClosed
+  const leaveAfterClose = (repeat: () => void) => {
+    exit.current = repeat
+    setHeld(null)
+  }
+  const discard = () => {
+    if (!held) return
+    onDiscard?.()
+    leaveAfterClose(held)
+  }
+  const save = () => {
+    if (!held || !onSave || saving.current) return
+    saving.current = true
+    const result = onSave()
+    if (!result.ok) {
+      saving.current = false
+      setError(result.message)
+      return
+    }
+    leaveAfterClose(held)
+  }
+  const closed = () => {
+    const go = exit.current
+    exit.current = null
+    saving.current = false
+    go?.()
+  }
+
+  const discardButton = (
+    <Button title="Descartar e sair" variant="danger" onPress={discard} />
+  )
+  const stayButton = (
+    <Button title="Continuar editando" variant="ghost" onPress={stay} />
+  )
   return (
     <BottomSheet
-      visible={leave !== null}
+      visible={held !== null}
       title="Sair sem salvar?"
-      onClose={() => setLeave(null)}
+      onClose={stay}
+      onClosed={closed}
       footer={
-        <>
-          <Button
-            title="Continuar editando"
-            variant="ghost"
-            onPress={() => setLeave(null)}
-          />
-          {extraAction}
-          <Button
-            title="Descartar e sair"
-            variant="danger"
-            onPress={() => {
-              const go = leave
-              setLeave(null)
-              go?.()
-            }}
-          />
-        </>
+        !onSave ? (
+          <>
+            {stayButton}
+            {discardButton}
+          </>
+        ) : column ? (
+          // No celular, em coluna: a principal embaixo, perto do polegar e
+          // longe da destrutiva (T-78), na mesma ordem do DOM da linha
+          <View testID="leave-actions" style={styles.column}>
+            {discardButton}
+            {stayButton}
+            <Button title={saveLabel} onPress={save} />
+          </View>
+        ) : (
+          <View testID="leave-actions" style={styles.row}>
+            <View style={styles.discard}>{discardButton}</View>
+            {stayButton}
+            <Button title={saveLabel} onPress={save} />
+          </View>
+        )
       }
     >
-      <Text>{message}</Text>
+      <View style={styles.body}>
+        {error ? (
+          <Text color="danger" accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
+        <Text>{message}</Text>
+      </View>
     </BottomSheet>
   )
 }
+
+const styles = StyleSheet.create({
+  body: { gap: tokens.space[2] },
+  column: { flex: 1, gap: tokens.space[2] },
+  row: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[3],
+  },
+  // Como o "Descartar" do resumo (T-78): à esquerda, longe da principal
+  discard: { flex: 1, alignItems: 'flex-start' },
+})
