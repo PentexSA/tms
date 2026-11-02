@@ -22,7 +22,7 @@ import {
   useTheme,
   useToast,
 } from '@tms/ui'
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
 import { CompletionMessage } from '../creation/CompletionMessage'
@@ -74,8 +74,12 @@ export interface ModeBarParts {
  */
 export function useModeBar({
   modes: only,
+  enabled = true,
 }: {
   readonly modes?: readonly SheetMode[]
+  // Quem não escreve (pelo papel ou pela política) fica sem as partes: o
+  // resumo aberto fecha, e não volta sozinho quando o Editar voltar
+  readonly enabled?: boolean
 } = {}): ModeBarParts {
   const { model, mode, roles } = useSheet()
   const creating = useCreation()?.active === true
@@ -103,6 +107,9 @@ export function useModeBar({
     readonly inactive: readonly ChangeLabel[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!enabled) setSummary(null)
+  }, [enabled])
   // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
   const back = (m: SheetMode): SheetMode =>
     !isDraftMode(m) && modes.includes(m) ? m : (modes[0] ?? 'read')

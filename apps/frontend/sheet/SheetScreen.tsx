@@ -53,7 +53,8 @@ import {
 } from './store/sheetStore'
 import {
   StatusMenuButton,
-  type StatusMenuButtonProps,
+  type StatusMenuDraft,
+  type StatusMenuTarget,
 } from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
@@ -90,12 +91,23 @@ export function SheetScreen({
     () => freebiesNotes(draftState.freebiesLeft),
     [draftState.freebiesLeft]
   )
-  // O que o menu do narrador recebe do rascunho, no botão largo e no menu
-  const draft = {
-    unsaved,
-    queued: draftState.queued,
-    notes: completionNotes,
-  }
+  // O que concluir pelo menu do narrador precisa (T-32, T-18): a revisão, a
+  // versão e o rascunho aberto, no botão largo e no "Mais opções"
+  const info = state.status === 'ready' ? state.character.creation : undefined
+  const sheetVersion =
+    state.status === 'ready' ? state.character.sheetVersion : undefined
+  const creation = useMemo(() => creationInfoOf(info), [info])
+  const draft = useMemo<StatusMenuDraft>(
+    () => ({
+      revision: creation?.revision,
+      sheetVersion,
+      approval: creation?.approval,
+      unsaved,
+      queued: draftState.queued,
+      notes: completionNotes,
+    }),
+    [creation, sheetVersion, unsaved, draftState.queued, completionNotes]
+  )
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -206,7 +218,7 @@ export function SheetScreen({
             {state.status !== 'ready' ? null : wide ? (
               <>
                 {state.roles.includes('storyteller') ? (
-                  <StatusMenuButton {...narratorOf(id, state, draft)} />
+                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
                 ) : null}
                 {xpLedgerFields(state.model).length ? (
                   <Button
@@ -228,9 +240,10 @@ export function SheetScreen({
               <SheetMenu
                 narrator={
                   state.roles.includes('storyteller')
-                    ? narratorOf(id, state, draft)
+                    ? narratorOf(id, state)
                     : null
                 }
+                draft={draft}
                 onExperience={
                   xpLedgerFields(state.model).length ? () => setXp(true) : null
                 }
@@ -281,24 +294,17 @@ export function SheetScreen({
   )
 }
 
-/** As props do menu do narrador: as mesmas no botão largo e no SheetMenu. */
+/** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
 function narratorOf(
   id: string,
-  state: Extract<SheetState, { status: 'ready' }>,
-  draft: Pick<StatusMenuButtonProps, 'unsaved' | 'queued' | 'notes'>
-): StatusMenuButtonProps {
-  const info = creationInfoOf(state.character.creation)
+  state: Extract<SheetState, { status: 'ready' }>
+): StatusMenuTarget {
   return {
     characterId: id,
     chronicleId: state.character.chronicle.id,
     model: state.model,
     status: state.character.status,
     locked: state.character.lockedAt !== null,
-    // Concluir pelo menu (T-32): a revisão, a versão e o rascunho aberto
-    revision: info?.revision,
-    sheetVersion: state.character.sheetVersion,
-    approval: info?.approval,
-    ...draft,
   }
 }
 

@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
@@ -14,7 +15,7 @@ import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import { fakeServer, type LiveProps, renderLive } from '../../test/live'
-import { sheetsDismissed } from '../../test/queries'
+import { sheetsDismissed, textInput } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -25,7 +26,11 @@ import {
 import { CharacterForm } from '../CharacterForm'
 import { SheetProvider } from '../context'
 import { identityColumnsPerRow } from '../IdentityBlock'
-import { createGroupTabsStore, currentSection } from '../layouts/groupTabsState'
+import {
+  createGroupTabsStore,
+  currentSection,
+  GroupTabsContext,
+} from '../layouts/groupTabsState'
 import { SectionView } from '../SectionView'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
@@ -247,7 +252,10 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     )
     await session.restore()
     renderWithSession(<SheetScreen id={ID} />, session)
-    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    // Em criação, a dona abre no Editar (T-05): espera a ficha pelo seletor
+    if (status === 'creating' && roles.includes('owner'))
+      expect(await screen.findByLabelText('Modo da ficha')).toBeTruthy()
+    else expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
   }
   const menu = () => screen.getByRole('button', { name: 'Mais opções' })
 
@@ -323,6 +331,11 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(
       screen.getByRole('header', { name: 'Histórico de alterações' })
     ).toBeTruthy()
+    // Fecha o Histórico antes: a folha cobre o cabeçalho
+    fireEvent.press(screen.getAllByRole('button', { name: 'Fechar' })[0]!)
+    expect(
+      screen.queryByRole('header', { name: 'Histórico de alterações' })
+    ).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Experiência' }))
     expect(screen.getByRole('header', { name: 'Experiência' })).toBeTruthy()
   })
@@ -387,8 +400,16 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
 
   it('no celular, o texto da sincronização quebra numa largura fixa, sem cortar', async () => {
     resize(PHONE)
-    await openSheet(['owner'], 'active')
-    const sync = screen.getByTestId(/^sync-/)
+    await openSheet(['owner'], 'creating')
+    // Duas alterações no rascunho: "2 alterações não salvas" (T-17)
+    for (const name of ['Força', 'Destreza'])
+      fireEvent(
+        screen.getByRole('adjustable', { name }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    const sync = screen.getByTestId('sync-unsaved')
+    expect(within(sync).getByText('2 alterações não salvas')).toBeTruthy()
     expect(StyleSheet.flatten(sync.props.style).maxWidth).toBe(112)
     expect(
       within(sync).getByText(/^Salvo|alteraç/).props.numberOfLines
@@ -548,10 +569,23 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     // De volta ao topo: os Atributos, com a escolha das Habilidades guardada
     scrollTo(0)
     expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
-    // "Orçamento" a um toque, sem voltar ao topo
+    // "Orçamento" a um toque, sem voltar ao topo; o painel novo começa logo
+    // abaixo da faixa (600 − 120), não no fim de um conteúdo mais curto
     scrollTo(1450)
+    const scrollView = screen
+      .UNSAFE_getByType(KeyboardArea)
+      .findAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollToSpy = jest.spyOn(scrollView, 'scrollTo')
     fireEvent.press(nav().getByRole('tab', { name: 'Orçamento' }))
     expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+    expect(scrollToSpy).toHaveBeenCalledWith({ y: 480, animated: false })
+    // No topo, trocar de aba não rola
+    scrollToSpy.mockClear()
+    scrollTo(0)
+    fireEvent.press(nav().getByRole('tab', { name: /^Ficha$/ }))
+    expect(scrollToSpy).not.toHaveBeenCalled()
   })
 
   it('a 750: as abas da zona continuam fixas; sub-abas não há', async () => {
@@ -616,6 +650,34 @@ describe('groupTabsState: a seção atual', () => {
     expect(currentSection(list, 950)).toBe('b')
     expect(currentSection([{ id: 'a', y: 400 }], 10)).toBe('a')
     expect(currentSection([], 10)).toBeNull()
+  })
+})
+
+describe('sub-abas de uma seção fora do painel da zona', () => {
+  it('com a faixa, mas fora do painel (no "Em jogo"), a barra fica no corpo', () => {
+    resize(PHONE)
+    const store = createSheetStore({
+      characterId: 'c1',
+      model: vtm,
+      sheet: helena(),
+      sheetVersion: 1,
+      roles: ['owner'],
+      mode: 'evolve',
+    })
+    store.getState().startDraft()
+    const section = vtm.zones
+      .flatMap(z => z.sections)
+      .find(s => s.id === 'attributes')!
+    const shared = { strip: true, store: createGroupTabsStore() }
+    render(
+      <SheetProvider store={store}>
+        <GroupTabsContext.Provider value={shared}>
+          <SectionView section={section} />
+        </GroupTabsContext.Provider>
+      </SheetProvider>
+    )
+    expect(screen.getByTestId('group-tabs-attributes')).toBeTruthy()
+    expect(shared.store.current()).toBeNull()
   })
 })
 
@@ -689,5 +751,59 @@ describe('a barra de modos não remonta a ficha quando a política muda', () => 
     expect(await screen.findByText('O narrador travou a ficha')).toBeTruthy()
     expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     expect(screen.UNSAFE_getByType(ScrollView).instance).toBe(before)
+  })
+
+  it('o resumo aberto fecha quando o Editar sai, e não volta sozinho', async () => {
+    jest
+      .mocked(useRouter)
+      .mockReturnValue({ push: jest.fn(), replace: jest.fn() } as never)
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const character = (lockedAt: string | null) =>
+      ok({
+        id: ID,
+        name: 'Helena Varga',
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        owner: { id: 'u1', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 3,
+        roles: ['owner'],
+        status: 'active',
+        lockedAt,
+        member: true,
+        updatedAt: '2026-10-18T12:00:00Z',
+        sheet: example('helena').sheet,
+      })
+    resize(TABLET)
+    calls.characterGet.mockResolvedValue(character(null))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    const { queryClient } = renderWithSession(<SheetScreen id={ID} />, session)
+    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+    // Uma alteração que a política deixa à dona da ficha ativa: o Conceito
+    fireEvent.press(screen.getByRole('button', { name: 'Conceito' }))
+    fireEvent.changeText(textInput('Conceito'), 'Arquivista')
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
+
+    const refetch = async (lockedAt: string | null) => {
+      calls.characterGet.mockResolvedValue(character(lockedAt))
+      await act(() =>
+        queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+      )
+    }
+    await refetch('2026-10-18T12:00:00Z')
+    expect(await screen.findByText('O narrador travou a ficha')).toBeTruthy()
+    expect(screen.queryByText('Salvar 1 alteração?')).toBeNull()
+    await refetch(null)
+    await waitFor(() =>
+      expect(screen.getByLabelText('Modo da ficha')).toBeTruthy()
+    )
+    expect(screen.queryByText('Salvar 1 alteração?')).toBeNull()
   })
 })

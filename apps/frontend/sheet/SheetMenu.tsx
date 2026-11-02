@@ -5,8 +5,8 @@ import { StyleSheet, View } from 'react-native'
 import { stateLabel } from '../components/chronicles/tableItems'
 import {
   StatusMenu,
-  type StatusMenuButtonProps,
   type StatusMenuDraft,
+  type StatusMenuTarget,
   statusActions,
 } from './storyteller/StatusMenu'
 
@@ -20,8 +20,9 @@ import {
 // no web o foco volta ao ⋯ antes, para a folha seguinte devolvê-lo a ele.
 
 export interface SheetMenuProps {
-  /** As ações do narrador (só para quem narra), com as props do StatusMenu. */
-  readonly narrator?: StatusMenuButtonProps | null
+  /** As ações do narrador (só para quem narra): a ficha e o rascunho. */
+  readonly narrator?: StatusMenuTarget | null
+  readonly draft?: StatusMenuDraft
   /** "Experiência", quando o template tem extrato de XP. */
   readonly onExperience?: (() => void) | null
   readonly onHistory: () => void
@@ -29,6 +30,7 @@ export interface SheetMenuProps {
 
 export function SheetMenu({
   narrator,
+  draft = {},
   onExperience,
   onHistory,
 }: SheetMenuProps) {
@@ -40,7 +42,7 @@ export function SheetMenu({
         narrator.model,
         narrator.status,
         narrator.locked,
-        narrator.approval
+        draft.approval
       )
     : []
   const state = narrator
@@ -105,24 +107,12 @@ export function SheetMenu({
           characterId={narrator.characterId}
           chronicleId={narrator.chronicleId}
           actions={actions}
-          draft={draftOf(narrator)}
+          draft={draft}
           onClose={() => setNarrating(false)}
         />
       ) : null}
     </>
   )
-}
-
-/** O rascunho e a criação que o menu leva ao concluir (T-32, T-18). */
-function draftOf({
-  characterId: _id,
-  chronicleId: _chronicle,
-  model: _model,
-  status: _status,
-  locked: _locked,
-  ...draft
-}: StatusMenuButtonProps): StatusMenuDraft {
-  return draft
 }
 
 const styles = StyleSheet.create({

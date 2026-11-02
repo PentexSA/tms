@@ -318,6 +318,18 @@ describe('a tela da ficha com o estado', () => {
     expect(screen.queryByTestId('policy-banner')).toBeNull()
   })
 
+  it('em criação, a dona também não tem o menu do narrador no "Mais opções"', async () => {
+    calls.characterGet.mockResolvedValue(character(['owner'], 'creating'))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    // A ficha em criação da dona abre no Editar (T-05)
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    expect(
+      screen.queryByRole('button', { name: /^Ações do narrador/ })
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
+  })
+
   it('arquivada, o dono abre em Leitura, com o aviso e sem o seletor de modo', async () => {
     await open(['owner'], 'archived')
     expect(screen.getByTestId('policy-banner')).toBeTruthy()

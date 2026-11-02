@@ -19,8 +19,21 @@ import {
   useLayout,
   useTheme,
 } from '@tms/ui'
-import { type ReactElement, type ReactNode, useMemo, useState } from 'react'
-import { Platform, ScrollView, StyleSheet, View } from 'react-native'
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import {
+  Platform,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
@@ -37,7 +50,11 @@ import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
-import { GroupTabsContext, useGroupTabsState } from './layouts/groupTabsState'
+import {
+  GroupTabsContext,
+  StripScope,
+  useGroupTabsState,
+} from './layouts/groupTabsState'
 import { PolicyBanner } from './PolicyBanner'
 import { ActionsButton } from './play/ActionsMenu'
 import { CombatDock, dockFields } from './play/CombatDock'
@@ -128,11 +145,13 @@ export function SheetView(props: SheetViewProps) {
 
 /** As partes da barra de modos, para quem escreve (T-27). */
 function ModeBarSlots({
+  enabled,
   children,
 }: {
+  readonly enabled: boolean
   readonly children: (bar: ModeBarParts) => ReactNode
 }) {
-  return children(useModeBar())
+  return children(useModeBar({ enabled }))
 }
 
 function SheetBody({
@@ -170,11 +189,6 @@ function SheetBody({
   // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
   // conteúdo fica num contêiner comum, sem papel de painel
   const shownTab = onBudget ? BUDGET_TAB : active?.id
-  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
-  const openBudget = useMemo(
-    () => (budget ? () => setTab(BUDGET_TAB) : null),
-    [budget]
-  )
   const paneled = shownTab !== undefined && tabs.some(t => t.id === shownTab)
   const zoneContent = (
     <>
@@ -208,6 +222,23 @@ function SheetBody({
   // fixa. Fora do celular, tudo fixo acima, como antes.
   const phone = breakpoint === 'compact'
   const groupTabs = useGroupTabsState(phone)
+  // Trocar de aba com a faixa presa (rolado para dentro do painel): o painel
+  // novo começa logo abaixo dela, não no fim de um conteúdo mais curto
+  const scrollRef = useRef<ScrollViewInstance>(null)
+  const showTab = useCallback(
+    (id: string) => {
+      setTab(id)
+      const top = groupTabs.store.panelTop()
+      if (groupTabs.store.scrollY() > top)
+        scrollRef.current?.scrollTo({ y: top, animated: false })
+    },
+    [groupTabs.store]
+  )
+  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  const openBudget = useMemo(
+    () => (budget ? () => showTab(BUDGET_TAB) : null),
+    [budget, showTab]
+  )
   // O header (painel do NPC e barra do narrador) é do app, não da ficha:
   // fica com o tema de fora (a skin do app e o accent neutro), mesmo quando
   // rola dentro da ficha, que usa a skin e o accent do personagem
@@ -272,7 +303,7 @@ function SheetBody({
           key="nav"
           tabs={tabs}
           selected={shownTab ?? ''}
-          onSelect={setTab}
+          onSelect={showTab}
         />
       ) : null,
       <View
@@ -280,13 +311,15 @@ function SheetBody({
         testID="sheet-panel"
         onLayout={e => groupTabs.store.panelAt(e.nativeEvent.layout.y)}
       >
-        {paneled && shownTab !== undefined ? (
-          <TabPanel tabsId="sheet-parts" tab={shownTab}>
-            {zoneContent}
-          </TabPanel>
-        ) : (
-          zoneContent
-        )}
+        <StripScope.Provider value>
+          {paneled && shownTab !== undefined ? (
+            <TabPanel tabsId="sheet-parts" tab={shownTab}>
+              {zoneContent}
+            </TabPanel>
+          ) : (
+            zoneContent
+          )}
+        </StripScope.Provider>
       </View>,
     ]
     return items.filter((i): i is ReactElement => Boolean(i))
@@ -312,21 +345,20 @@ function SheetBody({
             aberto */}
         <KeyboardArea>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             stickyHeaderIndices={nav >= 0 ? [nav] : undefined}
             scrollEventThrottle={16}
-            onScroll={
-              phone
-                ? e => groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
-                : undefined
+            onScroll={e =>
+              groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
             }
           >
             {items}
           </ScrollView>
         </KeyboardArea>
         {docked ? <CombatDock /> : null}
-        {budget ? <BonusNotice onBudget={() => setTab(BUDGET_TAB)} /> : null}
+        {budget ? <BonusNotice onBudget={() => showTab(BUDGET_TAB)} /> : null}
       </View>
     )
   }
@@ -340,7 +372,9 @@ function SheetBody({
               montada); quem não escreve, por papel ou pela política, fica
               sem as partes, e a ficha não remonta quando isso muda */}
             {editable ? (
-              <ModeBarSlots>{bar => screen(writer ? bar : null)}</ModeBarSlots>
+              <ModeBarSlots enabled={writer}>
+                {bar => screen(writer ? bar : null)}
+              </ModeBarSlots>
             ) : (
               screen(null)
             )}

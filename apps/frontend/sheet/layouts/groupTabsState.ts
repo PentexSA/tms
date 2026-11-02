@@ -45,6 +45,10 @@ export interface GroupTabsStore {
   readonly selected: (sectionId: string) => string | undefined
   /** A seção com sub-abas que está no topo da tela (ou a primeira). */
   readonly current: () => StripSection | null
+  /** A rolagem em que o painel da zona começa logo abaixo da faixa. */
+  readonly panelTop: () => number
+  /** A posição da rolagem. */
+  readonly scrollY: () => number
 }
 
 export interface GroupTabsShared {
@@ -56,6 +60,13 @@ export interface GroupTabsShared {
 export const GroupTabsContext = createContext<GroupTabsShared | null>(null)
 
 export const useGroupTabsContext = () => useContext(GroupTabsContext)
+
+/**
+ * As seções do painel da zona (as abas da ficha). Só elas sobem para a
+ * faixa: a posição delas é medida dentro do painel. Uma seção com sub-abas
+ * fora dele (no "Em jogo") fica com a barra no corpo.
+ */
+export const StripScope = createContext(false)
 
 /**
  * Qual seção está no topo: a última cujo início já passou da faixa fixa.
@@ -132,6 +143,8 @@ export function createGroupTabsStore(): GroupTabsStore {
     },
     selected: sectionId => chosen.get(sectionId),
     current: () => (currentId ? (sections.get(currentId) ?? null) : null),
+    panelTop: () => Math.max(0, panel - nav),
+    scrollY: () => scroll,
   }
 }
 

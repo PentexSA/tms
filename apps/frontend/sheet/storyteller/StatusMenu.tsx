@@ -161,14 +161,19 @@ export interface StatusMenuDraft {
   readonly notes?: readonly string[]
 }
 
-/** O que o menu do narrador precisa saber da ficha. */
-export interface StatusMenuButtonProps extends StatusMenuDraft {
+/** De qual ficha são as ações do narrador. */
+export interface StatusMenuTarget {
   readonly characterId: string
   readonly chronicleId: string
   readonly model: SheetModel
   readonly status: string
   readonly locked: boolean
 }
+
+/** O botão largo: a ficha e o rascunho aberto. */
+export interface StatusMenuButtonProps
+  extends StatusMenuTarget,
+    StatusMenuDraft {}
 
 /**
  * O gatilho do menu na tela larga (≥ 900). Abaixo disso, as ações ficam no

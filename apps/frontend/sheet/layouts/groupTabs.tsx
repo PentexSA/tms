@@ -1,8 +1,12 @@
 import type { CompiledGroup, CompiledSection } from '@tms/sheet-core'
 import { Tabs, tabPanelProps, tokens, useLayout } from '@tms/ui'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useContext, useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useGroupTabsContext, useSelectedGroup } from './groupTabsState'
+import {
+  StripScope,
+  useGroupTabsContext,
+  useSelectedGroup,
+} from './groupTabsState'
 
 // `groupTabs` no template: no celular, os grupos da seção viram abas e só um
 // aparece por vez (Físicos | Sociais | Mentais). Quem chama diz quando: no
@@ -41,7 +45,9 @@ export function useGroupTabs(
     breakpoint === 'compact' &&
     groups.length > 1
   const tabsId = `groups-${section.id}`
-  const inStrip = on && shared?.strip === true
+  // Só as seções do painel da zona sobem para a faixa
+  const scoped = useContext(StripScope)
+  const inStrip = on && shared?.strip === true && scoped
   const store = shared?.store
   const chosen = useSelectedGroup(store, section.id)
   const register = store?.register
