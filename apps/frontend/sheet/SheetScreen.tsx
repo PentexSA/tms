@@ -385,6 +385,7 @@ function LiveSheet({
 }) {
   const sync = useSync()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
@@ -540,6 +541,13 @@ function LiveSheet({
           <SheetView
             store={store}
             editable
+            // T-40: puxar rebusca a ficha; a resposta passa pelo received
+            onRefresh={() =>
+              queryClient.invalidateQueries(
+                { queryKey: sheetKeys.character(id) },
+                { cancelRefetch: false }
+              )
+            }
             header={
               <>
                 <NpcVisibilityBar state={state} />

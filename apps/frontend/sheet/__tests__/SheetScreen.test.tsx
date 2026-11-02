@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
+import { RefreshControl } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, templateJson } from '../../test/fixtures'
@@ -202,6 +203,22 @@ describe('SheetScreen', () => {
     )
     expect(router.back).toHaveBeenCalledTimes(1)
     expect(router.replace).not.toHaveBeenCalled()
+  })
+
+  // T-40 (P09-C): puxar para atualizar na ficha, sem intervalo novo
+  it('puxar rebusca a ficha', async () => {
+    calls.characterGet.mockResolvedValue(character())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByLabelText('Destreza, 2 de 5')
+    const before = calls.characterGet.mock.calls.length
+    const control = screen.UNSAFE_getByType(RefreshControl)
+    expect(control.props.refreshing).toBe(false)
+    await act(async () => {
+      await control.props.onRefresh()
+    })
+    expect(calls.characterGet.mock.calls.length).toBe(before + 1)
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false)
   })
 
   it('sem acesso (404)', async () => {

@@ -29,6 +29,7 @@ import {
 } from 'react'
 import {
   Platform,
+  RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -36,6 +37,7 @@ import {
 } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { usePullRefresh } from '../lib/queries/focus'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
 import {
@@ -89,6 +91,12 @@ export type SheetViewProps =
        * (T-27).
        */
       readonly header?: ReactNode
+      /**
+       * "Puxar para atualizar" (P09-C, T-40): a rebusca da ficha. O que volta
+       * passa pelo `received` do store, que confere a versão e o conflito
+       * com o rascunho. Sem ele, sem o gesto.
+       */
+      readonly onRefresh?: () => unknown
     }
   | {
       readonly model: SheetModel
@@ -139,6 +147,7 @@ export function SheetView(props: SheetViewProps) {
       store={store}
       editable={editable}
       header={'store' in props ? props.header : undefined}
+      onRefresh={'store' in props ? props.onRefresh : undefined}
     />
   )
 }
@@ -171,11 +180,14 @@ function SheetBody({
   store,
   editable,
   header,
+  onRefresh,
 }: {
   readonly store: SheetStore
   readonly editable: boolean
   readonly header?: ReactNode
+  readonly onRefresh?: () => unknown
 }) {
+  const pull = usePullRefresh(() => onRefresh?.())
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
   const lifecycle = useLifecycle()
@@ -368,6 +380,14 @@ function SheetBody({
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             stickyHeaderIndices={nav >= 0 ? [nav] : undefined}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={pull.refreshing}
+                  onRefresh={pull.onRefresh}
+                />
+              ) : undefined
+            }
             scrollEventThrottle={16}
             onScroll={e =>
               groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
