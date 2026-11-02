@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { ResolvedResource } from '@tms/sheet-core'
 import { Pressable, Text } from '@tms/ui'
@@ -23,6 +24,7 @@ import { createMemoryStorage } from '../sync/kv'
 import { createMemoryOutbox, type QueuedBatch } from '../sync/outbox'
 import { useSync } from '../sync/SyncProvider'
 import type { PostOutcome } from '../sync/sender'
+import { createSync } from '../sync/sync'
 import { useCommit } from '../useCommit'
 
 // Etapa 16 na tela: o toque aplica na hora, o aviso tem Desfazer, o conflito
@@ -416,6 +418,84 @@ describe('rascunho guardado no aparelho', () => {
       await gate
     })
     await waitFor(async () => expect(await saved(drafts)).toBe(0))
+  })
+
+  // Achado do /code-review: o 409 do "Salvar" com a ficha fechada sumia
+  it('salvar offline, fechar, o narrador muda um campo, reabrir: o rascunho volta', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    const outbox = createMemoryOutbox()
+    // Sem rede: o lote fica no outbox, e o registro do aparelho sai
+    const offline = jest.fn(
+      async (): Promise<PostOutcome> => ({ status: 0, body: null })
+    )
+    const first = await editThree(drafts, { outbox, post: offline })
+    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await waitFor(async () => expect(await saved(drafts)).toBe(0))
+    expect(await outbox.characters()).toEqual([ID])
+    first.unmount()
+
+    // A rede volta com a ficha fechada; o narrador tinha mudado a Força
+    const notify = jest.fn()
+    const background = createSync({
+      outbox,
+      drafts,
+      post: async () => ({
+        status: 409,
+        body: { issues: [{ path: 'values.strength', message: 'conflito' }] },
+      }),
+      queryClient: new QueryClient(),
+      notify,
+    })
+    await act(async () => {
+      await background.start()
+    })
+    await waitFor(async () => expect(await saved(drafts)).toBe(3))
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining('voltaram para o rascunho')
+    )
+    const helena = example('helena').sheet
+    calls.characterGet.mockResolvedValue(
+      character({
+        sheetVersion: 4,
+        sheet: { ...helena, values: { ...helena.values, strength: 4 } },
+      })
+    )
+
+    // Reabrir: a oferta, e o campo do narrador marcado
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { drafts })
+    expect(
+      await screen.findByText(/^Você tem 3 alterações não salvas/)
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Recuperar' }))
+    expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
+    expect(screen.getByText('Força mudou desde o seu rascunho.')).toBeTruthy()
+  })
+
+  it('com a ficha aberta e travada, o rascunho que volta do servidor aparece guardado', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    calls.characterGet.mockResolvedValue(
+      character({ status: 'active', lockedAt: '2026-11-01T15:00:00Z' })
+    )
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { drafts })
+    expect(await screen.findByLabelText(/^Pontos de Sangue, /)).toBeTruthy()
+    await act(async () => {
+      await drafts.park({
+        v: 1,
+        characterId: ID,
+        templateVersion: '1.0.0',
+        baseVersion: 3,
+        mode: 'evolve',
+        savedAt: Date.now(),
+        edits: [{ path: 'values.strength', from: 2, to: 3 }],
+      })
+    })
+    expect(
+      await screen.findByText('A ficha não pode ser editada agora.')
+    ).toBeTruthy()
+    // Fechar deixa para depois: o registro continua guardado
+    fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+    expect(await saved(drafts)).toBe(1)
   })
 
   it('ficha travada só oferece "Descartar", com o motivo', async () => {

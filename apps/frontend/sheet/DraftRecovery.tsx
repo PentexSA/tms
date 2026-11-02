@@ -94,7 +94,9 @@ export function useDraftPersistence({
         savedAt: Date.now(),
         edits: s.draftEvents(),
       }
-      run(() => drafts.write(next))
+      run(async () => {
+        await drafts.write(next)
+      })
       return
     }
     const exit = s.draftExit
@@ -136,9 +138,26 @@ export function useDraftPersistence({
       else if (phase.current === 'paused' && s.draft && !prev.draft)
         setOffer(record.current)
     })
+    // O "Salvar" recusado com a ficha sem edição volta guardado (sync.ts):
+    // a ficha aberta passa a oferecer "Recuperar", e nada o sobrescreve
+    const unpark = drafts.onParked(parked => {
+      if (parked !== characterId) return
+      phase.current = 'loading'
+      void drafts.read(characterId).then(found => {
+        if (!alive) return
+        if (!found) {
+          phase.current = 'active'
+          return
+        }
+        record.current = found
+        phase.current = 'paused'
+        setOffer(found)
+      })
+    })
     return () => {
       alive = false
       unsubscribe()
+      unpark()
     }
   }, [store, drafts, characterId, persist])
 

@@ -476,3 +476,114 @@ it('o 409 chega ao store só com os caminhos em conflito', async () => {
   await flush()
   expect(store.getState().conflict?.play?.paths).toEqual(['values.blood'])
 })
+
+// Achado do /code-review: o 409 ou 422 do "Salvar" com a ficha fechada
+// sumia (o rascunho já tinha saído do aparelho quando o lote entrou no outbox)
+describe('o "Salvar" recusado com a ficha fechada volta ao rascunho guardado', () => {
+  function savedThenClosed(status: 409 | 422) {
+    const drafts = createMemoryDraftStore()
+    let answer: (o: PostOutcome) => void = () => undefined
+    const post = jest.fn(
+      () =>
+        new Promise<PostOutcome>(resolve => {
+          answer = resolve
+        })
+    )
+    const notify = jest.fn()
+    const sync = createSync({
+      outbox: createMemoryOutbox(),
+      drafts,
+      post,
+      queryClient: new QueryClient(),
+      notify,
+      random: () => 0,
+    })
+    const store = createSheetStore({
+      characterId: ID,
+      model,
+      sheet,
+      sheetVersion: 3,
+      roles: ['owner'],
+      sync,
+    })
+    const unregister = sync.register(ID, store)
+    store.getState().setMode('evolve')
+    store.getState().startDraft()
+    store.getState().setDraftValue('values.strength', 3)
+    store.getState().saveDraft('Força')
+    return {
+      drafts,
+      notify,
+      store,
+      close: unregister,
+      answer: () =>
+        answer({
+          status,
+          body: { issues: [{ path: 'values.strength', message: 'x' }] },
+        }),
+      post,
+    }
+  }
+
+  it.each([409, 422] as const)(
+    '%i com a ficha fechada: o rascunho volta guardado',
+    async status => {
+      const t = savedThenClosed(status)
+      await flush()
+      expect(t.post).toHaveBeenCalledTimes(1)
+      t.close()
+      t.answer()
+      await flush()
+      await flush()
+      const back = await t.drafts.read(ID)
+      expect(back).toMatchObject({
+        characterId: ID,
+        templateVersion: model.version,
+        mode: 'evolve',
+        edits: [{ path: 'values.strength', from: 2, to: 3 }],
+      })
+      expect(t.notify).toHaveBeenCalled()
+    }
+  )
+
+  it('409 com a ficha aberta sem edição (travada): guarda em vez de abrir Editar', async () => {
+    const t = savedThenClosed(409)
+    await flush()
+    t.store.getState().setEditable(false)
+    t.store.getState().setMode('play')
+    const parked = jest.fn()
+    t.drafts.onParked(parked)
+    t.answer()
+    await flush()
+    await flush()
+    expect(t.store.getState().draft).toBeNull()
+    expect(parked).toHaveBeenCalledWith(ID)
+    expect((await t.drafts.read(ID))?.edits).toHaveLength(1)
+  })
+
+  it('o rascunho que já estava guardado entra junto, sem perder nada', async () => {
+    const t = savedThenClosed(409)
+    await flush()
+    t.close()
+    // Depois do "Salvar", a pessoa seguiu editando: Força 3 → 4 e Destreza
+    await t.drafts.write({
+      v: 1,
+      characterId: ID,
+      templateVersion: model.version,
+      baseVersion: 3,
+      mode: 'evolve',
+      savedAt: Date.now(),
+      edits: [
+        { path: 'values.strength', from: 3, to: 4 },
+        { path: 'values.dexterity', from: 2, to: 3 },
+      ],
+    })
+    t.answer()
+    await flush()
+    await flush()
+    expect((await t.drafts.read(ID))?.edits).toEqual([
+      { path: 'values.strength', from: 2, to: 4 },
+      { path: 'values.dexterity', from: 2, to: 3 },
+    ])
+  })
+})

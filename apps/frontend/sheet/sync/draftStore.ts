@@ -48,8 +48,19 @@ export interface DraftCount {
 
 export interface DraftStore {
   read(characterId: string): Promise<DraftRecord | null>
-  /** Grava; sem alterações, apaga. Registro inválido não é gravado. */
-  write(record: DraftRecord): Promise<void>
+  /**
+   * Grava; sem alterações, apaga. Registro inválido não é gravado: devolve
+   * false.
+   */
+  write(record: DraftRecord): Promise<boolean>
+  /**
+   * O "Salvar" recusado com a ficha fechada (ou sem permissão de edição)
+   * volta como rascunho guardado: grava e avisa quem estiver com a ficha
+   * aberta, para oferecer "Recuperar".
+   */
+  park(record: DraftRecord): Promise<boolean>
+  /** A ficha aberta escuta o rascunho que voltou do servidor. */
+  onParked(listener: (characterId: string) => void): () => void
   remove(characterId: string): Promise<void>
   /** As fichas com rascunho válido. */
   characters(): Promise<string[]>
@@ -184,6 +195,24 @@ export function createPersistedDraftStore(
     return ids
   }
 
+  const parkedListeners = new Set<(characterId: string) => void>()
+
+  const write = async (record: DraftRecord): Promise<boolean> => {
+    if (!UUID.test(record.characterId)) return false
+    if (!record.edits.length) {
+      await drop(record.characterId)
+      changed()
+      return true
+    }
+    const clean = parseDraftRecord(record, clock())
+    // Fora dos limites: o registro anterior fica (nunca grava o inválido)
+    if (!clean) return false
+    await storage.setItem(KEY + clean.characterId, JSON.stringify(clean))
+    known.add(clean.characterId)
+    changed()
+    return true
+  }
+
   return {
     read: characterId =>
       serial(async () => {
@@ -192,21 +221,17 @@ export function createPersistedDraftStore(
         changed()
         return record
       }),
-    write: record =>
+    write: record => serial(() => write(record)),
+    park: record =>
       serial(async () => {
-        if (!UUID.test(record.characterId)) return
-        if (!record.edits.length) {
-          await drop(record.characterId)
-          changed()
-          return
-        }
-        const clean = parseDraftRecord(record, clock())
-        // Fora dos limites: o registro anterior fica (nunca grava o inválido)
-        if (!clean) return
-        await storage.setItem(KEY + clean.characterId, JSON.stringify(clean))
-        known.add(clean.characterId)
-        changed()
+        const ok = await write(record)
+        if (ok) for (const l of parkedListeners) l(record.characterId)
+        return ok
       }),
+    onParked(listener) {
+      parkedListeners.add(listener)
+      return () => parkedListeners.delete(listener)
+    },
     remove: characterId =>
       serial(async () => {
         if (!UUID.test(characterId)) return
@@ -243,3 +268,40 @@ export function createPersistedDraftStore(
 /** Sem storage do aparelho (sem OfflineProvider, testes): só em memória. */
 export const createMemoryDraftStore = (clock: () => number = Date.now) =>
   createPersistedDraftStore(createMemoryStorage(), clock)
+
+/**
+ * O rascunho que volta de um "Salvar" recusado: as alterações do lote, com o
+ * rascunho que já estava guardado por cima (o mais novo vence no `to`; o
+ * `from` é o do lote, que é o que a ficha salva tinha). Nada se perde: o que
+ * mudou desde então aparece como conflito ao recuperar.
+ */
+export function returnedDraft(
+  existing: DraftRecord | null,
+  events: readonly DraftEditRecord[],
+  meta: {
+    readonly characterId: string
+    readonly templateVersion: string
+    readonly mode: 'create' | 'evolve'
+    readonly baseVersion: number
+  },
+  now: number
+): DraftRecord {
+  const edits = new Map<string, DraftEditRecord>()
+  for (const e of events)
+    edits.set(e.path, { path: e.path, from: e.from, to: e.to })
+  for (const e of existing?.edits ?? []) {
+    const back = edits.get(e.path)
+    edits.set(e.path, back ? { ...back, to: e.to } : e)
+  }
+  return {
+    v: 1,
+    characterId: meta.characterId,
+    templateVersion: meta.templateVersion,
+    baseVersion: meta.baseVersion,
+    mode: meta.mode,
+    savedAt: now,
+    edits: [...edits.values()].filter(
+      e => JSON.stringify(e.from) !== JSON.stringify(e.to)
+    ),
+  }
+}

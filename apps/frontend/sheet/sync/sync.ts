@@ -10,7 +10,11 @@ import type {
   SheetSync,
 } from '../store/sheetStore'
 import { ledgerMessage } from '../xp/messages'
-import { createMemoryDraftStore, type DraftStore } from './draftStore'
+import {
+  createMemoryDraftStore,
+  type DraftStore,
+  returnedDraft,
+} from './draftStore'
 import type { Outbox, QueuedBatch } from './outbox'
 import { createSender, type PostOutcome, type Sender } from './sender'
 
@@ -168,6 +172,44 @@ export function rejectionMessage(
 export function createSync(deps: SyncDeps): Sync {
   const { outbox, queryClient, notify } = deps
   const drafts = deps.drafts ?? createMemoryDraftStore()
+
+  /** O lote do "Salvar" recusado volta como rascunho guardado da ficha. */
+  const park = async (
+    characterId: string,
+    batch: QueuedBatch
+  ): Promise<boolean> => {
+    try {
+      const cached = queryClient.getQueryData(
+        sheetKeys.character(characterId)
+      ) as { templateVersion?: unknown; sheetVersion?: unknown } | undefined
+      const existing = await drafts.read(characterId)
+      const templateVersion =
+        batch.draftMeta?.templateVersion ??
+        (typeof cached?.templateVersion === 'string'
+          ? cached.templateVersion
+          : existing?.templateVersion) ??
+        // Versão desconhecida: a oferta mostra só "Descartar", com o motivo
+        '0.0.0'
+      return await drafts.park(
+        returnedDraft(
+          existing,
+          batch.events,
+          {
+            characterId,
+            templateVersion,
+            mode: batch.draftMeta?.mode ?? existing?.mode ?? 'evolve',
+            baseVersion:
+              typeof cached?.sheetVersion === 'number'
+                ? cached.sheetVersion
+                : (existing?.baseVersion ?? 0),
+          },
+          Date.now()
+        )
+      )
+    } catch {
+      return false
+    }
+  }
   const stores = new Map<string, SheetStore>()
   const refetch = (characterId: string) =>
     queryClient.invalidateQueries({
@@ -235,21 +277,36 @@ export function createSync(deps: SyncDeps): Sync {
       },
       conflicted(characterId, batch, body) {
         answered()
-        stores
-          .get(characterId)
-          ?.getState()
-          .conflicted(batch.clientBatchId, parseConflictBody(body, batch))
+        const taken =
+          stores
+            .get(characterId)
+            ?.getState()
+            .conflicted(batch.clientBatchId, parseConflictBody(body, batch)) ??
+          false
+        // O "Salvar" com a ficha fechada (ou sem edição): o rascunho já saiu
+        // do aparelho quando o lote entrou no outbox. Ele volta guardado, e
+        // a próxima abertura oferece "Recuperar", com o conflito marcado
+        if (batch.draft && !taken)
+          void park(characterId, batch).then(kept =>
+            notify(
+              kept
+                ? `“${batch.label}” não foi salvo: a ficha mudou em outro lugar. As alterações voltaram para o rascunho; abra a ficha para revisar.`
+                : `“${batch.label}” não foi salvo: a ficha mudou em outro lugar, e as alterações não couberam no rascunho do aparelho.`
+            )
+          )
         void refetch(characterId)
       },
       rejected(characterId, batch, status, body) {
         answered()
-        stores
-          .get(characterId)
-          ?.getState()
-          .rejected(
-            batch.clientBatchId,
-            status === 422 ? issuesOf(body) : undefined
-          )
+        const store = stores.get(characterId)?.getState()
+        store?.rejected(
+          batch.clientBatchId,
+          status === 422 ? issuesOf(body) : undefined
+        )
+        // O 422 do "Salvar" volta ao rascunho na ficha aberta e editável;
+        // fora dela, fica guardado no aparelho
+        if (status === 422 && batch.draft && (!store || !store.editable))
+          void park(characterId, batch)
         notify(
           rejectionMessage(
             batch.label,
