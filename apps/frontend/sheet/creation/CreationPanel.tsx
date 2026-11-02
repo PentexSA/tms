@@ -22,7 +22,12 @@ import {
 import { useSheet, useSheetSelector } from '../context'
 import { CompletionMessage } from './CompletionMessage'
 import { useCreation } from './CreationContext'
-import { completionBy, completionCopy } from './completion'
+import {
+  completionBy,
+  completionCopy,
+  isStaleCompletion,
+  STALE_COMPLETION,
+} from './completion'
 import {
   basicsDone,
   type CreationPhase,
@@ -41,8 +46,8 @@ import { RadioChips } from './RadioChips'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
 // a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
-// Orçamento (CreationPanel), e o botão único da barra (ModeBar) salva o
-// rascunho ou, com a conta fechada, conclui. As prioridades ficam no
+// Orçamento (CreationPanel), e a barra (ModeBar) tem "Salvar" sempre e, com
+// a conta fechada, a conclusão ao lado (D-01). As prioridades ficam no
 // cabeçalho de cada grupo (CreationCounter). Concluir exige rede, rascunho
 // salvo e a fila confirmada: a conclusão nunca confirma escolhas ainda locais.
 
@@ -79,8 +84,9 @@ export function useFreebiesNotes(): readonly string[] {
 }
 
 /**
- * O botão único da criação. Com a conta fechada (`ready`), ele conclui:
- * `start` espera o rascunho salvo e a fila confirmada e só então chama a API.
+ * A conclusão da barra de Criação (D-01: ao lado do "Salvar"). Com a conta
+ * fechada (`ready`), `start` espera o rascunho salvo e a fila confirmada e só
+ * então chama a API.
  * Mexer na ficha enquanto espera cancela a conclusão.
  */
 export function useFinishCreation() {
@@ -122,12 +128,17 @@ export function useFinishCreation() {
               action: 'complete',
             }).done,
           }),
+        // Um pedido de ajuste no meio sobe a revisão (P04-D): a mesma
+        // frase do menu do narrador, e a rebusca traz o banner do pedido
         onError: error => {
-          const code = creationRefusalOf(errorBodyOf(error))
+          const body = errorBodyOf(error)
+          const code = creationRefusalOf(body)
           toast.show({
-            message: code
-              ? REFUSAL_TEXT[code]
-              : messageOf(error, 'Não foi possível concluir a criação.'),
+            message: isStaleCompletion(body)
+              ? STALE_COMPLETION
+              : code
+                ? REFUSAL_TEXT[code]
+                : messageOf(error, 'Não foi possível concluir a criação.'),
           })
         },
       }

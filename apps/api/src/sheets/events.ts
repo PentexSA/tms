@@ -20,6 +20,7 @@ import {
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely, Transaction } from 'kysely'
+import type { AuditAction } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
 import { characterAccess } from '../authz'
@@ -104,15 +105,33 @@ async function changedByOf(
 const contentFree = (type: string | undefined) =>
   type === 'text' || type === 'longText'
 
+/** Os passos do ciclo da criação que o Histórico da ficha mostra. */
+export type LifecycleEvent =
+  | 'creation.completed'
+  | 'creation.submitted'
+  | 'creation.returned'
+  | 'creation.adjust'
+  | 'creation.ready'
+
 /**
- * As ações do registro da crônica que viram "Criação concluída" no Histórico
- * da ficha (T-80): o dono ou o narrador conclui, ou o narrador aprova. Só
- * estas duas; o resto do registro continua só para o narrador, em Bastidores.
+ * As ações do registro da crônica que viram passos no Histórico da ficha:
+ * "Criação concluída" (T-80: o dono ou o narrador conclui, ou o narrador
+ * aprova) e, desde o P04-D (R-12), enviar, devolver, pedir ajuste e avisar
+ * que terminou. Só estas; o resto do registro continua só para o narrador,
+ * em Bastidores.
  */
-const COMPLETION_ACTIONS = [
-  'character.creation.complete',
-  'character.creation.approve',
-] as const
+export const LIFECYCLE_EVENTS = {
+  'character.creation.complete': 'creation.completed',
+  'character.creation.approve': 'creation.completed',
+  'character.creation.submit': 'creation.submitted',
+  'character.creation.return': 'creation.returned',
+  'character.creation.adjust': 'creation.adjust',
+  'character.creation.ready': 'creation.ready',
+} as const satisfies Partial<Record<AuditAction, LifecycleEvent>>
+
+const LIFECYCLE_ACTIONS = Object.keys(
+  LIFECYCLE_EVENTS
+) as (keyof typeof LIFECYCLE_EVENTS)[]
 
 export interface HistoryEntry {
   readonly id: string
@@ -121,7 +140,7 @@ export interface HistoryEntry {
   readonly byRole: string
   readonly sheetVersion: number | null
   readonly operationId: string | null
-  readonly event?: 'creation.completed'
+  readonly event?: LifecycleEvent
   readonly reversible: boolean
   readonly changes: readonly {
     readonly label: string
@@ -148,6 +167,29 @@ export function completionRole(row: {
   return row.actor_id !== null && row.actor_id === row.target_user_id
     ? 'owner'
     : 'storyteller'
+}
+
+/**
+ * Quem deu o passo do ciclo, calculado no servidor pela ação: enviar e
+ * avisar são do dono; devolver e pedir ajuste, do narrador; concluir segue o
+ * `completionRole`. Nada vem do corpo.
+ */
+export function lifecycleRole(row: {
+  readonly action: keyof typeof LIFECYCLE_EVENTS
+  readonly actor_id: string | null
+  readonly target_user_id: string | null
+  readonly payload: unknown
+}): 'owner' | 'storyteller' {
+  switch (LIFECYCLE_EVENTS[row.action]) {
+    case 'creation.completed':
+      return completionRole(row)
+    case 'creation.submitted':
+    case 'creation.ready':
+      return 'owner'
+    case 'creation.returned':
+    case 'creation.adjust':
+      return 'storyteller'
+  }
 }
 
 /** Ordem do Histórico: do mais novo ao mais antigo, por (quando, id). */
@@ -491,13 +533,13 @@ export function eventRoutes(
           batches.length === limit && last
             ? `${new Date(last.created_at).toISOString()}_${last.id}`
             : null
-        // "Criação concluída" (T-80) vem do registro da crônica, que é onde a
-        // conclusão é gravada. As páginas são intervalos contíguos de
+        // Os passos do ciclo (T-80, P04-D) vêm do registro da crônica, que é
+        // onde eles são gravados. As páginas são intervalos contíguos de
         // (quando, id): esta vai do último lote dela (inclusive) até o cursor
         // pedido (exclusive), e a última página não tem piso. Assim cada
-        // conclusão aparece uma vez, na página certa. Só as duas ações, só
+        // passo aparece uma vez, na página certa. Só as ações do ciclo, só
         // desta ficha e da crônica dela, sem `payload` nem `target_user_id`
-        // na resposta
+        // na resposta (o motivo da devolução e do ajuste nunca está lá)
         let audits = db
           .selectFrom('chronicle_audit as a')
           .leftJoin('users as u', 'u.id', 'a.actor_id')
@@ -512,7 +554,7 @@ export function eventRoutes(
           ])
           .where('a.chronicle_id', '=', access.character.chronicleId)
           .where('a.target_character_id', '=', params.id)
-          .where('a.action', 'in', COMPLETION_ACTIONS)
+          .where('a.action', 'in', LIFECYCLE_ACTIONS)
         if (before) {
           const { when, id } = before
           audits = audits.where(eb =>
@@ -534,17 +576,23 @@ export function eventRoutes(
             ])
           )
         }
-        const completions: HistoryEntry[] = (await audits.execute()).map(a => ({
-          id: a.id,
-          at: new Date(a.created_at),
-          by: a.username === null ? null : { username: a.username },
-          byRole: completionRole(a),
-          sheetVersion: null,
-          operationId: null,
-          event: 'creation.completed',
-          reversible: false,
-          changes: [],
-        }))
+        const steps: HistoryEntry[] = (await audits.execute()).map(a => {
+          const row = {
+            ...a,
+            action: a.action as keyof typeof LIFECYCLE_EVENTS,
+          }
+          return {
+            id: a.id,
+            at: new Date(a.created_at),
+            by: a.username === null ? null : { username: a.username },
+            byRole: lifecycleRole(row),
+            sheetVersion: null,
+            operationId: null,
+            event: LIFECYCLE_EVENTS[row.action],
+            reversible: false,
+            changes: [],
+          }
+        })
         const items: HistoryEntry[] = batches
           .map(b => {
             const mine = events.filter(e => e.batch_id === b.id)
@@ -592,7 +640,7 @@ export function eventRoutes(
           })
           .filter(b => b.changes.length > 0)
         return {
-          items: [...items, ...completions].sort(newestFirst),
+          items: [...items, ...steps].sort(newestFirst),
           next,
         }
       },

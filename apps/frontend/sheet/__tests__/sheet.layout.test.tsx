@@ -340,6 +340,71 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(screen.getByRole('header', { name: 'Experiência' })).toBeTruthy()
   })
 
+  // P04-D (R-12): o estado sob o nome, em qualquer modo, como região viva
+  const creation = (over: Record<string, unknown> = {}) => ({
+    creation: {
+      revision: 1,
+      mode: 'points',
+      accounting: true,
+      choices: {},
+      config: {},
+      effective: effectiveCreationConfig(modelOf('vtm-v20')),
+      returned: null,
+      adjust: null,
+      ready: null,
+      approval: false,
+      ...over,
+    },
+  })
+
+  it('o selo do estado fica sob o nome, em Criação e em Jogo', async () => {
+    resize(PHONE)
+    await openSheet(['owner'], 'creating', creation())
+    const badge = screen.getByTestId('sheet-state')
+    expect(badge).toHaveTextContent('Em criação · por pontos')
+    expect(badge.props.accessibilityLiveRegion).toBe('polite')
+    // Não passa da coluna do nome (quebra em vez de cortar)
+    expect(StyleSheet.flatten(badge.props.style).maxWidth).toBe('100%')
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Em criação · por pontos'
+    )
+  })
+
+  it('o narrador lê o pedido no selo (Leitura) e no item do "Mais opções"', async () => {
+    resize(PHONE)
+    await openSheet(
+      ['storyteller'],
+      'creating',
+      creation({ adjust: { reason: 'Refaça', at: '2026-11-02T10:00:00Z' } })
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Aguardando ajuste'
+    )
+    fireEvent.press(menu())
+    expect(
+      screen.getByRole('button', {
+        name: 'Ações do narrador · Aguardando ajuste',
+      })
+    ).toBeTruthy()
+  })
+
+  it('a ficha concluída diz a data; no Editar também', async () => {
+    resize({ width: 360, height: 740, scale: 3, fontScale: 1 })
+    await openSheet(
+      ['owner'],
+      'active',
+      creation({ activatedAt: '2026-11-01T12:00:00Z' })
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+  })
+
   it('a ficha revelada (viewer) não ganha o menu', async () => {
     resize(PHONE)
     calls.characterGet.mockResolvedValue(
@@ -371,6 +436,8 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     renderWithSession(<SheetScreen id={ID} />, session)
     expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
+    // Nem o selo do estado: o envelope do viewer não traz a criação
+    expect(screen.queryByTestId('sheet-state')).toBeNull()
   })
 
   it('T-27: a barra do narrador rola com a ficha no celular e fica fixa no desktop', async () => {

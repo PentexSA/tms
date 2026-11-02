@@ -854,6 +854,29 @@ A ordem provisória da consolidação é **P03-D → P04-D → P11 → P09-C**, 
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementado sobre `8fb653e`, sem o P03-D (§8.4, "Se o P03-D atrasar"): a barra é a `EvolveBar` de hoje.
+
+1. **A barra recebe `next` e `note` na `EvolveBar` de hoje** (commit 8). As props têm os nomes do contrato do P03-D (§3.1 dele): o rebase troca o botão "Concluir" pelo `save` dele e mantém o `next` ("Avisar que terminei", `testID="creation-ready"`) e o `note` (`testID="next-step"`). A barra ganhou `flexWrap`: com pouco espaço, os botões descem para a linha de baixo, à direita, sem transbordar. A medida a 360 dp continua com o AVD (pergunta 1).
+2. **O `useNextStep` mora num arquivo próprio** (`sheet/creation/useNextStep.ts`), em vez de virar a base do `useFinishCreation`. O caminho de espera da fila é o mesmo, mas o `useFinishCreation`, que o P03-D também mexe, só ganhou o `STALE_COMPLETION` no `onError`. Menos conflito no rebase.
+3. **O aviso manda só a `revision`**, não a `sheetVersion`. A corrida que importa é a do pedido de ajuste, que sobe a revisão; a versão da ficha recusaria o aviso por qualquer lote do narrador no meio. A rota aceita as duas.
+4. **O `StateBadge` não é um elemento acessível à parte** (sem `accessible` nem `accessibilityRole="text"`). Dentro da linha da lista e do cartão da Mesa, um filho acessível ganharia foco próprio no Android e seria engolido no iOS; o texto já é lido como texto, e o rótulo entra no nome da linha. Com `live`, a região viva fica na `View` (`aria-live` no web, `accessibilityLiveRegion` no Android).
+5. **`CreationInfo` (`adjust`, `ready`) e o `sheetStateRow` entraram no commit 5**, não no 6: o `narratorOf` já precisava deles para o estado no menu do narrador.
+6. **`CreationContext` ganhou `kind` e `completedWhileEditing`.** O `kind` deixa o selo do NPC de fora; o segundo liga o banner da nota do P04-C (§3.7), que só vale no Editar (criação livre).
+7. **Testes da lista, da Mesa, do Histórico e da contagem no `creation.test.ts` da API**, e não no `events.test.ts` e no `chronicles.test.ts`: o template sintético por pontos (`acct-teste`) e os ajudantes já estão lá. O `table.test.ts` só mudou a linha esperada. O `isReturned` virou `creationFlags`, em `apps/api/src/sheets/creation-state.ts`, junto do `creationStateOf` da lista e da Mesa.
+8. **O `pendingReview` confere o `ready` pela forma do parse** (`jsonb_typeof(creation -> 'ready' -> 'at') = 'string'`), não só pela chave.
+9. **O 409 do "Pedir ajuste" diz o motivo quando a API o manda:** "A ficha não está mais em criação: o pedido de ajuste não vale aqui." (`CREATION_NOT_CREATING`) e "Esta ficha não recebe pedido de ajuste." (`CREATION_ADJUST_UNAVAILABLE`); os outros 409 dizem "A ficha mudou desde que você abriu. Confira e peça de novo.". A folha fecha e a ficha é rebuscada.
+10. **Um passo do Histórico que o app não conhece** fica só com a data e o autor (pergunta 8), sem `undefined` na linha.
+11. **E2E: além do `layout.spec.ts:143` e do `lifecycle.spec.ts:226` e `:297`, o `lifecycle.spec.ts:194` muda.** O `getByText('Aguardando aprovação')` passa a casar o painel e o selo (modo estrito do Playwright); o seletor vira `getByTestId('creation-pending')`, como no Jest. Os quatro ficam para depois do merge do P03-D (§8.4). O `creation-state.spec.ts` já usa os seletores novos e foi só checado com typecheck.
+12. **O teste da regra é `components/chronicles/__tests__/characterState.test.tsx`**, não `.test.ts`: o `testMatch` do Jest em `components/` só pega `.test.tsx`, e com a extensão do plano o arquivo passava verde sem rodar (aviso do P11). Conferido com `jest --listTests`.
+13. **O `PATCH …/creation` mantém o `ready` só na criação livre** (§3.1 dizia "mantém `adjust` e `ready`"). Se o narrador passa a ficha para pontos depois do aviso, o `ready` sai: concluir volta a ser da dona, e a Mesa, a lista e a contagem não seguem dizendo "avisou que terminou" numa ficha por pontos. O `adjust` continua. Achado da revisão do próprio pacote; há teste no `creation.test.ts`.
+14. **Achados do `/code-review high`, corrigidos no commit de revisão:**
+    - o NPC fica sem estado de criação (§3.4, regra 1), mas mostra "Travada", "Arquivada" e o rótulo de `dead`, como a Mesa mostrava antes;
+    - a lista da crônica recebe o `lockedAt`, e a trava vence "Concluída em" também nela (antes, só na Mesa);
+    - o `pendingReview` conta o aviso só em PC de outra pessoa, como o banner da aba Fichas (depois de uma transferência, a ficha do próprio narrador não conta);
+    - o `creationStateOf` faz um parse só (`parseCharacterCreation`), e só em `creating` e `pending`; o `creationFlags` saiu;
+    - o "Avisar que terminei" confirmado depois de a ficha mudar (aviso noutro aparelho, conclusão) não fica em silêncio: o toast diz que a ficha mudou;
+    - o `narratorOf` reusa o `creationInfoOf` da tela.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.

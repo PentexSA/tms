@@ -103,6 +103,8 @@ const character = (
       config: {},
       effective: effectiveCreationConfig(vtm),
       returned: null,
+      adjust: null,
+      ready: null,
       approval: false,
     },
   })
@@ -624,11 +626,52 @@ describe('barra de Criação em duas linhas (D-01)', () => {
     expect(screen.getByTestId('mode-bar-actions')).toBeTruthy()
   })
 
-  it('só "Salvar" (a conta aberta), uma linha no celular, como antes', async () => {
+  // P04-D (D-03): a linha do próximo passo é o `note`; no celular, com ela,
+  // a barra fica em duas linhas mesmo só com "Salvar" (onda-3 §4.1)
+  it('só "Salvar" (a conta aberta): com o próximo passo, duas linhas no celular', async () => {
     await open(PRIORITIES)
     at(390)
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    const actions = screen.getByTestId('mode-bar-actions')
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map(b => b.props.testID)
+    ).toEqual(['mode-save'])
+    // A tela larga continua numa linha
+    at(1280)
     expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
     expect(style('mode-bar').flexDirection).toBe('row')
+  })
+
+  it('Editar da criação livre: "Salvar" (nome "Salvar alterações") e "Avisar que terminei" numa linha embaixo', async () => {
+    const free = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...free.data, creation: { ...free.data.creation, mode: 'free' } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    await screen.findByTestId('creation-ready')
+    at(360)
+    const actions = screen.getByTestId('mode-bar-actions')
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map(b => b.props.testID)
+    ).toEqual(['mode-save', 'creation-ready'])
+    const save = screen.getByTestId('mode-save')
+    expect(save).toHaveTextContent('Salvar')
+    expect(save).not.toHaveTextContent('Salvar alterações')
+    expect(save.props.accessibilityLabel).toBe('Salvar alterações')
   })
 })
 
@@ -752,5 +795,177 @@ describe('devolver para correção', () => {
     expect(screen.queryByTestId('creation-return-reason')).toBeNull()
     fireEvent.press(screen.getByTestId('creation-return-open'))
     expect(screen.getByTestId('creation-return-reason').props.value).toBe('')
+  })
+})
+
+// P04-D (D-04, R-14): o pedido de ajuste do narrador aparece como a
+// devolução, em qualquer modo; só um banner por vez
+describe('ajuste pedido', () => {
+  const ADJUST = {
+    reason: 'Refaça os Antecedentes',
+    at: '2026-11-02T10:00:00Z',
+  }
+  const asked = (roles: string[], over: Record<string, unknown> = {}) => {
+    const base = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    return ok({
+      ...base.data,
+      roles,
+      creation: { ...base.data.creation, adjust: ADJUST, ...over },
+    })
+  }
+  const render = async (roles: string[], over?: Record<string, unknown>) => {
+    calls.characterGet.mockResolvedValue(asked(roles, over))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+  }
+
+  it('a dona vê "O narrador pediu um ajuste" com o motivo, também em Jogo', async () => {
+    await render(['owner'])
+    const banner = await screen.findByTestId('creation-adjust')
+    expect(banner.props.accessibilityLabel).toBe(
+      'O narrador pediu um ajuste. Refaça os Antecedentes'
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Aguardando ajuste'
+    )
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(screen.getByTestId('creation-adjust')).toBeTruthy()
+  })
+
+  it('o narrador vê "Você pediu um ajuste"', async () => {
+    await render(['storyteller'])
+    expect(
+      (await screen.findByTestId('creation-adjust')).props.accessibilityLabel
+    ).toBe('Você pediu um ajuste. Refaça os Antecedentes')
+  })
+
+  it('só um banner por vez: o pedido vence a devolução', async () => {
+    await render(['owner'], {
+      returned: { reason: 'Antiga', at: '2026-10-20T00:00:00Z' },
+    })
+    expect(await screen.findByTestId('creation-adjust')).toBeTruthy()
+    expect(screen.queryByTestId('creation-returned')).toBeNull()
+  })
+})
+
+// P04-D (D-03, R-13): a barra diz o próximo passo; na criação livre, a dona
+// avisa que terminou
+describe('próximo passo e "Avisar que terminei"', () => {
+  const render = async (
+    creation: Record<string, unknown>,
+    roles = ['owner']
+  ) => {
+    const base = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({
+        ...base.data,
+        roles,
+        creation: { ...base.data.creation, ...creation },
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+  }
+
+  it('por pontos, a dona lê que conclui quando a conta fechar', async () => {
+    await open(PRIORITIES)
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+  })
+
+  it('livre: a linha e o botão; com 1 alteração, salva, espera a fila e só então avisa', async () => {
+    calls.eventsPost.mockResolvedValue({
+      ...ok({
+        sheetVersion: 2,
+        sheet: {
+          values: { name: 'Nova', clan: 'tremere', strength: 2 },
+          specialties: {},
+        },
+      }),
+      status: 200,
+      response: {} as Response,
+      headers: {},
+    })
+    calls.creationReadyPost.mockResolvedValue(ok({ revision: 2 }))
+    await render({ mode: 'free' })
+    // A ficha livre da dona abre no Editar (T-05)
+    expect(await screen.findByTestId('next-step')).toHaveTextContent(
+      'Quando terminar, avise: o narrador conclui.'
+    )
+    const button = screen.getByTestId('creation-ready')
+    expect(button).toHaveTextContent('Avisar que terminei')
+    expect(button).toBeEnabled()
+    step('Força')
+    fireEvent.press(screen.getByTestId('creation-ready'))
+    expect(screen.getByText('Avisar que terminei?')).toBeTruthy()
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      'O narrador vê na Mesa que você terminou e conclui a criação. Até lá, você ainda pode editar. As alterações abaixo são salvas antes.'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-ready-confirm'))
+    })
+    await waitFor(() =>
+      expect(calls.creationReadyPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({ revision: 1 })
+      )
+    )
+    // O lote sai antes do aviso
+    expect(calls.eventsPost.mock.invocationCallOrder[0]).toBeLessThan(
+      calls.creationReadyPost.mock.invocationCallOrder[0]!
+    )
+    expect(
+      await screen.findByText('Pronto: o narrador foi avisado.')
+    ).toBeTruthy()
+  })
+
+  it('depois de avisar: sem o botão, e a linha muda', async () => {
+    await render({ mode: 'free', ready: { at: '2026-11-02T10:00:00Z' } })
+    expect(await screen.findByTestId('next-step')).toHaveTextContent(
+      'Você avisou. O narrador conclui a criação.'
+    )
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Você avisou que terminou'
+    )
+  })
+
+  it('um 409 diz que a ficha mudou', async () => {
+    calls.creationReadyPost.mockResolvedValue({
+      data: null,
+      error: {
+        status: 409,
+        value: {
+          error: 'a configuração da criação mudou',
+          code: 'CREATION_REVISION_CONFLICT',
+        },
+      },
+    })
+    await render({ mode: 'free' })
+    fireEvent.press(await screen.findByTestId('creation-ready'))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-ready-confirm'))
+    })
+    expect(
+      await screen.findByText(
+        'A ficha mudou desde que você abriu. Confira e avise de novo.'
+      )
+    ).toBeTruthy()
   })
 })

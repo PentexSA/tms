@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
 import { effectiveCreationConfig, type SheetData } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
@@ -414,6 +420,7 @@ describe('a tela da ficha com o estado', () => {
         model={vtm}
         status="creating"
         locked={false}
+        state={null}
         unsaved={0}
         queued={1}
       />,
@@ -482,7 +489,9 @@ describe('a tela da ficha com o estado', () => {
     const trigger = screen.getByRole('button', { name: 'Narrador, Travada' })
     expect(trigger.props.accessibilityHint).toBe('Abre as ações do narrador')
     expect(screen.getByText('Narrador')).toBeTruthy()
-    expect(screen.getByText('Travada')).toBeTruthy()
+    // "Travada" no gatilho e no selo sob o nome (P04-D)
+    expect(within(trigger).getByText('Travada')).toBeTruthy()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent('Travada')
     fireEvent.press(trigger)
     expect(screen.getByTestId('status-unlock')).toBeTruthy()
   })

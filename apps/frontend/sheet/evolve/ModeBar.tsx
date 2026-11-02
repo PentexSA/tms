@@ -29,6 +29,8 @@ import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
 import { completionBy, completionCopy } from '../creation/completion'
+import { READY_COPY } from '../creation/nextStep'
+import { useNextStep } from '../creation/useNextStep'
 import { useDraftCount } from './hooks'
 import { saveDraftNow } from './saveDraft'
 
@@ -98,11 +100,15 @@ export function useModeBar({
   const toast = useToast()
   const count = useDraftCount()
   const finishing = useFinishCreation()
+  // O próximo passo (D-03): a linha da barra e o "Avisar que terminei"
+  const step = useNextStep()
   const freebies = useFreebiesText()
   const [summary, setSummary] = useState<{
     readonly next: SheetMode
     // Concluir a criação depois de salvar
     readonly finish: boolean
+    // Avisar que terminou (criação livre) depois de salvar
+    readonly announce?: boolean
     readonly events: readonly SheetEvent[]
     // Pontos que ficam inativos (ou voltam a valer) com o teto novo
     readonly inactive: readonly ChangeLabel[]
@@ -138,7 +144,7 @@ export function useModeBar({
   }
 
   // O resumo antes de salvar; `next` é o modo depois (na criação, ela mesma)
-  const review = (next: SheetMode, finish = false) => {
+  const review = (next: SheetMode, finish = false, announce = false) => {
     const s = store.getState()
     setError(null)
     const events = s.draftEvents()
@@ -146,6 +152,7 @@ export function useModeBar({
     setSummary({
       next,
       finish,
+      announce,
       // Só para mostrar (T-54): o "de" efetivo da ficha salva ("Aparência
       // 1 → 3", não "0 → 3"), como o Histórico. O lote sai do rascunho do
       // store, com o `from` cru, que é o que o conflito compara.
@@ -154,11 +161,20 @@ export function useModeBar({
     })
   }
 
+  // Depois de salvar: concluir ou avisar, cada um esperando a fila
+  const proceed = () => {
+    if (!summary?.announce) finishing.start()
+    else if (step.announce) step.announce.start()
+    // A ficha mudou com o resumo aberto (avisou noutro aparelho, foi
+    // concluída): nada é enviado, e a pessoa fica sabendo
+    else toast.show({ message: READY_COPY.stale })
+  }
+
   const save = () => {
     if (!summary) return
-    if (summary.finish && !summary.events.length) {
+    if ((summary.finish || summary.announce) && !summary.events.length) {
       setSummary(null)
-      finishing.start()
+      proceed()
       return
     }
     const result = saveDraftNow(store)
@@ -169,9 +185,10 @@ export function useModeBar({
     const next = summary.next
     setSummary(null)
     switchTo(next)
-    // Concluir: espera a fila confirmar o lote; sem Desfazer no meio
-    if (summary.finish) {
-      if (result.batchId !== null) finishing.start()
+    // Concluir ou avisar: espera a fila confirmar o lote; sem Desfazer no
+    // meio
+    if (summary.finish || summary.announce) {
+      if (result.batchId !== null) proceed()
       return
     }
     if (result.batchId !== null) {
@@ -196,18 +213,43 @@ export function useModeBar({
   }
 
   const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
+  // O próximo passo (D-03), sob a contagem. Muda pouco e não é região viva:
+  // o banner da ficha anuncia o pedido do narrador
+  const nextStepNote = step.copy ? (
+    <Text variant="caption" color="inkMuted" testID="next-step">
+      {step.copy}
+    </Text>
+  ) : null
   const actionBar =
     mode === 'evolve' ? (
       // R-05 (D-01): o botão só salva; sem alterações, não há o que salvar,
-      // e a saída do modo é o seletor
+      // e a saída do modo é o seletor. Na criação livre, a dona tem a ação
+      // seguinte (D-03): com ela ao lado, o salvar mostra "Salvar" e mantém
+      // o nome "Salvar alterações" (onda-3 §4.1; ponto 1 para o PO)
       <EvolveBar
         count={count}
         save={{
-          title: 'Salvar alterações',
+          title: step.announce ? 'Salvar' : 'Salvar alterações',
+          accessibilityLabel: 'Salvar alterações',
           testID: 'mode-save',
           disabled: count === 0,
           onPress: () => go(returnTo.current),
         }}
+        note={nextStepNote}
+        next={
+          step.announce
+            ? {
+                title: step.announce.waitingSync
+                  ? 'Sincronizando…'
+                  : step.announce.label,
+                busy: step.announce.busy,
+                disabled: step.announce.busy,
+                testID: 'creation-ready',
+                // O resumo confirma e salva antes; a ficha fica no Editar
+                onPress: () => review('evolve', false, true),
+              }
+            : null
+        }
       />
     ) : mode === 'create' ? (
       // D-01: "Salvar" sempre; com a conta fechada, a conclusão ao lado
@@ -215,6 +257,7 @@ export function useModeBar({
         count={count}
         label="Criação"
         detail={freebies}
+        note={nextStepNote}
         save={{
           // "Salvar" visível; o nome é o do Editar (WCAG 2.5.3: começa
           // pelo texto visível) e não colide com o "Salvar" do resumo
@@ -243,17 +286,23 @@ export function useModeBar({
     <SummarySheet
       visible={summary !== null}
       finish={
-        summary?.finish
+        summary?.announce
           ? {
-              label: finishing.label,
-              body: completionCopy({
-                by: completionBy(roles),
-                approval: finishing.approval,
-                action: 'complete',
-              }).body,
-              notes: finishing.notes,
+              label: READY_COPY.label,
+              body: READY_COPY.body,
+              testID: 'creation-ready-confirm',
             }
-          : null
+          : summary?.finish
+            ? {
+                label: finishing.label,
+                body: completionCopy({
+                  by: completionBy(roles),
+                  approval: finishing.approval,
+                  action: 'complete',
+                }).body,
+                notes: finishing.notes,
+              }
+            : null
       }
       events={summary?.events ?? []}
       inactive={summary?.inactive ?? []}
@@ -429,6 +478,7 @@ function SummarySheet({
     readonly label: string
     readonly body: string
     readonly notes?: readonly string[]
+    readonly testID?: string
   } | null
   readonly events: readonly SheetEvent[]
   readonly inactive: readonly ChangeLabel[]
@@ -451,7 +501,7 @@ function SummarySheet({
             <Button title="Voltar" variant="ghost" onPress={onClose} />
             <Button
               title={finish.label}
-              testID="creation-confirm"
+              testID={finish.testID ?? 'creation-confirm'}
               onPress={onSave}
             />
           </>

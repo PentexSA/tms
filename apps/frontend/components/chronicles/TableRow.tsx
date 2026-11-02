@@ -3,6 +3,7 @@ import {
   Avatar,
   Pressable,
   Skeleton,
+  StateBadge,
   Text,
   ThemeProvider,
   tokens,
@@ -59,7 +60,7 @@ export const TableRow = memo(function TableRow({
     : []
   const label = [
     [row.name, identity?.chip].filter(Boolean).join(', '),
-    state,
+    state?.label,
     ...alerts.map(a => a.label),
     ...described,
     problem,
@@ -107,9 +108,11 @@ export const TableRow = memo(function TableRow({
           {state || alerts.length ? (
             <View style={styles.badges}>
               {state ? (
-                <Text variant="caption" color="inkMuted">
-                  {state}
-                </Text>
+                <StateBadge
+                  label={state.label}
+                  tone={state.tone}
+                  testID={`table-state-${row.id}`}
+                />
               ) : null}
               {alerts.map(a => (
                 <Text
