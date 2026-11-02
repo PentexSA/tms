@@ -538,9 +538,13 @@ export function creationRoutes(
                 ...(next.choices && { choices: next.choices }),
                 ...(config && { config }),
                 ...(next.returned && { returned: next.returned }),
-                // O ajuste do orçamento não apaga o pedido nem o aviso
+                // O ajuste do orçamento não apaga o pedido nem o aviso. O
+                // aviso é da criação livre: o narrador que passa a ficha
+                // para pontos o apaga (concluir passa a ser do dono)
                 ...(next.adjust && { adjust: next.adjust }),
-                ...(next.ready && { ready: next.ready }),
+                ...(next.ready &&
+                  creationInputOf(model, { ...(config && { config }) }).config
+                    .mode === 'free' && { ready: next.ready }),
               }
               // Escolha ou orçamento que piorariam a conta não são gravados
               // sozinhos (§3.1); o narrador também passa por aqui (§2.3, 21)

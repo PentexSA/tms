@@ -1281,6 +1281,22 @@ describe('pedir ajuste e avisar que terminei', () => {
       status: 'active',
     })
     expect((await row(free)).creation).not.toHaveProperty('ready')
+    // O narrador passa a ficha livre para pontos: o aviso (da criação livre)
+    // sai, e concluir volta a ser da dona
+    const switched = await freeCharacter()
+    expect((await ready(switched)).status).toBe(200)
+    const points = await as(
+      ctx,
+      storyteller,
+      'PATCH',
+      `/characters/${switched}/creation`,
+      { revision: 1, config: null }
+    )
+    expect(points.status).toBe(200)
+    expect(await creationOf(switched)).toMatchObject({
+      mode: 'points',
+      ready: null,
+    })
     // Aprovação ligada: enviar apaga o pedido; devolver não o traz de volta
     await approval(true)
     const sent = await character({ ...COMPLETE, name: 'Enviada' })
