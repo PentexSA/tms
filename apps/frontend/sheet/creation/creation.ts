@@ -1,6 +1,7 @@
 import {
   type CreationCheck,
   type CreationChoices,
+  type CreationComponent,
   type CreationConfig,
   type CreationGroup,
   type CreationInput,
@@ -230,10 +231,141 @@ export function reorder(
 export type CreationPhase = 'basics' | 'freebies'
 
 /**
+ * Por que um toque não entra (R-20): o motivo, para a tela e para o aviso que
+ * some quando a causa some (sheetStore). `budget`, `cap`: só do app, na fase
+ * de Básicos; os outros repetem a conta do servidor.
+ */
+export type RefusalCause =
+  | 'priorities' // grupo sem prioridade escolhida
+  | 'budget' // em Básicos: os pontos básicos do grupo acabaram
+  | 'cap' // em Básicos: o traço chegou ao creation-cap
+  | 'freebies' // o saldo de bônus não cobre o custo
+  | 'ceiling' // hard-cap (Arete ≤ 3, Esfera ≤ Arete)
+  | 'locked' // baseline travado (Aparência do Nosferatu)
+  | 'not-purchasable' // sem preço de bônus
+  | 'other' // outro problema bloqueante da conta
+
+export interface CreationNotice {
+  readonly cause: RefusalCause
+  // Só rótulos do template e números da conta; nunca texto da ficha
+  readonly text: string
+  // "Ver orçamento" (T-07): leva à aba onde a fase é escolhida
+  readonly action?: 'budget'
+}
+
+/** O componente da conta num caminho ("values.alert", "values.x#item"). */
+export function componentAt(
+  check: CreationCheck | null,
+  path: string
+): CreationComponent | null {
+  if (!check) return null
+  for (const b of check.budgets)
+    for (const g of b.groups)
+      for (const c of g.components) if (c.path === path) return c
+  for (const l of check.lines)
+    for (const c of l.components ?? []) if (c.path === path) return c
+  return null
+}
+
+/** "(Clã: Nosferatu)": a escolha da ficha que trava o valor inicial. */
+function lockReason(
+  model: SheetModel,
+  sheet: SheetData,
+  c: CreationComponent
+): string {
+  for (const bl of model.template.creation?.baselines ?? []) {
+    if (!bl.locked || !bl.targets.includes(c.field) || bl.value !== c.initial)
+      continue
+    if (!bl.when) return ''
+    const chosen = sheet.values[bl.when.field]
+    const def = model.fields.get(bl.when.field)?.def
+    if (typeof chosen !== 'string' || def?.type !== 'choice') continue
+    if (bl.when.in && !bl.when.in.includes(chosen)) continue
+    const option = def.options.find(o => o.id === chosen)?.label
+    return option ? ` (${def.label}: ${option})` : ''
+  }
+  return ''
+}
+
+/** A frase de um problema que um toque piorou (T-57: custo, não estado). */
+function refusalNotice(
+  model: SheetModel,
+  sheets: { readonly before: SheetData; readonly after: SheetData },
+  checks: {
+    readonly before: CreationCheck | null
+    readonly after: CreationCheck | null
+  },
+  code: CreationRefusalCode,
+  problems: readonly CreationProblem[]
+): CreationNotice {
+  const find = (c: CreationProblem['code']) => problems.find(p => p.code === c)
+  const locked = find('CREATION_LOCKED')
+  const lockedAt = locked?.paths[0]
+  const lockedC = lockedAt ? componentAt(checks.after, lockedAt) : null
+  if (locked && lockedAt && lockedC)
+    return {
+      cause: 'locked',
+      text: `${fieldLabel(model, lockedAt)}: fica em ${lockedC.initial} na criação${lockReason(model, sheets.after, lockedC)}.`,
+    }
+  const hard = find('CREATION_HARD_CAP')
+  const hardAt = hard?.paths[0]
+  const ceiling = hardAt
+    ? componentAt(checks.after, hardAt)?.ceiling
+    : undefined
+  if (hard && hardAt && ceiling !== undefined)
+    return {
+      cause: 'ceiling',
+      text: `${fieldLabel(model, hardAt)}: na criação, vai até ${ceiling}.`,
+    }
+  const priorities = find('CREATION_PRIORITIES_REQUIRED')
+  if (priorities) {
+    const group = checks.after?.budgets
+      .find(b => b.id === priorities.budget)
+      ?.groups.find(g => g.id === priorities.group)?.label
+    return {
+      cause: 'priorities',
+      text: group
+        ? `${group}: escolha a prioridade antes de distribuir os pontos.`
+        : REFUSAL_TEXT.CREATION_PRIORITIES_REQUIRED,
+    }
+  }
+  const notPurchasable = find('CREATION_NOT_PURCHASABLE')
+  if (notPurchasable)
+    return {
+      cause: 'not-purchasable',
+      text: problemText(model, checks.after, notPurchasable),
+    }
+  const before = checks.before?.freebies
+  const after = checks.after?.freebies
+  if (find('CREATION_FREEBIES_EXCEEDED') && before && after) {
+    // O custo líquido do toque, com os descontos derivados (a FdV que passa
+    // a vir da Coragem custa menos que o preço de tabela)
+    const cost = before.remaining - after.remaining
+    const left = before.remaining
+    return {
+      cause: 'freebies',
+      text:
+        left < 0
+          ? `Bônus: o saldo já está ${-left} acima; este ponto custa ${cost}.`
+          : `${-after.remaining === 1 ? 'Faltaria 1' : `Faltariam ${-after.remaining}`} de bônus: custa ${cost}, ${left === 1 ? 'resta 1' : `restam ${left}`}.`,
+    }
+  }
+  const first = problems[0]
+  return {
+    cause: 'other',
+    text:
+      first && code === 'CREATION_BUDGET_EXCEEDED'
+        ? problemText(model, checks.after, first)
+        : REFUSAL_TEXT[code],
+  }
+}
+
+/**
  * Por que uma mudança no rascunho da criação não entra, ou null. A mesma
  * avaliação parcial do "Salvar" (`checkCreationBatch`), agora a cada toque, e
- * em `basics` também o grupo que passaria do orçamento. Só o app trava aqui:
- * gastar bônus continua valendo no servidor.
+ * em `basics` também o grupo que passaria do orçamento ou o traço que passaria
+ * do teto dos básicos. Só o app trava aqui: gastar bônus continua valendo no
+ * servidor. Do motivo mais específico para o mais geral (T-07).
  */
 export function draftRefusal(
   model: SheetModel,
@@ -244,24 +376,48 @@ export function draftRefusal(
   },
   input: CreationInput,
   phase: CreationPhase
-): string | null {
+): CreationNotice | null {
   const refused = checkCreationBatch(model, sheets.before, sheets.after, input)
-  if (refused) {
-    const first = refused.problems[0]
-    return first && refused.code === 'CREATION_BUDGET_EXCEEDED'
-      ? problemText(model, checks.after, first)
-      : REFUSAL_TEXT[refused.code]
-  }
+  if (refused)
+    return refusalNotice(model, sheets, checks, refused.code, refused.problems)
   if (phase !== 'basics' || !checks.after) return null
+  const freebies = checks.after.freebies !== null
   for (const b of checks.after.budgets)
     for (const g of b.groups) {
       const was = checks.before?.budgets
         .find(x => x.id === b.id)
         ?.groups.find(x => x.id === g.id)
-      if (g.budget !== null && g.extra > (was?.extra ?? 0))
-        return basicsSpentText(g, checks.after.freebies !== null)
+      if (g.budget === null || g.extra <= (was?.extra ?? 0)) continue
+      // O que passou dos básicos veio do teto do traço ou do grupo cheio
+      const over = (c: CreationComponent) => c.invested - c.eligible
+      const capped = g.components.find(c => {
+        const old = was?.components.find(x => x.path === c.path)
+        return c.cap !== undefined && over(c) > (old ? over(old) : 0)
+      })
+      const action =
+        freebies && g.price !== null ? { action: 'budget' as const } : {}
+      if (capped?.cap !== undefined)
+        return {
+          cause: 'cap',
+          text: capText(model, capped, g, freebies),
+          ...action,
+        }
+      return { cause: 'budget', text: basicsSpentText(g, freebies), ...action }
     }
   return null
+}
+
+/** "Prontidão: com pontos básicos, vai até 3. Acima disso, cada ponto ..." */
+function capText(
+  model: SheetModel,
+  c: CreationComponent,
+  g: CreationGroup,
+  freebies: boolean
+): string {
+  const first = `${fieldLabel(model, c.path)}: com pontos básicos, vai até ${c.cap}.`
+  return freebies && g.price !== null
+    ? `${first} Acima disso, cada ponto custa ${g.price} de bônus.`
+    : first
 }
 
 /**
@@ -279,10 +435,10 @@ export function basicsDone(check: CreationCheck | null): boolean {
 
 /** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
 export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
-  const unit = g.measure === 'items' ? 'itens' : 'pontos'
-  const spent = `${g.label}: os ${g.budget} ${unit} básicos já foram usados.`
+  const items = g.measure === 'items'
+  const spent = `${g.label}: os ${g.budget} ${items ? 'itens' : 'pontos'} básicos já foram usados.`
   return freebies && g.price !== null
-    ? `${spent} Para passar disso, use os pontos de bônus.`
+    ? `${spent} Para passar disso, use os pontos de bônus (${g.price} por ${items ? 'item' : 'ponto'}).`
     : spent
 }
 

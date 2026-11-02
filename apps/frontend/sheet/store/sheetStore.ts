@@ -526,7 +526,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           return {
             ok: false,
             kind: 'creation',
-            issues: events.map(e => ({ path: e.path, message: why })),
+            issues: events.map(e => ({ path: e.path, message: why.text })),
           }
       }
       set({ draft, fieldIssues, ...next })

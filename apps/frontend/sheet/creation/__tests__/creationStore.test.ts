@@ -96,7 +96,7 @@ describe('trava da criação a cada toque', () => {
         {
           path: 'values.str',
           message:
-            'Escolha as prioridades deste grupo antes de distribuir os pontos.',
+            'Físicos: escolha a prioridade antes de distribuir os pontos.',
         },
       ],
     })
@@ -117,7 +117,7 @@ describe('trava da criação a cada toque', () => {
         {
           path: 'values.dex',
           message:
-            'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus.',
+            'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
         },
       ],
     })
@@ -138,7 +138,12 @@ describe('trava da criação a cada toque', () => {
     expect(store.getState().check?.freebies?.remaining).toBe(0)
     expect(set(store, 'str', 4)).toMatchObject({
       ok: false,
-      issues: [{ path: 'values.str', message: 'Bônus: 5 acima do saldo.' }],
+      issues: [
+        {
+          path: 'values.str',
+          message: 'Faltariam 5 de bônus: custa 5, restam 0.',
+        },
+      ],
     })
   })
 

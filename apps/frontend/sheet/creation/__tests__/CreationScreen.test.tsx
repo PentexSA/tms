@@ -219,7 +219,7 @@ describe('trava da distribuição', () => {
     step('Vigor')
     expect(
       screen.getByText(
-        'Físicos: os 7 pontos básicos já foram usados. Para passar disso, use os pontos de bônus.'
+        'Físicos: os 7 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
       )
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
@@ -236,6 +236,23 @@ describe('trava da distribuição', () => {
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
       'Bônus: 10 de 15 restantes.'
     )
+  })
+})
+
+describe('o motivo certo da recusa (T-07)', () => {
+  it('o 4º ponto em Prontidão diz o teto, e o contador continua 3/13', async () => {
+    await open(PRIORITIES)
+    tab('Talentos')
+    for (let i = 0; i < 3; i++) step('Prontidão')
+    expect(screen.getByTestId('counter-talents').props.children).toBe('3/13')
+    step('Prontidão')
+    expect(
+      screen.getByText(
+        'Prontidão: com pontos básicos, vai até 3. Acima disso, cada ponto custa 2 de bônus.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByText(/já foram usados/)).toBeNull()
+    expect(screen.getByTestId('counter-talents').props.children).toBe('3/13')
   })
 })
 
