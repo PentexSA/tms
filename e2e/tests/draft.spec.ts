@@ -72,6 +72,13 @@ test('F5 com 3 alterações em Editar: "Recuperar" devolve as 3; o logout apaga'
   await expect.poll(() => draftKeys(page)).toBe(1)
   await page.goto('/')
   await page.getByRole('button', { name: 'Sair' }).click()
+  // O aviso de "Sair" do P02 conta o rascunho (sem valor de campo)
+  await expect(
+    page.getByText(
+      'O rascunho não salvo de 1 ficha será descartado neste aparelho.'
+    )
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Sair e descartar' }).click()
   await expect(page).toHaveURL(/\/login$/)
   await expect.poll(() => draftKeys(page)).toBe(0)
 })
