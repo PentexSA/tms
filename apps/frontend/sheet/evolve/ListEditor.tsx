@@ -11,7 +11,7 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import {
   describeItem,
   ItemLine,
@@ -34,6 +34,9 @@ const NOTES_MAX = 2000
 const META_TEXT_MAX = 80
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] }
+
+/** A recusa da conta (ou do validador) para quem tocou; `null` se entrou. */
+type Write = string | null
 
 /** Item sem campos vazios: o validador do core recusa chave sem esquema. */
 function cleanItem(item: ListItem): ListItem {
@@ -58,17 +61,15 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const issue = useFieldIssue(resolved.id)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   if (resolved.type !== 'list') return null
   const list: ResolvedList = resolved
   const def = list.field.def
   const items = stored(list, sheet) as ListItem[]
-  const write = (next: readonly ListItem[]): boolean => {
-    const err = set(`values.${list.id}`, next.map(cleanItem))
-    setError(err)
-    return !err
-  }
-  const add = (name: string) => {
+  // A recusa volta para a folha que recebeu o toque (T-19): desenhada aqui,
+  // embaixo da lista, ela ficava atrás do modal e sobrava ao fechar.
+  const write = (next: readonly ListItem[]): Write =>
+    set(`values.${list.id}`, next.map(cleanItem))
+  const add = (name: string): Write => {
     const id = nextItemId(items)
     // Aspecto (Fate) é só texto; o resto tem nome e, se o esquema pede, valor
     const value = def.item.value
@@ -79,7 +80,9 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
       def,
       def.item.aspect ? { id, text: name } : { id, name, value }
     )
-    if (write([...items, item])) setAdding(false)
+    const refused = write([...items, item])
+    if (!refused) setAdding(false)
+    return refused
   }
   const current = items.find(i => i.id === editing)
   const border = { borderBottomColor: colors.borderSubtle }
@@ -108,14 +111,14 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
           {noneOf(def.itemLabel)}
         </Text>
       ) : null}
-      {error || issue ? (
+      {issue ? (
         <Text
           variant="caption"
           color="danger"
           accessibilityRole="alert"
           style={styles.empty}
         >
-          {error ?? issue}
+          {issue}
         </Text>
       ) : null}
       {def.fixed ? null : (
@@ -140,17 +143,43 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
           item={current}
           onClose={() => setEditing(null)}
           onSave={next => {
-            if (write(items.map(i => (i.id === next.id ? next : i))))
-              setEditing(null)
+            const refused = write(items.map(i => (i.id === next.id ? next : i)))
+            if (!refused) setEditing(null)
+            return refused
           }}
           onRemove={() => {
-            if (write(items.filter(i => i.id !== current.id))) setEditing(null)
+            const refused = write(items.filter(i => i.id !== current.id))
+            if (!refused) setEditing(null)
+            return refused
           }}
         />
       ) : null}
     </View>
   )
 }
+
+/** A frase da recusa dentro da folha, perto do toque; o app a anuncia. */
+function Refusal({
+  message,
+  testID,
+}: {
+  readonly message: string
+  readonly testID: string
+}) {
+  return (
+    <Text
+      variant="caption"
+      color="danger"
+      accessibilityRole="alert"
+      testID={testID}
+    >
+      {message}
+    </Text>
+  )
+}
+
+const announce = (message: string) =>
+  AccessibilityInfo.announceForAccessibility(message)
 
 function AddItemSheet({
   visible,
@@ -161,25 +190,44 @@ function AddItemSheet({
   readonly visible: boolean
   readonly list: ResolvedList
   readonly onClose: () => void
-  readonly onAdd: (name: string) => void
+  readonly onAdd: (name: string) => Write
 }) {
   const [query, setQuery] = useState('')
+  // Onde a recusa aparece: `option:<nome>` (a opção tocada) ou `custom`
+  // (o botão do texto livre)
+  const [refused, setRefused] = useState<{
+    readonly at: string
+    readonly message: string
+  } | null>(null)
   const def = list.field.def
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
   const q = fold(query)
   const options = (def.catalog ?? []).filter(name => fold(name).includes(q))
   const exact = (def.catalog ?? []).some(name => fold(name) === q)
   const custom = query.trim()
-  const pick = (name: string) => {
+  // Recusado, o nome digitado fica (QAA-05); só limpa o que entrou
+  const pick = (name: string, at: string) => {
+    const message = onAdd(name)
+    if (message) {
+      setRefused({ at, message })
+      announce(message)
+      return
+    }
     setQuery('')
-    onAdd(name)
+    setRefused(null)
   }
+  const refusalAt = (at: string) =>
+    refused?.at === at ? (
+      <Refusal message={refused.message} testID={`refusal-${list.id}`} />
+    ) : null
   return (
     <BottomSheet
       visible={visible}
       title={`Adicionar ${def.itemLabel}`}
+      testID={`add-sheet-${list.id}`}
       onClose={() => {
         setQuery('')
+        setRefused(null)
         onClose()
       }}
     >
@@ -187,36 +235,44 @@ function AddItemSheet({
         <TextField
           label={def.catalog?.length ? `Buscar ${def.itemLabel}` : 'Nome'}
           value={query}
-          onChangeText={setQuery}
+          onChangeText={text => {
+            setQuery(text)
+            setRefused(null)
+          }}
           maxLength={ITEM_NAME_MAX}
           autoFocus
         />
         {options.map(name => {
           const taken = have.has(fold(name))
           return (
-            <Pressable
-              key={name}
-              accessibilityRole="button"
-              accessibilityLabel={taken ? `${name}, já na ficha` : name}
-              disabled={taken}
-              onPress={() => pick(name)}
-              style={styles.option}
-            >
-              <Text>{name}</Text>
-              {taken ? (
-                <Text variant="caption" color="inkMuted">
-                  já na ficha
-                </Text>
-              ) : null}
-            </Pressable>
+            <View key={name}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={taken ? `${name}, já na ficha` : name}
+                disabled={taken}
+                onPress={() => pick(name, `option:${name}`)}
+                style={styles.option}
+              >
+                <Text>{name}</Text>
+                {taken ? (
+                  <Text variant="caption" color="inkMuted">
+                    já na ficha
+                  </Text>
+                ) : null}
+              </Pressable>
+              {refusalAt(`option:${name}`)}
+            </View>
           )
         })}
         {custom && !exact ? (
-          <Button
-            title={`Adicionar “${custom}”`}
-            variant="secondary"
-            onPress={() => pick(custom)}
-          />
+          <View style={styles.sheet}>
+            <Button
+              title={`Adicionar “${custom}”`}
+              variant="secondary"
+              onPress={() => pick(custom, 'custom')}
+            />
+            {refusalAt('custom')}
+          </View>
         ) : null}
       </View>
     </BottomSheet>
@@ -233,8 +289,8 @@ function ItemSheet({
   readonly list: ResolvedList
   readonly item: ListItem
   readonly onClose: () => void
-  readonly onSave: (item: ListItem) => void
-  readonly onRemove: () => void
+  readonly onSave: (item: ListItem) => Write
+  readonly onRemove: () => Write
 }) {
   const def = list.field.def
   const schema = def.item
@@ -243,17 +299,35 @@ function ItemSheet({
     withItemDefaults(def, item)
   )
   const [confirming, setConfirming] = useState(false)
+  // A recusa fica na folha, acima do Aplicar, até o próximo ajuste (T-19)
+  const [refused, setRefused] = useState<string | null>(null)
   const title = itemTitle(list, item) || def.itemLabel
-  const patch = (p: Partial<Mutable<ListItem>>) =>
+  const patch = (p: Partial<Mutable<ListItem>>) => {
+    setRefused(null)
     setDraft(d => ({ ...d, ...p }))
+  }
+  const attempt = (message: Write) => {
+    setRefused(message)
+    if (message) announce(message)
+  }
+  const refusal = refused ? (
+    <Refusal message={refused} testID={`refusal-${list.id}`} />
+  ) : null
   const footer = confirming ? (
     <>
       <Button
         title="Cancelar"
         variant="ghost"
-        onPress={() => setConfirming(false)}
+        onPress={() => {
+          setConfirming(false)
+          setRefused(null)
+        }}
       />
-      <Button title="Remover" variant="danger" onPress={onRemove} />
+      <Button
+        title="Remover"
+        variant="danger"
+        onPress={() => attempt(onRemove())}
+      />
     </>
   ) : (
     <>
@@ -264,14 +338,23 @@ function ItemSheet({
           onPress={() => setConfirming(true)}
         />
       )}
-      <Button title="Aplicar" onPress={() => onSave(draft)} />
+      <Button title="Aplicar" onPress={() => attempt(onSave(draft))} />
     </>
   )
   return (
-    <BottomSheet visible title={title} onClose={onClose} footer={footer}>
+    <BottomSheet
+      visible
+      title={title}
+      onClose={onClose}
+      footer={footer}
+      testID={`item-sheet-${list.id}`}
+    >
       <View style={styles.sheet}>
         {confirming ? (
-          <Text accessibilityRole="alert">{`Remover ${title}?`}</Text>
+          <>
+            <Text accessibilityRole="alert">{`Remover ${title}?`}</Text>
+            {refusal}
+          </>
         ) : (
           <>
             {def.fixed || schema.aspect ? (
@@ -344,6 +427,7 @@ function ItemSheet({
                 maxLength={NOTES_MAX}
               />
             ) : null}
+            {refusal}
           </>
         )}
       </View>

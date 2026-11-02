@@ -151,3 +151,100 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
     )
   })
 })
+
+// Três Disciplinas a 1: os 3 pontos básicos do grupo já usados
+const THREE = {
+  disciplines: [
+    { id: 'd1', name: 'Taumaturgia', value: 1 },
+    { id: 'd2', name: 'Auspícios', value: 1 },
+    { id: 'd3', name: 'Dominação', value: 1 },
+  ],
+}
+// 15 de bônus gastos em Qualidades (7 + 7 + 1): saldo zero
+const SPENT = [
+  { id: 'm1', name: 'Memória Eidética', meta: { cost: 7 } },
+  { id: 'm2', name: 'Sono Leve', meta: { cost: 7 } },
+  { id: 'm3', name: 'Senso de Direção', meta: { cost: 1 } },
+]
+
+const alertsIn = (testID: string) =>
+  within(screen.getByTestId(testID)).queryAllByRole('alert')
+const announced = () =>
+  jest.mocked(AccessibilityInfo.announceForAccessibility).mock.calls.flat()
+
+describe('T-19: a recusa aparece dentro da folha tocada', () => {
+  it('4ª Disciplina em Pontos básicos: a frase fica embaixo da opção, e nada sobra na ficha ao fechar', async () => {
+    await open(THREE)
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'ofusc')
+    fireEvent.press(screen.getByRole('button', { name: 'Ofuscação' }))
+    const sheet = alertsIn('add-sheet-disciplines')
+    expect(sheet).toHaveLength(1)
+    expect(sheet[0]).toHaveTextContent(/Disciplinas/)
+    // Só a da folha: nenhuma frase embaixo da lista, atrás do modal
+    expect(alertsIn('editor-disciplines')).toHaveLength(1)
+    expect(announced()).toContain(sheet[0]?.props.children)
+    // A opção continua lá, com a frase logo abaixo dela
+    expect(screen.getByRole('button', { name: 'Ofuscação' })).toBeTruthy()
+
+    fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
+    expect(alertsIn('editor-disciplines')).toHaveLength(0)
+  })
+
+  it('editor de Disciplina: + e Aplicar acima dos básicos avisa acima do Aplicar; o − apaga; com 1, Aplicar fecha', async () => {
+    await open(THREE)
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    const stepper = { name: 'Dominação, valor' }
+    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
+      /Disciplinas/
+    )
+    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
+  })
+
+  it('tirar o Defeito cujo crédito foi gasto: a frase aparece sob "Remover Inimigo?"', async () => {
+    await open({
+      merits: [...SPENT, { id: 'm4', name: 'Ambidestro', meta: { cost: 3 } }],
+      flaws: [{ id: 'f1', name: 'Inimigo', meta: { bonus: 3 } }],
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Inimigo, Bônus 3' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
+    const sheet = within(screen.getByTestId('item-sheet-flaws'))
+    expect(sheet.getByText('Remover Inimigo?')).toBeTruthy()
+    expect(alertsIn('item-sheet-flaws')).toHaveLength(2)
+    expect(alertsIn('item-sheet-flaws')[1]).toHaveTextContent(/Bônus/)
+    // Cancelar a remoção apaga a frase; o Defeito continua na ficha
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(alertsIn('item-sheet-flaws')).toHaveLength(0)
+    expect(
+      within(screen.getByTestId('editor-flaws')).getByText('Bônus 3')
+    ).toBeTruthy()
+  })
+
+  it('recusa do texto livre mantém o nome digitado; mudar a busca apaga a frase', async () => {
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'Ambidestro')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
+    )
+    expect(textInput('Nome').props.value).toBe('Ambidestro')
+    expect(alertsIn('add-sheet-merits')).toHaveLength(1)
+    expect(alertsIn('add-sheet-merits')[0]).toHaveTextContent(/Bônus/)
+    fireEvent.changeText(textInput('Nome'), 'Ambidestra')
+    expect(alertsIn('add-sheet-merits')).toHaveLength(0)
+  })
+})
