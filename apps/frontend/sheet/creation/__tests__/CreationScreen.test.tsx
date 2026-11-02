@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
@@ -253,6 +259,54 @@ describe('o motivo certo da recusa (T-07)', () => {
     ).toBeTruthy()
     expect(screen.queryByText(/já foram usados/)).toBeNull()
     expect(screen.getByTestId('counter-talents').props.children).toBe('3/13')
+  })
+})
+
+// T-20, T-55: o aviso fica ao lado do toque (na coluna do rótulo, na altura
+// do "+"), um por ficha, e some quando a causa some
+describe('aviso ao lado do toque', () => {
+  it('Mentais 3/3: o aviso de Raciocínio fica na coluna do rótulo, e o próximo apaga o anterior', async () => {
+    await open(PRIORITIES)
+    tab('Mentais')
+    for (let i = 0; i < 3; i++) step('Raciocínio')
+    expect(screen.getByTestId('counter-mental').props.children).toBe('3/3')
+    step('Raciocínio')
+    // O rótulo e o aviso dividem a coluna, à esquerda do controle
+    const column = screen.getByTestId('editor-wits-label')
+    expect(within(column).getByText('Raciocínio')).toBeTruthy()
+    expect(within(column).getByTestId('notice-wits')).toHaveTextContent(
+      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+    )
+    // "Ver orçamento" leva à aba da fase
+    expect(screen.getByTestId('notice-wits-budget')).toBeTruthy()
+    step('Inteligência')
+    expect(screen.queryByTestId('notice-wits')).toBeNull()
+    expect(screen.getByTestId('notice-intelligence')).toBeTruthy()
+    fireEvent.press(screen.getByTestId('notice-intelligence-budget'))
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
+  })
+
+  it('o aviso de "escolha a prioridade" some ao escolher a prioridade', async () => {
+    calls.creationPatch.mockResolvedValue(ok({}))
+    await open()
+    step('Força')
+    expect(screen.getByTestId('notice-strength')).toHaveTextContent(
+      'Físicos: escolha a prioridade antes de distribuir os pontos.'
+    )
+    // O PATCH salva a escolha e a ficha rebuscada traz a ordem nova
+    calls.characterGet.mockResolvedValue(
+      character({ attributes: ['physical', 'social', 'mental'] })
+    )
+    await act(async () => {
+      fireEvent.press(
+        screen.getByRole('radio', { name: 'Físicos, Primária, 7 pontos' })
+      )
+    })
+    await waitFor(() =>
+      expect(screen.queryByTestId('notice-strength')).toBeNull()
+    )
+    // O ponto não entra sozinho
+    expect(screen.getByTestId('counter-physical').props.children).toBe('0/7')
   })
 })
 

@@ -1,10 +1,15 @@
 import { stored } from '@tms/sheet-core'
 import { Stepper, Text, tokens } from '@tms/ui'
-import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
+import { DraftNoticeText } from './DraftNoticeText'
 import { EditorShell } from './EditorShell'
-import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
+import {
+  useClassNote,
+  useDraftNotice,
+  useFieldIssue,
+  useSetDraft,
+} from './hooks'
 
 // resource em Evoluir: o permanente (FdV do WoD), o máximo guardado (PV do
 // D&D, Sanidade inicial) e o atual. O jogo do dia a dia (gastar, recuperar)
@@ -16,13 +21,15 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   // O permanente e o máximo são evolução; o atual, jogo (doc/plano-v3.md, Etapa 4)
   const advance = useClassNote('advance')
   const play = useClassNote('play')
-  const [error, setError] = useState<string | null>(null)
+  // A recusa do toque mora no store e some quando a causa some (T-55)
+  const notice = useDraftNotice(`values.${resolved.id}`)
   if (resolved.type !== 'resource') return null
   const r = resolved
   const def = r.field.def
   const base = stored(r, sheet) as Record<string, number>
-  const write = (patch: Record<string, number>) =>
-    setError(set(`values.${r.id}`, { ...base, ...patch }))
+  const write = (patch: Record<string, number>) => {
+    set(`values.${r.id}`, { ...base, ...patch })
+  }
   const capped = !def.tempUncapped && !def.overMax
   const rows: {
     key: string
@@ -77,7 +84,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     <EditorShell
       label={def.label}
       sub={note}
-      error={error ?? issue}
+      error={notice ? <DraftNoticeText notice={notice} field={r.id} /> : issue}
       testID={`editor-${r.id}`}
       below={
         <View style={styles.rows}>

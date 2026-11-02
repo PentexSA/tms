@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 // A linha de um campo em Evoluir (DS: FieldRow com `editor`): rótulo à
-// esquerda, controle à direita e, embaixo, o erro (do core ou do servidor).
+// esquerda, controle à direita. O erro (do core, da conta ou do servidor) fica
+// na coluna do rótulo, logo abaixo dele, na altura do toque (T-20): embaixo
+// de tudo, ele caía fora da tela a 390 px. A linha cresce para baixo.
 export function EditorShell({
   label,
   sub,
@@ -14,7 +16,8 @@ export function EditorShell({
 }: {
   readonly label: string
   readonly sub?: string | null
-  readonly error?: string | null
+  // Texto (vira alerta) ou o aviso já montado (DraftNoticeText)
+  readonly error?: ReactNode
   readonly children?: ReactNode
   readonly below?: ReactNode
   readonly testID?: string
@@ -26,22 +29,27 @@ export function EditorShell({
       style={[styles.wrap, { borderBottomColor: colors.borderSubtle }]}
     >
       <View style={styles.row}>
-        <View style={styles.text}>
+        <View
+          style={styles.text}
+          testID={testID ? `${testID}-label` : undefined}
+        >
           <Text variant="fieldLabel">{label}</Text>
           {sub ? (
             <Text variant="caption" color="inkMuted" numberOfLines={2}>
               {sub}
             </Text>
           ) : null}
+          {typeof error === 'string' && error ? (
+            <Text variant="caption" color="danger" accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : (
+            error || null
+          )}
         </View>
         {children}
       </View>
       {below}
-      {error ? (
-        <Text variant="caption" color="danger" accessibilityRole="alert">
-          {error}
-        </Text>
-      ) : null}
     </View>
   )
 }

@@ -25,7 +25,11 @@ import {
 } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import { type CreationPhase, draftRefusal } from '../creation/creation'
+import {
+  type CreationPhase,
+  draftRefusal,
+  type RefusalCause,
+} from '../creation/creation'
 import {
   batchBytes,
   checkLimits,
@@ -137,6 +141,24 @@ export type CommitResult =
       readonly issues: readonly Issue[]
     }
 
+/**
+ * O aviso de um toque recusado no rascunho (R-20, T-20, T-55): um só por
+ * ficha. O próximo toque recusado o substitui, um toque aceito em qualquer
+ * campo o apaga, e ele some sozinho quando a causa some (a prioridade
+ * escolhida, a fase trocada, o limite que subiu). Só UX: quem decide é a
+ * conta exata (draftRefusal) e, depois, o servidor.
+ */
+export interface DraftNotice {
+  // Cresce a cada aviso novo: o leitor de tela anuncia de novo
+  readonly id: number
+  // Os caminhos da tentativa ("values.wits")
+  readonly paths: readonly string[]
+  readonly text: string
+  // `invalid`: o core recusou o valor; `limit`: o rascunho não cabe num lote
+  readonly cause: RefusalCause | 'invalid' | 'limit'
+  readonly action?: 'budget'
+}
+
 /** Para onde vão os lotes confirmados no aparelho (o SyncProvider). */
 export interface SheetSync {
   enqueue(characterId: string, batch: QueuedBatch): void | Promise<void>
@@ -181,6 +203,8 @@ export interface SheetState {
   readonly check: CreationCheck | null
   // A última recusa da avaliação parcial, para a tela explicar por grupo
   readonly creationRefusal: CreationRefusal | null
+  // O aviso do último toque recusado no rascunho, ou null
+  readonly notice: DraftNotice | null
   // Na criação, o que a distribuição gasta agora: básicos ou bônus
   readonly creationPhase: CreationPhase
   // A política deixa editar (não travada, arquivada nem de quem saiu). Sem
@@ -251,6 +275,8 @@ export interface SheetActions {
   setCreation(creation: CreationInput | null): void
   /** Básicos (o grupo cheio trava) ou Bônus (passar do grupo usa o saldo). */
   setCreationPhase(phase: CreationPhase): void
+  /** Apaga o aviso do toque recusado (a folha mudou o que estava tentando). */
+  clearNotice(): void
 }
 
 export type SheetStore = StoreApi<SheetState & SheetActions>
@@ -398,7 +424,87 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
     }
   }
 
-  return createStore<SheetState & SheetActions>()((set, get) => {
+  // O que um toque no rascunho faria: entra, ou o aviso de por que não.
+  // Puro: o editDraft grava; a reavaliação do aviso só lê.
+  type Attempt =
+    | {
+        readonly ok: true
+        readonly draft: Map<string, DraftEdit>
+        readonly next: Derived
+      }
+    | {
+        readonly ok: false
+        readonly result: CommitResult
+        readonly notice: Omit<DraftNotice, 'id' | 'paths'>
+      }
+  const attemptDraft = (
+    s: SheetState,
+    draftNow: Draft,
+    events: readonly SheetEvent[]
+  ): Attempt => {
+    const r = applyBatch(model, shown(s.values, draftNow), { events }, roles)
+    if (!r.ok)
+      return {
+        ok: false,
+        result: { ok: false, kind: r.kind, issues: r.issues },
+        notice: {
+          cause: 'invalid',
+          text: r.issues[0]?.message ?? 'valor inválido',
+        },
+      }
+    const draft = new Map(draftNow)
+    for (const e of events) {
+      // `from: null` (campo sem valor guardado) também é o de antes
+      const before = draft.get(e.path)
+      const from = before ? before.from : e.from
+      // Voltou ao valor de antes: a alteração some do rascunho
+      if (jsonEqual(from, e.to)) draft.delete(e.path)
+      else draft.set(e.path, { from, to: e.to })
+    }
+    // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
+    // o que não cabe num "Salvar" também não caberia no aparelho
+    const tooBig = draftLimit(draft)
+    if (tooBig)
+      return {
+        ok: false,
+        result: failure('limit', tooBig, events[0]?.path ?? ''),
+        notice: { cause: 'limit', text: tooBig },
+      }
+    const next = derive({ ...s, draft }, s.values)
+    // Na criação, a conta vale a cada toque, não só no "Salvar": o grupo
+    // cheio trava em Básicos e o saldo de bônus trava em Bônus
+    if (s.mode === 'create' && s.creation) {
+      const why = draftRefusal(
+        model,
+        { before: shown(s.values, draftNow), after: r.sheet },
+        { before: s.check, after: next.check },
+        s.creation,
+        s.creationPhase
+      )
+      if (why)
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            kind: 'creation',
+            issues: events.map(e => ({ path: e.path, message: why.text })),
+          },
+          notice: {
+            cause: why.cause,
+            text: why.text,
+            ...(why.action ? { action: why.action } : {}),
+          },
+        }
+    }
+    return { ok: true, draft, next }
+  }
+
+  // A tentativa por trás do aviso, fora do estado público: a reavaliação a
+  // repete quando a ficha, a conta ou a fase mudam
+  let tried: readonly SheetEvent[] | null = null
+  let noticeId = 0
+
+  const store = createStore<SheetState & SheetActions>()((set, get) => {
     const without = (clientBatchId: string) => {
       const s = get()
       const batch = s.pending.find(b => b.clientBatchId === clientBatchId)
@@ -486,21 +592,21 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
     const editDraft: SheetActions['editDraft'] = events => {
       const s = get()
       if (!s.draft) return null
-      const r = applyBatch(model, shown(s.values, s.draft), { events }, roles)
-      if (!r.ok) return { ok: false, kind: r.kind, issues: r.issues }
-      const draft = new Map(s.draft)
-      for (const e of events) {
-        // `from: null` (campo sem valor guardado) também é o de antes
-        const before = draft.get(e.path)
-        const from = before ? before.from : e.from
-        // Voltou ao valor de antes: a alteração some do rascunho
-        if (jsonEqual(from, e.to)) draft.delete(e.path)
-        else draft.set(e.path, { from, to: e.to })
+      const attempt = attemptDraft(s, s.draft, events)
+      if (!attempt.ok) {
+        // Um aviso só por ficha: o novo substitui o anterior (T-20)
+        tried = events
+        noticeId += 1
+        set({
+          notice: {
+            id: noticeId,
+            paths: events.map(e => e.path),
+            ...attempt.notice,
+          },
+        })
+        return attempt.result
       }
-      // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
-      // o que não cabe num "Salvar" também não caberia no aparelho
-      const tooBig = draftLimit(draft)
-      if (tooBig) return failure('limit', tooBig, events[0]?.path ?? '')
+      const { draft, next } = attempt
       // Mexeu no campo: a recusa anterior do servidor deixa de valer
       let fieldIssues = s.fieldIssues
       for (const e of events) {
@@ -511,25 +617,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           fieldIssues = next
         }
       }
-      const next = derive({ ...s, draft }, s.values)
-      // Na criação, a conta vale a cada toque, não só no "Salvar": o grupo
-      // cheio trava em Básicos e o saldo de bônus trava em Bônus
-      if (s.mode === 'create' && s.creation) {
-        const why = draftRefusal(
-          model,
-          { before: shown(s.values, s.draft), after: r.sheet },
-          { before: s.check, after: next.check },
-          s.creation,
-          s.creationPhase
-        )
-        if (why)
-          return {
-            ok: false,
-            kind: 'creation',
-            issues: events.map(e => ({ path: e.path, message: why.text })),
-          }
-      }
-      set({ draft, fieldIssues, ...next })
+      // Um toque aceito, em qualquer campo, apaga o aviso e a faixa do
+      // "Salvar" recusado: eles respondiam a outro toque (T-55)
+      tried = null
+      set({ draft, fieldIssues, notice: null, creationRefusal: null, ...next })
       return {
         ok: true,
         batch: { clientBatchId: '', events: [...events], label: '' },
@@ -568,6 +659,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       }),
       creation: init.creation ?? null,
       creationRefusal: null,
+      notice: null,
       creationPhase: 'basics',
       mode: init.mode ?? 'read',
       draft: null,
@@ -782,13 +874,15 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       },
 
       setMode(mode) {
-        set({ mode })
+        tried = null
+        set({ mode, notice: null })
       },
 
       startDraft() {
         const s = get()
         if (s.draft) return
-        set({ draft: new Map() })
+        tried = null
+        set({ draft: new Map(), notice: null })
       },
 
       draftEvents() {
@@ -808,8 +902,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         const result = commit(events, label, { draft: true })
         if (result.ok) {
           const after = get()
+          tried = null
           set({
             draft: null,
+            notice: null,
             draftExit: {
               kind: 'saved',
               queued: result.queued ?? Promise.resolve(true),
@@ -823,8 +919,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
 
       discardDraft() {
         const s = get()
+        tried = null
         set({
           draft: null,
+          notice: null,
           draftExit: { kind: 'discarded' },
           // O conflito do rascunho sai com ele; o do Jogo fica
           conflict: conflictOf(
@@ -846,8 +944,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         const draft = new Map(
           plan.events.map(e => [e.path, { from: e.from, to: e.to }])
         )
+        tried = null
         set({
           draft,
+          notice: null,
           mode: allowedMode(mode),
           conflict: conflictOf(
             s.conflict?.play ?? null,
@@ -869,9 +969,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
 
       setCreation(creation) {
         const s = get()
+        if (!creation) tried = null
         set({
           creation,
           creationRefusal: null,
+          ...(creation ? {} : { notice: null }),
           ...derive({ ...s, creation }, s.values),
         })
       },
@@ -879,6 +981,44 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       setCreationPhase(creationPhase) {
         set({ creationPhase })
       },
+
+      clearNotice() {
+        tried = null
+        if (get().notice) set({ notice: null })
+      },
     }
   })
+
+  // O aviso some quando a causa some (T-55): a prioridade escolhida
+  // (setCreation), a fase trocada, a ficha que chega do servidor, a fila
+  // confirmada, outra pessoa mudando um campo. A mesma avaliação do toque,
+  // sem gravar nada: se a tentativa agora passaria, o aviso sai (o ponto não
+  // entra sozinho); se é recusada por outro motivo, o texto muda.
+  store.subscribe((s, prev) => {
+    if (!s.notice || !tried || !s.draft) return
+    if (
+      s.check === prev.check &&
+      s.values === prev.values &&
+      s.creation === prev.creation &&
+      s.creationPhase === prev.creationPhase
+    )
+      return
+    const now = shown(s.values, s.draft)
+    const events = tried
+      .map(e => ({ ...e, from: valueAt(now, e.path) }))
+      .filter(e => !jsonEqual(e.from, e.to))
+    const attempt = events.length ? attemptDraft(s, s.draft, events) : null
+    if (!attempt || attempt.ok) {
+      tried = null
+      store.setState({ notice: null })
+      return
+    }
+    const { notice } = s
+    if (notice.text === attempt.notice.text) return
+    noticeId += 1
+    store.setState({
+      notice: { id: noticeId, paths: notice.paths, ...attempt.notice },
+    })
+  })
+  return store
 }

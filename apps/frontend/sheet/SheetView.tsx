@@ -138,6 +138,11 @@ function SheetBody({
   // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
   // conteúdo fica num contêiner comum, sem papel de painel
   const shownTab = onBudget ? BUDGET_TAB : active?.id
+  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  const openBudget = useMemo(
+    () => (budget ? () => setTab(BUDGET_TAB) : null),
+    [budget]
+  )
   const paneled = shownTab !== undefined && tabs.some(t => t.id === shownTab)
   const zoneContent = (
     <>
@@ -165,7 +170,7 @@ function SheetBody({
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider store={store}>
+      <SheetProvider store={store} openBudget={openBudget}>
         <FieldSheetProvider>
           <View style={styles.screen}>
             {writer ? <ModeBar /> : null}
