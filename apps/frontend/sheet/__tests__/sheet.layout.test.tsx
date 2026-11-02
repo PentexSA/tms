@@ -340,3 +340,29 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(within(sync).getByText(/^Salvo|alteraç/).props.numberOfLines).toBe(2)
   })
 })
+
+describe('T-59: "Em jogo" recolhido na Criação', () => {
+  it('na Criação: começa recolhido, sem a Vitalidade; um toque mostra', async () => {
+    resize(TABLET)
+    await renderSheet({ mode: 'create' })
+    const toggle = screen.getByRole('button', { name: 'Em jogo' })
+    expect(toggle.props.accessibilityState).toMatchObject({ expanded: false })
+    expect(screen.queryByLabelText(/^Vitalidade/)).toBeNull()
+    fireEvent.press(toggle)
+    expect(
+      screen.getByRole('button', { name: 'Em jogo' }).props.accessibilityState
+    ).toMatchObject({ expanded: true })
+    expect(screen.getAllByLabelText(/^Vitalidade/).length).toBeGreaterThan(0)
+  })
+
+  it.each(['play', 'evolve'] as const)(
+    'em %s: aberto como antes, com o título de grupo',
+    async mode => {
+      resize(TABLET)
+      await renderSheet({ mode })
+      expect(screen.queryByRole('button', { name: 'Em jogo' })).toBeNull()
+      expect(screen.getByRole('header', { name: 'Em jogo' })).toBeTruthy()
+      expect(screen.getAllByLabelText(/^Vitalidade/).length).toBeGreaterThan(0)
+    }
+  )
+})

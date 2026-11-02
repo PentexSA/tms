@@ -10,15 +10,17 @@ import {
 } from '@tms/sheet-core'
 import {
   KeyboardArea,
+  Pressable,
   SectionHeader,
   TabPanel,
   Tabs,
+  Text,
   ThemeProvider,
   tokens,
   useLayout,
 } from '@tms/ui'
 import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
@@ -163,6 +165,10 @@ function SheetBody({
     mode === 'play' &&
     breakpoint === 'compact' &&
     dockFields(model, new Set(roles)).length > 0
+  // T-59: na Criação, "Em jogo" começa recolhido (os Atributos ficam na
+  // primeira dobra) e abre com um toque; nos outros modos, aberto como antes
+  const collapsible = mode === 'create'
+  const [playOpen, setPlayOpen] = useState(false)
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
@@ -196,12 +202,23 @@ function SheetBody({
                 <IdentityBlock />
                 {play.length && !docked ? (
                   <View>
-                    <View style={styles.title}>
-                      <SectionHeader title="Em jogo" level="group" />
-                    </View>
-                    {play.map(s => (
-                      <SectionView key={s.id} section={s} hideTitle />
-                    ))}
+                    {collapsible ? (
+                      <PlayToggle
+                        open={playOpen}
+                        onToggle={() => setPlayOpen(v => !v)}
+                      />
+                    ) : (
+                      <View style={styles.title}>
+                        <SectionHeader title="Em jogo" level="group" />
+                      </View>
+                    )}
+                    {!collapsible || playOpen ? (
+                      <View nativeID={PLAY_ID}>
+                        {play.map(s => (
+                          <SectionView key={s.id} section={s} hideTitle />
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
                 {tabs.length ? (
@@ -235,8 +252,48 @@ function SheetBody({
   )
 }
 
+const PLAY_ID = 'sheet-play'
+
+/** O título "Em jogo" que abre e recolhe o bloco (T-59). */
+function PlayToggle({
+  open,
+  onToggle,
+}: {
+  readonly open: boolean
+  readonly onToggle: () => void
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Em jogo"
+      accessibilityState={{ expanded: open }}
+      aria-expanded={open}
+      {...(Platform.OS === 'web' ? { 'aria-controls': PLAY_ID } : {})}
+      testID="play-toggle"
+      onPress={onToggle}
+      style={styles.toggle}
+    >
+      <Text variant="title" style={styles.toggleText}>
+        Em jogo
+      </Text>
+      <Text variant="caption" color="inkMuted" aria-hidden>
+        {open ? '▾' : '▸'}
+      </Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[2],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[4],
+    paddingBottom: tokens.space[2],
+  },
+  toggleText: { flex: 1 },
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
