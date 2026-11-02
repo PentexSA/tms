@@ -513,7 +513,10 @@ describe('aviso dos pontos de bônus', () => {
 // T-32: "Aprovar ficha" confirma antes, com o mesmo texto do concluir
 describe('aprovar ficha', () => {
   it('abre "Aprovar ficha?" sem chamar a API; confirmar aprova', async () => {
-    const pending = character(PRIORITIES) as { data: Record<string, unknown> }
+    // Enviada com a conta fechada e os 15 de bônus livres
+    const pending = character(PRIORITIES, { ...ALMOST, stamina: 3 }) as {
+      data: Record<string, unknown>
+    }
     calls.characterGet.mockResolvedValue(
       ok({ ...pending.data, status: 'pending', roles: ['storyteller'] })
     )
@@ -530,7 +533,7 @@ describe('aprovar ficha', () => {
     expect(screen.getByTestId('completion-message')).toHaveTextContent(
       /passa por você/
     )
-    // T-18: a sobra de bônus também ao aprovar (nada gasto: 15)
+    // T-18: a sobra de bônus também ao aprovar (nenhum bônus gasto: 15)
     expect(
       screen.getByText('Sobram 15 pontos de bônus. Eles não viram XP.')
     ).toBeTruthy()

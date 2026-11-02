@@ -9,7 +9,7 @@ import {
   useToast,
 } from '@tms/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -63,6 +63,9 @@ export default function NewCharacterScreen() {
   // da linha vem do formulário, e o do formulário, daqui
   const scroll = useRef<ScrollViewInstance>(null)
   const formY = useRef(0)
+  // Uma lista por resposta do servidor: a mesma recusa repetida também leva
+  // ao campo (o formulário reage a cada resposta)
+  const serverIssues = useMemo(() => issuesOf(create.error), [create.error])
   // As regras de criação da crônica (T-29): o texto de topo diz em que modo
   // a ficha vai abrir e o orçamento combinado
   // (o ex-membro não recebe as regras, e não cria ficha)
@@ -126,11 +129,11 @@ export default function NewCharacterScreen() {
             }
             busy={create.isPending}
             error={
-              create.isError && !issuesOf(create.error).length
+              create.isError && !serverIssues.length
                 ? messageOf(create.error, 'Não foi possível criar a ficha')
                 : null
             }
-            serverIssues={issuesOf(create.error)}
+            serverIssues={serverIssues}
             onDirtyChange={setDirty}
             onSubmit={values => {
               if (submitting.current) return

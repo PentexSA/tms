@@ -19,7 +19,8 @@ export interface CharacterFormProps {
   readonly model: SheetModel
   readonly busy?: boolean
   readonly error?: string | null
-  // Erros do servidor (422), no formato "/values/<campo>"
+  // Erros do servidor (422), no formato "/values/<campo>". Uma lista nova
+  // por resposta (memoizada por quem chama): ela leva ao primeiro campo
   readonly serverIssues?: readonly ServerIssue[]
   readonly onSubmit: (values: Record<string, unknown>) => void
   // Algum campo preenchido (depois do trim): a tela segura a saída (T-56)
@@ -48,11 +49,13 @@ function rowsOf(
 const fieldOfPath = (path: string) =>
   path.replace(/^\/?values[./]/, '').split(/[./]/)[0] ?? ''
 
+const NO_ISSUES: readonly ServerIssue[] = []
+
 export function CharacterForm({
   model,
   busy,
   error,
-  serverIssues = [],
+  serverIssues = NO_ISSUES,
   onSubmit,
   onDirtyChange,
   onInvalid,
@@ -91,13 +94,15 @@ export function CharacterForm({
     onInvalid?.(rowY.current.get(row.join(':')) ?? 0)
     inputs.current.get(id)?.focus()
   }
-  // O 422 do servidor (serverIssues) faz o mesmo ao chegar
-  const serverKey = serverIssues.map(i => fieldOfPath(i.path)).join('|')
+  // O 422 do servidor faz o mesmo ao chegar: cada resposta é uma lista nova
+  // (quem chama a guarda por resposta), então a mesma recusa repetida leva ao
+  // campo de novo
   const reach = useRef(goTo)
   reach.current = goTo
   useEffect(() => {
-    if (serverKey) reach.current(new Set(serverKey.split('|')))
-  }, [serverKey])
+    if (serverIssues.length)
+      reach.current(new Set(serverIssues.map(i => fieldOfPath(i.path))))
+  }, [serverIssues])
 
   const submit = () => {
     const clean: Record<string, unknown> = {}

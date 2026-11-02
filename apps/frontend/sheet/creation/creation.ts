@@ -692,17 +692,22 @@ export function freebiesBalance(check: CreationCheck | null): string | null {
  * Eles não viram XP." Concluir com sobra continua permitido (README §14,
  * item 6: a sobra não vira XP). Null sem bônus ou sem sobra.
  */
-export function freebiesLeftText(check: CreationCheck | null): string | null {
-  return freebiesLeftNote(check?.freebies?.remaining ?? null)
-}
-
-/** O mesmo, a partir da sobra (o menu do narrador recebe só o número). */
 export function freebiesLeftNote(n: number | null): string | null {
   if (n === null || n <= 0) return null
   return n === 1
     ? 'Sobra 1 ponto de bônus. Ele não vira XP.'
     : `Sobram ${n} pontos de bônus. Eles não viram XP.`
 }
+
+/**
+ * A sobra que as confirmações mostram: só com a conta fechada. Com básicos
+ * faltando, o servidor recusa concluir (CREATION_INCOMPLETE), e "Sobram 15"
+ * diria que só faltam bônus.
+ */
+export const completionFreebies = (
+  check: CreationCheck | null
+): number | null =>
+  check?.complete && check.freebies ? check.freebies.remaining : null
 
 /** As linhas extras das confirmações de concluir e aprovar (T-18, T-32). */
 export const freebiesNotes = (n: number | null): readonly string[] => {

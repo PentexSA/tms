@@ -174,16 +174,23 @@ describe('Criar ficha leva ao erro (T-21)', () => {
     )
     expect(onInvalid).toHaveBeenCalledWith(180)
     expect(focused()).toEqual(['editor-concept'])
-    // A mesma recusa no próximo render não rola de novo
-    rerender(
+    // O mesmo erro de servidor num render qualquer não rola de novo; uma
+    // resposta nova com a mesma recusa (lista nova) leva ao campo de novo
+    const same = [{ path: '/values/concept', message: 'longo demais' }]
+    const form = (issues: typeof same) => (
       <CharacterForm
         model={modelOf('vtm-v20')}
         onSubmit={jest.fn()}
         onInvalid={onInvalid}
-        serverIssues={[{ path: '/values/concept', message: 'longo demais' }]}
+        serverIssues={issues}
       />
     )
-    expect(onInvalid).toHaveBeenCalledTimes(1)
+    rerender(form(same))
+    expect(onInvalid).toHaveBeenCalledTimes(2)
+    rerender(form(same))
+    expect(onInvalid).toHaveBeenCalledTimes(2)
+    rerender(form([...same]))
+    expect(onInvalid).toHaveBeenCalledTimes(3)
   })
 
   it('erro num campo de escolha rola até ele, sem foco de texto', () => {

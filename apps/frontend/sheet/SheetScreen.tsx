@@ -33,6 +33,7 @@ import { useRefetchOnFocus } from '../lib/queries/focus'
 import { SheetProvider } from './context'
 import { CreationContext } from './creation/CreationContext'
 import {
+  completionFreebies,
   creationActive,
   creationInfoOf,
   creationInputOf,
@@ -317,18 +318,22 @@ export interface DraftState {
   readonly unsaved: number
   // Lotes salvos ainda na fila, sem confirmação do servidor
   readonly queued: number
-  // A sobra de bônus da conta (T-18); null sem conta da criação. A conta
-  // existe sempre que a ficha tem `creation`, em qualquer modo, então o
-  // narrador em Leitura também tem o número
+  // A sobra de bônus na hora de concluir (T-18), para a confirmação do menu
+  // do narrador: só para o narrador e só com a conta fechada (a conta vale
+  // na criação por pontos, em creating e pending, em qualquer modo). Null no
+  // resto: sem linha, e o jogador não re-renderiza a tela a cada bônus
   readonly freebiesLeft: number | null
 }
 
 const NO_DRAFT: DraftState = { unsaved: 0, queued: 0, freebiesLeft: null }
 
-const draftStateOf = (s: SheetStoreState): DraftState => ({
+const draftStateOf = (
+  s: SheetStoreState,
+  storyteller: boolean
+): DraftState => ({
   unsaved: s.draft?.size ?? 0,
   queued: s.pending.length,
-  freebiesLeft: s.check?.freebies?.remaining ?? null,
+  freebiesLeft: storyteller ? completionFreebies(s.check) : null,
 })
 
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
@@ -409,10 +414,11 @@ function LiveSheet({
   // avisa quando o que ele mostra muda
   useEffect(() => {
     if (!onDraftState) return
-    let last = draftStateOf(store.getState())
+    const storyteller = store.getState().roles.includes('storyteller')
+    let last = draftStateOf(store.getState(), storyteller)
     onDraftState(last)
     const unsubscribe = store.subscribe(s => {
-      const next = draftStateOf(s)
+      const next = draftStateOf(s, storyteller)
       if (jsonEqual(next, last)) return
       last = next
       onDraftState(next)

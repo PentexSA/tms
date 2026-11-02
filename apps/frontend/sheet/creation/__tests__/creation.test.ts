@@ -12,6 +12,7 @@ import { modelOf } from '../../../test/fixtures'
 import {
   type CreationPhase,
   completeLabel,
+  completionFreebies,
   counterSpoken,
   counterText,
   creationActive,
@@ -20,7 +21,7 @@ import {
   draftRefusal,
   freebieLedger,
   freebiesBalance,
-  freebiesLeftText,
+  freebiesLeftNote,
   freebiesNotes,
   groupFor,
   priorityNote,
@@ -546,18 +547,27 @@ describe('bônus que sobram (T-18)', () => {
   const left = (remaining: number, credit = 0) =>
     ({
       freebies: { available: 15, credit, spent: 15 - remaining, remaining },
-    }) as unknown as Parameters<typeof freebiesLeftText>[0]
+    }) as unknown as Parameters<typeof freebiesBalance>[0]
 
   it('a sobra na confirmação: nada com 0, singular com 1, plural com N', () => {
-    expect(freebiesLeftText(left(0))).toBeNull()
-    expect(freebiesLeftText(left(-2))).toBeNull()
-    expect(freebiesLeftText(null)).toBeNull()
-    expect(freebiesLeftText(left(1))).toBe(
-      'Sobra 1 ponto de bônus. Ele não vira XP.'
-    )
-    expect(freebiesLeftText(left(4))).toBe(
+    expect(freebiesLeftNote(0)).toBeNull()
+    expect(freebiesLeftNote(-2)).toBeNull()
+    expect(freebiesLeftNote(null)).toBeNull()
+    expect(freebiesLeftNote(1)).toBe('Sobra 1 ponto de bônus. Ele não vira XP.')
+    expect(freebiesLeftNote(4)).toBe(
       'Sobram 4 pontos de bônus. Eles não viram XP.'
     )
+  })
+
+  it('a sobra só vale com a conta fechada (achado do /code-review)', () => {
+    type Check = Parameters<typeof completionFreebies>[0]
+    const done = { ...left(4), complete: true } as Check
+    expect(completionFreebies(done)).toBe(4)
+    // Com básicos faltando, o servidor recusa concluir: nada de "Sobram 15"
+    expect(
+      completionFreebies({ ...left(15), complete: false } as Check)
+    ).toBeNull()
+    expect(completionFreebies(null)).toBeNull()
   })
 
   it('as linhas da confirmação: uma com sobra, nenhuma sem conta ou sem sobra', () => {

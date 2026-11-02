@@ -353,22 +353,66 @@ describe('sem tempo real', () => {
 })
 
 // T-18 (P05-C): a sobra de bônus também na confirmação do narrador, que
-// fica no cabeçalho, fora da ficha (o número chega pelo onDraftState)
+// fica no cabeçalho, fora da ficha (o número chega pelo onDraftState). Só com
+// a conta fechada: com básicos faltando, o servidor recusa concluir
 describe('sobra de bônus na confirmação do narrador (T-18)', () => {
-  const creating = (status: string, points = true) =>
+  // Todos os pontos básicos da V20, sem bônus gasto
+  const COMPLETE = {
+    name: 'Nova',
+    clan: 'tremere',
+    strength: 4,
+    dexterity: 3,
+    stamina: 3,
+    charisma: 3,
+    manipulation: 3,
+    appearance: 2,
+    perception: 2,
+    intelligence: 2,
+    wits: 2,
+    alertness: 3,
+    athletics: 3,
+    awareness: 3,
+    brawl: 3,
+    empathy: 1,
+    animalKen: 3,
+    crafts: 3,
+    drive: 3,
+    academics: 3,
+    computer: 2,
+    disciplines: [
+      { id: 'd1', name: 'Taumaturgia', value: 2 },
+      { id: 'd2', name: 'Auspícios', value: 1 },
+    ],
+    backgrounds: [
+      { id: 'b1', name: 'Recursos', value: 3 },
+      { id: 'b2', name: 'Mentor', value: 2 },
+    ],
+    conscience: 4,
+    selfControl: 3,
+    courage: 3,
+  }
+  const creating = (values: Record<string, unknown> | null, points = true) =>
     ok({
       ...character(['storyteller']).data,
-      status,
+      status: 'creating',
       lockedAt: null,
       member: true,
-      sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+      sheet: {
+        values: values ?? { name: 'Nova', clan: 'tremere' },
+        specialties: {},
+      },
       ...(points
         ? {
             creation: {
               revision: 1,
               mode: 'points',
               accounting: true,
-              choices: {},
+              choices: {
+                priorities: {
+                  attributes: ['physical', 'social', 'mental'],
+                  abilities: ['talents', 'skills', 'knowledges'],
+                },
+              },
               config: {},
               effective: effectiveCreationConfig(modelOf('vtm-v20')),
               returned: null,
@@ -377,26 +421,32 @@ describe('sobra de bônus na confirmação do narrador (T-18)', () => {
           }
         : {}),
     })
-
-  it('"Concluir criação" pelo menu traz a mesma linha da barra', async () => {
-    calls.characterGet.mockResolvedValue(creating('creating'))
+  const confirm = async () => {
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     fireEvent.press(await screen.findByTestId('status-menu'))
     fireEvent.press(screen.getByTestId('status-complete'))
     expect(screen.getByTestId('completion-message')).toHaveTextContent(
       /passa por você/
     )
+  }
+
+  it('"Concluir criação" pelo menu traz a mesma linha da barra', async () => {
+    calls.characterGet.mockResolvedValue(creating(COMPLETE))
+    await confirm()
     expect(
-      screen.getByText('Sobram 15 pontos de bônus. Eles não viram XP.')
+      await screen.findByText('Sobram 15 pontos de bônus. Eles não viram XP.')
     ).toBeTruthy()
   })
 
+  it('com básicos faltando, nenhuma linha de bônus (achado do /code-review)', async () => {
+    calls.characterGet.mockResolvedValue(creating(null))
+    await confirm()
+    expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
+  })
+
   it('sem a conta da criação, nenhuma linha de bônus', async () => {
-    calls.characterGet.mockResolvedValue(creating('creating', false))
-    renderWithSession(<SheetScreen id={ID} />, await signedIn())
-    fireEvent.press(await screen.findByTestId('status-menu'))
-    fireEvent.press(screen.getByTestId('status-complete'))
-    expect(screen.getByTestId('completion-message')).toBeTruthy()
+    calls.characterGet.mockResolvedValue(creating(COMPLETE, false))
+    await confirm()
     expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
   })
 })

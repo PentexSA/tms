@@ -633,7 +633,11 @@ Os passos do "PR local" da matriz ("Como executar"):
 
 Implementado na `pacote/p05-c-feedback-conta`, sobre `fc2649c`, em paralelo com o P04-C. O que saiu diferente do desenho acima, e por quê:
 
-1. **O commit 7 (T-18) virou dois.** O `fix(app): bônus que sobram no Orçamento e na barra` entrou agora: os textos do Orçamento e da barra e o `freebiesLeftText(check)`, com teste. A linha da sobra nas três confirmações (`notes` do `completionCopy`) e o `freebiesLeft` no `onDraftState` dependem do P04-C, e entram num commit próprio depois da onda receber o P04-C. Até lá, o E2E não confere a confirmação, e o teste do narrador em `storyteller.test.tsx` fica para esse commit.
+1. **O commit 7 (T-18) virou dois.** O `e037bc7` trouxe os textos do Orçamento e da barra. A linha da sobra nas três confirmações entrou depois do merge da onda com o P04-C (`317b28c`), no `c25aea0`:
+   - `finishing.notes` da barra e as notas do "Aprovar ficha" vêm do hook `useFreebiesNotes()`;
+   - o menu do narrador recebe o número pelo `freebiesLeft` do `DraftState` (`onDraftState`).
+
+   A linha só aparece **com a conta fechada** (`completionFreebies`). Com básicos faltando, o servidor recusa concluir, e "Sobram 15" diria que só faltam bônus. O `freebiesLeft` só é calculado para o narrador, para o jogador não re-renderizar a tela a cada bônus. O `freebiesLeftText(check)` deu lugar a `freebiesLeftNote(n)` e `freebiesNotes(n)`.
 2. **`ref` do `TextField`: `Ref<TextInputInstance>`, não `Ref<TextInput>`.** No React Native 0.88, `TextInput` é o componente, e o tipo da instância é o `TextInputInstance` exportado por `react-native`. O mesmo vale para o `EditorProps.inputRef`. O P08 (T-26) precisa usar o mesmo tipo, para o rebase sair sem conflito de fato.
 3. **O "Ver orçamento" chega pelo `SheetProvider`.** O `OpenBudgetContext` mora em `creation/CreationContext.tsx`, e o `SheetProvider` ganhou a prop `openBudget`. Assim, o `SheetView` muda uma linha, em vez de embrulhar a árvore inteira num provedor novo, o que reindentaria o arquivo que o P08 reorganiza.
 4. **O `aria-disabled` do "+" no web vai pelo `accessibilityDisabled`.** O `Pressable` do react-native-web 0.21 escreve `aria-disabled` a partir do `disabled` depois das outras props, e apagaria o nosso. O `accessibilityDisabled` chega ao DOM como `aria-disabled="true"` (createDOMProps) sem tirar o toque nem o foco. No app, os botões continuam fora do leitor de tela, e a trava vai na dica do controle ajustável.
@@ -659,7 +663,25 @@ Dez achados. Corrigidos em `fc2a51d`, `6df70ea`, `92a77d4` e `bd58730`:
 
 Ficaram, por desenho:
 
-- **`freebiesLeftText` sem uso na tela.** É o item 1 acima: a ligação nas confirmações entra depois do P04-C.
+- **`freebiesLeftText` sem uso na tela.** Era a ligação nas confirmações, que entrou depois do P04-C (item 1).
 - **O `creationRefusal` do "Salvar" some no primeiro toque aceito.** É o desenho da seção 3.0 (T-55: o aviso responde a um toque). A pergunta 5 da seção 9 continua aberta para o PO.
 - **O aviso de uma recusa de lista, escolha ou texto fica guardado no store sem linha que o mostre.** Essas folhas mostram o próprio erro, como antes (seção 3.0, `useSetDraft` igual). O `ListEditor` passa a ler o aviso no P07-C. Para não custar nada enquanto isso, a recusa do core (`invalid`) não é reavaliada.
 - **O caso da escolha "resolvida por padrão" não existe hoje:** o `choice` não tem `default` no contrato, e a ficha resolvida só tem o que foi gravado. O critério ficou igual ao da conta de qualquer jeito.
+
+### Merge da onda com o P04-C e segunda revisão (`/code-review`, nível medium)
+
+O merge `317b28c` teve dois conflitos, resolvidos nele mesmo:
+
+- **`new-character.tsx`:** o `ref` do `ScrollView` e o `y` do formulário (T-21) ficam ao lado das regras da crônica (T-29, P04-C). O texto de topo novo fica acima do `View` que mede o formulário.
+- **`CreationScreen.test.tsx`:** os imports dos dois pacotes (`cleanup` e `within`).
+
+`ModeBar`, `StatusMenu`, `SheetScreen` e `CreationPanel` mesclaram sozinhos, sem perder nada dos dois.
+
+A revisão do merge e do `c25aea0` achou sete pontos, todos corrigidos no commit seguinte:
+
+- a linha da sobra no menu do narrador com a conta incompleta;
+- a tela inteira re-renderizando para o jogador a cada bônus;
+- a derivação repetida (`useFreebiesNotes`);
+- o `freebiesLeftText` sem uso;
+- três comentários desatualizados;
+- a mesma recusa 422 repetida, que não levava ao campo de novo. Agora a Nova ficha guarda os `serverIssues` por resposta (`useMemo` no `create.error`), e o formulário reage a cada resposta nova.

@@ -27,6 +27,7 @@ import {
   basicsDone,
   type CreationPhase,
   completeLabel,
+  completionFreebies,
   creationRefusalOf,
   errorBodyOf,
   freebieLedger,
@@ -67,6 +68,17 @@ export function useFreebiesText(): string | null {
 }
 
 /**
+ * A sobra de bônus nas confirmações de concluir e aprovar (T-18): "Sobram 4
+ * pontos de bônus. Eles não viram XP.", só com a conta fechada. Concluir com
+ * sobra continua permitido. O menu do narrador recebe o mesmo número pelo
+ * onDraftState (SheetScreen), porque fica fora da ficha.
+ */
+export function useFreebiesNotes(): readonly string[] {
+  const left = useSheetSelector(s => completionFreebies(s.check))
+  return useMemo(() => freebiesNotes(left), [left])
+}
+
+/**
  * O botão único da criação. Com a conta fechada (`ready`), ele conclui:
  * `start` espera o rascunho salvo e a fila confirmada e só então chama a API.
  * Mexer na ficha enquanto espera cancela a conclusão.
@@ -78,10 +90,7 @@ export function useFinishCreation() {
   const ready = useSheetSelector(s => s.check?.complete === true)
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
-  // T-18: a sobra de bônus na confirmação ("Sobram 4 pontos de bônus. Eles
-  // não viram XP."); concluir com sobra continua permitido
-  const left = useSheetSelector(s => s.check?.freebies?.remaining ?? null)
-  const notes = useMemo(() => freebiesNotes(left), [left])
+  const notes = useFreebiesNotes()
   const toast = useToast()
   const complete = useCompleteCreation(
     creation?.characterId ?? '',
@@ -341,8 +350,7 @@ export function CreationStatusPanel() {
   // "Aprovar ficha" confirma antes, como concluir (T-32), com a sobra de
   // bônus (T-18)
   const [approving, setApproving] = useState(false)
-  const left = useSheetSelector(s => s.check?.freebies?.remaining ?? null)
-  const approveNotes = useMemo(() => freebiesNotes(left), [left])
+  const approveNotes = useFreebiesNotes()
   // O painel continua montado fora de `pending`: sem zerar, o formulário de
   // devolução reaparecia preenchido na próxima revisão (nota do QA app)
   const pending = creation?.status === 'pending'

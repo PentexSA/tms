@@ -3,8 +3,8 @@ import { StyleSheet, View } from 'react-native'
 
 /**
  * O corpo das confirmações de concluir e aprovar (T-32): o texto do
- * `completionCopy` e as linhas extras (`notes`), como a sobra de bônus que o
- * P05-C (T-18) põe nos três caminhos.
+ * `completionCopy` e as linhas extras (`notes`), como a sobra de bônus
+ * (T-18), nos três caminhos.
  */
 export function CompletionMessage({
   body,
