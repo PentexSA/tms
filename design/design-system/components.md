@@ -616,8 +616,9 @@ Aviso de 5 s com Desfazer, rede de segurança de toda edição em jogo.
 - **Classes:** `ds-toast-region` (fixa acima do dock via `--dock-offset`, `layer-toast`, `role="status"`, `aria-live="polite"`), `ds-toast` (invertido: fundo `ink`, texto `bg`, `elevation-2`), `__text` (tabular), botão ghost "Desfazer" sublinhado.
 - **`ui.js`:** `toast(text, { undo, duration = 5000 })` devolve `close`. Um por vez: o novo substitui o anterior.
 - **API RN:** hook `useToast()` com `show(text: string, opts?: { undo?(): void; duration?: number }): () => void`.
-- **Estados:** entrando (`ds-rise`; sem animação com reduzir movimento), visível, fechado.
-- **A11y:** região polite; "Desfazer" é botão de 44 com anel em `bg`. Depois dos 5 s, a alteração continua no Histórico. RN: componente próprio com Reanimated + `announceForAccessibility`, acima do dock e da safe area.
+- **App (`@tms/ui`):** `useToast().show({ message, action?, durationMs? })`. O prazo pausa enquanto há ponteiro em cima (web), foco dentro (teclado) ou toque no aviso (nativo), e volta com o que faltava, nunca menos de 2 s (`TOAST_RESUME_MIN_MS`). `useToastOffset(height)` é o `--dock-offset`: enquanto montado, ergue o aviso `height` acima do fundo (com vários, vale o maior); a barra da seleção da Mesa o usa. A operação em grupo da Mesa passa `durationMs: 10000`; os outros avisos ficam nos 5 s (T-76, P09-C).
+- **Estados:** entrando (`ds-rise`; sem animação com reduzir movimento), visível, pausado (enquanto se interage), fechado.
+- **A11y:** região polite; "Desfazer" é botão de 44 com anel em `bg`. Com leitor de tela, o prazo nunca fica abaixo de 10 s, mesmo com `durationMs` menor. Depois do prazo, a alteração continua no Histórico, com o "Desfazer" sem prazo. RN: componente próprio com Reanimated + `announceForAccessibility`, acima do dock e da safe area.
 - **Multi-sistema:** "Sangue 10 → 9", "PV 27+5 → 25 (7 de dano)", "Espaço de 1º nível usado (2/4)", "Paradoxo +1 consumiu 1 de Quintessência", "Destino 3 → 2".
 - **Resolve:** C-01, C-17, DS-04, §7.
 
