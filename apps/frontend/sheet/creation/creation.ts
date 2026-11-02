@@ -9,6 +9,8 @@ import {
   type CreationRefusalCode,
   checkCreationBatch,
   type FieldId,
+  type PointBuyBudget,
+  type ResolvedSheet,
   type RoleName,
   type SheetData,
   type SheetModel,
@@ -114,19 +116,39 @@ export const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quint
 export const rankLabel = (index: number): string =>
   RANKS[index] ?? `${index + 1}ª`
 
-/** "5/7", "3/3 · +1 bônus", "Escolha a prioridade". */
-export function counterText(g: CreationGroup): string {
+/**
+ * O preço do próximo ponto, no cabeçalho, quando ele já sai do bônus (R-17):
+ * na fase de bônus, com os básicos do grupo cheios. O preço é uniforme no
+ * grupo (README §14), então um número por grupo basta.
+ */
+const nextPrice = (g: CreationGroup, phase?: CreationPhase): number | null =>
+  phase === 'freebies' &&
+  g.budget !== null &&
+  g.missing === 0 &&
+  g.measure !== 'cost'
+    ? g.price
+    : null
+
+/** "5/7", "3/3 · +1 bônus", "13/13 · +2 bônus · +1 = 2 bônus". */
+export function counterText(g: CreationGroup, phase?: CreationPhase): string {
   if (g.budget === null) return 'Escolha a prioridade'
   const base = `${g.basic}/${g.budget}`
-  return g.extra > 0 ? `${base} · +${g.extra} bônus` : base
+  const extra = g.extra > 0 ? `${base} · +${g.extra} bônus` : base
+  const price = nextPrice(g, phase)
+  return price === null ? extra : `${extra} · +1 = ${price} bônus`
 }
 
 /** O mesmo, por extenso, para o leitor de tela. */
-export function counterSpoken(g: CreationGroup): string {
+export function counterSpoken(g: CreationGroup, phase?: CreationPhase): string {
   if (g.budget === null) return `${g.label}: escolha a prioridade`
-  const unit = g.measure === 'items' ? 'itens' : 'pontos'
+  const items = g.measure === 'items'
   const extra = g.extra > 0 ? `, mais ${g.extra} com bônus` : ''
-  return `${g.label}: ${g.basic} de ${g.budget} ${unit} básicos${extra}`
+  const price = nextPrice(g, phase)
+  const next =
+    price === null
+      ? ''
+      : `, cada ${items ? 'item' : 'ponto'} a mais custa ${price} de bônus`
+  return `${g.label}: ${g.basic} de ${g.budget} ${items ? 'itens' : 'pontos'} básicos${extra}${next}`
 }
 
 // As frases-base do plano (§3.6)
@@ -270,14 +292,14 @@ export function componentAt(
 /** "(Clã: Nosferatu)": a escolha da ficha que trava o valor inicial. */
 function lockReason(
   model: SheetModel,
-  sheet: SheetData,
+  choiceOf: (field: FieldId) => unknown,
   c: CreationComponent
 ): string {
   for (const bl of model.template.creation?.baselines ?? []) {
     if (!bl.locked || !bl.targets.includes(c.field) || bl.value !== c.initial)
       continue
     if (!bl.when) return ''
-    const chosen = sheet.values[bl.when.field]
+    const chosen = choiceOf(bl.when.field)
     const def = model.fields.get(bl.when.field)?.def
     if (typeof chosen !== 'string' || def?.type !== 'choice') continue
     if (bl.when.in && !bl.when.in.includes(chosen)) continue
@@ -305,7 +327,7 @@ function refusalNotice(
   if (locked && lockedAt && lockedC)
     return {
       cause: 'locked',
-      text: `${fieldLabel(model, lockedAt)}: fica em ${lockedC.initial} na criação${lockReason(model, sheets.after, lockedC)}.`,
+      text: `${fieldLabel(model, lockedAt)}: fica em ${lockedC.initial} na criação${lockReason(model, f => sheets.after.values[f], lockedC)}.`,
     }
   const hard = find('CREATION_HARD_CAP')
   const hardAt = hard?.paths[0]
@@ -418,6 +440,159 @@ function capText(
   return freebies && g.price !== null
     ? `${first} Acima disso, cada ponto custa ${g.price} de bônus.`
     : first
+}
+
+/**
+ * O que o próximo ponto de um campo faria, antes do toque (T-20, R-17).
+ * `blocked`: a trava prevista; `text`: o motivo ou o custo; `cost`: bônus
+ * pelo preço de tabela (0: pago com básicos); `inline`: o texto aparece
+ * escrito na linha, porque o cabeçalho do grupo não o diz.
+ */
+export interface StepAdvice {
+  readonly blocked: RefusalCause | null
+  readonly text: string | null
+  readonly cost: number | null
+  readonly inline: boolean
+}
+
+const advice = (
+  blocked: RefusalCause | null,
+  text: string | null,
+  cost: number | null = null,
+  inline = false
+): StepAdvice => ({ blocked, text, cost, inline })
+
+const bonus = (n: number) => `+1 = ${n} bônus`
+
+/**
+ * A previsão do "+", pela conta que o store já tem e pelo preço de tabela,
+ * sem reavaliar a ficha. É uma previsão, não a decisão: os descontos
+ * derivados (a FdV que passa a vir da Coragem) podem fazer o ponto custar
+ * menos. Por isso o "+" bloqueado continua tocável, e quem decide é o
+ * draftRefusal, com a conta exata, e depois o servidor. Caminho fora de
+ * qualquer conta: null (o toque decide).
+ */
+export function stepAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  phase: CreationPhase,
+  path: string,
+  resolved?: ResolvedSheet
+): StepAdvice | null {
+  const choiceOf = (f: FieldId) => {
+    const r = resolved?.get(f)
+    return r?.type === 'choice' ? r.value : null
+  }
+  const freebies = check.freebies
+  const limits = (c: CreationComponent): StepAdvice | null => {
+    if (c.locked && c.value >= c.initial)
+      return advice(
+        'locked',
+        `Fica em ${c.initial} na criação${lockReason(model, choiceOf, c)}.`
+      )
+    if (c.ceiling !== undefined && c.value >= c.ceiling)
+      return advice('ceiling', `Na criação, vai até ${c.ceiling}.`)
+    return null
+  }
+  for (const b of check.budgets)
+    for (const g of b.groups) {
+      const c = g.components.find(x => x.path === path)
+      if (!c) continue
+      if (g.budget === null)
+        return advice(
+          'priorities',
+          `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+        )
+      const limit = limits(c)
+      if (limit) return limit
+      if (g.measure === 'cost') return pointBuyAdvice(model, b.id, g, c)
+      // Abaixo do inicial, o ponto só devolve o que faltava
+      if (c.value < c.initial) return advice(null, null, 0)
+      const atCap = c.cap !== undefined && c.value >= c.cap
+      const priced = freebies !== null && g.price !== null
+      if (phase === 'basics') {
+        if (atCap)
+          return advice(
+            'cap',
+            `Com pontos básicos, vai até ${c.cap}.${priced ? ` Acima disso, ${bonus(g.price as number)}.` : ''}`,
+            null,
+            // O cabeçalho diz "3/13": o teto do traço só a linha explica
+            g.missing > 0
+          )
+        if (g.missing === 0)
+          return advice('budget', basicsSpentText(g, freebies !== null))
+        return advice(null, null, 0)
+      }
+      if (!atCap && g.missing > 0) return advice(null, null, 0)
+      // Daqui em diante, o ponto sai do bônus
+      if (!priced)
+        return advice(
+          'not-purchasable',
+          `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
+        )
+      const price = g.price as number
+      const inline = g.missing > 0
+      const left = (freebies as NonNullable<typeof freebies>).remaining
+      return price > left
+        ? advice(
+            'freebies',
+            `${bonus(price)}; ${left === 1 ? 'resta 1' : `restam ${Math.max(0, left)}`}.`,
+            price,
+            inline
+          )
+        : advice(null, bonus(price), price, inline)
+    }
+  for (const l of check.lines) {
+    const c = l.components?.find(x => x.path === path)
+    if (!c) continue
+    const limit = limits(c)
+    if (limit) return limit
+    if (c.value < c.initial) return advice(null, null, 0)
+    if (l.price === undefined || !freebies) return null
+    // Linha de bônus fora dos orçamentos (FdV, Humanidade): o cabeçalho não
+    // diz o preço, a linha diz
+    return l.price > freebies.remaining
+      ? advice(
+          'freebies',
+          `${bonus(l.price)}; ${freebies.remaining === 1 ? 'resta 1' : `restam ${Math.max(0, freebies.remaining)}`}.`,
+          l.price,
+          true
+        )
+      : advice(null, bonus(l.price), l.price, true)
+  }
+  return null
+}
+
+/** Point-buy (D&D): o degrau da tabela do template e o fim dela. */
+function pointBuyAdvice(
+  model: SheetModel,
+  budgetId: string,
+  g: CreationGroup,
+  c: CreationComponent
+): StepAdvice | null {
+  const def = model.template.creation?.budgets.find(
+    (b): b is PointBuyBudget => b.id === budgetId && b.rule === 'point-buy'
+  )
+  if (!def) return null
+  const now = def.table[c.value - def.base]
+  const next = def.table[c.value + 1 - def.base]
+  if (next === undefined)
+    return advice(
+      'ceiling',
+      `Na criação, vai até ${def.base + def.table.length - 1}.`,
+      null,
+      true
+    )
+  const step = next - (now ?? 0)
+  const unit = (n: number) => (n === 1 ? '1 ponto' : `${n} pontos`)
+  return step > g.missing
+    ? advice(
+        'budget',
+        `+1 = ${unit(step)}; ${g.missing === 1 ? 'falta 1' : `faltam ${g.missing}`} de ${g.budget}.`,
+        null,
+        true
+      )
+    : advice(null, `+1 = ${unit(step)}`, null, true)
 }
 
 /**

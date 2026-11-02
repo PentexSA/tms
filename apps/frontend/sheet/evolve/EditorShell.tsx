@@ -9,6 +9,7 @@ import { StyleSheet, View } from 'react-native'
 export function EditorShell({
   label,
   sub,
+  note,
   error,
   children,
   below,
@@ -16,6 +17,8 @@ export function EditorShell({
 }: {
   readonly label: string
   readonly sub?: string | null
+  // Nota da linha sob o rótulo (o custo do próximo ponto na criação)
+  readonly note?: ReactNode
   // Texto (vira alerta) ou o aviso já montado (DraftNoticeText)
   readonly error?: ReactNode
   readonly children?: ReactNode
@@ -39,6 +42,7 @@ export function EditorShell({
               {sub}
             </Text>
           ) : null}
+          {note || null}
           {typeof error === 'string' && error ? (
             <Text variant="caption" color="danger" accessibilityRole="alert">
               {error}

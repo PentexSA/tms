@@ -4,6 +4,7 @@ import {
   checkCreation,
   compileTemplate,
   effectiveCreationConfig,
+  resolve,
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
@@ -19,6 +20,7 @@ import {
   draftRefusal,
   groupFor,
   reorder,
+  stepAdvice,
 } from '../creation'
 
 const template = require('../../../../../design/templates/testes/acct-teste.json')
@@ -105,6 +107,37 @@ describe('prioridades e contadores', () => {
     expect(counterText({ ...group, budget: null, basic: 0, extra: 0 })).toBe(
       'Escolha a prioridade'
     )
+  })
+
+  it('na fase de bônus, com o grupo cheio, o contador diz o preço do próximo (R-17)', () => {
+    const full = {
+      id: 'phys',
+      label: 'Físicos',
+      measure: 'points',
+      budget: 7,
+      basic: 7,
+      missing: 0,
+      extra: 1,
+      price: 5,
+    } as CreationGroup
+    expect(counterText(full, 'freebies')).toBe('7/7 · +1 bônus · +1 = 5 bônus')
+    expect(counterSpoken(full, 'freebies')).toBe(
+      'Físicos: 7 de 7 pontos básicos, mais 1 com bônus, cada ponto a mais custa 5 de bônus'
+    )
+    // Em Básicos, ou com básico sobrando, ou sem preço: o de hoje
+    expect(counterText(full, 'basics')).toBe('7/7 · +1 bônus')
+    expect(counterText({ ...full, missing: 1, basic: 6 }, 'freebies')).toBe(
+      '6/7 · +1 bônus'
+    )
+    expect(counterText({ ...full, price: null }, 'freebies')).toBe(
+      '7/7 · +1 bônus'
+    )
+    expect(
+      counterSpoken(
+        { ...full, measure: 'items', extra: 0, price: 6 },
+        'freebies'
+      )
+    ).toBe('Físicos: 7 de 7 itens básicos, cada item a mais custa 6 de bônus')
   })
 })
 
@@ -309,5 +342,197 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     expect(
       refusalOf(COMPLETE, { ...COMPLETE, str: 4 }, { phase: 'freebies' })
     ).toBeNull()
+  })
+})
+
+// T-20, R-17: a previsão do "+" antes do toque, pelo preço de tabela
+describe('stepAdvice: o que o próximo ponto faria', () => {
+  const adviceOf = (
+    values: Record<string, unknown>,
+    path: string,
+    {
+      phase = 'basics',
+      choices = PRIORITIES,
+      m = model,
+      freebies,
+    }: {
+      phase?: CreationPhase
+      choices?: CreationChoices
+      m?: SheetModel
+      freebies?: number
+    } = {}
+  ) => {
+    const config = {
+      ...effectiveCreationConfig(m),
+      ...(freebies === undefined ? {} : { freebies }),
+    }
+    const sheet = { values } as SheetData
+    const check = checkCreation(m, sheet, { config, choices })
+    return stepAdvice(m, check, phase, path, resolve(m, sheet))
+  }
+
+  it('sem prioridade, pede a escolha', () => {
+    expect(adviceOf(COMPLETE, 'values.str', { choices: {} })).toEqual({
+      blocked: 'priorities',
+      text: 'Físicos: escolha a prioridade antes de distribuir os pontos.',
+      cost: null,
+      inline: false,
+    })
+  })
+
+  it('Básicos: o grupo cheio trava com o texto do grupo (não escrito na linha)', () => {
+    expect(adviceOf(COMPLETE, 'values.str')).toMatchObject({
+      blocked: 'budget',
+      text: 'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
+      inline: false,
+    })
+    // Com básico sobrando, passa sem custo
+    expect(adviceOf({ ...COMPLETE, str: 2 }, 'values.dex')).toEqual({
+      blocked: null,
+      text: null,
+      cost: 0,
+      inline: false,
+    })
+  })
+
+  it('Básicos: o traço no teto trava, escrito na linha enquanto o grupo não fecha', () => {
+    expect(adviceOf({ ...COMPLETE, brawl: 1 }, 'values.alert')).toEqual({
+      blocked: 'cap',
+      text: 'Com pontos básicos, vai até 3. Acima disso, +1 = 2 bônus.',
+      cost: null,
+      inline: true,
+    })
+    // Com o grupo cheio, o cabeçalho já diz 5/5
+    expect(adviceOf(COMPLETE, 'values.alert')).toMatchObject({
+      blocked: 'cap',
+      inline: false,
+    })
+  })
+
+  it('valor travado e hard-cap travam em qualquer fase', () => {
+    const c = { ...COMPLETE, lineage: 'c', app: 0, cha: 3 }
+    expect(adviceOf(c, 'values.app')).toMatchObject({
+      blocked: 'locked',
+      text: 'Fica em 0 na criação (Linhagem: C).',
+    })
+    expect(
+      adviceOf({ ...COMPLETE, arete: 3 }, 'values.arete', {
+        phase: 'freebies',
+      })
+    ).toMatchObject({ blocked: 'ceiling', text: 'Na criação, vai até 3.' })
+    // A Esfera vai até o Arete (1): de 0 para 1 passa, pago com bônus
+    expect(adviceOf(COMPLETE, 'values.sphereA')).toMatchObject({
+      blocked: null,
+      text: '+1 = 3 bônus',
+    })
+    expect(
+      adviceOf({ ...COMPLETE, sphereA: 1 }, 'values.sphereA')
+    ).toMatchObject({ blocked: 'ceiling', text: 'Na criação, vai até 1.' })
+  })
+
+  it('Bônus: o grupo cheio custa o preço; sem saldo, trava', () => {
+    expect(adviceOf(COMPLETE, 'values.str', { phase: 'freebies' })).toEqual({
+      blocked: null,
+      text: '+1 = 5 bônus',
+      cost: 5,
+      inline: false,
+    })
+    expect(
+      adviceOf(COMPLETE, 'values.str', { phase: 'freebies', freebies: 4 })
+    ).toEqual({
+      blocked: 'freebies',
+      text: '+1 = 5 bônus; restam 4.',
+      cost: 5,
+      inline: false,
+    })
+    expect(
+      adviceOf(COMPLETE, 'values.brawl', { phase: 'freebies', freebies: 1 })
+    ).toMatchObject({ blocked: 'freebies', text: '+1 = 2 bônus; resta 1.' })
+    // O traço no teto com o grupo incompleto: o custo escrito na linha
+    expect(
+      adviceOf({ ...COMPLETE, brawl: 1 }, 'values.alert', {
+        phase: 'freebies',
+      })
+    ).toEqual({ blocked: null, text: '+1 = 2 bônus', cost: 2, inline: true })
+    // Com básico sobrando e abaixo do teto, ainda é básico
+    expect(
+      adviceOf({ ...COMPLETE, brawl: 1 }, 'values.brawl', {
+        phase: 'freebies',
+      })
+    ).toMatchObject({ blocked: null, cost: 0 })
+  })
+
+  it('linha de bônus fora dos orçamentos: o preço da linha, escrito na linha', () => {
+    expect(adviceOf(COMPLETE, 'values.will')).toEqual({
+      blocked: null,
+      text: '+1 = 1 bônus',
+      cost: 1,
+      inline: true,
+    })
+    expect(adviceOf(COMPLETE, 'values.morality', { freebies: 1 })).toEqual({
+      blocked: 'freebies',
+      text: '+1 = 2 bônus; resta 1.',
+      cost: 2,
+      inline: true,
+    })
+    // Abaixo do valor de partida, o ponto não custa
+    expect(adviceOf({ ...COMPLETE, morality: 4 }, 'values.morality')).toEqual({
+      blocked: null,
+      text: null,
+      cost: 0,
+      inline: false,
+    })
+  })
+
+  it('grupo sem preço de bônus não se compra além dos básicos', () => {
+    const noPrice = compileTemplate({
+      ...template,
+      costs: {
+        ...template.costs,
+        freebie: template.costs.freebie.filter(
+          (e: { id: string }) => e.id !== 'attribute'
+        ),
+      },
+    })
+    expect(
+      adviceOf(COMPLETE, 'values.str', { phase: 'freebies', m: noPrice })
+    ).toMatchObject({ blocked: 'not-purchasable' })
+  })
+
+  it('point-buy (D&D): o degrau da tabela e o fim dela', () => {
+    const dnd = modelOf('dnd5e-2014')
+    const base = {
+      name: 'Lia',
+      str: 15,
+      dex: 14,
+      con: 13,
+      int: 12,
+      wis: 10,
+      cha: 8,
+    }
+    const opts = { m: dnd, choices: {} }
+    expect(adviceOf(base, 'values.str', opts)).toEqual({
+      blocked: 'ceiling',
+      text: 'Na criação, vai até 15.',
+      cost: null,
+      inline: true,
+    })
+    expect(adviceOf({ ...base, cha: 8, wis: 8 }, 'values.con', opts)).toEqual({
+      blocked: null,
+      text: '+1 = 2 pontos',
+      cost: null,
+      inline: true,
+    })
+    expect(adviceOf(base, 'values.cha', opts)).toEqual({
+      blocked: 'budget',
+      text: '+1 = 1 ponto; faltam 0 de 27.',
+      cost: null,
+      inline: true,
+    })
+  })
+
+  it('fora de qualquer conta, sem previsão', () => {
+    expect(adviceOf(COMPLETE, 'values.name')).toBeNull()
+    expect(adviceOf(COMPLETE, 'values.xpTotal')).toBeNull()
   })
 })

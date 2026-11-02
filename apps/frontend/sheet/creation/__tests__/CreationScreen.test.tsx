@@ -235,8 +235,9 @@ describe('trava da distribuição', () => {
     fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
     tab('Ficha')
     step('Vigor')
+    // R-17: na fase de bônus, com o grupo cheio, o preço do próximo
     expect(screen.getByTestId('counter-physical').props.children).toBe(
-      '7/7 · +1 bônus'
+      '7/7 · +1 bônus · +1 = 5 bônus'
     )
     tab('Orçamento')
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
@@ -310,6 +311,47 @@ describe('aviso ao lado do toque', () => {
   })
 })
 
+// T-20, R-17: o "+" mostra a trava e o custo antes do toque
+describe('"+" com a previsão da conta', () => {
+  it('Mentais 3/3: o controle de Raciocínio diz a trava como dica, e o toque ainda chega', async () => {
+    await open(PRIORITIES)
+    tab('Mentais')
+    for (let i = 0; i < 3; i++) step('Raciocínio')
+    const wits = screen.getByRole('adjustable', { name: 'Raciocínio' })
+    expect(wits.props.accessibilityHint).toBe(
+      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+    )
+    // Não é disabled: o toque chega à conta, que explica
+    expect(wits.props['aria-disabled']).toBe(false)
+    step('Raciocínio')
+    expect(screen.getByTestId('notice-wits')).toBeTruthy()
+  })
+
+  it('Nosferatu: o "+" de Aparência trava, e o toque diz o porquê', async () => {
+    await open(PRIORITIES, { clan: 'nosferatu' })
+    tab('Sociais')
+    expect(
+      screen.getByRole('adjustable', { name: 'Aparência' }).props
+        .accessibilityHint
+    ).toBe('Fica em 0 na criação (Clã: Nosferatu).')
+    step('Aparência')
+    expect(screen.getByTestId('notice-appearance')).toHaveTextContent(
+      'Aparência: fica em 0 na criação (Clã: Nosferatu).'
+    )
+  })
+
+  it('a Força de Vontade diz o custo do próximo ponto na linha (R-17)', async () => {
+    await open(PRIORITIES)
+    expect(screen.getByTestId('advice-willpower')).toHaveTextContent(
+      '+1 = 1 bônus'
+    )
+    expect(
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+        .props.accessibilityHint
+    ).toBe('+1 = 1 bônus')
+  })
+})
+
 describe('aba Orçamento e botão único', () => {
   it('a conta fica na aba, e a barra tem um botão só', async () => {
     await open(PRIORITIES)
@@ -369,8 +411,9 @@ describe('aviso dos pontos de bônus', () => {
     // Em Bônus, o grupo cheio passa
     tab('Ficha')
     step('Vigor')
+    // R-17: na fase de bônus, com o grupo cheio, o preço do próximo
     expect(screen.getByTestId('counter-physical').props.children).toBe(
-      '7/7 · +1 bônus'
+      '7/7 · +1 bônus · +1 = 5 bônus'
     )
   })
 })

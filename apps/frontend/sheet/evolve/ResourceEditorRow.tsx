@@ -1,6 +1,7 @@
 import { stored } from '@tms/sheet-core'
-import { Stepper, Text, tokens } from '@tms/ui'
+import { Stepper, type StepperIncrease, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { useStepAdvice } from '../creation/useStepAdvice'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
 import { EditorShell } from './EditorShell'
@@ -23,6 +24,8 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   const play = useClassNote('play')
   // A recusa do toque mora no store e some quando a causa some (T-55)
   const notice = useDraftNotice(`values.${resolved.id}`)
+  // O permanente na criação (FdV): o custo do próximo ponto (R-17)
+  const advice = useStepAdvice(`values.${resolved.id}`)
   if (resolved.type !== 'resource') return null
   const r = resolved
   const def = r.field.def
@@ -39,7 +42,9 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     max: number
     onChange: (n: number) => void
     blocked: string | null
+    increase?: StepperIncrease
   }[] = []
+  const written = !notice && advice?.inline && advice.text ? advice.text : null
   if (def.permanent && r.permanent !== null)
     rows.push({
       key: 'permanent',
@@ -55,6 +60,19 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
             : { permanent: n }
         ),
       blocked: advance,
+      ...(advice
+        ? {
+            increase: {
+              blocked: advice.blocked !== null,
+              hint: advice.text,
+              hintID: notice
+                ? `notice-${r.id}`
+                : written
+                  ? `advice-${r.id}`
+                  : null,
+            },
+          }
+        : {}),
     })
   const storedMax =
     def.max && typeof def.max === 'object' && 'stored' in def.max
@@ -84,6 +102,18 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     <EditorShell
       label={def.label}
       sub={note}
+      note={
+        written ? (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            nativeID={`advice-${r.id}`}
+            testID={`advice-${r.id}`}
+          >
+            {written}
+          </Text>
+        ) : null
+      }
       error={notice ? <DraftNoticeText notice={notice} field={r.id} /> : issue}
       testID={`editor-${r.id}`}
       below={
@@ -100,6 +130,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
                 max={row.max}
                 onChange={row.onChange}
                 disabled={row.blocked !== null}
+                increase={row.increase}
               />
             </View>
           ))}
