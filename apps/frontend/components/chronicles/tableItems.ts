@@ -7,7 +7,11 @@ import {
 
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
-import { type CharacterState, characterState } from './characterState'
+import {
+  type CharacterState,
+  characterState,
+  npcVisibilityText,
+} from './characterState'
 
 // O que cada linha da Mesa mostra, calculado uma vez por ficha (doc/plano-v3.md,
 // Etapa 9). Puro: o mesmo item enquanto a linha e o modelo não mudam, para
@@ -31,6 +35,9 @@ export interface TableRowData {
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
   readonly sheet: unknown
+  // A visibilidade do NPC (T-52): a Mesa separa os NPCs (pelo `kind`) e
+  // mostra o selo dela. A API já manda os dois
+  readonly visibility?: string
 }
 
 export interface TableItem {
@@ -43,6 +50,9 @@ export interface TableItem {
   // O estado da ficha (D-02): "Em criação · livre", "Aguardando aprovação",
   // "Avisou que terminou", "Concluída em dd/mm", "Travada"...
   readonly state: CharacterState | null
+  // O selo de visibilidade do NPC ("Oculto", "Identidade revelada", "Ficha
+  // revelada"); null no PC (T-52). Não passa pelo characterState
+  readonly visibility: string | null
 }
 
 export function buildItem(
@@ -75,7 +85,22 @@ export function buildItem(
       { ...row, locked: Boolean(row.lockedAt) },
       { narrating: true, deadLabel: model ? deadLabel(model) : undefined }
     ),
+    visibility: row.kind === 'npc' ? npcVisibilityText(row.visibility) : null,
   }
+}
+
+/**
+ * PCs e NPCs em seções (T-52, plano v5 §1.2), cada uma na ordem da tela. A
+ * ordem que a navegação da Mesa lembra é a da tela: PCs e depois NPCs.
+ */
+export function bySection(items: readonly TableItem[]): {
+  readonly pcs: readonly TableItem[]
+  readonly npcs: readonly TableItem[]
+} {
+  const pcs: TableItem[] = []
+  const npcs: TableItem[] = []
+  for (const item of items) (item.row.kind === 'npc' ? npcs : pcs).push(item)
+  return { pcs, npcs }
 }
 
 export type TableSort = 'name' | 'updated'

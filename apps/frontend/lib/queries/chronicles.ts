@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, unwrap } from '../api'
 import { useCommandKey } from '../commandKey'
+import { statusOf } from '../errors'
 
 // Crônicas e convites (Etapa 11). As chaves ficam aqui para a invalidação
 // depois de criar, entrar ou revogar.
@@ -197,10 +198,19 @@ export const useSetNpcVisibility = (
         queryClient.invalidateQueries({
           queryKey: chronicleKeys.characters(chronicleId),
         }),
+        // Pelo prefixo, também a crônica e a Mesa (o selo do T-52)
         queryClient.invalidateQueries({
           queryKey: chronicleKeys.all,
         }),
       ]),
+    // Revisão velha (o NPC aberto do cache restaurado): a folha mostra o
+    // erro, e a ficha rebusca a visibilidade e a revisão atuais
+    onError: error =>
+      statusOf(error) === 409
+        ? queryClient.invalidateQueries({
+            queryKey: ['characters', characterId],
+          })
+        : undefined,
   })
 }
 

@@ -35,6 +35,11 @@ export const useCreateSession = (id: string) => {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: backstageKeys.sessions(id) }),
         queryClient.invalidateQueries({ queryKey: chronicleKeys.one(id) }),
+        // A "Última sessão" da lista de crônicas (U-04)
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.all,
+          exact: true,
+        }),
       ]),
   })
 }
@@ -55,6 +60,10 @@ export const useUpdateSession = (id: string, sessionId: string) => {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: backstageKeys.sessions(id) }),
         queryClient.invalidateQueries({ queryKey: chronicleKeys.one(id) }),
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.all,
+          exact: true,
+        }),
       ]),
   })
 }
@@ -142,7 +151,14 @@ const useTransferDecision = (
       )
     },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: backstageKeys.transfer(id) }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: backstageKeys.transfer(id) }),
+        // O aviso da proposta sai também da lista de crônicas (U-03)
+        queryClient.invalidateQueries({
+          queryKey: chronicleKeys.all,
+          exact: true,
+        }),
+      ]),
   })
 }
 

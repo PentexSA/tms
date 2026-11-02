@@ -90,3 +90,68 @@ describe('unwrap', () => {
     )
   })
 })
+
+describe('cliente Eden (T-16)', () => {
+  type Client = {
+    sessions: { get: () => Promise<{ data: Record<string, unknown> }> }
+  }
+  const body = {
+    date: '2026-11-01',
+    title: '01/11/2026',
+    at: '2026-11-01T15:04:05.000Z',
+  }
+  const fetcher = (() =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
+      })
+    )) as unknown as typeof fetch
+  const realTreaty = () =>
+    jest.requireActual<typeof import('@elysiajs/eden')>('@elysiajs/eden').treaty
+
+  it('should create the client with parseDate off', () => {
+    jest.isolateModules(() => {
+      // Arrange: o mock do test/setup.ts guarda a chamada
+      const { treaty } = jest.requireMock<{ treaty: jest.Mock }>(
+        '@elysiajs/eden'
+      )
+
+      // Act
+      require('../api')
+
+      // Assert
+      expect(treaty).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ parseDate: false })
+      )
+    })
+  })
+
+  it('should keep civil dates and free text as text with parseDate off', async () => {
+    // Arrange: o Eden de verdade; só o fetch é falso
+    const client = realTreaty()<never>('http://localhost:3001', {
+      fetcher,
+      parseDate: false,
+    }) as unknown as Client
+
+    // Act
+    const { data } = await client.sessions.get()
+
+    // Assert
+    expect(data).toEqual(body)
+  })
+
+  it('should turn the same texts into Date with the Eden default (the cause)', async () => {
+    // Arrange
+    const client = realTreaty()<never>('http://localhost:3001', {
+      fetcher,
+    }) as unknown as Client
+
+    // Act
+    const { data } = await client.sessions.get()
+
+    // Assert
+    expect(data.date).toBeInstanceOf(Date)
+    expect(data.title).toBeInstanceOf(Date)
+  })
+})

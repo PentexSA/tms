@@ -665,6 +665,77 @@ describe('Fichas na crônica', () => {
     ).toBeTruthy()
   })
 
+  it('o NPC do narrador diz "NPC" e a visibilidade, nunca "Sua ficha" (T-52)', async () => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'storyteller',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        row({
+          id: 'n1',
+          name: 'Figura Velada',
+          kind: 'npc',
+          visibility: 'hidden',
+          owner: { id: 'u1', username: 'ana' },
+          values: { name: 'Figura Velada', clan: 'tremere' },
+        }),
+        row({
+          id: 'n2',
+          name: 'Oráculo',
+          kind: 'npc',
+          visibility: 'full',
+          owner: { id: 'u1', username: 'ana' },
+          values: { name: 'Oráculo' },
+        }),
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: /^Figura Velada, .*Tremere · NPC, Oculto$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /^Oráculo, .*NPC, Ficha revelada$/ })
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Sua ficha/ })).toBeNull()
+  })
+
+  it('o jogador vê "NPC revelado", sem a visibilidade (T-52)', async () => {
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        {
+          projection: 'identity',
+          id: 'n1',
+          kind: 'npc',
+          visibility: 'full',
+          identity: {
+            name: 'Figura Velada',
+            chip: 'Tremere',
+            subtitle: null,
+            portraitUrl: null,
+          },
+        },
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: /^Figura Velada, .*NPC revelado$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.queryByText(/Oculto|Identidade revelada|Ficha revelada/)
+    ).toBeNull()
+  })
+
   it('voltar à crônica rebusca a lista', async () => {
     const focus: (() => void)[] = []
     jest.mocked(useFocusEffect).mockImplementation(effect => {

@@ -109,3 +109,24 @@ export function characterState(
       return null
   }
 }
+
+/**
+ * A visibilidade do NPC para o narrador (T-52): a forma longa, porque
+ * "Identidade" sozinha numa linha seria ambígua. O jogador nunca vê este
+ * texto: a regra só é chamada com `narrating`, e a lista dele só recebe a
+ * projeção de identidade. Sem valor conhecido, null.
+ */
+export function npcVisibilityText(
+  visibility: string | null | undefined
+): string | null {
+  switch (visibility) {
+    case 'hidden':
+      return 'Oculto'
+    case 'identity':
+      return 'Identidade revelada'
+    case 'full':
+      return 'Ficha revelada'
+    default:
+      return null
+  }
+}

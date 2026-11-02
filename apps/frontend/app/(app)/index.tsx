@@ -13,10 +13,44 @@ import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 import { FlatList, StyleSheet, View } from 'react-native'
 
+import { TransferOffer } from '../../components/chronicles/TransferOffer'
 import { LogoutButton } from '../../components/session/LogoutButton'
 import { messageOf } from '../../lib/errors'
-import { plural } from '../../lib/format'
+import { civilDate, plural } from '../../lib/format'
 import { useChronicles } from '../../lib/queries/chronicles'
+
+/**
+ * "Narrador: ana · 2 personagens · Última sessão: 01/11 · Convite para
+ * narrar". A última sessão é data civil (U-04); a proposta, só para quem a
+ * recebeu (U-03).
+ */
+function chronicleMeta(item: {
+  readonly role: 'storyteller' | 'player' | 'former'
+  readonly storyteller: { readonly username: string }
+  readonly characterCount: number
+  readonly pendingReview: number
+  readonly lastSession?: string | null
+  readonly transferOffer?: unknown
+}) {
+  const last = item.lastSession
+    ? civilDate(item.lastSession, { year: false })
+    : null
+  return [
+    item.role === 'storyteller'
+      ? 'Você narra'
+      : item.role === 'former'
+        ? 'Você saiu'
+        : `Narrador: ${item.storyteller.username}`,
+    plural(item.characterCount, 'personagem', 'personagens'),
+    item.pendingReview
+      ? `${plural(item.pendingReview, 'ficha aguarda', 'fichas aguardam')} revisão`
+      : null,
+    last ? `Última sessão: ${last}` : null,
+    item.transferOffer ? 'Convite para narrar' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 // Crônicas (design/telas/cronicas.html): as que eu narro e as de que participo.
 export default function ChroniclesScreen() {
@@ -64,6 +98,17 @@ export default function ChroniclesScreen() {
         keyExtractor={c => c.id}
         ListHeaderComponent={
           <View style={styles.header}>
+            {/* U-03: a proposta de narrar, para quem a recebeu */}
+            {chronicles.data.map(item =>
+              item.transferOffer ? (
+                <TransferOffer
+                  key={item.transferOffer.id}
+                  chronicleId={item.id}
+                  transferId={item.transferOffer.id}
+                  chronicleName={item.name}
+                />
+              ) : null
+            )}
             <SectionHeader title="Suas crônicas" />
           </View>
         }
@@ -71,17 +116,7 @@ export default function ChroniclesScreen() {
           <ListItem
             title={item.name}
             subtitle={item.system.name}
-            meta={`${
-              item.role === 'storyteller'
-                ? 'Você narra'
-                : item.role === 'former'
-                  ? 'Você saiu'
-                  : `Narrador: ${item.storyteller.username}`
-            } · ${plural(item.characterCount, 'personagem', 'personagens')}${
-              item.pendingReview
-                ? ` · ${plural(item.pendingReview, 'ficha aguarda', 'fichas aguardam')} revisão`
-                : ''
-            }`}
+            meta={chronicleMeta(item)}
             leading={<Avatar name={item.name} />}
             onPress={() => router.push(`/chronicles/${item.id}`)}
           />
@@ -114,6 +149,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: tokens.layout.gutter,
     paddingTop: tokens.space[4],
+    gap: tokens.space[3],
   },
   footer: { padding: tokens.layout.gutter },
   bar: { flexDirection: 'row', gap: tokens.space[1] },

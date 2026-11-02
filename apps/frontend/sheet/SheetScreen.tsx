@@ -60,6 +60,15 @@ import {
   type SheetState as SheetStoreState,
 } from './store/sheetStore'
 import {
+  lowerDone,
+  type NpcVisibility,
+  npcVisibilityOf,
+  REVEAL_COPY,
+  type Reveal,
+  RevealNpcSheet,
+  revealsMore,
+} from './storyteller/RevealNpcSheet'
+import {
   StatusMenuButton,
   type StatusMenuDraft,
   type StatusMenuTarget,
@@ -130,9 +139,12 @@ export function SheetScreen({
       void sync.drafts.remove(id).catch(() => undefined)
     }
   }, [id, queryClient, state, sync])
+  // O NPC com a identidade revelada também volta para a crônica dele (T-81)
   const chronicle =
-    state.status === 'ready' || state.status === 'viewer'
-      ? state.character.chronicle
+    state.status === 'ready' ||
+    state.status === 'viewer' ||
+    state.status === 'identity'
+      ? (state.character.chronicle ?? null)
       : null
   const back = chronicle
     ? {
@@ -167,8 +179,11 @@ export function SheetScreen({
       body = <IdentityProjection character={state.character} />
       break
     case 'viewer':
+      // T-15: no nativo (Yoga), o filho com flex 1 num pai de altura
+      // automática fica com altura 0, e só o aviso aparecia. O contêiner
+      // ocupa a tela: o aviso fica em cima e a ficha rola embaixo.
       body = (
-        <View>
+        <View style={styles.viewer} testID="viewer-sheet">
           <View style={styles.readNotice}>
             <Text variant="fieldLabel">Leitura</Text>
             <Text color="inkMuted">
@@ -627,6 +642,7 @@ function LiveSheet({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+  viewer: { flex: 1 },
   readNotice: {
     gap: tokens.space[1],
     paddingHorizontal: tokens.layout.gutter,
@@ -685,11 +701,52 @@ function NpcVisibilityBar({
     key: string
   } | null>(null)
   const presentationKey = useRef<string | null>(null)
+  const toast = useToast()
+  // T-46: revelar mais abre a confirmação; o rádio só muda com a resposta
+  const [reveal, setReveal] = useState<{
+    readonly target: Reveal
+    readonly open: boolean
+  } | null>(null)
+  // O aviso do sucesso espera a folha sair da tela (onClosed)
+  const revealed = useRef<string | null>(null)
   useEffect(() => {
     setPortraitUrl(character.identity.portraitUrl ?? '')
   }, [character.identity.portraitUrl])
+  // A folha aberta sobre dado velho (o 409 rebuscou a ficha): se a
+  // visibilidade já chegou ao alvo ou passou dele, confirmar baixaria o NPC
+  // com o texto de "Revelar". A folha fecha, sem enviar, e o erro fica sob
+  // o rádio
+  const current = npcVisibilityOf(character.visibility)
+  const pending = change.isPending
+  useEffect(() => {
+    if (reveal?.open && !pending && !revealsMore(current, reveal.target))
+      setReveal({ target: reveal.target, open: false })
+  }, [current, pending, reveal])
   if (character.kind !== 'npc' || !state.roles.includes('storyteller'))
     return null
+  const send = (visibility: NpcVisibility, done: () => void) => {
+    const pending =
+      visibilityCommand.current?.visibility === visibility
+        ? visibilityCommand.current
+        : { visibility, key: randomUUID() }
+    visibilityCommand.current = pending
+    change.mutate(
+      {
+        visibility,
+        revision: character.visibilityRevision,
+        clientCommandId: pending.key,
+      },
+      {
+        onSuccess: () => {
+          visibilityCommand.current = null
+          done()
+        },
+        onError: error => {
+          if (statusOf(error)) visibilityCommand.current = null
+        },
+      }
+    )
+  }
   const choices = [
     { id: 'hidden' as const, label: 'Oculto' },
     {
@@ -717,30 +774,50 @@ function NpcVisibilityBar({
         onChange={id => {
           const choice = choices.find(c => c.id === id)
           if (!choice || character.visibility === choice.id) return
-          const pending =
-            visibilityCommand.current?.visibility === choice.id
-              ? visibilityCommand.current
-              : { visibility: choice.id, key: randomUUID() }
-          visibilityCommand.current = pending
-          change.mutate(
-            {
-              visibility: choice.id,
-              revision: character.visibilityRevision,
-              clientCommandId: pending.key,
-            },
-            {
-              onSuccess: () => {
-                visibilityCommand.current = null
-              },
-              onError: error => {
-                if (statusOf(error)) visibilityCommand.current = null
-              },
-            }
+          if (revealsMore(current, choice.id)) {
+            // O erro de uma tentativa anterior não abre a folha nova
+            change.reset()
+            setReveal({ target: choice.id, open: true })
+            return
+          }
+          send(choice.id, () =>
+            toast.show({ message: lowerDone(choice.id, character.name) })
           )
         }}
       />
-      {change.isError ? (
+      {change.isError && !reveal?.open ? (
         <Text color="danger">{messageOf(change.error)}</Text>
+      ) : null}
+      {reveal ? (
+        <RevealNpcSheet
+          visible={reveal.open}
+          target={reveal.target}
+          name={character.name}
+          busy={change.isPending}
+          error={change.isError ? messageOf(change.error) : null}
+          onConfirm={() => {
+            // Só sobe: a revelação nunca baixa a visibilidade
+            if (!revealsMore(current, reveal.target)) {
+              setReveal({ target: reveal.target, open: false })
+              return
+            }
+            send(reveal.target, () => {
+              revealed.current = REVEAL_COPY[reveal.target].done
+              setReveal({ target: reveal.target, open: false })
+            })
+          }}
+          // Com o envio em curso, fechar não desfaria a revelação: espera
+          onClose={() => {
+            if (!change.isPending)
+              setReveal({ target: reveal.target, open: false })
+          }}
+          onClosed={() => {
+            setReveal(null)
+            const message = revealed.current
+            revealed.current = null
+            if (message) toast.show({ message })
+          }}
+        />
       ) : null}
       <TextField
         label="Retrato HTTPS"

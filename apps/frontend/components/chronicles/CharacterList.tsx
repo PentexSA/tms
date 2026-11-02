@@ -26,7 +26,7 @@ import {
 import { useCompiled, useLatestTemplate, useTemplate } from '../../sheet/data'
 import { deadLabel } from '../../sheet/policy'
 import type { ChronicleCreationInfo } from './CreationSettings'
-import { characterState } from './characterState'
+import { characterState, npcVisibilityText } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -91,12 +91,21 @@ function CharacterRow({
       (model
         ? identityOf(resolve(model, { values: row.values } as SheetData))
         : null))
+  // T-52: o NPC do narrador diz "NPC" (o dono dele é o narrador, e "Sua
+  // ficha" confundia) e a visibilidade. O jogador continua com "NPC
+  // revelado", sem a visibilidade
+  const npc = !partial && row.kind === 'npc' && narrating
   const owner = partial
     ? 'NPC revelado'
-    : row.mine
-      ? 'Sua ficha'
-      : `de ${row.owner.username}`
+    : npc
+      ? 'NPC'
+      : row.mine
+        ? 'Sua ficha'
+        : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
+  // O selo de visibilidade do NPC (T-52), só para o narrador; não passa
+  // pelo characterState, que devolve null para o NPC em criação ou em jogo
+  const visibility = npc ? npcVisibilityText(row.visibility) : null
   // O estado vai no selo, sob o meta, e entra no nome acessível (D-02)
   const state = partial
     ? null
@@ -104,6 +113,26 @@ function CharacterRow({
         { ...row, locked: Boolean(row.lockedAt) },
         { narrating, deadLabel: model ? deadLabel(model) : undefined }
       )
+  const badges = [
+    ...(visibility
+      ? [
+          {
+            label: visibility,
+            tone: 'neutral' as const,
+            testID: `npc-visibility-${row.id}`,
+          },
+        ]
+      : []),
+    ...(state
+      ? [
+          {
+            label: state.label,
+            tone: state.tone,
+            testID: `character-state-${row.id}`,
+          },
+        ]
+      : []),
+  ]
   return (
     <ThemeProvider
       accent={
@@ -120,17 +149,7 @@ function CharacterRow({
             : undefined
         }
         meta={identity?.chip ? `${identity.chip} · ${owner}` : owner}
-        badges={
-          state
-            ? [
-                {
-                  label: state.label,
-                  tone: state.tone,
-                  testID: `character-state-${row.id}`,
-                },
-              ]
-            : undefined
-        }
+        badges={badges.length ? badges : undefined}
         leading={
           <Avatar
             name={name}

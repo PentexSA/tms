@@ -1,6 +1,15 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
-import { Button, Chip, Skeleton, TabPanel, Tabs, Text, tokens } from '@tms/ui'
+import {
+  Button,
+  Chip,
+  SectionHeader,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  Text,
+  tokens,
+} from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -23,6 +32,7 @@ import { TableRow } from './TableRow'
 import {
   arrange,
   buildItem,
+  bySection,
   type TableItem,
   type TableRowData,
   type TableSort,
@@ -156,16 +166,29 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
   )
+  // PCs e, depois, NPCs numa seção própria (T-52)
+  const sections = useMemo(() => bySection(shown), [shown])
   // A ordem da tela, lida ao abrir: o callback não muda com o filtro, e as
   // linhas não redesenham por causa dele
   const order = useRef<readonly string[]>([])
-  order.current = shown.map(i => i.row.id)
+  order.current = [...sections.pcs, ...sections.npcs].map(i => i.row.id)
   const open = useCallback(
     (id: string) => {
       remember(chronicleId, order.current)
       router.push(`/characters/${id}`)
     },
     [chronicleId, remember, router]
+  )
+  // A mesma linha nas duas seções (PCs e NPCs)
+  const row = (item: TableItem) => (
+    <TableRow
+      key={item.row.id}
+      item={item}
+      onOpen={open}
+      selecting={selecting}
+      selected={selected.has(item.row.id)}
+      onSelect={select}
+    />
   )
 
   return (
@@ -296,16 +319,17 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 : 'Nenhuma ficha na crônica ainda.'}
           </Text>
         ) : (
-          shown.map(item => (
-            <TableRow
-              key={item.row.id}
-              item={item}
-              onOpen={open}
-              selecting={selecting}
-              selected={selected.has(item.row.id)}
-              onSelect={select}
-            />
-          ))
+          <>
+            {sections.pcs.map(row)}
+            {sections.npcs.length ? (
+              <>
+                <View style={styles.section} testID="table-npcs">
+                  <SectionHeader title="NPCs" level="group" />
+                </View>
+                {sections.npcs.map(row)}
+              </>
+            ) : null}
+          </>
         )}
       </TabPanel>
       {xpSheet === 'grant' ? (
@@ -342,6 +366,10 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
+  section: {
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[3],
+  },
   hint: {
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[2],

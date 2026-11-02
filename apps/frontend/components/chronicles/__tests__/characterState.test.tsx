@@ -171,7 +171,8 @@ describe('characterState', () => {
     // Com o fuso de São Paulo no CI, o dia é o 31/10
     if (local.getTimezoneOffset() === 180)
       expect(state?.label).toBe('Concluída em 31/10')
-    // Também com Date (Eden converte datas)
+    // Também com Date: o cliente manda texto (parseDate: false, P11), mas o
+    // tipo inferido ainda diz Date
     expect(
       characterState({ status: 'active', activatedAt: new Date(at) }, player)
         ?.label

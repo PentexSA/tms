@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
+import { StyleSheet } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, templateJson } from '../../test/fixtures'
@@ -73,6 +74,7 @@ const npcIdentity = () =>
     kind: 'npc',
     visibility: 'identity',
     identity,
+    chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
   })
 const npcFull = () =>
   ok({
@@ -134,6 +136,33 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       WAIT
     )
     expect(screen.queryByText('Oráculo')).toBeNull()
+  })
+
+  it('o "‹" do NPC com a identidade revelada volta para a crônica (T-81)', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcIdentity())
+    renderWithSession(<SheetScreen id={NPC} />, await signedIn())
+    expect(
+      await screen.findByText(
+        'O narrador revelou apenas a identidade.',
+        {},
+        WAIT
+      )
+    ).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
+    )
+    expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
+  })
+
+  it('a ficha revelada ocupa a tela: o contêiner do viewer tem flex 1 (T-15)', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcFull())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={NPC} />, await signedIn())
+    const viewer = await screen.findByTestId('viewer-sheet', {}, WAIT)
+    // O Jest não faz layout: o estilo prova a causa (Yoga, pai sem flex),
+    // não a tela, que se confere no aparelho
+    expect(StyleSheet.flatten(viewer.props.style)).toMatchObject({ flex: 1 })
+    expect(screen.getByLabelText('Destreza, 2 de 5')).toBeTruthy()
   })
 
   it('sem rede, a ficha do viewer em cache não volta à tela', async () => {
