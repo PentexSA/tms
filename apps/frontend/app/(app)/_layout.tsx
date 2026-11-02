@@ -1,4 +1,4 @@
-import { Screen, Skeleton } from '@tms/ui'
+import { AppBar, Screen, Skeleton } from '@tms/ui'
 import { Redirect, Stack } from 'expo-router'
 
 import { useSession } from '../../lib/session/SessionProvider'
@@ -7,9 +7,12 @@ import { useSession } from '../../lib/session/SessionProvider'
 // jeito; esta guarda é só para a navegação.
 export default function AppLayout() {
   const { status } = useSession()
+  // Restaurando a sessão: a app bar com título fixo (nenhum dado do usuário
+  // nem do cache antes de a sessão voltar) e o carregamento anunciado
   if (status === 'loading')
     return (
       <Screen>
+        <AppBar title="TMS" />
         <Skeleton />
       </Screen>
     )

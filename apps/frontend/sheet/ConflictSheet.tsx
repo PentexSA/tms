@@ -102,12 +102,15 @@ export function ConflictSheet({
           <View style={styles.actions}>
             <Button
               title="Ficar com o atual"
+              // Um par de botões por campo: o nome diz qual (T-61)
+              accessibilityLabel={`Ficar com o atual: ${place}`}
               variant="ghost"
               accessibilityHint={`${place}: tira a sua alteração do rascunho`}
               onPress={() => store.getState().resolveConflict(r.path, 'theirs')}
             />
             <Button
               title="Usar o meu"
+              accessibilityLabel={`Usar o meu: ${place}`}
               variant="secondary"
               accessibilityHint={`${place}: o seu valor substitui o atual ao salvar`}
               onPress={() => store.getState().resolveConflict(r.path, 'mine')}

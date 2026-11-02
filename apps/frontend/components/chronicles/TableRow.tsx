@@ -65,8 +65,16 @@ export const TableRow = memo(function TableRow({
     problem,
     meta,
   ]
-    .filter(Boolean)
-    .join('. ')
+    .filter((part): part is string => Boolean(part))
+    // O texto de cada parte fica como está (o nome "Quem?" ou "Dr. Who
+    // Jr." é o que aparece na tela, WCAG 2.5.3). Só o separador gerado se
+    // ajusta: depois de uma parte que já termina em pontuação, vai só o
+    // espaço, sem ".."
+    .reduce(
+      (text, part) =>
+        text ? `${text}${/[.!?…]$/u.test(text) ? ' ' : '. '}${part}` : part,
+      ''
+    )
 
   return (
     <ThemeProvider accent={identity?.accent ?? 'accent-neutral'}>

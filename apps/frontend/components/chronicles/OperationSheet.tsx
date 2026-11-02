@@ -197,6 +197,7 @@ export function OperationSheet({
           <>
             <Stepper
               label="Quantidade"
+              showLabel
               value={amount}
               min={1}
               max={50}

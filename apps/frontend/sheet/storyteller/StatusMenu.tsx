@@ -171,8 +171,9 @@ function StatusMenuTrigger({
     <Pressable
       testID="status-menu"
       accessibilityRole="button"
-      accessibilityLabel="Ações do narrador"
-      accessibilityHint={state ? `Ficha ${state.toLowerCase()}` : undefined}
+      // O nome acessível começa pelo texto visível (WCAG 2.5.3)
+      accessibilityLabel={state ? `Narrador, ${state}` : 'Narrador'}
+      accessibilityHint="Abre as ações do narrador"
       onPress={onPress}
       style={[styles.trigger, { borderColor: colors.borderControl }]}
     >

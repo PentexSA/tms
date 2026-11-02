@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react-native'
 import type { ListItem } from '@tms/sheet-core'
 import { example, modelOf } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { textInput } from '../../../test/queries'
 
 // Etapa 18: o editor de `list` (DS: Repeater / ListEditor). O esquema do
 // item vem do template; o mesmo editor serve a Disciplinas, ataques do D&D,
@@ -121,7 +122,7 @@ describe('ListEditor', () => {
   it('renomear o item; o campo de nome respeita o limite do validador', async () => {
     const { disciplines } = await helenaInEvolve()
     fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
-    const name = screen.getByLabelText('Nome')
+    const name = textInput('Nome')
     expect(name.props.maxLength).toBe(80)
     fireEvent.changeText(name, ' Dominação Plena ')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
@@ -223,7 +224,7 @@ describe('outros sistemas, o mesmo editor', () => {
 
     const aspects = within(screen.getByTestId('editor-aspects'))
     fireEvent.press(aspects.getByRole('button', { name: 'Adicionar Aspecto' }))
-    fireEvent.changeText(screen.getByLabelText('Nome'), 'Café forte')
+    fireEvent.changeText(textInput('Nome'), 'Café forte')
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Café forte”' })
     )

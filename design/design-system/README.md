@@ -257,6 +257,7 @@ O visual e o alvo de toque são **separados**: o pip tem 16, mas o alvo é a lin
 | Token | Valor | Uso |
 |---|---|---|
 | `hit-size` | 44 | Menor alvo permitido (44×44). Abaixo disso, `hitSlop` até 44. |
+| `hit-size-android` | 48 | Menor alvo no Android (48×48 dp, Material). No RN, `hitTarget()` do `@tms/ui` devolve 48 no Android e 44 no iOS e no web. |
 | `row-min` | 48 | Altura mínima da linha de campo; a linha inteira é um único alvo. |
 | `pip-size` / `pip-size-sm` | 16 / 12 | Pip em linha e célula / pip de escala 0–10 (só visual). |
 | `pip-hit-w` | 32 | Reservado para pip individualmente tocável. Hoje nenhum componente usa: a edição é pelo `Stepper`. |

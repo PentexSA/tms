@@ -1,5 +1,5 @@
 import type { CompiledGroup, CompiledSection } from '@tms/sheet-core'
-import { Tabs, tokens, useLayout } from '@tms/ui'
+import { Tabs, tabPanelProps, tokens, useLayout } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -16,7 +16,12 @@ export function useGroupTabs(
     enabled,
     all = false,
   }: { readonly enabled: boolean; readonly all?: boolean }
-): { readonly bar: ReactNode; readonly groups: readonly CompiledGroup[] } {
+): {
+  readonly bar: ReactNode
+  readonly groups: readonly CompiledGroup[]
+  /** Props do contêiner dos grupos: o painel das abas (vazio sem abas). */
+  readonly panelProps: ReturnType<typeof tabPanelProps> | Record<string, never>
+} {
   const { breakpoint } = useLayout()
   const [tab, setTab] = useState(groups[0]?.id ?? '')
   const on =
@@ -24,11 +29,13 @@ export function useGroupTabs(
     enabled &&
     breakpoint === 'compact' &&
     groups.length > 1
-  if (!on) return { bar: null, groups }
+  if (!on) return { bar: null, groups, panelProps: {} }
   const active = groups.find(g => g.id === tab) ?? groups[0]
+  const tabsId = `groups-${section.id}`
   const bar = (
     <View style={styles.bar} testID={`group-tabs-${section.id}`}>
       <Tabs
+        id={tabsId}
         size="sm"
         accessibilityLabel={`Grupos de ${section.def.title}`}
         items={groups.map(g => ({ id: g.id, label: g.title || g.id }))}
@@ -37,7 +44,11 @@ export function useGroupTabs(
       />
     </View>
   )
-  return { bar, groups: all || !active ? groups : [active] }
+  return {
+    bar,
+    groups: all || !active ? groups : [active],
+    panelProps: tabPanelProps(tabsId, active?.id ?? ''),
+  }
 }
 
 const styles = StyleSheet.create({

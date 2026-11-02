@@ -10,6 +10,7 @@ import {
   AppBar,
   Avatar,
   Button,
+  Choice,
   EmptyState,
   Screen,
   Skeleton,
@@ -477,50 +478,53 @@ function NpcVisibilityBar({
     return null
   const choices = [
     { id: 'hidden' as const, label: 'Oculto' },
-    { id: 'identity' as const, label: 'Identidade' },
-    { id: 'full' as const, label: 'Ficha' },
+    {
+      id: 'identity' as const,
+      label: 'Identidade',
+      meta: 'Publica nome, selo, subtítulo e retrato.',
+    },
+    {
+      id: 'full' as const,
+      label: 'Ficha',
+      meta: 'Abre uma cópia somente leitura, sem notas do narrador.',
+    },
   ]
   return (
-    <View style={styles.readNotice} accessibilityRole="radiogroup">
-      <Text variant="fieldLabel">Visibilidade do NPC</Text>
-      <Text color="inkMuted">
-        Identidade publica nome, selo, subtítulo e retrato. Ficha abre uma cópia
-        somente leitura, sem notas do narrador.
-      </Text>
-      <View style={styles.actions}>
-        {choices.map(choice => (
-          <Button
-            key={choice.id}
-            title={choice.label}
-            variant={
-              character.visibility === choice.id ? 'primary' : 'secondary'
+    <View style={styles.readNotice}>
+      {/* Um radiogroup de verdade: o estado atual é "marcado", não um botão
+          desabilitado (que parecia esmaecido). Ativação manual no teclado:
+          a seta não revela o NPC; só Espaço, Enter ou toque. */}
+      <Choice
+        label="Visibilidade do NPC"
+        value={character.visibility}
+        options={choices}
+        disabled={change.isPending}
+        testID="npc-visibility"
+        onChange={id => {
+          const choice = choices.find(c => c.id === id)
+          if (!choice || character.visibility === choice.id) return
+          const pending =
+            visibilityCommand.current?.visibility === choice.id
+              ? visibilityCommand.current
+              : { visibility: choice.id, key: randomUUID() }
+          visibilityCommand.current = pending
+          change.mutate(
+            {
+              visibility: choice.id,
+              revision: character.visibilityRevision,
+              clientCommandId: pending.key,
+            },
+            {
+              onSuccess: () => {
+                visibilityCommand.current = null
+              },
+              onError: error => {
+                if (statusOf(error)) visibilityCommand.current = null
+              },
             }
-            disabled={change.isPending || character.visibility === choice.id}
-            onPress={() => {
-              const pending =
-                visibilityCommand.current?.visibility === choice.id
-                  ? visibilityCommand.current
-                  : { visibility: choice.id, key: randomUUID() }
-              visibilityCommand.current = pending
-              change.mutate(
-                {
-                  visibility: choice.id,
-                  revision: character.visibilityRevision,
-                  clientCommandId: pending.key,
-                },
-                {
-                  onSuccess: () => {
-                    visibilityCommand.current = null
-                  },
-                  onError: error => {
-                    if (statusOf(error)) visibilityCommand.current = null
-                  },
-                }
-              )
-            }}
-          />
-        ))}
-      </View>
+          )
+        }}
+      />
       {change.isError ? (
         <Text color="danger">{messageOf(change.error)}</Text>
       ) : null}

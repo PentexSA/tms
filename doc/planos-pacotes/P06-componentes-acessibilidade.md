@@ -642,3 +642,35 @@ O P02 não tem arquivo em comum com o P06.
 
 - **T-09:** "o template pode marcar o que a criação exige (o Clã)" é mudança de contrato e de comportamento, não correção (seção 3.1).
 - **R-01:** a R-01 lista o título "Modo de criação", mas o código usa "Modo padrão" (`CreationSettings.tsx:118`). O P06 mostra o rótulo atual e não mexe nesse arquivo. Trocar o texto é uma linha, que cabe no P01-C (L-01, mesmo trecho) se o PO quiser.
+
+---
+
+## 10. Desvios na implementação
+
+Implementado em 13 commits, na ordem da seção 8.1. Os padrões das perguntas da seção 9 foram os do plano (1 a 5, 8 e 9), com a 6 fora do pacote e a 7 aplicada a todos os alvos, inclusive as ações da `AppBar` (o Jest não mede sobreposição; a conferência do cabeçalho no Android fica para a integração). O que mudou em relação ao desenho:
+
+| Item | Desvio | Por quê |
+|---|---|---|
+| T-35 | `GridLayout.tsx` também espalha os `panelProps` do `useGroupTabs`, além do `GroupsLayout.tsx` | As abas de grupo levam `aria-controls` nos dois layouts; sem o painel no `GridLayout`, o `aria-controls` apontaria para um id inexistente |
+| T-35 | O `typing.ts` usa um id por instância (`useId`) em vez do id do campo | Evita colisão se o mesmo campo aparecer duas vezes na tela |
+| T-25 | O Enter não tira mais o foco (`submitBehavior="submit"`; no web, `blurOnSubmit={false}`), e abrir o campo limpa a mensagem anterior. O Esc também limpa a mensagem. No web, Enter e Esc devolvem o foco ao botão "Digitar" (`Stepper` ganha `valueNativeID`) | Sem isso, o Enter com valor inválido fechava o campo; e o campo focado desmontava com o foco caindo no `body` |
+| T-71 | O fundo também perde o papel `button` (e ganha `testID="bottom-sheet-scrim"`); o rótulo "Fechar" fica | Sem papel, o react-native-web desenha um `div`, não um `<button>` oculto. O rótulo mantém o `components.test.tsx`, que o P06 não toca |
+| T-61 | Com valor vazio, a linha do Editar passa a ter `accessibilityValue` ("vazio" no texto, "—" na escolha) | O `fieldA11y` sempre separa rótulo e valor no app |
+| T-61 | Testes existentes que buscavam o campo da folha com `getByLabelText` (`mage.test.tsx`, `ListEditor.test.tsx` e a l.260 de `evolve.test.tsx`, fora da lista da seção 4.2) passam a usar `textInput()` (`test/queries.ts`, novo) | No app, a linha que abre a folha tem o mesmo nome do campo ("Nome", "Conceito") |
+| T-38 | As props do nome próprio ficam numa constante (`sheet/editors/properName.ts`, novo), usada pelo `TextEditor` e pelo `TextEditorRow` | Uma fonte só para as duas telas |
+| T-42 | O fake da API (`test/fake-api.ts`) ganha as rolagens da crônica e a rota de visibilidade do NPC | Os testes da Mesa e do NPC precisam delas |
+| T-72 | As linhas do `Skeleton` ganham `testID="skeleton-line"` | Teste das linhas `aria-hidden` |
+| T-35 | Causa do foco no `body` (QAW-28), confirmada no código do react-native-web 0.21.4: o `ModalFocusTrap` lê o foco num efeito passivo, depois do `autoFocus` dos campos da folha, e guarda o campo de dentro, que some ao fechar. A folha lê o gatilho num insertion effect (antes da fase de layout) | Um layout effect da folha também leria tarde (os dos filhos rodam antes). O teste simula o `autoFocus` e falha com a leitura no layout effect |
+
+**Correções do `/code-review`** (commits entre o E2E e o T-70, que continua o último commit de código):
+
+- **T-72:** a região `role="status"` do `Skeleton` perdeu o `aria-busy` (ocupada, nunca seria anunciada), e o texto entra depois da montagem.
+- **T-35:** o `TabPanel` só aparece com o tablist: o ex-membro na crônica e a ficha sem zona com aba ficam num contêiner comum.
+- **T-61:** a junção do nome do cartão da Mesa não tira mais a pontuação do texto ("Quem?", "Dr. Who Jr."); só o separador se ajusta.
+- **T-35:** `useRovingFocus` ignora Alt, Ctrl, Meta, Shift+seta e teclas de descendentes; o Espaço do `Pressable` chama `preventDefault` também na repetição e só vale no próprio elemento.
+- **T-70:** a linha da sincronização no cabeçalho (`SyncIndicator`) usa `hitTarget()`. O desenho do `Clock` (`ClockViews.tsx:49` e o padrão de `Clock.tsx:91`) continua com o `hit-size`: é tamanho visual, e o alvo é a linha (`row-min` 48 mais o alvo do `Pressable`).
+- **Ambiente:** o P01-C (na onda) instala `@types/react-test-renderer`; o `matrix.test.tsx` recebe a mesma linha do P01-C, e o `textInput()` o mesmo cast.
+
+**Telas novas da onda, conferidas depois do merge** (`LogoutButton` do P02; `DraftRecovery` e `ConflictSheet` do P03-C): herdam o `BottomSheet` (um "Fechar") e o `Button` (`hitTarget()`). Dois ajustes: o `BottomSheet` volta ao último elemento focado quando o gatilho perdeu o foco ao ficar ocupado (o "Sair" desabilitado durante a checagem), e os botões "Usar o meu" e "Ficar com o atual" de cada campo em conflito dizem qual campo ("Usar o meu: Identidade › Senhor").
+
+**Não rodado no pacote** (portas e build nativo só na integração): o `a11y-keyboard.spec.ts` e as jornadas alteradas (`journey-backstage`, `journey-storyteller`), o Maestro `08-backstage.yaml` e as conferências da seção 7 no VoiceOver e no TalkBack.

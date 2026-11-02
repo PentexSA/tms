@@ -32,6 +32,12 @@ export interface StepperProps {
   // Tocar no valor (digitar o número). No web é um botão; no app, a ação
   // "activate" do controle ajustável (toque duplo do leitor de tela).
   readonly onValuePress?: () => void
+  // nativeID do botão "Digitar" (no web vira o id do elemento): quem abre o
+  // campo devolve o foco a ele ao fechar
+  readonly valueNativeID?: string
+  // Rótulo visível acima do controle, para quando a tela não o mostra ao
+  // lado. Fica fora da árvore de acessibilidade: o controle já tem o nome.
+  readonly showLabel?: boolean
 }
 
 const HOLD_DELAY_MS = 400
@@ -48,6 +54,8 @@ export function Stepper({
   size = 'inline',
   testID,
   onValuePress,
+  valueNativeID,
+  showLabel = false,
 }: StepperProps) {
   const { colors } = useTheme()
   const [display, setDisplay] = useState(value)
@@ -141,7 +149,9 @@ export function Stepper({
         'aria-valuemin': min,
         'aria-valuemax': max,
         'aria-valuenow': display,
-        'aria-valuetext': valueText ? valueText(display) : undefined,
+        // Sempre com texto: sem ele, o iOS lê now/(max−min) como porcentagem
+        // ("7" de 0 a 1000 vira "1%").
+        'aria-valuetext': spoken,
         'aria-disabled': disabled,
         accessibilityActions: [
           { name: 'increment' },
@@ -166,12 +176,13 @@ export function Stepper({
     </Text>
   )
 
-  return (
+  const control = (
     <View testID={testID} {...container} style={styles.row}>
       {button(-1)}
       {typeable ? (
         <Pressable
           testID={testID ? `${testID}-value` : undefined}
+          nativeID={valueNativeID}
           {...(web
             ? {
                 accessibilityRole: 'button' as const,
@@ -189,9 +200,19 @@ export function Stepper({
       {button(1)}
     </View>
   )
+  if (!showLabel) return control
+  return (
+    <View style={styles.labeled}>
+      <Text variant="fieldLabel" aria-hidden>
+        {label}
+      </Text>
+      {control}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
+  labeled: { gap: tokens.space[1] },
   row: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
   button: {
     alignItems: 'center',

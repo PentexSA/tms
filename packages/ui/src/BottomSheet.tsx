@@ -1,4 +1,10 @@
-import type { ReactNode } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useInsertionEffect,
+  useRef,
+} from 'react'
 import {
   KeyboardAvoidingView,
   Modal,
@@ -19,6 +25,53 @@ import { tokens } from './tokens'
 // inerte para o leitor de tela (aria-modal) e o título é heading.
 // Com "reduzir movimento", aparece sem animar. A raiz evita o teclado: no
 // iOS a folha inteira (campo e rodapé) sobe acima dele.
+//
+// Um "Fechar" só: o fundo fecha no toque, mas fica fora da árvore e do Tab
+// (no web o react-native-web não esconde os irmãos do modal). No iOS, o
+// gesto de escape do VoiceOver ("Z") fecha. No web, o foco volta a quem
+// abriu a folha, se ele ainda estiver na tela.
+//
+// Por que não basta o ModalFocusTrap do react-native-web: ele guarda o
+// elemento focado num efeito passivo, depois da montagem. Quando a folha
+// tem um campo com autoFocus ("Adicionar Antecedente", os editores de
+// texto), o React já focou o campo na fase de layout, e o trap guarda o
+// campo de dentro da folha, que some ao fechar: o foco cai no body
+// (QAW-28). Aqui o gatilho é lido num insertion effect, que roda antes da
+// fase de layout e, portanto, antes de qualquer autoFocus.
+
+type Focusable = { focus?: () => void; isConnected?: boolean }
+type WebDocument = {
+  activeElement?: unknown
+  body?: unknown
+  addEventListener?: (
+    type: string,
+    listener: (e: { target?: unknown }) => void,
+    capture?: boolean
+  ) => void
+}
+
+const webDocument = (): WebDocument | undefined =>
+  Platform.OS === 'web'
+    ? (globalThis as { document?: WebDocument }).document
+    : undefined
+
+// O último elemento que recebeu foco no documento (web). Um botão que fica
+// ocupado ao abrir a folha (o "Sair" do logout) é desabilitado, e o
+// navegador tira o foco dele: na abertura o foco está no body, e quem abriu
+// a folha é o último focado.
+let lastFocused: Focusable | null = null
+const tracked = new WeakSet<object>()
+function trackFocus(doc: WebDocument) {
+  if (tracked.has(doc) || typeof doc.addEventListener !== 'function') return
+  tracked.add(doc)
+  doc.addEventListener(
+    'focusin',
+    e => {
+      if (e.target && e.target !== doc.body) lastFocused = e.target as Focusable
+    },
+    true
+  )
+}
 
 export interface BottomSheetProps {
   readonly visible: boolean
@@ -39,12 +92,45 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
+  // Quem tinha o foco antes de abrir (web), lido antes do autoFocus de
+  // qualquer campo da folha e antes do trap do modal
+  const trigger = useRef<Focusable | null>(null)
+  useInsertionEffect(() => {
+    const doc = webDocument()
+    if (!visible || !doc) return
+    const active = doc.activeElement as Focusable | null | undefined
+    trigger.current = active && active !== doc.body ? active : lastFocused
+  }, [visible])
+  useEffect(() => {
+    const doc = webDocument()
+    if (doc) trackFocus(doc)
+  }, [])
+  // Um caminho só para devolver o foco, uma vez por abertura (o gatilho é
+  // zerado na primeira chamada). Roda depois que o modal sai da tela, quando
+  // o trap já soltou o foco: no onDismiss (a folha fecha e continua montada)
+  // ou ao desmontar aberta (quem chama some com ela; aí não há onDismiss).
+  // Se outro elemento pegou o foco de propósito, não o rouba.
+  const restoreFocus = useCallback(() => {
+    const el = trigger.current
+    trigger.current = null
+    if (!el) return
+    setTimeout(() => {
+      const doc = webDocument()
+      if (!doc || !el.isConnected) return
+      const active = doc.activeElement as Focusable | null | undefined
+      if (active && active !== doc.body && active.isConnected && active !== el)
+        return
+      el.focus?.()
+    }, 0)
+  }, [])
+  useEffect(() => () => restoreFocus(), [restoreFocus])
   return (
     <Modal
       visible={visible}
       transparent
       animationType={reduceMotion ? 'none' : 'slide'}
       onRequestClose={onClose}
+      onDismiss={restoreFocus}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
@@ -52,8 +138,11 @@ export function BottomSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable
-          accessibilityRole="button"
+          accessible={false}
+          aria-hidden
+          tabIndex={-1}
           accessibilityLabel="Fechar"
+          testID="bottom-sheet-scrim"
           onPress={onClose}
           minTarget={false}
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
@@ -61,6 +150,7 @@ export function BottomSheet({
         <View
           testID={testID}
           aria-modal
+          onAccessibilityEscape={onClose}
           style={[
             styles.sheet,
             {

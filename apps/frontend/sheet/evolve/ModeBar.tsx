@@ -18,6 +18,7 @@ import {
   Pressable,
   Text,
   tokens,
+  useRovingFocus,
   useTheme,
   useToast,
 } from '@tms/ui'
@@ -235,17 +236,24 @@ function ModeSwitch({
   readonly onChange: (mode: SheetMode) => void
 }) {
   const { colors } = useTheme()
+  // Setas só movem o foco: trocar de modo é uma ação (Espaço ou Enter)
+  const roving = useRovingFocus({
+    count: modes.length,
+    active: modes.indexOf(mode),
+    activate: 'manual',
+  })
   return (
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel="Modo da ficha"
       style={styles.switch}
     >
-      {modes.map(m => {
+      {modes.map((m, i) => {
         const on = m === mode
         return (
           <Pressable
             key={m}
+            {...roving(i)}
             accessibilityRole="radio"
             accessibilityLabel={MODE_LABELS[m]}
             aria-checked={on}
