@@ -548,6 +548,75 @@ Ordem de merge provisória da consolidação: **P03-D → P04-D → P11 → P09-
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementado sobre `8fb653e`, sem o P03-D, o P04-D e o P11. Foram 17 commits:
+
+- os 13 do §8.1;
+- 1 de teste, que corrige uma conferência vazia do T-33 (`216d792`);
+- 2 de correção, um da revisão própria (`62758a0`) e um dos achados do `/code-review` (`8ce2ddd`);
+- este, dos desvios.
+
+**Decisões em aberto, com o padrão do plano:**
+
+- **Pergunta 1:** o narrador abre em Leitura e entra na edição pelo "Editar como narrador". O destino é Criação na criação por pontos ativa, Editar na criação livre e Jogo na ficha em uso.
+- **Pergunta 2:** a conta aparece em Leitura só em `creating`.
+- **Pergunta 7:** o puxar na ficha entrou, no commit 11, que sai sozinho se brigar com a faixa fixa no Android.
+- **Pergunta 8:** o texto quando quem alterou é o dono é "alterada por dona às 13:15".
+- **Pergunta 9:** a lista de crônicas é invalidada a cada concluir, aprovar e devolver.
+
+Tudo continua aberto para o PO (seção 9).
+
+**Onde o código ficou diferente:**
+
+1. **`hiddenFromOwner` e os textos do R-09** ficam em `sheet/storyteller/privacy.ts`, não no `StorytellerBar.tsx`. Assim a Leitura (`TextLayout`) e a barra do narrador usam a mesma regra sem importar uma à outra, o que evita ciclo de import.
+2. **O mapa de rolagem** fica em `lib/chronicleScroll.ts`, não em `components/chronicles/`. Quem o apaga no logout é o `SessionProvider`, em `lib/`, e o `lib/` não importa `components/`.
+3. **`useSheetBack`** recebe a `chronicle` (`{ id, name } | null`), não só o id, e devolve o `back` inteiro da `AppBar` (rótulo e ação).
+   - Com tela de baixo, a ação é `router.back()`, mesmo sem crônica.
+   - Sem crônica, o rótulo é "Crônicas" até o P11 mandar a `chronicle` na identidade revelada (T-81).
+4. **A aba da crônica** é estado local sincronizado com `?view=`:
+   - a URL vale ao montar e quando muda por fora (link, F5, voltar do navegador);
+   - o toque troca a aba na hora e chama `setParams`.
+
+   Só ler `useLocalSearchParams` não trocava a aba enquanto o `setParams` não rendesse um render novo, como acontece no Jest. Pergunta 3 (se o `setParams` empilha no histórico do web) segue para o E2E.
+5. **Invalidação da lista no `useRefresh`:** usa `chronicleKeys.all` com `exact: true`. Rebusca só a lista de crônicas, não tudo o que começa com `['chronicles']`.
+6. **Barra da seleção:**
+   - Ela aparece só na aba Mesa. A seleção continua ao trocar de aba e voltar, mas o voltar do Android só desliga a seleção com a barra à vista. Em outra aba, o voltar é o de sempre (achado do `/code-review`).
+   - A ficha que sai da Mesa (arquivada, excluída ou fora do recorte) sai da seleção, e a contagem e o limite de 20 contam só o que está na tela. O vazio do carregamento não limpa a seleção.
+   - "Limpar seleção" fica desabilitado com 0 marcadas.
+   - O aviso do 21º toque sai no próximo toque ou ao limpar.
+   - O voltar do Android só é registrado com a tela em foco (`useFocusEffect`, na própria barra), para não capturar o voltar de uma ficha aberta por cima.
+   - O `TableView` exige o `TableSelectionProvider`. Os testes montam a Mesa com o provider e a barra, como a tela da crônica.
+7. **Papel `toolbar`:** fica num `View` que não é elemento acessível único, para os botões continuarem alcançáveis no VoiceOver e no TalkBack. Por isso o Jest o acha pelo nome (`getByLabelText`). O E2E usa `getByRole('toolbar')`, que vale no DOM.
+8. **Pausa do Toast:** usa ponteiro, foco e toque em todas as plataformas, sem ramo por `Platform.OS`.
+   - O aviso dentro de um `Modal` não sobe com o `useToastOffset`, porque a barra fica atrás da folha.
+   - O render de loop que um `[]` novo por render causava (a Mesa sincronizando a seleção) foi evitado com `NO_ROWS` e com o `sync` comparando a lista.
+9. **"Volta à Leitura depois de salvar"** vale para o Editar (o `returnTo` do narrador que entrou pela Leitura).
+   - Na Criação, salvar mantém a Criação, como para o dono: o botão da barra é `review('create')`.
+   - O narrador volta à Leitura pelo "Voltar à leitura", que pergunta se salva ou descarta.
+   - O teste disso usa o rótulo "Concluir" do Editar. Ele passa a "Salvar alterações" no merge do P03-D.
+10. **Grade (T-48):** é um contêiner só (`flexWrap`), com cada cartão numa célula de 1/colunas da largura (`table-cell-<id>`) e a key da ficha. Trocar a ordem ou o filtro move os cartões sem remontá-los. O espaço entre os cartões é o recuo das células, não o `gap` (achado do `/code-review`).
+11. **Volta à rolagem (T-39):**
+   - Ela é pedida no foco e feita quando o conteúdo cabe o ponto guardado mais a altura da tela. Antes disso, o ScrollView pararia no máximo de então.
+   - A chave é a da aba mostrada, já com a crônica carregada.
+   - Qualquer rolagem antes da volta a cancela (dedo, roda, teclado ou barra), não só o arrasto (achado do `/code-review`).
+12. **Aceitar a narração (T-40):** usa `invalidateQueries()`, e não o `resetQueries()` do plano. O reset derrubava a tela da crônica para o esqueleto, e a invalidação mantém o dado de agora até a resposta com o papel novo.
+   - É o mesmo usuário, e o dado de jogador é o de menos acesso.
+   - O logout continua com `clear()`.
+   - O `/security-review` não teve achado.
+13. **Toast:** o aviso que sai da tela com o foco, o ponteiro ou o dedo em cima (ao passar para um modal) solta o que o segurava, e o prazo não fica parado (achado do `/code-review`).
+14. **`/code-review`, achado não aplicado:** o foco da crônica invalida o prefixo dela, e a Mesa e a lista de fichas mantêm a própria rebusca no foco. É o desenho do §3.4: o `cancelRefetch: false` não duplica pedido. O foco da Mesa também cobre os pedidos de XP, que ficam fora do prefixo.
+15. **`a11y-keyboard.spec.ts`:** foi conferido e não muda. A Mesa vazia do teste não tem a barra, e com a Mesa vazia não há "Selecionar personagens" (NW-17).
+16. **Medidas do E2E** (o cartão abaixo de 170 a 390 e a barra dentro da viewport): são as do plano e ainda não rodaram. Se o cartão em criação, com o selo, passar de 170, a integração mede e ajusta o limite ou o cartão.
+
+**Ficam para a integração**, depois do P03-D, do P04-D e do P11 (seção 8.4):
+
+- os selos do P04-D e a visibilidade do P11 na linha de selos do cartão (`TableRow`, `badges`);
+- a seção de NPCs na grade (`TableGrid` dentro de cada seção);
+- o `stateLabel` trocado pelo `characterState`;
+- o `kind` do `TableRowData`, que o P04-D também declara e que dá conflito trivial;
+- a `chronicle` da identidade revelada no `useSheetBack`;
+- o texto final do "Pedir ajuste";
+- os rótulos do P03-D nos testes do narrador.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 O roteiro confere cada item na interface, nas três plataformas, com a API local e o seed do roteiro (só contas fictícias `@roteiro.test`). Ele detalha o passo 6 da seção 7. A coluna "Resultado" fica em branco e é preenchida na integração.
