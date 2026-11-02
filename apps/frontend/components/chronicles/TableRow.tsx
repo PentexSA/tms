@@ -22,11 +22,11 @@ import { changeLabel, type TableItem } from './tableItems'
 // selo e o estado da ficha. Nada aqui conhece sistema. Memo: a mesma linha não
 // redesenha quando o filtro ou a ordem mudam.
 //
-// T-48 (P09-C): o cartão compacto. Em cima, o avatar e o texto (nome em até 2
-// linhas, o selo de identidade e quem alterou); depois, a linha de selos
-// (estado e alertas); embaixo, os recursos do dock numa linha só, na largura
-// inteira do cartão, como o CombatDock da ficha. A linha de selos é onde
-// entram o estado do P04-D e a visibilidade do NPC do P11, e o progresso do
+// T-48 (P09-C): o cartão compacto. Em cima, o avatar e o texto: o nome em até
+// 2 linhas; o selo de identidade com os selos da ficha (a visibilidade do NPC
+// do P11, o estado do P04-D e os alertas) numa linha que quebra quando não
+// cabe; e quem alterou. Embaixo, os recursos do dock numa linha só, na
+// largura inteira do cartão, como o CombatDock da ficha. O progresso do
 // P09-D ganha uma linha livre.
 
 export const TableRow = memo(function TableRow({
@@ -117,10 +117,45 @@ export const TableRow = memo(function TableRow({
             <Text variant="fieldLabel" numberOfLines={2}>
               {row.name}
             </Text>
-            {identity?.chip ? (
-              <Text variant="caption" color="accent">
-                {identity.chip}
-              </Text>
+            {/* O selo de identidade e os selos da ficha numa linha só, que
+                quebra quando não cabe (o NPC com visibilidade, estado e
+                alerta): a visibilidade do NPC (T-52, P11), o estado (D-02,
+                P04-D) e os alertas do template, sempre com texto. Sem uma
+                linha própria para os selos, o cartão comum fica abaixo de
+                170 a 390 (T-48) */}
+            {identity?.chip || visibility || state || alerts.length ? (
+              <View style={styles.badges} testID={`table-badges-${row.id}`}>
+                {identity?.chip ? (
+                  <Text variant="caption" color="accent">
+                    {identity.chip}
+                  </Text>
+                ) : null}
+                {visibility ? (
+                  <StateBadge
+                    label={visibility}
+                    tone="neutral"
+                    testID={`visibility-${row.id}`}
+                  />
+                ) : null}
+                {state ? (
+                  <StateBadge
+                    label={state.label}
+                    tone={state.tone}
+                    testID={`table-state-${row.id}`}
+                  />
+                ) : null}
+                {alerts.map(a => (
+                  <Text
+                    key={a.id}
+                    variant="caption"
+                    color="danger"
+                    testID={`alert-${row.id}-${a.id}`}
+                    style={[styles.badge, { borderColor: colors.danger }]}
+                  >
+                    {a.label}
+                  </Text>
+                ))}
+              </View>
             ) : null}
             <Text variant="caption" color="inkMuted">
               {meta}
@@ -132,37 +167,6 @@ export const TableRow = memo(function TableRow({
             ) : null}
           </View>
         </View>
-        {/* A linha de selos: a visibilidade do NPC (T-52, P11), o estado
-            (D-02, P04-D) e os alertas do template, sempre com texto */}
-        {visibility || state || alerts.length ? (
-          <View style={styles.badges} testID={`table-badges-${row.id}`}>
-            {visibility ? (
-              <StateBadge
-                label={visibility}
-                tone="neutral"
-                testID={`visibility-${row.id}`}
-              />
-            ) : null}
-            {state ? (
-              <StateBadge
-                label={state.label}
-                tone={state.tone}
-                testID={`table-state-${row.id}`}
-              />
-            ) : null}
-            {alerts.map(a => (
-              <Text
-                key={a.id}
-                variant="caption"
-                color="danger"
-                testID={`alert-${row.id}-${a.id}`}
-                style={[styles.badge, { borderColor: colors.danger }]}
-              >
-                {a.label}
-              </Text>
-            ))}
-          </View>
-        ) : null}
         {store ? (
           <SheetProvider store={store}>
             <View style={styles.chips} testID={`table-dock-${row.id}`}>
@@ -206,7 +210,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: tokens.space[2],
+    columnGap: tokens.space[2],
+    rowGap: tokens.space[1],
   },
   badge: {
     borderWidth: tokens.borderWidth.hair,

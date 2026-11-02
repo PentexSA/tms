@@ -129,15 +129,26 @@ test.describe('a 390', () => {
     browser,
     page,
   }) => {
-    const { chronicleId, playerContext, player } = await table(browser, page, {
-      free: true,
-    })
+    const { desk, storyteller, chronicleId, playerContext, player } =
+      await table(browser, page, { free: true })
     const ids: string[] = []
     for (let i = 1; i <= 8; i++)
       ids.push(
         (await sheetOf(playerContext, player, chronicleId, `Ficha ${i}`)).id
       )
     const last = ids.at(-1) as string
+    // Um NPC oculto: o selo de visibilidade e o de estado na mesma linha
+    const npc = await apiAs<{ id: string }>(
+      desk,
+      storyteller,
+      'POST',
+      `/chronicles/${chronicleId}/characters`,
+      {
+        kind: 'npc',
+        clientCommandId: randomUUID(),
+        values: { name: 'Sentinela', clan: 'tremere' },
+      }
+    )
     await page.goto(`/chronicles/${chronicleId}`)
     await page.getByRole('tab', { name: 'Mesa' }).click()
     await expect(page).toHaveURL(/\?view=table$/)
@@ -146,6 +157,26 @@ test.describe('a 390', () => {
     // T-48: os recursos numa linha, ~5 cartões por tela
     const card = await first.boundingBox()
     expect(card?.height ?? 999).toBeLessThan(170)
+    // O NPC, com os dois selos, cabe na largura (a linha pode quebrar)
+    const npcRow = page.getByTestId(`table-row-${npc.id}`)
+    await npcRow.scrollIntoViewIfNeeded()
+    await expect(npcRow).toContainText('Oculto')
+    for (const width of [390, 360]) {
+      await page.setViewportSize({ width, height: 844 })
+      const box = await npcRow.boundingBox()
+      const badges = await page
+        .getByTestId(`table-badges-${npc.id}`)
+        .boundingBox()
+      expect((box?.x ?? 0) + (box?.width ?? 999)).toBeLessThanOrEqual(width)
+      expect((badges?.x ?? 0) + (badges?.width ?? 999)).toBeLessThanOrEqual(
+        (box?.x ?? 0) + (box?.width ?? 0)
+      )
+      test.info().annotations.push({
+        type: 'altura',
+        description: `${width}: PC ${(await first.boundingBox())?.height} · NPC ${box?.height}`,
+      })
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
 
     // T-39: abrir a última e voltar pelo "‹"
     const row = page.getByTestId(`table-row-${last}`)
@@ -295,8 +326,14 @@ test.describe('a 1280', () => {
       loads++
     })
     await mine.getByRole('button', { name: 'Aceitar narração' }).click()
-    await expect(mine.getByText('Você narra esta crônica.')).toBeVisible()
-    await expect(mine.getByText('Agora você narra esta crônica.')).toBeVisible()
+    // O aviso sai com a resposta do aceite; a tela troca quando a crônica
+    // volta com o papel novo. Os dois textos se contêm: casa exato
+    await expect(
+      mine.getByText('Agora você narra esta crônica.', { exact: true })
+    ).toBeVisible()
+    await expect(
+      mine.getByText('Você narra esta crônica.', { exact: true })
+    ).toBeVisible()
     await expect(mine.getByRole('tab', { name: 'Mesa' })).toBeVisible()
     expect(loads).toBe(0)
     await playerContext.close()
