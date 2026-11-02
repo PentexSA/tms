@@ -605,6 +605,51 @@ Pontos para o PO: nenhum. As perguntas 4, 5 e 9 são de forma e seguem a matriz 
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementado em `8fb653e` (sem o P04-D), nos 13 commits da seção 8.1 e em quatro commits de correção: um teste de API e três achados do `/code-review`.
+
+**Base sem o P04-D (seção 8.4, "se o P04-D atrasar"):**
+
+- **Lista:** a visibilidade vai como texto no `meta`. Exemplo: "Tremere · NPC · Oculto".
+- **Mesa:** ela vai como `caption` com borda nos `badges` do `TableRow`, com `testID="visibility-<id>"`.
+- **Integração:** ao entrar o P04-D, as duas trocam pelo `StateBadge` (`tone: 'neutral'`). O `PHRASES` ganha as frases de `character.creation.adjust` e `character.creation.ready`, e o typecheck as pede no rebase.
+
+**AuthZ e API:**
+
+- **Matriz de AuthZ.** O plano dizia que ela não mudava, porque não há rota nova. Ela ganha:
+  - a linha de `GET /characters/:id` com `target: 'npc'`, o NPC oculto: o narrador recebe 200, e todos os outros, 404;
+  - em toda linha, a conferência de que o nome do NPC oculto não sai para quem não narra.
+- **`transferOffer` só para o membro atual.** Além de "destinatário, pendente, não vencida", quem pergunta precisa ser membro (`role === 'player'`). O destinatário que saiu continua vendo a crônica ("Você saiu"), mas sem a proposta.
+- **A proposta na lista de crônicas** vem de um `LEFT JOIN LATERAL`, uma consulta por crônica. Antes eram duas subconsultas iguais (achado do `/code-review`).
+- **`character` da auditoria** é `{ id, name, deleted }`. O `deleted` permite escrever "(excluída)" sem uma segunda consulta.
+- **Usuário alvo na auditoria:** só em `member.*`, `chronicle.transfer.request` e `chronicle.transfer.accept`. Recusar e cancelar não gravam o `target_user_id`.
+- **`members.test.ts`** passa a esperar a linha `invite.create` ao lado de `member.leave`. O teste lista toda a auditoria da crônica.
+
+**App:**
+
+- **A Mesa não ganhou uma invalidação própria.** O `chronicleKeys.all` (`['chronicles']`) já a rebusca pelo prefixo. O `useSetNpcVisibility` ganhou outra coisa: o 409 rebusca a ficha.
+- **`RevealNpcSheet`:**
+  - Com o envio em curso, "Cancelar" fica desabilitado, e o Esc e o voltar esperam.
+  - Visibilidade desconhecida conta como oculto (`npcVisibilityOf`), e qualquer troca confirma (fail secure).
+  - Se a ficha rebuscada depois de um 409 já chegou ao alvo ou passou dele, a folha fecha sem enviar. Revelar nunca baixa a visibilidade (achado do `/code-review`).
+- **`TransferOffer`:**
+  - mostra o erro da decisão dentro do aviso;
+  - se o servidor recusa a decisão, rebusca a proposta e a lista e zera as chaves (achado do `/code-review`);
+  - sem resposta da rede, a chave continua para o reenvio.
+- **`CampaignBackstage`** só busca a transferência para o painel do narrador (`useTransfer(id, narrating)`). A do jogador fica no topo da crônica.
+- **Registrar ou editar sessão** também rebusca a lista de crônicas (`exact`), para a "Última sessão".
+
+**Testes e E2E:**
+
+- **Nomes dos arquivos de teste.** São `components/chronicles/__tests__/npcVisibility.test.tsx` e `auditPhrase.test.tsx`, não `characterState.test.ts` nem `auditPhrase.test.ts`.
+  - O `testMatch` do Jest em `components/` só pega `.test.tsx`.
+  - O nome diferente também evita o conflito com o `characterState.test.ts` que o P04-D planeja. Pelo mesmo `testMatch`, esse arquivo não rodaria se ficar em `.ts`.
+- **E2E a 1280.** Narrador e jogador entram por `POST /auth/login` num contexto próprio. Copiar o cookie do refresh dividiria a família de tokens, e a rotação revogaria uma das sessões.
+
+**Perguntas da seção 9 que seguem abertas:** 4, 6, 7, 8 e 9. A 1 e a 5 seguiram o plano: `parseDate: false` global e toast também na descida.
+
+- **Pergunta 7.** O filtro "Desde/Até" da auditoria continua em UTC. Com as horas da lista agora no fuso de quem lê (`whenLabel`), a diferença fica mais visível.
+- **Fora do escopo.** Depois de "Aceitar narração", o `queryClient.clear()` não rebusca as telas montadas. Isso é do P09-C (T-40, item 4) e vale para o `TransferOffer` nos dois lugares.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 O roteiro confere cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só entram contas e dados fictícios. Detalha o passo 6 da seção 7. Os screenshots ficam no scratchpad da sessão, com o nome da coluna "Evidência", e nenhum mostra senha nem token.
