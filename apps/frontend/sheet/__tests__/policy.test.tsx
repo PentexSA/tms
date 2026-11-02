@@ -46,6 +46,13 @@ const vtm = modelOf('vtm-v20')
 const helena = example('helena').sheet as unknown as SheetData
 const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
 const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
+const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
+
+/** No celular, as ações do narrador ficam no "Mais opções" (T-11). */
+const openNarratorMenu = () => {
+  fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+  fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador/ }))
+}
 const ID = '00000000-0000-4000-8000-00000000c001'
 
 const lifecycle = (status: string, locked = false): SheetLifecycle => ({
@@ -261,7 +268,11 @@ describe('a tela da ficha com o estado', () => {
 
   it('o dono não tem o menu do narrador', async () => {
     await open(['owner'], 'creating')
-    expect(screen.queryByLabelText('Ações do narrador')).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+    expect(
+      screen.queryByRole('button', { name: /^Ações do narrador/ })
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
     expect(screen.queryByTestId('policy-banner')).toBeNull()
   })
 
@@ -285,7 +296,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'active', lockedAt: null, creationCompletedAt: 'x' })
     )
     await open(['storyteller'], 'creating')
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    openNarratorMenu()
     await act(async () => {
       fireEvent.press(screen.getByTestId('status-complete'))
     })
@@ -297,14 +308,27 @@ describe('a tela da ficha com o estado', () => {
     ).toBeTruthy()
   })
 
-  it('no celular, o menu do narrador é o ⋯', async () => {
+  it('no celular, as ações do narrador ficam no "Mais opções", com o estado no item', async () => {
     await open(['storyteller'], 'creating')
-    expect(screen.getByLabelText('Ações do narrador')).toBeTruthy()
+    // Um ⋯ só no cabeçalho, sem o gatilho largo, "Experiência" ou "Histórico"
     expect(screen.queryByText('Narrador')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Histórico' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Experiência' })).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+    expect(screen.getByRole('header', { name: 'Mais opções' })).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ações do narrador · Em criação' })
+    )
+    // O menu fecha e as ações abrem no mesmo toque
+    expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+    expect(
+      screen.getByRole('header', { name: 'Ações do narrador' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-complete')).toBeTruthy()
   })
 
   it('na tela larga, o menu do narrador diz de quem é e o estado da ficha', async () => {
-    Dimensions.set({ window: TABLET, screen: TABLET })
+    Dimensions.set({ window: DESKTOP, screen: DESKTOP })
     await open(['storyteller'], 'active', '2026-10-18T12:00:00Z')
     // O nome acessível começa pelo texto visível (WCAG 2.5.3, T-42)
     const trigger = screen.getByRole('button', { name: 'Narrador, Travada' })
@@ -320,7 +344,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'archived', lockedAt: null, creationCompletedAt: null })
     )
     await open(['storyteller'], 'active')
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-archive'))
     expect(calls.statusPost).not.toHaveBeenCalled()
     expect(

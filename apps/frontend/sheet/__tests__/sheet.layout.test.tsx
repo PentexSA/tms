@@ -6,12 +6,39 @@ import {
   within,
 } from '@testing-library/react-native'
 import { KeyboardArea } from '@tms/ui'
+import { useRouter } from 'expo-router'
 import { Dimensions, ScrollView, StyleSheet, TextInput } from 'react-native'
 
-import { modelOf, sheetFor } from '../../test/fixtures'
+import * as apiModule from '../../lib/api'
+import { type createFakeApi, ok } from '../../test/fake-api'
+import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import { fakeServer, type LiveProps, renderLive } from '../../test/live'
+import {
+  json,
+  memoryStore,
+  renderWithSession,
+  testSession,
+  tokens,
+} from '../../test/session'
 import { CharacterForm } from '../CharacterForm'
 import { identityColumnsPerRow } from '../IdentityBlock'
+import { SheetScreen } from '../SheetScreen'
+
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(),
+  impactAsync: jest.fn(),
+  notificationAsync: jest.fn(),
+  ImpactFeedbackStyle: { Medium: 'medium' },
+  NotificationFeedbackType: { Warning: 'warning' },
+}))
+jest.mock('../../lib/api', () => {
+  const { createFakeApi } = require('../../test/fake-api')
+  const fake = createFakeApi()
+  return { ...jest.requireActual('../../lib/api'), api: fake.api, fake }
+})
+const calls = (
+  apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
+).fake.calls
 
 // P08 (onda 2): layout e teclado na ficha. Cada caso é a regressão de um
 // achado da matriz (doc/testes/2026-11-01/matriz-achados.md).
@@ -171,5 +198,145 @@ describe('T-65: identidade em duas colunas quando três não cabem', () => {
     expect(cols).toHaveLength(3)
     expect(cols.map(c => c.width)).toEqual(['50%', '50%', '50%'])
     expect(cols[0]!.labels).toHaveLength(4)
+  })
+})
+
+describe('T-11: o cabeçalho da ficha cabe na tela', () => {
+  const ID = '00000000-0000-4000-8000-00000000c001'
+  beforeEach(() => {
+    jest
+      .mocked(useRouter)
+      .mockReturnValue({ push: jest.fn(), replace: jest.fn() } as never)
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
+  })
+
+  async function openSheet(
+    roles: string[],
+    status = 'creating',
+    extra: Record<string, unknown> = {}
+  ) {
+    calls.characterGet.mockResolvedValue(
+      ok({
+        id: ID,
+        name: 'Helena Varga',
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        owner: { id: 'u1', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 3,
+        roles,
+        status,
+        lockedAt: null,
+        member: true,
+        updatedAt: '2026-10-18T12:00:00Z',
+        sheet: example('helena').sheet,
+        ...extra,
+      })
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+  }
+  const menu = () => screen.getByRole('button', { name: 'Mais opções' })
+
+  it.each([
+    ['390', PHONE],
+    ['750', TABLET],
+  ])(
+    'a %s, um "Mais opções" só; o menu tem Experiência e Histórico',
+    async (_, size) => {
+      resize(size)
+      await openSheet(['owner'], 'active')
+      expect(screen.queryByRole('button', { name: 'Histórico' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Experiência' })).toBeNull()
+      expect(
+        screen.getAllByRole('button', { name: 'Mais opções' })
+      ).toHaveLength(1)
+      fireEvent.press(menu())
+      expect(screen.getByRole('header', { name: 'Mais opções' })).toBeTruthy()
+      // O dono não tem as ações do narrador
+      expect(
+        screen.queryByRole('button', { name: /^Ações do narrador/ })
+      ).toBeNull()
+      fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+      // O menu fecha e o Histórico abre no mesmo toque
+      expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+      expect(
+        screen.getByRole('header', { name: 'Histórico de alterações' })
+      ).toBeTruthy()
+    }
+  )
+
+  it('"Experiência" pelo menu abre o extrato', async () => {
+    resize(PHONE)
+    await openSheet(['owner'], 'active')
+    fireEvent.press(menu())
+    fireEvent.press(screen.getByRole('button', { name: 'Experiência' }))
+    expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+    expect(screen.getByRole('header', { name: 'Experiência' })).toBeTruthy()
+  })
+
+  it('o narrador vê o estado no item e chega às ações', async () => {
+    resize(PHONE)
+    await openSheet(['storyteller'], 'creating')
+    fireEvent.press(menu())
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ações do narrador · Em criação' })
+    )
+    expect(screen.getByTestId('status-complete')).toBeTruthy()
+  })
+
+  it('a 1280: os botões no cabeçalho, como antes, sem o "Mais opções"', async () => {
+    resize(DESKTOP)
+    await openSheet(['owner'], 'active')
+    expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Experiência' })).toBeTruthy()
+  })
+
+  it('a ficha revelada (viewer) não ganha o menu', async () => {
+    resize(PHONE)
+    calls.characterGet.mockResolvedValue(
+      ok({
+        projection: 'full',
+        id: ID,
+        kind: 'npc',
+        visibility: 'full',
+        identity: {
+          name: 'Oráculo',
+          chip: '',
+          subtitle: null,
+          portraitUrl: null,
+        },
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        roles: ['viewer'],
+        status: 'active',
+        lockedAt: null,
+        sheet: example('helena').sheet,
+      })
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
+  })
+
+  it('no celular, o "N alterações não salvas" quebra em 2 linhas numa largura fixa', async () => {
+    resize(PHONE)
+    await openSheet(['owner'], 'creating')
+    const sync = screen.getByTestId(/^sync-/)
+    expect(StyleSheet.flatten(sync.props.style).maxWidth).toBe(112)
+    expect(within(sync).getByText(/^Salvo|alteraç/).props.numberOfLines).toBe(2)
   })
 })

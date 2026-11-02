@@ -497,6 +497,7 @@ Header compacto e fixo da ficha.
 - **API RN:** `{ name: string; identity: { label: string; accent?: AccentName }; backLabel: string; onBack(): void; sync: SyncState; onMenu(): void; collapsed?: boolean }`.
 - **Estados:** expandido (com chips), recolhido.
 - **A11y:** voltar "Voltar para {crônica}"; ⋯ "Mais opções" com `aria-haspopup="dialog"`; nome como `h1`.
+- **No app (RN, T-11):** abaixo de 900, o cabeçalho tem o voltar (até 96 no `compact`), o nome (que encolhe até caber), o `SyncIndicator` e um ⋯ "Mais opções" (`SheetMenu`) com, nesta ordem: "Ações do narrador · {estado}" (só para o narrador, com ação no estado), "Experiência" (com extrato de XP no template) e "Histórico". O item tocado fecha o menu e abre a folha dele. A partir de 900, os botões ficam no cabeçalho, com o gatilho largo "Narrador [estado] ▾". A ficha revelada (viewer) não tem menu. A `AppBar` tem `subtitle` (uma linha sob o nome) para o estado da ficha (D-02, P04-D): a 360 dp com "2 alterações não salvas" sobram ~64 dp para o nome e o selo.
 - **Multi-sistema:** o esqueleto é fixo; o template dá o campo do nome, o formato do chip (`"{class} nv {level}"` no D&D, o clã no Vampiro) e o accent. Ações de sistema entram por `actions[]` ("Descanso longo", "Descanso curto" no D&D).
 - **Resolve:** C-04, C-15, C-20, C-21.
 
@@ -545,6 +546,7 @@ Estado de salvamento no header.
 - **API RN:** `type SyncState = 'saved' | 'saving' | 'offline' | 'error'`; `{ state: SyncState; pending?: number; onPress(): void }`.
 - **Estados:** os quatro acima.
 - **A11y:** `aria-label` por extenso ("Sem conexão. 3 alterações serão enviadas quando a conexão voltar."); forma do ponto + texto, nunca só cor. Anunciar a passagem para offline ou erro: proposta.
+- **No celular (RN, T-11):** até 112 de largura e 2 linhas ("2 alterações / não salvas"); o texto não muda.
 - **Multi-sistema:** o evento é por caminho (`{ id, from, to }`) e não depende do tipo: pips, PV, %, texto e listas usam a mesma fila.
 - **Resolve:** C-08, DS-04.
 
@@ -716,7 +718,7 @@ Barra de topo das telas de lista e voltar como alvo único.
 
 - **Classes:** `ds-appbar` (sticky, safe area, borda inferior), `ds-appbar__title` (`h1` com reticências), `ds-back` (chevron + nome, 44).
 - **Usos:** Crônicas, Mesa e estados de erro da ficha ("‹ Noites de São Paulo").
-- **API RN:** `{ title: string; back?: { label: string; onPress(): void }; actions?: ReactNode }`.
+- **API RN:** `{ title: string; back?: { label: string; onPress(): void }; actions?: ReactNode; subtitle?: ReactNode }`. O título encolhe até caber (`minWidth: 0`, uma linha); `subtitle` é uma linha sob ele, na mesma coluna. O voltar tem até 96 no `compact` e 160 fora dele, com o rótulo truncado e o nome acessível inteiro.
 - **Safe area:** a barra fica sempre dentro de um `Screen`, que soma o inset de cima uma vez. A barra não soma de novo (T-37, onda 2).
 - **Estados:** estático.
 - **A11y:** voltar com texto visível; título `h1`.

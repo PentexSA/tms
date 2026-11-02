@@ -83,6 +83,15 @@ async function open(roles: RoleName[], post?: () => Promise<PostOutcome>) {
   await screen.findByLabelText(/^Destreza, 2 de 5/)
 }
 
+/**
+ * O Histórico pelo "Mais opções" (T-11): sem Dimensions, o mock do RN fica em
+ * 750 (medium), abaixo dos 900 dos botões no cabeçalho.
+ */
+const openHistory = () => {
+  fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+  fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+}
+
 describe('Editar como narrador', () => {
   it('a ficha do jogador abre em Leitura; editar é explícito e avisado', async () => {
     await open(['storyteller'])
@@ -201,7 +210,7 @@ describe('Histórico de alterações', () => {
       })
     )
     await open(['owner'])
-    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    openHistory()
     expect(
       await screen.findByLabelText(
         /^Vitalidade: \+1 letal\. às \d\d:\d\d · ana \(narrador\)$/
@@ -234,7 +243,7 @@ describe('Histórico de alterações', () => {
       })
     )
     await open(['owner'])
-    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    openHistory()
     expect(
       await screen.findByLabelText(
         /^Vitalidade: \+1 letal\. às \d\d:\d\d · Conta excluída \(narrador\)$/
@@ -260,7 +269,7 @@ describe('Histórico de alterações', () => {
             })
     )
     await open(['owner'])
-    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Carregar mais' })
     )
@@ -277,7 +286,7 @@ describe('Histórico de alterações', () => {
     calls.historyGet.mockResolvedValueOnce(ok({ items: [], next: 'c' }))
     calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
     await open(['owner'])
-    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Carregar mais' })
     )
@@ -288,7 +297,7 @@ describe('Histórico de alterações', () => {
     calls.historyGet.mockResolvedValueOnce(fail(500, 'erro interno'))
     calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
     await open(['owner'])
-    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Tentar de novo' })
     )

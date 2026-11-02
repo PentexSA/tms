@@ -63,10 +63,11 @@ describe('T-37: a safe area aplicada uma vez', () => {
     const screenStyle = styleOf(screen.getByTestId('screen'))
     expect(screenStyle.paddingTop).toBe(47)
     expect(screenStyle.paddingBottom).toBe(34)
-    // A barra é o pai do título (heading)
-    const bar = hostViewAbove(
+    // A barra: o primeiro View acima do título com a altura do cabeçalho
+    let bar = hostViewAbove(
       screen.getByRole('header', { name: 'Crônicas' }) as unknown as Node
     )
+    while (styleOf(bar).minHeight === undefined) bar = hostViewAbove(bar)
     const barStyle = styleOf(bar)
     expect(barStyle.paddingTop).toBeUndefined()
     expect(barStyle.minHeight).toBe(48)
@@ -294,5 +295,51 @@ describe('T-69: folha como diálogo central a partir de 600', () => {
       })
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('T-11: cabeçalho que cabe, com o lugar do estado', () => {
+  const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
+  const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
+  afterEach(() => {
+    act(() => Dimensions.set({ window: TABLET, screen: TABLET }))
+  })
+
+  it('subtitle: uma linha sob o título, na mesma coluna, que encolhe', () => {
+    render(
+      <AppBar
+        title="Helena Varga"
+        subtitle={<RNText>Aguardando aprovação</RNText>}
+      />
+    )
+    const title = screen.getByRole('header', { name: 'Helena Varga' })
+    const subtitle = screen.getByTestId('app-bar-subtitle')
+    const column = hostViewAbove(title as unknown as Node)
+    expect(hostViewAbove(subtitle as unknown as Node)).toBe(column)
+    expect(styleOf(column)).toMatchObject({ flex: 1, minWidth: 0 })
+    expect(screen.getByText('Aguardando aprovação')).toBeTruthy()
+  })
+
+  it('sem subtitle, nada a mais', () => {
+    render(<AppBar title="Crônicas" />)
+    expect(screen.queryByTestId('app-bar-subtitle')).toBeNull()
+  })
+
+  it('o voltar fica com até 96 no celular e 160 fora dele; o nome acessível é o mesmo', () => {
+    const back = { label: 'Crônica da Liberdade', onPress: () => undefined }
+    act(() => Dimensions.set({ window: PHONE, screen: PHONE }))
+    render(<AppBar title="Helena" back={back} />)
+    const link = screen.getByRole('button', {
+      name: 'Voltar para Crônica da Liberdade',
+    })
+    expect(styleOf(link).maxWidth).toBe(96)
+    screen.unmount()
+    act(() => Dimensions.set({ window: TABLET, screen: TABLET }))
+    render(<AppBar title="Helena" back={back} />)
+    expect(
+      styleOf(
+        screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
+      ).maxWidth
+    ).toBe(160)
   })
 })

@@ -3,11 +3,9 @@ import type { SheetModel } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
-  IconButton,
   Pressable,
   Text,
   tokens,
-  useLayout,
   useTheme,
   useToast,
 } from '@tms/ui'
@@ -115,38 +113,34 @@ async function run(characterId: string, action: StatusActionId) {
   }
 }
 
+/** O que o menu do narrador precisa saber da ficha. */
+export interface StatusMenuButtonProps {
+  readonly characterId: string
+  readonly chronicleId: string
+  readonly model: SheetModel
+  readonly status: string
+  readonly locked: boolean
+}
+
+/**
+ * O gatilho do menu na tela larga (≥ 900). Abaixo disso, as ações ficam no
+ * "Mais opções" da ficha (SheetMenu, T-11), com o estado no item. O botão
+ * diz de quem são as ações e em que estado a ficha está.
+ */
 export function StatusMenuButton({
   characterId,
   chronicleId,
   model,
   status,
   locked,
-}: {
-  readonly characterId: string
-  readonly chronicleId: string
-  readonly model: SheetModel
-  readonly status: string
-  readonly locked: boolean
-}) {
+}: StatusMenuButtonProps) {
   const [open, setOpen] = useState(false)
-  const { breakpoint } = useLayout()
   const actions = statusActions(model, status, locked)
   if (!actions.length) return null
   const state = stateLabel(model, status, locked)
   return (
     <>
-      {breakpoint === 'compact' ? (
-        <IconButton
-          label="Ações do narrador"
-          glyph="⋯"
-          testID="status-menu"
-          onPress={() => setOpen(true)}
-        />
-      ) : (
-        // Na tela larga o ⋯ sozinho some entre "Experiência" e "Histórico":
-        // o botão diz de quem são as ações e em que estado a ficha está
-        <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
-      )}
+      <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
       {open ? (
         <StatusMenu
           characterId={characterId}
@@ -192,7 +186,7 @@ function StatusMenuTrigger({
   )
 }
 
-function StatusMenu({
+export function StatusMenu({
   characterId,
   chronicleId,
   actions,

@@ -1,4 +1,4 @@
-import { Banner, hitTarget, Text, tokens, useTheme } from '@tms/ui'
+import { Banner, hitTarget, Text, tokens, useLayout, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useOnline } from '../../lib/network'
 import { useSyncStatus } from './SyncProvider'
@@ -55,6 +55,9 @@ export function SyncIndicator({
 }) {
   const { colors } = useTheme()
   const { state, text } = describeSync(useSyncStatus(), useOnline(), unsaved)
+  // T-11: no celular, o texto quebra em até 2 linhas ("2 alterações / não
+  // salvas") numa largura fixa, e o cabeçalho cabe na tela
+  const compact = useLayout().breakpoint === 'compact'
   const dot = {
     unsaved: colors.action,
     saved: colors.success,
@@ -69,10 +72,19 @@ export function SyncIndicator({
       aria-live="polite"
       testID={`sync-${state}`}
       // Mesma altura dos controles do cabeçalho, que crescem no Android
-      style={[styles.row, { minHeight: hitTarget() }]}
+      style={[
+        styles.row,
+        { minHeight: hitTarget() },
+        compact && styles.compact,
+      ]}
     >
       <View style={[styles.dot, { backgroundColor: dot }]} />
-      <Text variant="caption" color="inkMuted">
+      <Text
+        variant="caption"
+        color="inkMuted"
+        numberOfLines={compact ? 2 : undefined}
+        style={styles.text}
+      >
         {text}
       </Text>
     </View>
@@ -100,6 +112,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.space[1],
   },
+  compact: { maxWidth: 112 },
+  text: { flexShrink: 1 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   banner: {
     paddingHorizontal: tokens.layout.gutter,
