@@ -268,22 +268,19 @@ export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
  * O modo em que a ficha abre sem pedido na URL (T-05): a ficha em criação da
  * dona abre na montagem, por qualquer entrada (lista, link, recarga, troca de
  * estado). Criação quando a conta por pontos vale; Editar na criação livre.
- * Nos demais casos, o padrão do papel. O narrador não muda, nem no NPC dele.
- * É UX: o servidor valida cada escrita.
+ * Nos demais casos, o padrão do papel. O narrador, na ficha alheia, continua
+ * em Leitura; o NPC dele nasce em criação livre e pode ficar assim em jogo,
+ * então também não muda. É UX: o servidor valida cada escrita.
  */
 export function openingMode(args: {
   readonly roles: readonly RoleName[]
   readonly status: string
   readonly active: boolean
   readonly writer: boolean
+  readonly npc?: boolean
 }): SheetMode {
-  const { roles, status, active, writer } = args
-  if (
-    status === 'creating' &&
-    writer &&
-    roles.includes('owner') &&
-    !roles.includes('storyteller')
-  )
+  const { roles, status, active, writer, npc = false } = args
+  if (status === 'creating' && writer && !npc && roles.includes('owner'))
     return active ? 'create' : 'evolve'
   return defaultMode(roles)
 }
@@ -355,7 +352,13 @@ function LiveSheet({
     () => canEditSomething(state.model, new Set(state.roles)),
     [state.model, state.roles]
   )
-  const opening = openingMode({ roles: state.roles, status, active, writer })
+  const opening = openingMode({
+    roles: state.roles,
+    status,
+    active,
+    writer,
+    npc: state.character.kind === 'npc',
+  })
   const [store] = useState(() => {
     // Com pedido de rascunho (ficha recém-criada), o modo de montagem; sem
     // pedido, o modo de abertura da ficha (T-05)

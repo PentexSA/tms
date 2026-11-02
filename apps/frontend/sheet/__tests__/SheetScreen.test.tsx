@@ -315,14 +315,26 @@ describe('modo de abertura (T-05)', () => {
     [['owner'], 'active', false, true, 'play'],
     [['owner'], 'pending', true, true, 'play'],
     [['storyteller'], 'creating', true, true, 'read'],
-    // O NPC do narrador em criação não muda
-    [['owner', 'storyteller'], 'creating', false, true, 'play'],
+    // A ficha do próprio narrador é dele: vale o fluxo do dono
+    [['owner', 'storyteller'], 'creating', false, true, 'evolve'],
   ] as const)(
     'openingMode(%j, %s, conta %s, escreve %s) = %s',
     (roles, status, active, writer, expected) => {
       expect(openingMode({ roles, status, active, writer })).toBe(expected)
     }
   )
+
+  it('o NPC do narrador em criação não muda: abre no padrão do papel', () => {
+    expect(
+      openingMode({
+        roles: ['owner', 'storyteller'],
+        status: 'creating',
+        active: false,
+        writer: true,
+        npc: true,
+      })
+    ).toBe('play')
+  })
 
   it('por pontos, sem ?mode=, abre em Criação', async () => {
     calls.characterGet.mockResolvedValue(creating())
