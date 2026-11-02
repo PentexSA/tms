@@ -21,6 +21,7 @@ import {
   freebieLedger,
   freebiesBalance,
   freebiesLeftText,
+  freebiesNotes,
   groupFor,
   priorityNote,
   reorder,
@@ -557,6 +558,16 @@ describe('bônus que sobram (T-18)', () => {
     expect(freebiesLeftText(left(4))).toBe(
       'Sobram 4 pontos de bônus. Eles não viram XP.'
     )
+  })
+
+  it('as linhas da confirmação: uma com sobra, nenhuma sem conta ou sem sobra', () => {
+    expect(freebiesNotes(4)).toEqual([
+      'Sobram 4 pontos de bônus. Eles não viram XP.',
+    ])
+    expect(freebiesNotes(null)).toEqual([])
+    expect(freebiesNotes(0)).toEqual([])
+    // A mesma referência vazia: a confirmação não re-renderiza à toa
+    expect(freebiesNotes(null)).toBe(freebiesNotes(0))
   })
 
   it('o saldo diz o que resta, não o que foi usado', () => {

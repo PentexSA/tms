@@ -9,7 +9,7 @@ import {
   tokens,
   useToast,
 } from '@tms/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
@@ -31,6 +31,7 @@ import {
   errorBodyOf,
   freebieLedger,
   freebiesBalance,
+  freebiesNotes,
   problemText,
   REFUSAL_TEXT,
   restam,
@@ -51,8 +52,6 @@ const PHASES: readonly {
   { id: 'basics', label: 'Pontos básicos' },
   { id: 'freebies', label: 'Pontos de bônus' },
 ]
-
-const NO_NOTES: readonly string[] = []
 
 /** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
 export function useCreating(): boolean {
@@ -79,6 +78,10 @@ export function useFinishCreation() {
   const ready = useSheetSelector(s => s.check?.complete === true)
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
+  // T-18: a sobra de bônus na confirmação ("Sobram 4 pontos de bônus. Eles
+  // não viram XP."); concluir com sobra continua permitido
+  const left = useSheetSelector(s => s.check?.freebies?.remaining ?? null)
+  const notes = useMemo(() => freebiesNotes(left), [left])
   const toast = useToast()
   const complete = useCompleteCreation(
     creation?.characterId ?? '',
@@ -127,8 +130,8 @@ export function useFinishCreation() {
     label: info ? completeLabel(info, roles) : '',
     // A ficha vai para o narrador aprovar
     approval: info?.approval === true && !roles.has('storyteller'),
-    // Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
-    notes: NO_NOTES,
+    // Linhas extras da confirmação: a sobra de bônus (T-18)
+    notes,
     busy: waiting || complete.isPending,
     waitingSync: waiting && queued,
     start: () => setWaiting(true),
@@ -335,8 +338,11 @@ export function CreationStatusPanel() {
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // "Aprovar ficha" confirma antes, como concluir (T-32)
+  // "Aprovar ficha" confirma antes, como concluir (T-32), com a sobra de
+  // bônus (T-18)
   const [approving, setApproving] = useState(false)
+  const left = useSheetSelector(s => s.check?.freebies?.remaining ?? null)
+  const approveNotes = useMemo(() => freebiesNotes(left), [left])
   // O painel continua montado fora de `pending`: sem zerar, o formulário de
   // devolução reaparecia preenchido na próxima revisão (nota do QA app)
   const pending = creation?.status === 'pending'
@@ -480,8 +486,6 @@ const approveCopy = completionCopy({
   approval: true,
   action: 'approve',
 })
-// Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
-const approveNotes: readonly string[] = []
 
 /** O narrador ajusta o saldo de bônus da ficha ou libera a criação livre. */
 function BudgetControls() {

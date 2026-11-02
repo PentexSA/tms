@@ -214,6 +214,13 @@ test('Bônus: com os básicos completos, o saldo diz o que resta (T-18)', async 
   await expect(page.getByTestId('creation-action')).toContainText(
     'Concluir criação'
   )
+  // A confirmação de concluir diz a sobra, e concluir continua permitido
+  await page.getByTestId('creation-action').click()
+  await expect(page.getByTestId('completion-message')).toContainText(
+    'Sobram 15 pontos de bônus. Eles não viram XP.'
+  )
+  await expect(page.getByTestId('creation-confirm')).toBeEnabled()
+  await page.getByRole('button', { name: 'Voltar', exact: true }).click()
 })
 
 test('Bônus: o custo do toque e o extrato (T-57, R-17)', async ({

@@ -459,8 +459,14 @@ describe('confirmação da barra', () => {
   it('a dona lê "passa pelo narrador"; o narrador, "passa por você"', async () => {
     await open(PRIORITIES, { ...ALMOST, stamina: 3 })
     fireEvent.press(screen.getByTestId('creation-action'))
+    // O corpo do T-32, e a sobra de bônus do T-18 numa linha à parte
+    expect(
+      screen.getByText(
+        'A ficha entra em jogo. Depois disso, subir um traço passa pelo narrador. Não dá para voltar à criação.'
+      )
+    ).toBeTruthy()
     expect(screen.getByTestId('completion-message')).toHaveTextContent(
-      'A ficha entra em jogo. Depois disso, subir um traço passa pelo narrador. Não dá para voltar à criação.'
+      /Sobram 15 pontos de bônus\. Eles não viram XP\.$/
     )
     cleanup()
     const mine = character(PRIORITIES, { ...ALMOST, stamina: 3 }) as {
@@ -524,6 +530,10 @@ describe('aprovar ficha', () => {
     expect(screen.getByTestId('completion-message')).toHaveTextContent(
       /passa por você/
     )
+    // T-18: a sobra de bônus também ao aprovar (nada gasto: 15)
+    expect(
+      screen.getByText('Sobram 15 pontos de bônus. Eles não viram XP.')
+    ).toBeTruthy()
     expect(calls.creationApprovePost).not.toHaveBeenCalled()
     await act(async () => {
       fireEvent.press(screen.getByTestId('creation-approve-confirm'))

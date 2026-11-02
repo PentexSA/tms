@@ -693,12 +693,24 @@ export function freebiesBalance(check: CreationCheck | null): string | null {
  * item 6: a sobra não vira XP). Null sem bônus ou sem sobra.
  */
 export function freebiesLeftText(check: CreationCheck | null): string | null {
-  const n = check?.freebies?.remaining ?? 0
-  if (n <= 0) return null
+  return freebiesLeftNote(check?.freebies?.remaining ?? null)
+}
+
+/** O mesmo, a partir da sobra (o menu do narrador recebe só o número). */
+export function freebiesLeftNote(n: number | null): string | null {
+  if (n === null || n <= 0) return null
   return n === 1
     ? 'Sobra 1 ponto de bônus. Ele não vira XP.'
     : `Sobram ${n} pontos de bônus. Eles não viram XP.`
 }
+
+/** As linhas extras das confirmações de concluir e aprovar (T-18, T-32). */
+export const freebiesNotes = (n: number | null): readonly string[] => {
+  const note = freebiesLeftNote(n)
+  return note ? [note] : NO_NOTES
+}
+
+const NO_NOTES: readonly string[] = []
 
 /** Uma linha do extrato do bônus: a fonte e, às vezes, o porquê. */
 export interface LedgerEntry {

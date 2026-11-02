@@ -36,6 +36,7 @@ import {
   creationActive,
   creationInfoOf,
   creationInputOf,
+  freebiesNotes,
 } from './creation/creation'
 import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
@@ -76,6 +77,11 @@ export function SheetScreen({
   // do narrador não conclui por cima delas)
   const [draftState, setDraftState] = useState<DraftState>(NO_DRAFT)
   const unsaved = draftState.unsaved
+  // T-18: a sobra de bônus na confirmação de concluir pelo menu do narrador
+  const completionNotes = useMemo(
+    () => freebiesNotes(draftState.freebiesLeft),
+    [draftState.freebiesLeft]
+  )
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -195,6 +201,7 @@ export function SheetScreen({
                 approval={creationInfoOf(state.character.creation)?.approval}
                 unsaved={unsaved}
                 queued={draftState.queued}
+                notes={completionNotes}
               />
             ) : null}
             {state.status === 'ready' && xpLedgerFields(state.model).length ? (
@@ -302,21 +309,26 @@ export function policyMode(
 }
 
 /**
- * O que o cabeçalho sabe do rascunho aberto. O P05-C acrescenta a sobra de
- * bônus (`freebiesLeft`, T-18) pelo mesmo caminho.
+ * O que o cabeçalho sabe do rascunho aberto e da conta da criação. O menu do
+ * narrador fica no AppBar, fora do SheetProvider: é por aqui que ele sabe.
  */
 export interface DraftState {
   // Alterações não salvas
   readonly unsaved: number
   // Lotes salvos ainda na fila, sem confirmação do servidor
   readonly queued: number
+  // A sobra de bônus da conta (T-18); null sem conta da criação. A conta
+  // existe sempre que a ficha tem `creation`, em qualquer modo, então o
+  // narrador em Leitura também tem o número
+  readonly freebiesLeft: number | null
 }
 
-const NO_DRAFT: DraftState = { unsaved: 0, queued: 0 }
+const NO_DRAFT: DraftState = { unsaved: 0, queued: 0, freebiesLeft: null }
 
 const draftStateOf = (s: SheetStoreState): DraftState => ({
   unsaved: s.draft?.size ?? 0,
   queued: s.pending.length,
+  freebiesLeft: s.check?.freebies?.remaining ?? null,
 })
 
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */

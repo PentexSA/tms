@@ -1,5 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { canWrite, type RoleName } from '@tms/sheet-core'
+import {
+  canWrite,
+  effectiveCreationConfig,
+  type RoleName,
+} from '@tms/sheet-core'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { AccessibilityInfo } from 'react-native'
 
@@ -345,5 +349,54 @@ describe('sem tempo real', () => {
     await waitFor(() =>
       expect(calls.characterGet.mock.calls.length).toBe(before + 1)
     )
+  })
+})
+
+// T-18 (P05-C): a sobra de bônus também na confirmação do narrador, que
+// fica no cabeçalho, fora da ficha (o número chega pelo onDraftState)
+describe('sobra de bônus na confirmação do narrador (T-18)', () => {
+  const creating = (status: string, points = true) =>
+    ok({
+      ...character(['storyteller']).data,
+      status,
+      lockedAt: null,
+      member: true,
+      sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+      ...(points
+        ? {
+            creation: {
+              revision: 1,
+              mode: 'points',
+              accounting: true,
+              choices: {},
+              config: {},
+              effective: effectiveCreationConfig(modelOf('vtm-v20')),
+              returned: null,
+              approval: false,
+            },
+          }
+        : {}),
+    })
+
+  it('"Concluir criação" pelo menu traz a mesma linha da barra', async () => {
+    calls.characterGet.mockResolvedValue(creating('creating'))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByTestId('status-menu'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      /passa por você/
+    )
+    expect(
+      screen.getByText('Sobram 15 pontos de bônus. Eles não viram XP.')
+    ).toBeTruthy()
+  })
+
+  it('sem a conta da criação, nenhuma linha de bônus', async () => {
+    calls.characterGet.mockResolvedValue(creating('creating', false))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByTestId('status-menu'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(screen.getByTestId('completion-message')).toBeTruthy()
+    expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
   })
 })
