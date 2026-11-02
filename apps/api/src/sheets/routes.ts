@@ -68,6 +68,22 @@ const idempotencyConflict = () =>
     { code: 'IDEMPOTENCY_CONFLICT' }
   )
 
+/**
+ * A ficha foi devolvida (T-06): a mesma forma que `parseCharacterCreation`
+ * aceita (motivo e data em texto), sem validar as escolhas e a configuração
+ * de cada linha da lista só para um booleano.
+ */
+export function isReturned(creation: unknown): boolean {
+  const c = creation as { returned?: unknown } | null
+  const r = c && typeof c === 'object' ? c.returned : null
+  return (
+    r !== null &&
+    typeof r === 'object' &&
+    typeof (r as { reason?: unknown }).reason === 'string' &&
+    typeof (r as { at?: unknown }).at === 'string'
+  )
+}
+
 export function sheetRoutes(
   db: Kysely<DB>,
   guard: ReturnType<typeof authGuard>
@@ -419,9 +435,7 @@ export function sheetRoutes(
             status: r.status,
             // A ficha devolvida (T-06): só o booleano. O motivo fica no
             // GET /characters/:id, para o dono e o narrador
-            returned:
-              r.status === 'creating' &&
-              parseCharacterCreation(model, r.creation).returned !== undefined,
+            returned: r.status === 'creating' && isReturned(r.creation),
             templateVersion: r.template_version,
             updatedAt: r.updated_at,
             values: Object.fromEntries(

@@ -75,6 +75,10 @@ export const unsavedBeforeCompleting = (count: number): string =>
     count === 1 ? '1 alteração não salva' : `${count} alterações não salvas`
   } nesta ficha. Salve ou descarte antes de concluir.`
 
+/** Lotes salvos ainda na fila: concluir espera o servidor confirmá-los. */
+export const QUEUED_BEFORE_COMPLETING =
+  'Há alterações salvas ainda sendo enviadas. Espere sincronizar antes de concluir.'
+
 /** O 409 de revisão ou versão: a ficha mudou desde que foi aberta. */
 export const STALE_COMPLETION =
   'A ficha mudou desde que você abriu. Confira e conclua de novo.'

@@ -23,6 +23,7 @@ import { CompletionMessage } from '../creation/CompletionMessage'
 import {
   completionCopy,
   isStaleCompletion,
+  QUEUED_BEFORE_COMPLETING,
   STALE_COMPLETION,
   unsavedBeforeCompleting,
 } from '../creation/completion'
@@ -152,8 +153,10 @@ export interface StatusMenuDraft {
   // com 409 o que mudou desde então
   readonly revision?: number
   readonly sheetVersion?: number
-  // Alterações não salvas do rascunho aberto: concluir fica desabilitado
+  // Alterações não salvas do rascunho aberto e lotes ainda na fila:
+  // concluir fica desabilitado (a barra também espera a fila)
   readonly unsaved?: number
+  readonly queued?: number
   // A crônica pede aprovação
   readonly approval?: boolean
   // Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
@@ -258,10 +261,13 @@ function StatusMenu({
   const [asking, setAsking] = useState<StatusAction | null>(null)
   const [busy, setBusy] = useState(false)
   const unsaved = draft.unsaved ?? 0
+  const queued = draft.queued ?? 0
 
-  const applied = (action: StatusAction) => {
+  // `refresh: false` quando a mutação já rebuscou (concluir)
+  const applied = (action: StatusAction, refresh = true) => {
     toast.show({ message: action.done })
     onClose()
+    if (!refresh) return
     void queryClient.invalidateQueries({
       queryKey: sheetKeys.character(characterId),
     })
@@ -279,7 +285,8 @@ function StatusMenu({
         revision: draft.revision,
         sheetVersion: draft.sheetVersion,
       })
-      applied(action)
+      // A mutação já rebuscou a ficha, a Mesa e a lista
+      applied(action, false)
     } catch (error) {
       const body = errorBodyOf(error)
       const code = creationRefusalOf(body)
@@ -314,8 +321,17 @@ function StatusMenu({
   }
 
   if (asking) {
-    // Concluir com o rascunho aberto descartaria as alterações em silêncio
-    const blocked = asking.id === 'complete' && unsaved > 0
+    // Concluir com o rascunho aberto descartaria as alterações em silêncio;
+    // com lotes na fila, concluiria sobre uma versão que ainda vai mudar
+    const waiting =
+      asking.id !== 'complete'
+        ? null
+        : unsaved > 0
+          ? unsavedBeforeCompleting(unsaved)
+          : queued > 0
+            ? QUEUED_BEFORE_COMPLETING
+            : null
+    const blocked = waiting !== null
     return (
       <BottomSheet
         visible
@@ -340,9 +356,9 @@ function StatusMenu({
       >
         {asking.id === 'complete' ? (
           <View style={styles.list}>
-            {blocked ? (
+            {waiting ? (
               <Text color="danger" accessibilityRole="alert">
-                {unsavedBeforeCompleting(unsaved)}
+                {waiting}
               </Text>
             ) : null}
             <CompletionMessage

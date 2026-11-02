@@ -194,6 +194,7 @@ export function SheetScreen({
                 sheetVersion={state.character.sheetVersion}
                 approval={creationInfoOf(state.character.creation)?.approval}
                 unsaved={unsaved}
+                queued={draftState.queued}
               />
             ) : null}
             {state.status === 'ready' && xpLedgerFields(state.model).length ? (
@@ -307,12 +308,15 @@ export function policyMode(
 export interface DraftState {
   // Alterações não salvas
   readonly unsaved: number
+  // Lotes salvos ainda na fila, sem confirmação do servidor
+  readonly queued: number
 }
 
-const NO_DRAFT: DraftState = { unsaved: 0 }
+const NO_DRAFT: DraftState = { unsaved: 0, queued: 0 }
 
 const draftStateOf = (s: SheetStoreState): DraftState => ({
   unsaved: s.draft?.size ?? 0,
+  queued: s.pending.length,
 })
 
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */

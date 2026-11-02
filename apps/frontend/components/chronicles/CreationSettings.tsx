@@ -20,6 +20,7 @@ import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { useChronicleCreationSettings } from '../../lib/queries/creation'
+import { layerOf } from '../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate } from '../../sheet/data'
 import { ReloadButton, unsupportedShort } from '../../sheet/UnsupportedTemplate'
 import { UnsavedChangesGuard } from '../UnsavedChangesGuard'
@@ -31,11 +32,6 @@ export interface ChronicleCreationInfo {
   readonly defaults: unknown
   readonly revision: number
 }
-
-const layerOf = (value: unknown): CreationConfigLayer =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as CreationConfigLayer)
-    : {}
 
 /** Regras padrão das próximas fichas, configuradas pelo narrador. */
 export function CreationSettings({

@@ -129,6 +129,27 @@ export interface HistoryEntry {
   }[]
 }
 
+/**
+ * Quem concluiu, calculado no servidor a partir do que ele gravou: aprovar é
+ * do narrador; concluir grava `approved: true` quando o narrador conclui (o
+ * mesmo papel do lote do freeze), também na ficha dele e com a conta já
+ * excluída. Registro sem o campo (anterior à v4): o autor contra o dono.
+ * O `payload` nunca vai na resposta.
+ */
+export function completionRole(row: {
+  readonly action: string
+  readonly actor_id: string | null
+  readonly target_user_id: string | null
+  readonly payload: unknown
+}): 'owner' | 'storyteller' {
+  if (row.action === 'character.creation.approve') return 'storyteller'
+  const approved = (row.payload as { approved?: unknown } | null)?.approved
+  if (typeof approved === 'boolean') return approved ? 'storyteller' : 'owner'
+  return row.actor_id !== null && row.actor_id === row.target_user_id
+    ? 'owner'
+    : 'storyteller'
+}
+
 /** Ordem do Histórico: do mais novo ao mais antigo, por (quando, id). */
 const newestFirst = (a: HistoryEntry, b: HistoryEntry) =>
   b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
@@ -483,8 +504,10 @@ export function eventRoutes(
           .select([
             'a.id',
             'a.created_at',
+            'a.action',
             'a.actor_id',
             'a.target_user_id',
+            'a.payload',
             'u.username',
           ])
           .where('a.chronicle_id', '=', access.character.chronicleId)
@@ -515,12 +538,7 @@ export function eventRoutes(
           id: a.id,
           at: new Date(a.created_at),
           by: a.username === null ? null : { username: a.username },
-          // Calculado no servidor: o autor gravado contra o dono da ficha no
-          // momento da conclusão (o mesmo critério do `by_role` dos lotes)
-          byRole:
-            a.actor_id !== null && a.actor_id === a.target_user_id
-              ? 'owner'
-              : 'storyteller',
+          byRole: completionRole(a),
           sheetVersion: null,
           operationId: null,
           event: 'creation.completed',

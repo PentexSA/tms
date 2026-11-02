@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { completionRole } from '../sheets/events'
+import { isReturned } from '../sheets/routes'
 import {
   addMember,
   as,
@@ -555,6 +557,23 @@ describe('concluir, aprovar e devolver', () => {
     )
   })
 
+  it('isReturned: a forma que a ficha guarda, nada além', () => {
+    expect(isReturned({ returned: { reason: 'x', at: '2026-11-02' } })).toBe(
+      true
+    )
+    for (const creation of [
+      null,
+      undefined,
+      'x',
+      {},
+      { returned: null },
+      { returned: 'x' },
+      { returned: { reason: 'x' } },
+      { returned: { reason: 1, at: '2026-11-02' } },
+    ])
+      expect(isReturned(creation)).toBe(false)
+  })
+
   it('motivo vazio ou com HTML é 422', async () => {
     const id = await character()
     await setStatus(ctx, id, 'pending')
@@ -744,6 +763,45 @@ describe('Histórico da conclusão (T-80)', () => {
         by: { username: 'narradora' },
       }),
     ])
+  })
+
+  it('o narrador que conclui a própria ficha assina como narrador, como o freeze', async () => {
+    const id = await createCharacter(ctx, storyteller, chronicleId, COMPLETE)
+    await choose(id, storyteller)
+    expect((await complete(id, storyteller)).status).toBe(200)
+    const { items } = await history(id, storyteller)
+    expect(items.filter(i => i.event === 'creation.completed')).toEqual([
+      expect.objectContaining({ byRole: 'storyteller' }),
+    ])
+  })
+
+  it('completionRole: o que o servidor gravou, também com a conta excluída', () => {
+    const row = (
+      action: string,
+      payload: unknown,
+      actor: string | null = 'a',
+      target: string | null = 'b'
+    ) => ({ action, payload, actor_id: actor, target_user_id: target })
+    expect(completionRole(row('character.creation.approve', {}, null))).toBe(
+      'storyteller'
+    )
+    expect(
+      completionRole(
+        row('character.creation.complete', { approved: false }, null)
+      )
+    ).toBe('owner')
+    expect(
+      completionRole(
+        row('character.creation.complete', { approved: true }, 'b')
+      )
+    ).toBe('storyteller')
+    // Registro anterior à v4, sem `approved`: o autor contra o dono
+    expect(completionRole(row('character.creation.complete', {}, 'b'))).toBe(
+      'owner'
+    )
+    expect(completionRole(row('character.creation.complete', null, 'a'))).toBe(
+      'storyteller'
+    )
   })
 
   it('o outro jogador e o estranho continuam sem Histórico', async () => {

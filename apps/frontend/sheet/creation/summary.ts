@@ -40,7 +40,8 @@ export function creationSummary(
   return { mode: 'points', parts, approval }
 }
 
-const layerOf = (value: unknown): CreationConfigLayer =>
+/** O padrão da crônica como camada (forma errada vale como camada vazia). */
+export const layerOf = (value: unknown): CreationConfigLayer =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as CreationConfigLayer)
     : {}

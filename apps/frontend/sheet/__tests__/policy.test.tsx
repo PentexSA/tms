@@ -17,7 +17,7 @@ import {
 } from '../../test/session'
 import type { SheetLifecycle } from '../policy'
 import { SheetScreen } from '../SheetScreen'
-import { statusActions } from '../storyteller/StatusMenu'
+import { StatusMenuButton, statusActions } from '../storyteller/StatusMenu'
 
 // v3, Etapa 6: a ficha usa a política só para desabilitar o que o servidor
 // vai recusar, com o motivo no lugar; o narrador muda o estado pelo menu ⋯.
@@ -372,6 +372,35 @@ describe('a tela da ficha com o estado', () => {
     expect(screen.getByTestId('status-complete-confirm')).toBeDisabled()
     fireEvent.press(screen.getByTestId('status-complete-confirm'))
     expect(calls.completePost).not.toHaveBeenCalled()
+  })
+
+  // Achado do /code-review: a barra espera a fila; o menu também
+  it('com lotes ainda na fila, concluir pelo menu espera sincronizar', async () => {
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(
+      <StatusMenuButton
+        characterId={ID}
+        chronicleId="c1"
+        model={vtm}
+        status="creating"
+        locked={false}
+        unsaved={0}
+        queued={1}
+      />,
+      session
+    )
+    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(
+      screen.getByText(
+        'Há alterações salvas ainda sendo enviadas. Espere sincronizar antes de concluir.'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-complete-confirm')).toBeDisabled()
   })
 
   it('um 409 de versão diz que a ficha mudou e rebusca', async () => {
