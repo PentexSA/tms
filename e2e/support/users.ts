@@ -68,6 +68,25 @@ export function freeCreation(
   )
 }
 
+/**
+ * Conclui a criação pela API (T-05): a ficha em criação da dona abre na
+ * montagem (Criação ou Editar), e os testes de Jogo usam ficha em uso. Na
+ * criação livre (o padrão de `freeCreation`), quem conclui é o narrador.
+ */
+export function completeCreation(
+  context: BrowserContext,
+  user: { accessToken: string; ip?: string },
+  characterId: string
+) {
+  return apiAs(
+    context,
+    user,
+    'POST',
+    `/characters/${characterId}/creation/complete`,
+    { clientCommandId: randomUUID() }
+  )
+}
+
 /** Chamada autenticada que deixa o teste inspecionar erros e respostas 204. */
 export function rawAs(
   context: BrowserContext,

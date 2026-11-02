@@ -1,5 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { canWrite, type RoleName } from '@tms/sheet-core'
+import {
+  canWrite,
+  effectiveCreationConfig,
+  type RoleName,
+} from '@tms/sheet-core'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { AccessibilityInfo } from 'react-native'
 
@@ -219,6 +223,34 @@ describe('Histórico de alterações', () => {
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).toBeNull()
   })
 
+  // T-80: a conclusão aparece com quem concluiu, sem "Desfazer"
+  it('"Criação concluída" com quem concluiu e sem "Desfazer"', async () => {
+    calls.historyGet.mockResolvedValue(
+      ok({
+        items: [
+          {
+            ...item('a1', 'storyteller', []),
+            event: 'creation.completed',
+            reversible: false,
+            sheetVersion: null,
+            operationId: null,
+          },
+          item('b1', 'owner', [{ label: 'Força', change: '2 → 3' }]),
+        ],
+        next: null,
+      })
+    )
+    await open(['storyteller'])
+    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    expect(
+      await screen.findByLabelText(
+        /^Criação concluída\. às \d\d:\d\d · ana \(narrador\)$/
+      )
+    ).toBeTruthy()
+    expect(screen.getByText('Criação concluída')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
+  })
+
   it('quem excluiu a conta aparece como "Conta excluída"', async () => {
     calls.historyGet.mockResolvedValue(
       ok({
@@ -317,5 +349,104 @@ describe('sem tempo real', () => {
     await waitFor(() =>
       expect(calls.characterGet.mock.calls.length).toBe(before + 1)
     )
+  })
+})
+
+// T-18 (P05-C): a sobra de bônus também na confirmação do narrador, que
+// fica no cabeçalho, fora da ficha (o número chega pelo onDraftState). Só com
+// a conta fechada: com básicos faltando, o servidor recusa concluir
+describe('sobra de bônus na confirmação do narrador (T-18)', () => {
+  // Todos os pontos básicos da V20, sem bônus gasto
+  const COMPLETE = {
+    name: 'Nova',
+    clan: 'tremere',
+    strength: 4,
+    dexterity: 3,
+    stamina: 3,
+    charisma: 3,
+    manipulation: 3,
+    appearance: 2,
+    perception: 2,
+    intelligence: 2,
+    wits: 2,
+    alertness: 3,
+    athletics: 3,
+    awareness: 3,
+    brawl: 3,
+    empathy: 1,
+    animalKen: 3,
+    crafts: 3,
+    drive: 3,
+    academics: 3,
+    computer: 2,
+    disciplines: [
+      { id: 'd1', name: 'Taumaturgia', value: 2 },
+      { id: 'd2', name: 'Auspícios', value: 1 },
+    ],
+    backgrounds: [
+      { id: 'b1', name: 'Recursos', value: 3 },
+      { id: 'b2', name: 'Mentor', value: 2 },
+    ],
+    conscience: 4,
+    selfControl: 3,
+    courage: 3,
+  }
+  const creating = (values: Record<string, unknown> | null, points = true) =>
+    ok({
+      ...character(['storyteller']).data,
+      status: 'creating',
+      lockedAt: null,
+      member: true,
+      sheet: {
+        values: values ?? { name: 'Nova', clan: 'tremere' },
+        specialties: {},
+      },
+      ...(points
+        ? {
+            creation: {
+              revision: 1,
+              mode: 'points',
+              accounting: true,
+              choices: {
+                priorities: {
+                  attributes: ['physical', 'social', 'mental'],
+                  abilities: ['talents', 'skills', 'knowledges'],
+                },
+              },
+              config: {},
+              effective: effectiveCreationConfig(modelOf('vtm-v20')),
+              returned: null,
+              approval: false,
+            },
+          }
+        : {}),
+    })
+  const confirm = async () => {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByTestId('status-menu'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      /passa por você/
+    )
+  }
+
+  it('"Concluir criação" pelo menu traz a mesma linha da barra', async () => {
+    calls.characterGet.mockResolvedValue(creating(COMPLETE))
+    await confirm()
+    expect(
+      await screen.findByText('Sobram 15 pontos de bônus. Eles não viram XP.')
+    ).toBeTruthy()
+  })
+
+  it('com básicos faltando, nenhuma linha de bônus (achado do /code-review)', async () => {
+    calls.characterGet.mockResolvedValue(creating(null))
+    await confirm()
+    expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
+  })
+
+  it('sem a conta da criação, nenhuma linha de bônus', async () => {
+    calls.characterGet.mockResolvedValue(creating(COMPLETE, false))
+    await confirm()
+    expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
   })
 })

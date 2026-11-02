@@ -25,8 +25,10 @@ import {
 import { useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
+import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
+import { completionBy, completionCopy } from '../creation/completion'
 import { REFUSAL_TEXT } from '../creation/creation'
 import { useDraftCount } from './hooks'
 
@@ -212,7 +214,15 @@ export function ModeBar({
         visible={summary !== null}
         finish={
           summary?.finish
-            ? { label: finishing.label, approval: finishing.approval }
+            ? {
+                label: finishing.label,
+                body: completionCopy({
+                  by: completionBy(roles),
+                  approval: finishing.approval,
+                  action: 'complete',
+                }).body,
+                notes: finishing.notes,
+              }
             : null
         }
         events={summary?.events ?? []}
@@ -338,8 +348,13 @@ function SummarySheet({
   onClose,
 }: {
   readonly visible: boolean
-  // Conclusão da criação: confirma em vez de oferecer Descartar
-  readonly finish: { readonly label: string; readonly approval: boolean } | null
+  // Conclusão da criação: confirma em vez de oferecer Descartar. O corpo é o
+  // do `completionCopy` (T-32), com as linhas extras em `notes`
+  readonly finish: {
+    readonly label: string
+    readonly body: string
+    readonly notes?: readonly string[]
+  } | null
   readonly events: readonly SheetEvent[]
   readonly inactive: readonly ChangeLabel[]
   readonly error: string | null
@@ -388,12 +403,13 @@ function SummarySheet({
           </Text>
         ) : null}
         {finish ? (
-          <Text color="inkMuted">
-            {finish.approval
-              ? 'A ficha vai para o narrador aprovar e fica somente para leitura até lá.'
-              : 'Depois de concluir, subir um traço passa pelo narrador.'}
-            {events.length ? ' As alterações abaixo são salvas antes.' : ''}
-          </Text>
+          <CompletionMessage
+            body={finish.body}
+            notes={finish.notes}
+            suffix={
+              events.length ? ' As alterações abaixo são salvas antes.' : ''
+            }
+          />
         ) : null}
         {groupByPlace(model, events).map(group => (
           <View key={group.key} style={styles.group}>

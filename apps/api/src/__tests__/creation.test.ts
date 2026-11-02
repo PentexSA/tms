@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { completionRole } from '../sheets/events'
+import { isReturned } from '../sheets/routes'
 import {
   addMember,
   as,
@@ -348,6 +350,74 @@ describe('/events: avaliação parcial', () => {
     })
     expect(await listOf(id, 'flaws')).toEqual(flaw)
   })
+
+  // P05-C: o app passa a sinalizar antes do toque ("+" com cara de
+  // indisponível, aviso ao lado). Isso é só UX: lotes que chegam direto à
+  // API, sem passar pelo app, continuam recusados pela mesma conta.
+  describe('o servidor recusa o que o app só sinaliza', () => {
+    const values = async (id: string) =>
+      ((await row(id)).sheet_data as { values: Record<string, unknown> }).values
+
+    it('teto da criação (hard-cap): Arete acima de 3', async () => {
+      const id = await character({ ...COMPLETE, arete: 3 })
+      await choose(id)
+      const res = await send(id, owner, 'arete', 3, 4)
+      expect(res.status).toBe(422)
+      const body = await json(res)
+      expect(body.code).toBe('CREATION_BUDGET_EXCEEDED')
+      expect(body.problems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'CREATION_HARD_CAP' }),
+        ])
+      )
+      expect((await values(id)).arete).toBe(3)
+    })
+
+    it('baseline travado: Aparência da linhagem C fica em 0', async () => {
+      const id = await character({ ...COMPLETE, lineage: 'c', app: 0 })
+      await choose(id)
+      const res = await send(id, owner, 'app', 0, 1)
+      expect(res.status).toBe(422)
+      expect(await json(res)).toMatchObject({
+        code: 'CREATION_BUDGET_EXCEEDED',
+        problems: [{ code: 'CREATION_LOCKED', paths: ['values.app'] }],
+      })
+      expect((await values(id)).app).toBe(0)
+    })
+
+    it('saldo de bônus: o lote inteiro é recusado, nada aplicado', async () => {
+      const id = await character()
+      await choose(id)
+      // 2 + 2 pontos de atributo acima dos básicos, a 5 cada: 20 de 10
+      const res = await as(
+        ctx,
+        storyteller,
+        'POST',
+        `/characters/${id}/events`,
+        {
+          clientBatchId: crypto.randomUUID(),
+          events: [
+            { path: 'values.str', from: 3, to: 5 },
+            { path: 'values.dex', from: 3, to: 5 },
+          ],
+        }
+      )
+      expect(res.status).toBe(422)
+      expect(await json(res)).toMatchObject({
+        code: 'CREATION_BUDGET_EXCEEDED',
+        problems: [{ code: 'CREATION_FREEBIES_EXCEEDED', amount: 10 }],
+      })
+      expect(await values(id)).toMatchObject({ str: 3, dex: 3 })
+    })
+
+    it('o 4º ponto acima do creation-cap passa, pago com bônus (a trava de Básicos é só do app)', async () => {
+      const id = await character()
+      await choose(id)
+      const res = await send(id, owner, 'alert', 3, 4)
+      expect(res.status).toBe(200)
+      expect((await values(id)).alert).toBe(4)
+    })
+  })
 })
 
 describe('concluir, aprovar e devolver', () => {
@@ -560,6 +630,73 @@ describe('concluir, aprovar e devolver', () => {
     ).toBe(409)
   })
 
+  it('a lista marca a ficha devolvida, sem o motivo (T-06)', async () => {
+    await approval(true)
+    const id = await character()
+    const other = await createCharacter(ctx, owner, chronicleId, {
+      ...COMPLETE,
+      name: 'Ativa',
+    })
+    await setStatus(ctx, other, 'active')
+    await choose(id)
+    await complete(id)
+    const reason = 'Troque um ponto: motivo-da-lista-42'
+    expect(
+      (
+        await as(
+          ctx,
+          storyteller,
+          'POST',
+          `/characters/${id}/creation/return`,
+          {
+            reason,
+          }
+        )
+      ).status
+    ).toBe(200)
+    const listOf = async (user: TestUser) => {
+      const res = await as(
+        ctx,
+        user,
+        'GET',
+        `/chronicles/${chronicleId}/characters`
+      )
+      const text = await res.text()
+      expect(text).not.toContain('motivo-da-lista')
+      return JSON.parse(text) as { id: string; returned?: boolean }[]
+    }
+    for (const user of [owner, storyteller]) {
+      const list = await listOf(user)
+      expect(list.find(c => c.id === id)?.returned).toBe(true)
+      // A ficha ativa nunca é devolvida
+      expect(list.find(c => c.id === other)?.returned).toBe(false)
+    }
+    // O outro jogador não tem a linha
+    expect((await listOf(player)).some(c => c.id === id)).toBe(false)
+    // Enviada de novo, deixa de ser devolvida
+    expect((await complete(id)).status).toBe(200)
+    expect((await listOf(storyteller)).find(c => c.id === id)?.returned).toBe(
+      false
+    )
+  })
+
+  it('isReturned: a forma que a ficha guarda, nada além', () => {
+    expect(isReturned({ returned: { reason: 'x', at: '2026-11-02' } })).toBe(
+      true
+    )
+    for (const creation of [
+      null,
+      undefined,
+      'x',
+      {},
+      { returned: null },
+      { returned: 'x' },
+      { returned: { reason: 'x' } },
+      { returned: { reason: 1, at: '2026-11-02' } },
+    ])
+      expect(isReturned(creation)).toBe(false)
+  })
+
   it('motivo vazio ou com HTML é 422', async () => {
     const id = await character()
     await setStatus(ctx, id, 'pending')
@@ -655,6 +792,195 @@ describe('concluir, aprovar e devolver', () => {
     const res = await complete(id)
     expect(res.status).toBe(403)
     expect(await json(res)).toMatchObject({ code: 'NOT_MEMBER' })
+  })
+})
+
+// T-80: a conclusão não deixa "Moral 0 → 6" no Histórico, assinada por quem
+// concluiu, e o Histórico diz quem concluiu
+describe('Histórico da conclusão (T-80)', () => {
+  interface Item {
+    id: string
+    byRole: string
+    by: { username: string } | null
+    event?: string
+    reversible: boolean
+    changes: { label: string; change: string }[]
+  }
+  const history = async (id: string, by: TestUser, query = '') => {
+    const res = await as(ctx, by, 'GET', `/characters/${id}/history${query}`)
+    expect(res.status).toBe(200)
+    return (await res.json()) as { items: Item[]; next: string | null }
+  }
+  const frozen = (id: string) =>
+    ctx.db
+      .selectFrom('character_events as e')
+      .innerJoin('character_batches as b', 'b.id', 'e.batch_id')
+      .select(['e.path', 'e.from_value', 'e.to_value', 'e.from_absent'])
+      .where('b.character_id', '=', id)
+      .where('e.path', 'in', ['values.morality', 'values.will'])
+      .execute()
+
+  it('aprovação ligada: sem linha sem mudança e com "Criação concluída" do narrador', async () => {
+    await approval(true)
+    const id = await character()
+    await choose(id)
+    await complete(id)
+    expect(
+      (await as(ctx, storyteller, 'POST', `/characters/${id}/creation/approve`))
+        .status
+    ).toBe(200)
+    // O lote do freeze guarda o "de" efetivo; desfazer devolve o vazio
+    const events = await frozen(id)
+    expect(events.map(e => e.path).sort()).toEqual([
+      'values.morality',
+      'values.will',
+    ])
+    for (const e of events) {
+      expect(e.from_value).toEqual(e.to_value)
+      expect(e.from_absent).toBe(true)
+    }
+    for (const by of [owner, storyteller]) {
+      const { items } = await history(id, by)
+      const labels = items.flatMap(i => i.changes.map(c => c.label))
+      expect(labels).not.toContain('Moral')
+      expect(labels).not.toContain('Vontade')
+      const done = items.filter(i => i.event === 'creation.completed')
+      expect(done).toHaveLength(1)
+      expect(done[0]).toMatchObject({
+        byRole: 'storyteller',
+        by: { username: 'narradora' },
+        reversible: false,
+        changes: [],
+      })
+      expect(done[0]).not.toHaveProperty('payload')
+      expect(JSON.stringify(done[0])).not.toContain(owner.id)
+    }
+  })
+
+  it('aprovação desligada: a dona conclui e assina o item', async () => {
+    const id = await character()
+    await choose(id)
+    expect((await complete(id)).status).toBe(200)
+    const { items } = await history(id, owner)
+    expect(items.filter(i => i.event === 'creation.completed')).toEqual([
+      expect.objectContaining({ byRole: 'owner', by: { username: 'dona' } }),
+    ])
+    expect(items.flatMap(i => i.changes.map(c => c.label))).not.toContain(
+      'Moral'
+    )
+  })
+
+  it('criação livre: o narrador conclui, sem lote de freeze', async () => {
+    const id = await character()
+    await as(ctx, storyteller, 'PATCH', `/characters/${id}/creation`, {
+      revision: 0,
+      config: { mode: 'free' },
+    })
+    expect((await complete(id, storyteller)).status).toBe(200)
+    expect(await frozen(id)).toEqual([])
+    const { items } = await history(id, storyteller)
+    expect(items).toEqual([
+      expect.objectContaining({
+        event: 'creation.completed',
+        byRole: 'storyteller',
+        by: { username: 'narradora' },
+      }),
+    ])
+  })
+
+  it('o narrador que conclui a própria ficha assina como narrador, como o freeze', async () => {
+    const id = await createCharacter(ctx, storyteller, chronicleId, COMPLETE)
+    await choose(id, storyteller)
+    expect((await complete(id, storyteller)).status).toBe(200)
+    const { items } = await history(id, storyteller)
+    expect(items.filter(i => i.event === 'creation.completed')).toEqual([
+      expect.objectContaining({ byRole: 'storyteller' }),
+    ])
+  })
+
+  it('completionRole: o que o servidor gravou, também com a conta excluída', () => {
+    const row = (
+      action: string,
+      payload: unknown,
+      actor: string | null = 'a',
+      target: string | null = 'b'
+    ) => ({ action, payload, actor_id: actor, target_user_id: target })
+    expect(completionRole(row('character.creation.approve', {}, null))).toBe(
+      'storyteller'
+    )
+    expect(
+      completionRole(
+        row('character.creation.complete', { approved: false }, null)
+      )
+    ).toBe('owner')
+    expect(
+      completionRole(
+        row('character.creation.complete', { approved: true }, 'b')
+      )
+    ).toBe('storyteller')
+    // Registro anterior à v4, sem `approved`: o autor contra o dono
+    expect(completionRole(row('character.creation.complete', {}, 'b'))).toBe(
+      'owner'
+    )
+    expect(completionRole(row('character.creation.complete', null, 'a'))).toBe(
+      'storyteller'
+    )
+  })
+
+  it('o outro jogador e o estranho continuam sem Histórico', async () => {
+    const id = await character()
+    await choose(id)
+    await complete(id)
+    expect(
+      (await as(ctx, player, 'GET', `/characters/${id}/history`)).status
+    ).toBe(404)
+    const stranger = await createUser(ctx, 'estranho')
+    expect(
+      (await as(ctx, stranger, 'GET', `/characters/${id}/history`)).status
+    ).toBe(404)
+  })
+
+  it('paginação: a conclusão aparece uma vez, na página certa', async () => {
+    const id = await character({ ...COMPLETE, str: 2 })
+    await choose(id)
+    // Dois lotes antes da conclusão, dois depois (o relógio do teste é fixo)
+    const tick = () => ctx.clock.advance(1000)
+    expect((await send(id, owner, 'str', 2, 3)).status).toBe(200)
+    tick()
+    expect((await send(id, owner, 'name', 'Teste', 'Antes')).status).toBe(200)
+    tick()
+    expect((await complete(id)).status).toBe(200)
+    tick()
+    expect(
+      (await send(id, storyteller, 'name', 'Antes', 'Depois')).status
+    ).toBe(200)
+    tick()
+    expect(
+      (await send(id, storyteller, 'name', 'Depois', 'Mais tarde')).status
+    ).toBe(200)
+    const ids: string[] = []
+    let next: string | null = null
+    let pages = 0
+    do {
+      const query: string = next
+        ? `?limit=2&before=${encodeURIComponent(next)}`
+        : '?limit=2'
+      const page = await history(id, owner, query)
+      ids.push(...page.items.map(i => i.id))
+      next = page.next
+      pages++
+    } while (next && pages < 10)
+    expect(pages).toBeGreaterThan(2)
+    expect(new Set(ids).size).toBe(ids.length)
+    const all = (await history(id, owner, '?limit=50')).items
+    expect(ids).toEqual(all.map(i => i.id))
+    // Do mais novo ao mais antigo: os dois nomes depois, a conclusão no meio
+    const at = all.findIndex(i => i.event === 'creation.completed')
+    expect(all.filter(i => i.event === 'creation.completed')).toHaveLength(1)
+    expect(all.slice(0, at).flatMap(i => i.changes.map(c => c.label))).toEqual([
+      'Nome',
+      'Nome',
+    ])
   })
 })
 

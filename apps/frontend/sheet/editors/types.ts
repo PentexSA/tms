@@ -1,5 +1,6 @@
 import type { FieldDef, FieldTypeName } from '@tms/sheet-core'
-import type { ComponentType } from 'react'
+import type { ComponentType, Ref } from 'react'
+import type { TextInputInstance } from 'react-native'
 
 // Editor de um campo (variante "editor"): criação de ficha e modo Evoluir.
 // Recebe o valor no formato de sheet_data e devolve o valor novo; quem chama
@@ -14,6 +15,9 @@ export interface EditorProps<V = unknown> {
   // Nome próprio (o nome do personagem): sem corretor nem sugestão do
   // teclado, que trocava "PO" por "PÔ" (T-38)
   readonly properName?: boolean
+  // O campo de texto do editor, para quem precisa focá-lo (T-21: o primeiro
+  // campo com erro); editores sem texto ignoram
+  readonly inputRef?: Ref<TextInputInstance>
 }
 
 export type Editor = ComponentType<EditorProps>

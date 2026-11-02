@@ -463,6 +463,90 @@ describe('checkCreation: tetos e iniciais', () => {
   })
 })
 
+// P05-C (T-07, T-20, R-17): a conta expõe o teto, o limite e a trava de cada
+// componente, e o preço e as partes de cada linha de bônus, para o app dizer
+// o motivo certo e o custo antes do toque. A conta em si não muda.
+describe('checkCreation: teto, limite e trava por componente', () => {
+  const component = (c: ReturnType<typeof check>, path: string) => {
+    for (const b of c.budgets)
+      for (const g of b.groups)
+        for (const x of g.components) if (x.path === path) return x
+    for (const l of c.lines)
+      for (const x of l.components ?? []) if (x.path === path) return x
+    throw new Error(`componente ausente: ${path}`)
+  }
+
+  it('acima do creation-cap, o componente diz o teto (T-07)', () => {
+    const c = check({ alert: 4, brawl: 1 })
+    expect(component(c, 'values.alert')).toMatchObject({
+      value: 4,
+      invested: 4,
+      eligible: 3,
+      cap: 3,
+    })
+    // O grupo continua 4/5 nos básicos: o quarto ponto vai para o bônus
+    expect(group(c, 'abilities', 'talents')).toMatchObject({
+      basic: 4,
+      extra: 1,
+      missing: 1,
+    })
+    // Fora do creation-cap, nada de `cap`
+    expect(component(c, 'values.str')).not.toHaveProperty('cap')
+  })
+
+  it('o hard-cap vira `ceiling`, fixo ou pelo valor de outro campo', () => {
+    const c = check({ arete: 2, sphereA: 1 })
+    expect(component(c, 'values.arete')).toMatchObject({ ceiling: 3 })
+    expect(component(c, 'values.sphereA')).toMatchObject({ ceiling: 2 })
+    expect(component(c, 'values.con')).not.toHaveProperty('ceiling')
+  })
+
+  it('o baseline travado vira `locked`; o destravado, não', () => {
+    const locked = check({ lineage: 'c', app: undefined, cha: 3, man: 2 })
+    expect(component(locked, 'values.app')).toMatchObject({
+      initial: 0,
+      locked: true,
+    })
+    expect(component(check(), 'values.app')).not.toHaveProperty('locked')
+  })
+
+  it('a linha `flat` traz o preço e as partes; `item-meta` e `credit`, não (R-17)', () => {
+    const c = check({
+      will: { current: 4, permanent: 4 },
+      merits: [{ id: 'm1', name: 'Q', meta: { cost: 2 } }],
+      flaws: [{ id: 'f1', name: 'D', meta: { bonus: 1 } }],
+    })
+    const will = c.lines.find(l => l.id === 'will')
+    expect(will).toMatchObject({ units: 1, cost: 1, price: 1 })
+    // O valor de partida vem da Consciência (con = 3)
+    expect(will?.components).toEqual([
+      {
+        path: 'values.will',
+        field: 'will',
+        initial: 3,
+        value: 4,
+        invested: 1,
+        eligible: 1,
+      },
+    ])
+    for (const id of ['merits', 'flaws']) {
+      const line = c.lines.find(l => l.id === id)
+      expect(line).not.toHaveProperty('price')
+      expect(line).not.toHaveProperty('components')
+    }
+  })
+
+  it('a conta não muda: só campos novos', () => {
+    const c = check({ alert: 4, brawl: 1, arete: 2 })
+    expect(c.freebies).toEqual({
+      available: 10,
+      credit: 0,
+      spent: 6,
+      remaining: 4,
+    })
+  })
+})
+
 describe('checkCreation: fora da conta', () => {
   it('evolução fora de qualquer conta não sobe (fail secure)', () => {
     const t = acct() as Json & { fields: Json; sections: Json[] }

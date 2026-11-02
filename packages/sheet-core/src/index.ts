@@ -3,6 +3,9 @@
 // (Expo) usam o mesmo código: no servidor ele é a autoridade; no cliente,
 // conveniência.
 
+// A condição declarativa da contabilização (`in`, `equalsTarget`,
+// `itemIn`): o app diz qual escolha trava um valor inicial (P05-C)
+export { conditionHolds } from './accounting'
 export * from './alerts'
 export * from './classify'
 export * from './compile'

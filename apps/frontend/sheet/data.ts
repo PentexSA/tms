@@ -45,9 +45,33 @@ const normalizeCharacter = (value: unknown) => {
   return value
 }
 
+/**
+ * T-06: a dona com a ficha em `pending` não tem evento que rebusque enquanto
+ * olha a ficha (o narrador decide noutro aparelho). A ficha rebusca a cada
+ * 30 s com a tela em primeiro plano (o TanStack não roda o intervalo em
+ * segundo plano), e a devolução ou a aprovação aparece sozinha. Mesma rota e
+ * mesma AuthZ do abrir a ficha.
+ */
+export const PENDING_REFETCH_MS = 30_000
+
+export const awaitsStoryteller = (data: unknown): boolean => {
+  const d = data as { status?: unknown; roles?: unknown } | null | undefined
+  const roles: readonly unknown[] = Array.isArray(d?.roles) ? d.roles : []
+  return (
+    d?.status === 'pending' &&
+    roles.includes('owner') &&
+    !roles.includes('storyteller')
+  )
+}
+
 export const useCharacter = (id: string) =>
   useQuery({
     queryKey: sheetKeys.character(id),
+    refetchInterval: ({
+      state,
+    }: {
+      readonly state: { readonly data?: unknown }
+    }) => (awaitsStoryteller(state.data) ? PENDING_REFETCH_MS : false),
     queryFn: async ({ signal }) =>
       normalizeCharacter(
         unwrap(await api.characters({ id }).get({ fetch: { signal } }))

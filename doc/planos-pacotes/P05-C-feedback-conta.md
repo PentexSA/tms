@@ -626,3 +626,62 @@ Os passos do "PR local" da matriz ("Como executar"):
 6. **R-28 em toast ou numa linha sob os chips?** O toast some sozinho; uma linha fixa ocuparia altura a 390 px (T-27). O desenho usa o toast, com o anúncio do leitor de tela.
 7. **`stepAdvice` no core?** Está no app porque é UX. Se a Mesa do narrador (D-10, P09-D: "Habilidades: faltam 4 · Bônus: restam 2 de 15") precisar do mesmo cálculo no servidor ou noutra tela, a função sobe para o `@tms/sheet-core`, com a meta de 95% por arquivo.
 8. **Forma da confirmação do P04-C (T-32):** resolvida na consolidação ([onda-2.md](onda-2.md) §4.1): `notes?: readonly string[]`, a forma do P04-C, e o número do menu do narrador pelo `onDraftState`.
+
+---
+
+## 10. Desvios na implementação
+
+Implementado na `pacote/p05-c-feedback-conta`, sobre `fc2649c`, em paralelo com o P04-C. O que saiu diferente do desenho acima, e por quê:
+
+1. **O commit 7 (T-18) virou dois.** O `e037bc7` trouxe os textos do Orçamento e da barra. A linha da sobra nas três confirmações entrou depois do merge da onda com o P04-C (`317b28c`), no `c25aea0`:
+   - `finishing.notes` da barra e as notas do "Aprovar ficha" vêm do hook `useFreebiesNotes()`;
+   - o menu do narrador recebe o número pelo `freebiesLeft` do `DraftState` (`onDraftState`).
+
+   A linha só aparece **com a conta fechada** (`completionFreebies`). Com básicos faltando, o servidor recusa concluir, e "Sobram 15" diria que só faltam bônus. O `freebiesLeft` só é calculado para o narrador, para o jogador não re-renderizar a tela a cada bônus. O `freebiesLeftText(check)` deu lugar a `freebiesLeftNote(n)` e `freebiesNotes(n)`.
+2. **`ref` do `TextField`: `Ref<TextInputInstance>`, não `Ref<TextInput>`.** No React Native 0.88, `TextInput` é o componente, e o tipo da instância é o `TextInputInstance` exportado por `react-native`. O mesmo vale para o `EditorProps.inputRef`. O P08 (T-26) precisa usar o mesmo tipo, para o rebase sair sem conflito de fato.
+3. **O "Ver orçamento" chega pelo `SheetProvider`.** O `OpenBudgetContext` mora em `creation/CreationContext.tsx`, e o `SheetProvider` ganhou a prop `openBudget`. Assim, o `SheetView` muda uma linha, em vez de embrulhar a árvore inteira num provedor novo, o que reindentaria o arquivo que o P08 reorganiza.
+4. **O `aria-disabled` do "+" no web vai pelo `accessibilityDisabled`.** O `Pressable` do react-native-web 0.21 escreve `aria-disabled` a partir do `disabled` depois das outras props, e apagaria o nosso. O `accessibilityDisabled` chega ao DOM como `aria-disabled="true"` (createDOMProps) sem tirar o toque nem o foco. No app, os botões continuam fora do leitor de tela, e a trava vai na dica do controle ajustável.
+5. **`StepAdvice` ganhou `inline`** (o texto aparece escrito na linha, porque o cabeçalho não o diz), e o `stepAdvice` aceita a ficha resolvida (opcional) para dizer a escolha que trava o valor ("Clã: Nosferatu"). Os textos da previsão não repetem o nome do campo, que já está no rótulo da linha: "Com pontos básicos, vai até 3. Acima disso, +1 = 2 bônus.", "Fica em 0 na criação (Clã: Nosferatu).", "Na criação, vai até 3.", "+1 = 5 bônus; restam 4.". O point-buy diz "+1 = 2 pontos" e, sem orçamento, "+1 = 2 pontos; faltam 1 de 27.".
+6. **Concordância.** "Faltaria 1 de bônus: custa 2, **resta** 1." (o plano escrevia "restam 1"); "Faltariam N" no plural. O E2E confere a forma nova.
+7. **A partida derivada no extrato é neutra em gênero:** "parte de 3, que vem de Coragem" (o plano escrevia "da Coragem"). O rótulo vem do template, e o app não sabe o gênero dele.
+8. **O aviso no store cobre também a recusa do core e o rascunho grande demais** (`cause: 'invalid'` e `'limit'`), não só a conta. Na reavaliação, o `from` da tentativa é trocado pelo valor de agora; se o valor já é o pedido, o aviso some.
+9. **O `EditorShell` só é usado pelas linhas de número e de recurso.** O texto, a escolha e a especialização mostram o erro dentro da folha, como antes. O `error` passou a aceitar um nó (o `DraftNoticeText`), e a linha ganhou o espaço `note` (o custo escrito) e o `testID` `<editor>-label` na coluna do rótulo.
+10. **`testID` novos para os testes:** `form-row-<campos>` nas linhas do `CharacterForm` e `new-character-form` em volta dele; `advice-<campo>`, `notice-<campo>`, `notice-<campo>-budget`, `creation-ledger` e `creation-ledger-total`.
+11. **O E2E de bônus foi dividido em dois testes**, com fichas preparadas pela API: os básicos completos ("restam 15 de 15") e o custo do toque com o extrato, que confere "Atributos › Físicos" e "Força de Vontade" (o plano citava "Talentos").
+12. **A dica do custo no web** só vira `aria-describedby` quando o texto está escrito na tela (aviso ou custo na linha). O custo que só o cabeçalho diz fica no contador do grupo, que o leitor de tela já lê.
+13. **`conditionHolds` passou a ser exportado pelo `@tms/sheet-core`** (aditivo), para o app dizer a escolha que trava um valor com o mesmo critério da conta.
+
+### Revisão (`/code-review`, nível high)
+
+Dez achados. Corrigidos em `fc2a51d`, `6df70ea`, `92a77d4` e `bd58730`:
+
+- a previsão do point-buy abaixo da base, o texto do teto num grupo sem preço e a escolha que trava (agora `conditionHolds` sobre a ficha resolvida);
+- o índice por conta na previsão (antes, cada linha varria a conta a cada mudança do store);
+- a reavaliação do aviso, que agora compara causa e ação e não roda para `invalid` e `limit`;
+- o bloco repetido das linhas (`useRowFeedback`) e o "resta/restam" num lugar só;
+- o contexto do narrador fechado no E2E.
+
+Ficaram, por desenho:
+
+- **`freebiesLeftText` sem uso na tela.** Era a ligação nas confirmações, que entrou depois do P04-C (item 1).
+- **O `creationRefusal` do "Salvar" some no primeiro toque aceito.** É o desenho da seção 3.0 (T-55: o aviso responde a um toque). A pergunta 5 da seção 9 continua aberta para o PO.
+- **O aviso de uma recusa de lista, escolha ou texto fica guardado no store sem linha que o mostre.** Essas folhas mostram o próprio erro, como antes (seção 3.0, `useSetDraft` igual). O `ListEditor` passa a ler o aviso no P07-C. Para não custar nada enquanto isso, a recusa do core (`invalid`) não é reavaliada.
+- **O caso da escolha "resolvida por padrão" não existe hoje:** o `choice` não tem `default` no contrato, e a ficha resolvida só tem o que foi gravado. O critério ficou igual ao da conta de qualquer jeito.
+
+### Merge da onda com o P04-C e segunda revisão (`/code-review`, nível medium)
+
+O merge `317b28c` teve dois conflitos, resolvidos nele mesmo:
+
+- **`new-character.tsx`:** o `ref` do `ScrollView` e o `y` do formulário (T-21) ficam ao lado das regras da crônica (T-29, P04-C). O texto de topo novo fica acima do `View` que mede o formulário.
+- **`CreationScreen.test.tsx`:** os imports dos dois pacotes (`cleanup` e `within`).
+
+`ModeBar`, `StatusMenu`, `SheetScreen` e `CreationPanel` mesclaram sozinhos, sem perder nada dos dois.
+
+A revisão do merge e do `c25aea0` achou sete pontos, todos corrigidos no commit seguinte:
+
+- a linha da sobra no menu do narrador com a conta incompleta;
+- a tela inteira re-renderizando para o jogador a cada bônus;
+- a derivação repetida (`useFreebiesNotes`);
+- o `freebiesLeftText` sem uso;
+- três comentários desatualizados;
+- a mesma recusa 422 repetida, que não levava ao campo de novo. Agora a Nova ficha guarda os `serverIssues` por resposta (`useMemo` no `create.error`), e o formulário reage a cada resposta nova.

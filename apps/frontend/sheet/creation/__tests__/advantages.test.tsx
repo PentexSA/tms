@@ -241,7 +241,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     const sheet = within(screen.getByTestId('item-sheet-flaws'))
     expect(sheet.getByText('Remover Inimigo?')).toBeTruthy()
     expect(alertsIn('item-sheet-flaws')).toHaveLength(2)
-    expect(alertsIn('item-sheet-flaws')[1]).toHaveTextContent(/Bônus/)
+    expect(alertsIn('item-sheet-flaws')[1]).toHaveTextContent(/bônus/i)
     // Cancelar a remoção apaga a frase; o Defeito continua na ficha
     fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
     expect(alertsIn('item-sheet-flaws')).toHaveLength(0)
@@ -277,7 +277,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     )
     expect(textInput('Nome').props.value).toBe('Ambidestro')
     expect(alertsIn('add-sheet-merits')).toHaveLength(1)
-    expect(alertsIn('add-sheet-merits')[0]).toHaveTextContent(/Bônus/)
+    expect(alertsIn('add-sheet-merits')[0]).toHaveTextContent(/bônus/i)
     fireEvent.changeText(textInput('Nome'), 'Ambidestra')
     expect(alertsIn('add-sheet-merits')).toHaveLength(0)
   })

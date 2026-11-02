@@ -13,6 +13,7 @@ export function TextEditor({
   error,
   required,
   properName,
+  inputRef,
 }: EditorProps) {
   const long = def.type === 'longText'
   const max =
@@ -23,6 +24,7 @@ export function TextEditor({
   const text = typeof value === 'string' ? value : ''
   const field = (
     <Field
+      ref={inputRef}
       testID={`editor-${id}`}
       label={required ? `${def.label} (obrigatório)` : def.label}
       value={text}

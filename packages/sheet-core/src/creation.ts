@@ -102,6 +102,12 @@ export interface CreationComponent {
   readonly value: number
   readonly invested: number
   readonly eligible: number
+  // O `creation-cap` que vale para o campo: acima dele, os básicos não pagam
+  readonly cap?: number
+  // O `hard-cap` que vale (Arete ≤ 3, Esfera ≤ Arete): acima dele, nada passa
+  readonly ceiling?: number
+  // O valor inicial é travado (baseline com `locked`): não sobe na criação
+  readonly locked?: true
 }
 
 export interface CreationGroup {
@@ -143,6 +149,10 @@ export interface FreebieLine {
   readonly units: number
   // Custo em bônus (`credit`: o crédito, já limitado pelo `max`).
   readonly cost: number
+  // Só no `flat`: o preço por unidade e as partes da linha (de onde vem o
+  // valor de partida, como a FdV que parte da Coragem)
+  readonly price?: number
+  readonly components?: readonly CreationComponent[]
 }
 
 export interface FreebieSummary {
@@ -367,6 +377,9 @@ export function checkCreation(
         value,
         invested,
         eligible: Math.max(0, top - initial.value),
+        ...(soft !== null && { cap: soft }),
+        ...(hard !== null && { ceiling: hard }),
+        ...(initial.locked && { locked: true as const }),
       })
       if (hard !== null && value > hard)
         problem({
@@ -641,6 +654,8 @@ export function checkCreation(
         paths: components.filter(c => c.invested > 0).map(c => c.path),
         units,
         cost: units * (e.cost ?? 0),
+        ...(e.cost !== undefined && { price: e.cost }),
+        components,
       })
       continue
     }

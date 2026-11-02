@@ -69,10 +69,11 @@ it('o dono abre a ficha nova em Editar', async () => {
   expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
 })
 
-it('sem parâmetro, o dono abre em Jogo (Etapa 17), com o seletor de modo', async () => {
+it('sem parâmetro, o dono abre a ficha em uso em Jogo (Etapa 17), com o seletor de modo', async () => {
   calls.characterGet.mockResolvedValue(
     ok({
       ...character(['owner']).data,
+      status: 'active',
       sheet: example('helena').sheet,
     })
   )
@@ -81,4 +82,12 @@ it('sem parâmetro, o dono abre em Jogo (Etapa 17), com o seletor de modo', asyn
   expect(await screen.findByRole('radio', { name: 'Jogo' })).toBeChecked()
   // O dono não tem Leitura: Jogo já mostra a ficha inteira
   expect(screen.queryByRole('radio', { name: 'Leitura' })).toBeNull()
+})
+
+it('sem parâmetro, a ficha em criação da dona abre em Editar (T-05)', async () => {
+  calls.characterGet.mockResolvedValue(character(['owner']))
+  calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+  renderWithSession(<SheetScreen id={ID} />, await signedIn())
+  expect(await screen.findByText('Editando · 0 alterações')).toBeTruthy()
+  expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
 })
