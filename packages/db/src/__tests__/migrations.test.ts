@@ -749,8 +749,11 @@ describe('migrations', () => {
         select name from characters order by updated_at desc`.execute(db)
       expect(order.map(r => r.name)).toEqual(['editada', 'nova'])
 
-      // O down volta os tipos e a hora de parede do fuso do banco
-      expect((await migrator.migrateDown()).error).toBeUndefined()
+      // O down volta os tipos e a hora de parede do fuso do banco. Desce até
+      // antes da 0021: as migrations depois dela (0022) descem junto
+      expect(
+        (await migrator.migrateTo('0020_product_templates')).error
+      ).toBeUndefined()
       const { rows: types } = await sql<{ column: string }>`
         select table_name || '.' || column_name as column
         from information_schema.columns
