@@ -20,6 +20,13 @@ import { changeLabel, type TableItem } from './tableItems'
 // campos do dock do template na variante `chip`, os alertas do template como
 // selo e o estado da ficha. Nada aqui conhece sistema. Memo: a mesma linha não
 // redesenha quando o filtro ou a ordem mudam.
+//
+// T-48 (P09-C): o cartão compacto. Em cima, o avatar e o texto (nome em até 2
+// linhas, o selo de identidade e quem alterou); depois, a linha de selos
+// (estado e alertas); embaixo, os recursos do dock numa linha só, na largura
+// inteira do cartão, como o CombatDock da ficha. A linha de selos é onde
+// entram o estado do P04-D e a visibilidade do NPC do P11, e o progresso do
+// P09-D ganha uma linha livre.
 
 export const TableRow = memo(function TableRow({
   item,
@@ -27,12 +34,16 @@ export const TableRow = memo(function TableRow({
   selecting = false,
   selected = false,
   onSelect,
+  framed = false,
 }: {
   readonly item: TableItem
   readonly onOpen: (id: string) => void
   readonly selecting?: boolean
   readonly selected?: boolean
   readonly onSelect?: (id: string) => void
+  // Na grade (telas largas), o cartão tem borda e raio; na coluna única, o
+  // separador entre as linhas
+  readonly framed?: boolean
 }) {
   const { row, model, store, alerts, state } = item
   const { colors } = useTheme()
@@ -86,80 +97,98 @@ export const TableRow = memo(function TableRow({
         }
         onPress={() => (selecting ? onSelect?.(row.id) : onOpen(row.id))}
         testID={`table-row-${row.id}`}
-        style={[styles.row, { borderBottomColor: colors.borderSubtle }]}
+        style={[
+          styles.card,
+          framed
+            ? [styles.framed, { borderColor: colors.borderSubtle }]
+            : { borderBottomColor: colors.borderSubtle },
+        ]}
       >
-        {selecting ? (
-          <Text color={selected ? 'action' : 'inkMuted'}>
-            {selected ? '☑' : '☐'}
-          </Text>
-        ) : null}
-        <Avatar name={row.name} emblem={model?.template.identity.emblem} />
-        <View style={styles.text}>
-          <Text variant="fieldLabel" numberOfLines={2}>
-            {row.name}
-          </Text>
-          {identity?.chip ? (
-            <Text variant="caption" color="accent">
-              {identity.chip}
+        <View style={styles.top}>
+          {selecting ? (
+            <Text color={selected ? 'action' : 'inkMuted'}>
+              {selected ? '☑' : '☐'}
             </Text>
           ) : null}
-          {state || alerts.length ? (
-            <View style={styles.badges}>
-              {state ? (
-                <Text variant="caption" color="inkMuted">
-                  {state}
-                </Text>
-              ) : null}
-              {alerts.map(a => (
-                <Text
-                  key={a.id}
-                  variant="caption"
-                  color="danger"
-                  testID={`alert-${row.id}-${a.id}`}
-                  style={[styles.badge, { borderColor: colors.danger }]}
-                >
-                  {a.label}
-                </Text>
+          <Avatar name={row.name} emblem={model?.template.identity.emblem} />
+          <View style={styles.text}>
+            <Text variant="fieldLabel" numberOfLines={2}>
+              {row.name}
+            </Text>
+            {identity?.chip ? (
+              <Text variant="caption" color="accent">
+                {identity.chip}
+              </Text>
+            ) : null}
+            <Text variant="caption" color="inkMuted">
+              {meta}
+            </Text>
+            {problem ? (
+              <Text variant="caption" color="inkMuted">
+                {problem}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        {state || alerts.length ? (
+          <View style={styles.badges} testID={`table-badges-${row.id}`}>
+            {state ? (
+              <Text variant="caption" color="inkMuted">
+                {state}
+              </Text>
+            ) : null}
+            {alerts.map(a => (
+              <Text
+                key={a.id}
+                variant="caption"
+                color="danger"
+                testID={`alert-${row.id}-${a.id}`}
+                style={[styles.badge, { borderColor: colors.danger }]}
+              >
+                {a.label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+        {store ? (
+          <SheetProvider store={store}>
+            <View style={styles.chips} testID={`table-dock-${row.id}`}>
+              {dock.map(id => (
+                <View key={id} style={styles.chip}>
+                  <FieldSlot id={id} variant="chip" />
+                </View>
               ))}
             </View>
-          ) : null}
-          <Text variant="caption" color="inkMuted">
-            {meta}
-          </Text>
-          {problem ? (
-            <Text variant="caption" color="inkMuted">
-              {problem}
-            </Text>
-          ) : null}
-          {store ? (
-            <SheetProvider store={store}>
-              <View style={styles.chips}>
-                {dock.map(id => (
-                  <FieldSlot key={id} id={id} variant="chip" />
-                ))}
-              </View>
-            </SheetProvider>
-          ) : model === undefined ? (
-            <Skeleton lines={1} label="Carregando o dock" />
-          ) : null}
-        </View>
+          </SheetProvider>
+        ) : model === undefined ? (
+          <Skeleton lines={1} label="Carregando o dock" />
+        ) : null}
       </Pressable>
     </ThemeProvider>
   )
 })
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: tokens.space[3],
+  card: {
+    gap: tokens.space[2],
     minHeight: tokens.size.rowMin + 16,
     paddingVertical: tokens.space[3],
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
   },
-  text: { flex: 1, gap: tokens.space[1] },
-  chips: { gap: tokens.space[1], marginTop: tokens.space[1] },
+  framed: {
+    borderWidth: tokens.borderWidth.hair,
+    borderRadius: tokens.radius.md,
+  },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.space[3],
+  },
+  text: { flex: 1, minWidth: 0, gap: tokens.space[1] },
+  // Os recursos numa linha: cada um com a mesma fração da largura
+  chips: { flexDirection: 'row', gap: tokens.space[2] },
+  chip: { flex: 1, minWidth: 0 },
   badges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
