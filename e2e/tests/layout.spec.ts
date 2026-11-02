@@ -67,8 +67,27 @@ async function inViewport(page: Page, locator: Locator) {
   expect(box!.x + box!.width).toBeLessThanOrEqual(size!.width + 0.5)
 }
 
+// A folha, não a raiz do Modal do react-native-web (que também é
+// aria-modal e ocupa a tela inteira)
 const sheetDialog = (page: Page) =>
-  page.getByRole('dialog').or(page.locator('[aria-modal]')).first()
+  page.getByTestId('bottom-sheet-root').locator('[aria-modal="true"]')
+
+/**
+ * Rola até a seção começar logo abaixo da faixa fixa: a faixa passa a
+ * mostrar as sub-abas dela (T-27).
+ */
+const scrollToSection = (page: Page, section: string) =>
+  page.getByTestId(`section-${section}`).evaluate(el => {
+    let scroller = el.parentElement
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight)
+      scroller = scroller.parentElement
+    if (!scroller) return
+    const nav = document.querySelector('[data-testid="sheet-nav"]')
+    scroller.scrollTop +=
+      el.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top -
+      (nav?.getBoundingClientRect().height ?? 0)
+  })
 
 for (const size of [PHONE, NARROW])
   test(`T-11 a ${size.width}: o cabeçalho cabe, com "Mais opções", para a dona e o narrador`, async ({
@@ -84,7 +103,8 @@ for (const size of [PHONE, NARROW])
         page.getByRole('heading', { name: 'Helena Varga' })
       ).toBeVisible()
       // Uma alteração não salva: o texto mais longo do cabeçalho (T-17)
-      await page.getByRole('button', { name: 'Conceito', exact: true }).click()
+      // No web, o nome da célula leva o valor ("Conceito: vazio")
+      await page.getByRole('button', { name: /^Conceito:/ }).click()
       await page.getByRole('textbox', { name: 'Conceito' }).fill('Arquivista')
       // T-10: Enter aplica na folha de uma linha
       await page.keyboard.press('Enter')
@@ -149,8 +169,15 @@ test('T-27 e T-59 a 390: "Em jogo" recolhido; abas e sub-abas fixas na Criação
       page.getByRole('tablist', { name: 'Partes da ficha' })
     ).toBeVisible()
 
+    // No topo, as sub-abas dos Atributos
+    await expect(
+      page.getByRole('tablist', { name: 'Grupos de Atributos' })
+    ).toBeVisible()
     // Rola até as Habilidades: a faixa fica no topo, com as sub-abas delas
-    await page.getByLabel('Buscar em Habilidades').scrollIntoViewIfNeeded()
+    await scrollToSection(page, 'abilities')
+    await expect(
+      page.getByRole('tablist', { name: 'Grupos de Atributos' })
+    ).toHaveCount(0)
     const groups = page.getByRole('tablist', { name: 'Grupos de Habilidades' })
     await expect(groups).toBeVisible()
     await inViewport(page, groups)

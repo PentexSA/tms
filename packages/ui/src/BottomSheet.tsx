@@ -55,12 +55,18 @@ import { tokens } from './tokens'
 // fase de layout e, portanto, antes de qualquer autoFocus.
 
 type Focusable = { focus?: () => void; isConnected?: boolean }
+type WebEvent = {
+  target?: unknown
+  key?: string
+  preventDefault?: () => void
+  stopPropagation?: () => void
+}
 type WebDocument = {
   activeElement?: unknown
   body?: unknown
   addEventListener?: (
     type: string,
-    listener: (e: { target?: unknown }) => void,
+    listener: (e: WebEvent) => void,
     capture?: boolean
   ) => void
 }
@@ -83,6 +89,32 @@ function trackFocus(doc: WebDocument) {
     'focusin',
     e => {
       if (e.target && e.target !== doc.body) lastFocused = e.target as Focusable
+    },
+    true
+  )
+}
+
+// Esc no web com o foco fora da folha: aberta pelo teclado, a folha sem
+// campo em autoFocus deixa o foco no gatilho até o fim da animação de
+// entrada (o trap do react-native-web só o move depois), e o Esc se perdia.
+// As folhas abertas ficam numa pilha; o Esc no documento (captura) fecha a
+// de cima, esteja o foco onde estiver. Com o foco dentro, é o mesmo Esc: o
+// da raiz não roda de novo (stopPropagation na captura do documento).
+const openSheets: { readonly close: () => void }[] = []
+const escapeTracked = new WeakSet<object>()
+function trackEscape(doc: WebDocument) {
+  if (escapeTracked.has(doc) || typeof doc.addEventListener !== 'function')
+    return
+  escapeTracked.add(doc)
+  doc.addEventListener(
+    'keydown',
+    e => {
+      if (e.key !== 'Escape') return
+      const top = openSheets.at(-1)
+      if (!top) return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      top.close()
     },
     true
   )
@@ -131,6 +163,19 @@ export function BottomSheet({
     const doc = webDocument()
     if (doc) trackFocus(doc)
   }, [])
+  const close = useRef(onClose)
+  close.current = onClose
+  useEffect(() => {
+    const doc = webDocument()
+    if (!doc || !visible) return
+    trackEscape(doc)
+    const entry = { close: () => close.current() }
+    openSheets.push(entry)
+    return () => {
+      const at = openSheets.indexOf(entry)
+      if (at >= 0) openSheets.splice(at, 1)
+    }
+  }, [visible])
   // Um caminho só para devolver o foco, uma vez por abertura (o gatilho é
   // zerado na primeira chamada). Roda depois que o modal sai da tela, quando
   // o trap já soltou o foco: no onDismiss (a folha fecha e continua montada)
