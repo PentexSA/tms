@@ -256,6 +256,41 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     ).toBeTruthy()
   })
 
+  it('o "+" do Valor avisa antes do toque; com o Valor já mudado na folha, a previsão sai (R-20)', async () => {
+    await open(THREE)
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    const stepper = () =>
+      screen.getByRole('adjustable', { name: 'Dominação, valor' })
+    // Grupo cheio em Pontos básicos: o motivo antes do toque, na dica e escrito
+    expect(stepper().props.accessibilityHint).toMatch(/Disciplinas/)
+    expect(screen.getByTestId('advice-disciplines-d3')).toHaveTextContent(
+      /Disciplinas/
+    )
+    // O "+" continua tocável: o toque passa pela conta exata
+    fireEvent(stepper(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    expect(stepper().props.accessibilityHint).toBeUndefined()
+    expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    // Recusado: o aviso fala pelo motivo, sem a previsão repetida
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
+  })
+
+  it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
+    await open(THREE)
+    tab('Orçamento')
+    fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
+    tab('Ficha')
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    expect(
+      screen.getByRole('adjustable', { name: 'Dominação, valor' }).props
+        .accessibilityHint
+    ).toMatch(/bônus/)
+  })
+
   it('a recusa do Aplicar não aparece sob "Remover X?"', async () => {
     await open(THREE)
     fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))

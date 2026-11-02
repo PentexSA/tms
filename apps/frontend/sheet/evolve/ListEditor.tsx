@@ -4,15 +4,17 @@ import {
   Button,
   Pressable,
   Stepper,
+  type StepperIncrease,
   Text,
   TextArea,
   TextField,
   tokens,
   useTheme,
 } from '@tms/ui'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheetStore } from '../context'
+import { useStepAdvice } from '../creation/useStepAdvice'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -303,6 +305,40 @@ function AddItemSheet({
   )
 }
 
+/**
+ * A previsão do "+" do Valor (R-20, T-19, antes do toque): a trava ou o
+ * custo do próximo ponto do item, pelo `useStepAdvice` do caminho do item.
+ * A previsão é do valor que o store tem: com o Valor já mudado na folha, ela
+ * não vale mais, e o toque decide (o "Aplicar" passa pela conta exata). O
+ * "+" bloqueado continua tocável, como nas linhas (`Stepper.increase`).
+ */
+function useItemAdvice(
+  list: ResolvedList,
+  item: ListItem,
+  draft: ListItem,
+  refused: boolean
+): { readonly stepper?: StepperIncrease; readonly note: ReactNode } {
+  const advice = useStepAdvice(`values.${list.id}#${item.id}`)
+  const min = list.field.def.item.value?.min ?? 0
+  const fresh = (draft.value ?? min) === (item.value ?? min)
+  if (!advice || !fresh) return { note: null }
+  // Com o aviso aberto, o aviso fala pelo motivo
+  const id = `advice-${list.id}-${item.id}`
+  const written = !refused && advice.text ? advice.text : null
+  return {
+    stepper: {
+      blocked: advice.blocked !== null,
+      hint: advice.text,
+      hintID: written ? id : null,
+    },
+    note: written ? (
+      <Text variant="caption" color="inkMuted" nativeID={id} testID={id}>
+        {written}
+      </Text>
+    ) : null,
+  }
+}
+
 function ItemSheet({
   list,
   item,
@@ -332,6 +368,7 @@ function ItemSheet({
     setDraft(d => ({ ...d, ...p }))
   }
   const refusal = notice.text
+  const increase = useItemAdvice(list, item, draft, refusal !== null)
   const footer = confirming ? (
     <>
       <Button
@@ -404,9 +441,11 @@ function ItemSheet({
                   max={schema.value.max}
                   onChange={value => patch({ value })}
                   valueText={n => `${n} de ${schema.value?.max}`}
+                  increase={increase.stepper}
                 />
               </View>
             ) : null}
+            {increase.note}
             {(schema.meta ?? []).map(m =>
               m.type === 'number' ? (
                 <View key={m.id} style={styles.inline}>
