@@ -44,7 +44,10 @@ import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
 import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
 import { SheetView } from './SheetView'
-import { createSheetStore } from './store/sheetStore'
+import {
+  createSheetStore,
+  type SheetState as SheetStoreState,
+} from './store/sheetStore'
 import { StatusMenuButton } from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
@@ -68,8 +71,11 @@ export function SheetScreen({
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
-  // Alterações do rascunho aberto (T-17): o cabeçalho não diz "Salvo"
-  const [unsaved, setUnsaved] = useState(0)
+  // O rascunho aberto, para o cabeçalho, que fica fora do store: as
+  // alterações não salvas (T-17: o cabeçalho não diz "Salvo"; T-32: o menu
+  // do narrador não conclui por cima delas)
+  const [draftState, setDraftState] = useState<DraftState>(NO_DRAFT)
+  const unsaved = draftState.unsaved
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -161,7 +167,7 @@ export function SheetScreen({
           key={`${state.character.templateVersion}:${state.roles.join(',')}`}
           state={state}
           initialMode={initialMode}
-          onUnsaved={setUnsaved}
+          onDraftState={setDraftState}
         />
       )
   }
@@ -184,6 +190,10 @@ export function SheetScreen({
                 model={state.model}
                 status={state.character.status}
                 locked={state.character.lockedAt !== null}
+                revision={creationInfoOf(state.character.creation)?.revision}
+                sheetVersion={state.character.sheetVersion}
+                approval={creationInfoOf(state.character.creation)?.approval}
+                unsaved={unsaved}
               />
             ) : null}
             {state.status === 'ready' && xpLedgerFields(state.model).length ? (
@@ -293,15 +303,30 @@ export function policyMode(
   return code === 'SHEET_LOCKED' ? 'play' : 'read'
 }
 
+/**
+ * O que o cabeçalho sabe do rascunho aberto. O P05-C acrescenta a sobra de
+ * bônus (`freebiesLeft`, T-18) pelo mesmo caminho.
+ */
+export interface DraftState {
+  // Alterações não salvas
+  readonly unsaved: number
+}
+
+const NO_DRAFT: DraftState = { unsaved: 0 }
+
+const draftStateOf = (s: SheetStoreState): DraftState => ({
+  unsaved: s.draft?.size ?? 0,
+})
+
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
 function LiveSheet({
   state,
   initialMode,
-  onUnsaved,
+  onDraftState,
 }: {
   readonly state: Extract<SheetState, { status: 'ready' }>
   readonly initialMode?: SheetMode
-  readonly onUnsaved?: (count: number) => void
+  readonly onDraftState?: (draft: DraftState) => void
 }) {
   const sync = useSync()
   const toast = useToast()
@@ -361,16 +386,23 @@ function LiveSheet({
   useEffect(() => {
     store.getState().setEditable(forced === null)
   }, [store, forced])
-  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero
+  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero. Só
+  // avisa quando o que ele mostra muda
   useEffect(() => {
-    if (!onUnsaved) return
-    onUnsaved(store.getState().draft?.size ?? 0)
-    const unsubscribe = store.subscribe(s => onUnsaved(s.draft?.size ?? 0))
+    if (!onDraftState) return
+    let last = draftStateOf(store.getState())
+    onDraftState(last)
+    const unsubscribe = store.subscribe(s => {
+      const next = draftStateOf(s)
+      if (jsonEqual(next, last)) return
+      last = next
+      onDraftState(next)
+    })
     return () => {
       unsubscribe()
-      onUnsaved(0)
+      onDraftState(NO_DRAFT)
     }
-  }, [store, onUnsaved])
+  }, [store, onDraftState])
   // O rascunho guardado no aparelho, e a oferta de recuperá-lo (T-03)
   const persistence = useDraftPersistence({
     store,

@@ -56,8 +56,9 @@ export function useSaveCreation(characterId: string) {
 }
 
 export interface CompleteRequest {
-  readonly revision: number
-  readonly sheetVersion: number
+  // Sem `creation` no template, a ficha não tem revisão de criação
+  readonly revision?: number
+  readonly sheetVersion?: number
 }
 
 export function useCompleteCreation(characterId: string, chronicleId: string) {
