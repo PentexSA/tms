@@ -1,7 +1,6 @@
 import {
   applyBatch,
   type ChangeLabel,
-  describeBatch,
   describeEvent,
   fieldPlace,
   inactiveChanges,
@@ -29,8 +28,8 @@ import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
 import { completionBy, completionCopy } from '../creation/completion'
-import { REFUSAL_TEXT } from '../creation/creation'
 import { useDraftCount } from './hooks'
+import { saveDraftNow } from './saveDraft'
 
 // Modos da ficha (DS: ModeBar). O modo é UX: o que cada um libera vem de
 // `editableIn` por campo e das permissões, conferidas pelo core e pelo
@@ -160,17 +159,9 @@ export function useModeBar({
       finishing.start()
       return
     }
-    const label = describeBatch(model, summary.events)
-    const result = store.getState().saveDraft(label)
-    if (result && !result.ok) {
-      const refused = store.getState().creationRefusal
-      setError(
-        result.kind === 'conflict'
-          ? 'Alguém mudou um destes campos enquanto você editava. Confira os valores e salve de novo.'
-          : result.kind === 'creation' && refused
-            ? REFUSAL_TEXT[refused.code]
-            : (result.issues[0]?.message ?? 'Não foi possível salvar.')
-      )
+    const result = saveDraftNow(model, store)
+    if (!result.ok) {
+      setError(result.message)
       return
     }
     const next = summary.next
@@ -178,13 +169,13 @@ export function useModeBar({
     switchTo(next)
     // Concluir: espera a fila confirmar o lote; sem Desfazer no meio
     if (summary.finish) {
-      if (result?.ok) finishing.start()
+      if (result.batchId !== null) finishing.start()
       return
     }
-    if (result?.ok) {
-      const id = result.batch.clientBatchId
+    if (result.batchId !== null) {
+      const id = result.batchId
       toast.show({
-        message: `Salvo: ${label}`,
+        message: `Salvo: ${result.label}`,
         action: {
           label: 'Desfazer',
           onPress: () => {
