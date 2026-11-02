@@ -159,8 +159,11 @@ export function SheetScreen({
       body = <IdentityProjection character={state.character} />
       break
     case 'viewer':
+      // T-15: no nativo (Yoga), o filho com flex 1 num pai de altura
+      // automática fica com altura 0, e só o aviso aparecia. O contêiner
+      // ocupa a tela: o aviso fica em cima e a ficha rola embaixo.
       body = (
-        <View>
+        <View style={styles.viewer} testID="viewer-sheet">
           <View style={styles.readNotice}>
             <Text variant="fieldLabel">Leitura</Text>
             <Text color="inkMuted">
@@ -566,6 +569,7 @@ function LiveSheet({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+  viewer: { flex: 1 },
   readNotice: {
     gap: tokens.space[1],
     paddingHorizontal: tokens.layout.gutter,
