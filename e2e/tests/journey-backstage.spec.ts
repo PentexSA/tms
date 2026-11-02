@@ -249,8 +249,9 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
       'GET',
       `/characters/${npcId}`
     )
+    // A crônica (só id e nome) leva o "‹" de volta a ela (T-81)
     expect(Object.keys(identity).sort()).toEqual(
-      ['id', 'identity', 'kind', 'projection', 'visibility'].sort()
+      ['chronicle', 'id', 'identity', 'kind', 'projection', 'visibility'].sort()
     )
     expect(identity).toMatchObject({
       id: npcId,
@@ -258,6 +259,7 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
       projection: 'identity',
       visibility: 'identity',
       identity: { name: NPC },
+      chronicle: { id: chronicle.id, name: 'Crônica dos Bastidores' },
     })
     expect(JSON.stringify(identity)).not.toContain(PRIVATE)
     expect(JSON.stringify(identity)).not.toContain('values')
@@ -365,6 +367,12 @@ test('a jornada da v5: bastidores privados, revelação e transferência', async
     await page.getByRole('tab', { name: 'Bastidores' }).click()
     await expect(page.getByText('A noite do oráculo')).toBeVisible()
     await expect(page.getByText('Auditoria')).toBeVisible()
+    // A auditoria em frases, sem os códigos internos (T-63)
+    await expect(
+      page.getByText('Apresentação da crônica alterada')
+    ).toBeVisible()
+    for (const code of ['chronicle.settings', 'sheet.change'])
+      await expect(page.getByText(code, { exact: true })).toHaveCount(0)
 
     // Reduzir a visibilidade revoga novas leituras e a projeção em cache.
     await apiAs(
