@@ -79,7 +79,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
   // o contador (W20 "Dons", M20 "Antecedentes"): o cabeçalho é o da seção
   const echo = Boolean(sectionTitled) && echoesSection(section)
   // T-28 (C-10): no desktop, os grupos lado a lado, cada um com pelo menos
-  // minColWidth; a busca e o "Mostrando" ficam acima, na largura toda
+  // GROUP_COL_MIN; a busca e o "Mostrando" ficam acima, na largura toda
   const { breakpoint, stacked } = useLayout()
   const columns =
     breakpoint === 'expanded' && !stacked && !tabs.tabbed && groups.length > 1
@@ -274,11 +274,18 @@ function FilterBar({
   )
 }
 
+// A coluna de um grupo no desktop (T-28): uma linha com controle (o rótulo,
+// "−", o valor e "+", com a margem) precisa de ~290. Com o minColWidth do DS
+// (240), os cinco grupos de Vantagens cabiam lado a lado a 1280 e o rótulo
+// ficava com 48 px, quebrado no meio da palavra ("Corag em"). Com 320, a 1280
+// eles ficam 3 + 2, e Atributos e Habilidades seguem em três colunas
+export const GROUP_COL_MIN = 320
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   columns: { flexDirection: 'row', flexWrap: 'wrap' },
   column: {
-    flexBasis: tokens.layout.minColWidth,
+    flexBasis: GROUP_COL_MIN,
     flexGrow: 1,
     minWidth: 0,
   },

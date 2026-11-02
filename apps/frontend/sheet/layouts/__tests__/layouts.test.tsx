@@ -22,6 +22,7 @@ import {
 import { fakeServer, renderLive } from '../../../test/live'
 import { fold } from '../../evolve/text'
 import { SheetView } from '../../SheetView'
+import { GROUP_COL_MIN } from '../GroupsLayout'
 
 // Etapa 18: os layouts ricos. `groups` com filtro e busca; `grid` em colunas
 // (variante `cell`), que vira lista com fonte grande ou tela estreita.
@@ -202,7 +203,7 @@ describe('groups: filtro e busca (Habilidades)', () => {
         StyleSheet.flatten(
           (g as unknown as { props: { style: never } }).props.style
         )
-      ).toMatchObject({ flexBasis: 240, flexGrow: 1, minWidth: 0 })
+      ).toMatchObject({ flexBasis: GROUP_COL_MIN, flexGrow: 1, minWidth: 0 })
     // A busca fica acima, na largura toda
     expect(screen.getByLabelText('Buscar em Habilidades')).toBeTruthy()
     screen.unmount()
@@ -216,6 +217,27 @@ describe('groups: filtro e busca (Habilidades)', () => {
       expect(bodyStyle()?.flexDirection).toBeUndefined()
       screen.unmount()
     }
+  })
+
+  // Integração da onda 2, no web a 1280: com 240 por coluna, os cinco
+  // grupos de Vantagens cabiam numa linha e o rótulo do Stepper ficava com
+  // 48 px ("Corag em"). A coluna tem de caber uma linha com controle
+  it('T-28: a coluna do grupo cabe uma linha com controle (Vantagens a 1280)', () => {
+    expect(GROUP_COL_MIN).toBeGreaterThanOrEqual(300)
+    dims(1280)
+    renderSheet(model, sheet)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const body = screen.getByTestId('groups-advantages-body')
+    expect(StyleSheet.flatten(body.props.style)).toEqual({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    })
+    for (const g of body.children)
+      expect(
+        StyleSheet.flatten(
+          (g as unknown as { props: { style: never } }).props.style
+        )
+      ).toMatchObject({ flexBasis: GROUP_COL_MIN })
   })
 
   it('T-28: fonte grande no desktop: empilhados', () => {
