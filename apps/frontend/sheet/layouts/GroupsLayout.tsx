@@ -1,4 +1,9 @@
-import { type CompiledGroup, isDraftMode, jsonEqual } from '@tms/sheet-core'
+import {
+  type CompiledGroup,
+  type FieldId,
+  isDraftMode,
+  jsonEqual,
+} from '@tms/sheet-core'
 import {
   Button,
   hitTarget,
@@ -9,7 +14,7 @@ import {
   tokens,
   useTheme,
 } from '@tms/ui'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
@@ -17,6 +22,7 @@ import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
 import { ChipFlow } from './ChipFlow'
 import { useGroupTabs } from './groupTabs'
+import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
 
 // Grupos com título (Habilidades do WoD, perícias do D&D, Vantagens). O
@@ -30,7 +36,7 @@ import type { LayoutProps } from './types'
 // (contrato §6), a linha cujo id é o valor do `choice` citado ganha o selo
 // (a Esfera de afinidade do Mago).
 
-export function GroupsLayout({ section }: LayoutProps) {
+export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
   const { mode, model } = useSheet()
   const filter = section.def.filter
   const [on, setOn] = useState(filter?.default ?? false)
@@ -62,6 +68,9 @@ export function GroupsLayout({ section }: LayoutProps) {
   })
   // O título do grupo some quando a aba já diz qual é
   const titled = !tabs.bar || searching
+  // T-58: o grupo único com o nome da seção à vista não repete o título nem
+  // o contador (W20 "Dons", M20 "Antecedentes"): o cabeçalho é o da seção
+  const echo = Boolean(sectionTitled) && echoesSection(section)
 
   return (
     <View testID={`groups-${section.id}`}>
@@ -95,14 +104,23 @@ export function GroupsLayout({ section }: LayoutProps) {
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
           if (searching && tabs.bar && !ids.length) return null
+          const header = Boolean(g.title) && titled && !echo
+          // A lista que o título à vista (do grupo ou da seção) já nomeia
+          const headed = titledList(
+            model,
+            g.fieldIds,
+            header ? g.title : echo ? section.def.title : null
+          )
           return (
-            <View key={g.id}>
-              {g.title && titled ? (
+            <GroupBlock key={g.id} headed={headed}>
+              {header ? (
                 <View style={styles.title}>
                   <SectionHeader
                     title={g.title}
                     level="group"
-                    right={<CreationCounter fieldIds={g.fieldIds} />}
+                    right={
+                      <CreationCounter fieldIds={g.fieldIds} items={headed} />
+                    }
                   />
                 </View>
               ) : null}
@@ -127,11 +145,26 @@ export function GroupsLayout({ section }: LayoutProps) {
                     : 'Nada para mostrar.'}
                 </Text>
               )}
-            </View>
+            </GroupBlock>
           )
         })}
       </View>
     </View>
+  )
+}
+
+/** O bloco do grupo; a lista que o título já nomeia não repete o cabeçalho. */
+function GroupBlock({
+  headed,
+  children,
+}: {
+  readonly headed: FieldId | undefined
+  readonly children: ReactNode
+}) {
+  return (
+    <HeadedList.Provider value={headed}>
+      <View>{children}</View>
+    </HeadedList.Provider>
   )
 }
 

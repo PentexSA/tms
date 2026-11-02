@@ -365,3 +365,58 @@ Linhas do commit `9f75426`.
 5. **Anúncio no app:** `role="alert"` mais `announceForAccessibility`, como o `CombatDock`, ou o anúncio que o P05-C adotar para a recusa perto do toque (um só padrão nas duas folhas e nas linhas).
 6. **Regra "seção × grupo" em todos os modos** (proposto: é só um título repetido), ou só no Editar e na Criação, como a regra "grupo × lista"?
 7. **`titled` no `LayoutProps` ou context.** A prop é explícita, e os outros layouts a ignoram. Um context evitaria mexer no tipo, mas esconde a dependência. O plano usa a prop.
+
+---
+
+## 10. Desvios na implementação
+
+Implementado nos commits 1 a 6 da seção 8.1, em paralelo com o P05-C. As perguntas da seção 9 seguiram a proposta do plano: 1 (valor inicial genérico, `withItemDefaults`), 2 (preencher ao abrir a folha), 3 (com sugestões do catálogo à vista, o Enter não adiciona texto livre), 6 (regra "seção × grupo" em todos os modos) e 7 (`titled` como prop do `LayoutProps`). A 4 e a 5 dependem do P05-C (abaixo). O que mudou em relação ao desenho:
+
+| Item | Desvio | Por quê |
+|---|---|---|
+| T-58 | O contador "N itens" no cabeçalho da **seção** só aparece quando a seção tem um grupo só, com o mesmo nome dela (`echoesSection`, em `layouts/headedList.ts`) | No W20, a seção "Cicatrizes de batalha" tem uma lista com o mesmo rótulo, mas o grupo do meio se chama "Cicatrizes": o cabeçalho da lista fica (títulos diferentes) e o número sairia duas vezes |
+| T-58 | O provedor `HeadedList` vai num `GroupBlock` que substitui o `View` de cada grupo, sem reindentar o corpo do `GroupsLayout` | O P08 mexe nas colunas do mesmo trecho (T-28): o diff fica em duas linhas ali |
+| T-58 | Os casos da criação por pontos (V20 "0/3", W20 "Dons · 0/3", M20 "7/7" uma vez, criação livre "3 itens") ficam no `advantages.test.tsx`; o `layouts.test.tsx` fica com o Editar (V20, W20, M20) e o Jogo | O contador da conta precisa do `CreationContext`, que só o `SheetScreen` monta; o `layouts.test.tsx` renderiza o `SheetView` sem ele |
+| T-23 | A linha do item usa o sinal do template nos metas numéricos com `display: 'signed'` ("Ataque +2", D&D), como o resto da ficha (`fmtSigned`) | Com o rótulo na frente, "Ataque 2" leria como contagem |
+| T-19 | As folhas ganham `testID` (`add-sheet-<lista>`, `item-sheet-<lista>`) pela prop que o `BottomSheet` já tinha, e a frase, `refusal-<lista>`. O `@tms/ui` não muda | Os testes acham a frase dentro da folha |
+| T-19 | No Jest, o `Modal` fica dentro da árvore do `ListEditor`; o teste confere que as frases da ficha são só as da folha e que, ao fechar, não sobra nenhuma. No E2E (web), o `Modal` é um portal, e o seletor da seção 4.3 vale como está | O `within(editor)` do plano também acharia a frase da folha no Jest |
+| T-19 | O anúncio no app é o `announceForAccessibility` sem condição de plataforma, como o `CombatDock`, a `ModeBar` e o `CreationPanel` | Mesmo padrão do app até o P05-C (pergunta 5) |
+| T-62 | Quando o Enter não adiciona (sugestões do catálogo à vista, ou o nome exato já na ficha), o campo diz por quê: "Toque numa sugestão, ou em “Adicionar “…”” para usar o nome como está." ou "X já está na ficha." | Correção da revisão: sem a frase, o Enter parecia não funcionar |
+| T-58 | O "N itens" do bloco só aparece quando a lista vira o editor (`drawsEditor`, o mesmo teste do `FieldSlot`) | Correção da revisão: a lista que o papel não escreve fica no `ListRow`, com o próprio cabeçalho, e o número saía duas vezes |
+| prova | O teste do core "Defeito sem `bonus` dá crédito 0" confere a linha do `credit` com 0 unidades e custo 0 (a linha existe, vazia) | É o que o core devolve |
+
+**`/code-review` (nível high), 9 achados:**
+
+- **Corrigidos** (dois commits `fix:` depois do E2E):
+  - o "N itens" contava de novo a lista que o papel não escreve;
+  - o "Remover" mostrava a recusa do "Aplicar" sob "Remover X?";
+  - o leitor de tela dizia "Ataque 2" com a linha mostrando "+2" (agora "Ataque mais 2", como o número `signed`);
+  - o Enter não dizia nada quando não adicionava;
+  - duas simplificações (a busca do nome exato uma vez só; um sentinela só no `headedList`).
+- **Mantidos, pelo plano:**
+  - o `ItemSheet` grava o mínimo ao abrir um item antigo, mesmo quando só as notas mudam. É a pergunta 2 da seção 9 (o esperado da matriz é "Aplicar" levar o saldo de 15 a 16) e o risco já está na seção 8.3;
+  - a regra "meta vazio vale o mínimo" no core (como o `value`) mudaria a conta do servidor: fica fora do pacote, que não muda o `@tms/sheet-core`;
+  - o texto livre igual a um item da ficha continua entrando (o botão já fazia isso antes da onda; não existe regra de nome repetido no template). Fica como nota para o P07-D.
+- **`GroupBlock`:** fica como componente, para o diff do `GroupsLayout` não reindentar o trecho das colunas do P08.
+
+**Depois do P05-C** (merge da onda `fa8ecfa` na branch, `6d7932a`):
+
+- **Merge:** um conflito, em `apps/api/src/__tests__/creation.test.ts`: os casos das listas do P07-C e o `describe` "o servidor recusa o que o app só sinaliza" do P05-C ficam juntos em `/events: avaliação parcial`. O `CreationCounter.tsx` mesclou sozinho. No `advantages.test.tsx`, a busca da frase passa a `/bônus/i`, porque o T-57 do P05-C reescreveu o texto ("Faltaria 1 de bônus: custa 1, restam 0.").
+- **T-19 pelo aviso do store** (`ab7fc22`):
+  - as folhas leem o `useDraftNotice('values.<lista>')` e desenham o `DraftNoticeText` dentro da folha. A folha guarda só onde foi o toque: embaixo da opção ou do botão do texto livre, acima do "Aplicar" ou sob "Remover X?";
+  - recusado pelo Enter, o texto do aviso vai como `error` do próprio campo, marcado inválido e ligado à frase;
+  - o `clearNotice()` roda no `patch`, ao cancelar a remoção, ao trocar a busca e ao fechar, e só quando o aviso é desta lista: o aviso de uma linha de Atributo continua;
+  - a dica do Enter (sugestões à vista, nome já na ficha) fica como `error` local do campo, porque não é recusa da conta;
+  - o anúncio é o do P05-C: `role="alert"` com `key` por aviso, sem o `announceForAccessibility` que o pacote usava antes.
+- **Commit 7** (`d971b44`): o "+" do Valor no `ItemSheet` usa o `useStepAdvice('values.<lista>#<item>')` e o `Stepper.increase`, com o motivo ou o custo escrito sob o Valor. O contrato do P05-C serve sem mudar o core, com um limite: a previsão é do valor que o store tem. Com o Valor já mudado na folha, ela sai, e o toque decide. Item sem Valor (Dons do W20) não tem previsão.
+- **`/code-review` (nível medium) do merge e dos dois commits:** 6 achados.
+  - **Corrigidos (4):**
+    - a previsão em item sem Valor;
+    - o `clearNotice()` apagava o aviso de outra linha;
+    - o "+" sem `aria-describedby` para o aviso aberto;
+    - a recusa do Enter fora do `error` do campo.
+  - **Não corrigidos (2):**
+    - a lógica repetida com o `useRowFeedback`: juntar as duas mexeria no arquivo do P05-C, e o caminho do item não casa com o aviso da lista. Fica para o P07-D;
+    - **o anúncio no app:** sem o `announceForAccessibility`, o aviso depende do `role="alert"`, que o iOS e o Android não falam sozinhos. Vale para as linhas do P05-C também. Conferir no VoiceOver e no TalkBack na integração. Se não falar, o `DraftNoticeText` ganha o anúncio, num lugar só.
+
+**Não rodado no pacote** (portas fixas e aparelho só na integração): o `advantages.spec.ts` (só typecheck) e a conferência da seção 7 no Android, no iOS e no web.

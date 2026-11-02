@@ -1,8 +1,15 @@
-import type { FieldId, PriorityBudget } from '@tms/sheet-core'
+import {
+  type FieldId,
+  type PriorityBudget,
+  plural,
+  short,
+} from '@tms/sheet-core'
 import { Text, tokens } from '@tms/ui'
 import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
+import { drawsEditor } from '../FieldSlot'
+import type { FieldEntry } from '../store/sheetStore'
 import { useCreation } from './CreationContext'
 import { counterSpoken, counterText, findGroup, groupFor } from './creation'
 import { RadioChips } from './RadioChips'
@@ -14,15 +21,20 @@ import { usePriorityChoice } from './usePriorityChoice'
  * conta do servidor; nada é calculado aqui. Num grupo de prioridades, a
  * escolha (7 · 5 · 3) fica ao lado, no próprio bloco que ela distribui.
  * `line`: fora de um cabeçalho, quando a aba já diz qual é o grupo.
+ * `items`: o cabeçalho intitula esta lista (T-58). Sem a conta (criação
+ * livre, Editar, lista fora dos orçamentos), o contador é o da lista, com
+ * unidade ("3 itens"; na lista fixa, as linhas preenchidas, "1/3").
  */
 export function CreationCounter({
   fieldIds,
   line = false,
+  items,
 }: {
   readonly fieldIds: readonly FieldId[]
   readonly line?: boolean
+  readonly items?: FieldId
 }) {
-  const { model, mode } = useSheet()
+  const { model, mode, roles } = useSheet()
   const creation = useCreation()
   const where = useMemo(() => groupFor(model, fieldIds), [model, fieldIds])
   const group = useSheetSelector(s => findGroup(s.check, where))
@@ -38,7 +50,11 @@ export function CreationCounter({
   // Escolher só em `creating`; depois, a prioridade fica fixa
   const pickable =
     Boolean(budget && creation?.info) && creation?.status === 'creating'
-  if (mode !== 'create' || !creation?.active || !group) return null
+  const list = useSheetSelector(s => (items ? s.entries.get(items) : undefined))
+  if (mode !== 'create' || !creation?.active || !group)
+    return list && items && drawsEditor(model, roles, items, mode) ? (
+      <ItemCount entry={list} />
+    ) : null
   const over = group.budget !== null && group.extra > 0
   const counter =
     pickable && group.budget === null ? (
@@ -66,6 +82,19 @@ export function CreationCounter({
         <PriorityPicker budget={budget} group={group.id} label={group.label} />
       ) : null}
     </View>
+  )
+}
+
+/** A contagem da lista, com unidade: o número de itens nunca parece ponto. */
+function ItemCount({ entry }: { readonly entry: FieldEntry }) {
+  const { resolved, sheet } = entry
+  if (resolved.type !== 'list') return null
+  return (
+    <Text variant="caption" color="inkMuted" testID={`items-${resolved.id}`}>
+      {resolved.field.def.fixed
+        ? short(resolved, sheet)
+        : plural(resolved.items.length, 'item', 'itens')}
+    </Text>
   )
 }
 

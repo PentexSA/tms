@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native'
 import { useSheet } from './context'
 import { CreationCounter } from './creation/CreationCounter'
 import { layoutFor } from './layouts'
+import { sectionList } from './layouts/headedList'
 
 /**
  * Uma seção com título e layout. Seção que os papéis não leem não aparece
@@ -25,11 +26,16 @@ export function SectionView({
         <View style={styles.title}>
           <SectionHeader
             title={section.def.title}
-            right={<CreationCounter fieldIds={section.fieldIds} />}
+            right={
+              <CreationCounter
+                fieldIds={section.fieldIds}
+                items={sectionList(model, section)}
+              />
+            }
           />
         </View>
       )}
-      <Layout section={section} />
+      <Layout section={section} titled={!hideTitle} />
     </View>
   )
 }
