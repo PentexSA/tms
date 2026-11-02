@@ -120,7 +120,9 @@ describe('characterState', () => {
       'neutral',
     ],
     ['sem estado', {}, player, null],
-  ])('%s', (_, row, options, label, tone) => {
+  ])('%s', (...[, row, options, label, tone]) => {
+    // Com o resto, o Jest não passa o `done` na quinta posição das linhas
+    // sem tom
     const state = characterState(row, options)
     expect(state?.label ?? null).toBe(label)
     if (tone) expect(state?.tone).toBe(tone)
