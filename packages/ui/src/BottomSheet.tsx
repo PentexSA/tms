@@ -7,6 +7,7 @@ import {
 } from 'react'
 import {
   KeyboardAvoidingView,
+  type KeyDownEvent,
   Modal,
   Platform,
   ScrollView,
@@ -16,6 +17,7 @@ import {
 import { IconButton } from './IconButton'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
+import { keyOf } from './roving'
 import { Text } from './Text'
 import { ModalToastHost } from './Toast'
 import { useTheme } from './theme'
@@ -30,6 +32,16 @@ import { tokens } from './tokens'
 // (no web o react-native-web não esconde os irmãos do modal). No iOS, o
 // gesto de escape do VoiceOver ("Z") fecha. No web, o foco volta a quem
 // abriu a folha, se ele ainda estiver na tela.
+//
+// Esc no web (T-71): o Modal do react-native-web só fecha com Esc depois
+// que a animação de entrada termina (~270 ms, o onShow que o deixa
+// "ativo"); antes disso a tecla se perdia, e a folha com campo em
+// autoFocus ficava aberta com o foco dentro dela. Aqui o Esc é tratado na
+// fase de captura da raiz da folha (o TextInput do react-native-web não
+// deixa o keydown subir), a qualquer momento em que o foco esteja nela. É o
+// único caminho no web: o onRequestClose fica só para o voltar do Android.
+// O fundo no web é um View sem tabindex: um Pressable sempre é focável, e o
+// trap do modal focava o fundo oculto ao entrar.
 //
 // Por que não basta o ModalFocusTrap do react-native-web: ele guarda o
 // elemento focado num efeito passivo, depois da montagem. Quando a folha
@@ -124,29 +136,52 @@ export function BottomSheet({
     }, 0)
   }, [])
   useEffect(() => () => restoreFocus(), [restoreFocus])
+  const web = Platform.OS === 'web'
+  const scrimStyle = [
+    StyleSheet.absoluteFill,
+    { backgroundColor: colors.scrim },
+  ]
   return (
     <Modal
       visible={visible}
       transparent
       animationType={reduceMotion ? 'none' : 'slide'}
-      onRequestClose={onClose}
+      onRequestClose={web ? undefined : onClose}
       onDismiss={restoreFocus}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
+        testID="bottom-sheet-root"
         style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {...(web
+          ? {
+              onKeyDownCapture: (e: KeyDownEvent) => {
+                if (keyOf(e).key !== 'Escape') return
+                e.preventDefault()
+                onClose()
+              },
+            }
+          : {})}
       >
-        <Pressable
-          accessible={false}
-          aria-hidden
-          tabIndex={-1}
-          accessibilityLabel="Fechar"
-          testID="bottom-sheet-scrim"
-          onPress={onClose}
-          minTarget={false}
-          style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
-        />
+        {web ? (
+          <View
+            aria-hidden
+            testID="bottom-sheet-scrim"
+            {...{ onClick: onClose }}
+            style={scrimStyle}
+          />
+        ) : (
+          <Pressable
+            accessible={false}
+            aria-hidden
+            accessibilityLabel="Fechar"
+            testID="bottom-sheet-scrim"
+            onPress={onClose}
+            minTarget={false}
+            style={scrimStyle}
+          />
+        )}
         <View
           testID={testID}
           aria-modal
