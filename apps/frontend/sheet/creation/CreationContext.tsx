@@ -9,6 +9,8 @@ export interface CreationContextValue {
   readonly characterId: string
   readonly chronicleId: string
   readonly status: string
+  // PC ou NPC: o NPC não tem selo de estado da criação (o dele é o do P11)
+  readonly kind?: 'pc' | 'npc'
   readonly info: CreationInfo | null
   // A conta vale: criação por pontos em creating ou pending
   readonly active: boolean

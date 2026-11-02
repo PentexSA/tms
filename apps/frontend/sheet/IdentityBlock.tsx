@@ -3,6 +3,7 @@ import { Avatar, Text, tokens, useLayout, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { contentWidthOf } from './contentWidth'
 import { useSheet, useSheetSelector } from './context'
+import { SheetStateBadge } from './creation/SheetState'
 import { CompactEditors } from './evolve/compact'
 import { FieldSlot } from './FieldSlot'
 import { SectionView } from './SectionView'
@@ -80,6 +81,9 @@ export function IdentityBlock() {
           <Text variant="displayXl" numberOfLines={2}>
             {id.name}
           </Text>
+          {/* O estado da ficha (D-02): sob o nome, em qualquer modo, e não no
+              título da AppBar, onde a 360 dp ele não cabe (P04-D §3.5) */}
+          <SheetStateBadge />
           {id.chip ? (
             <View style={[styles.chip, { borderColor: accent.fill }]}>
               <Text variant="caption" color="accent">

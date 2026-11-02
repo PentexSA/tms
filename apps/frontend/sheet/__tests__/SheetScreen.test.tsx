@@ -361,9 +361,11 @@ describe('modo de abertura (T-05)', () => {
       <SheetScreen id={ID} />,
       await signedIn()
     )
-    expect(
-      await screen.findByText('Aguardando aprovação', {}, WAIT)
-    ).toBeTruthy()
+    expect(await screen.findByTestId('creation-pending', {}, WAIT)).toBeTruthy()
+    // O selo sob o nome diz o mesmo (P04-D)
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Aguardando aprovação'
+    )
     expect(screen.queryByRole('radio', { name: 'Criação' })).toBeNull()
     unmount()
     calls.characterGet.mockResolvedValue(creating({ member: false }))
@@ -380,7 +382,7 @@ describe('modo de abertura (T-05)', () => {
       <SheetScreen id={ID} />,
       await signedIn()
     )
-    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    await screen.findByTestId('creation-pending', {}, WAIT)
     calls.characterGet.mockResolvedValue(
       creating({
         creation: creation('points', {
@@ -514,7 +516,7 @@ describe('devolução na ficha aberta (T-06)', () => {
     calls.characterGet.mockResolvedValue(creating({ status: 'pending' }))
     calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
-    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    await screen.findByTestId('creation-pending', {}, WAIT)
     const before = calls.characterGet.mock.calls.length
     calls.characterGet.mockResolvedValue(returned())
     await act(async () => {

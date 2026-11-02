@@ -409,6 +409,7 @@ function LiveSheet({
   const sync = useSync()
   const toast = useToast()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
+  const kind: 'pc' | 'npc' = state.character.kind === 'npc' ? 'npc' : 'pc'
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
     [status, lockedAt, member]
@@ -549,10 +550,11 @@ function LiveSheet({
       characterId: id,
       chronicleId: state.character.chronicle.id,
       status,
+      kind,
       info,
       active,
     }),
-    [id, state.character.chronicle.id, status, info, active]
+    [id, state.character.chronicle.id, status, kind, info, active]
   )
   return (
     <>
