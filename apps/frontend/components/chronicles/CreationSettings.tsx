@@ -119,9 +119,18 @@ export function CreationSettings({
             label="Aprovação do narrador"
             value={approval ? 'on' : 'off'}
             onChange={value => setApproval(value === 'on')}
+            // O efeito de cada opção (R-10, T-29): o comportamento de hoje
             options={[
-              { id: 'off', label: 'Desligada' },
-              { id: 'on', label: 'Ligada' },
+              {
+                id: 'off',
+                label: 'Desligada',
+                meta: 'Na criação por pontos, a ficha entra em jogo quando o jogador conclui.',
+              },
+              {
+                id: 'on',
+                label: 'Ligada',
+                meta: 'Na criação por pontos, o jogador envia a ficha e ela fica só para leitura até você aprovar ou devolver.',
+              },
             ]}
           />
           {loadFailed ? (
@@ -162,8 +171,16 @@ export function CreationSettings({
                 }))
               }
               options={[
-                { id: 'points', label: 'Por pontos' },
-                { id: 'free', label: 'Livre' },
+                {
+                  id: 'points',
+                  label: 'Por pontos',
+                  meta: 'A ficha conta os pontos do orçamento e avisa o que falta; o jogador conclui.',
+                },
+                {
+                  id: 'free',
+                  label: 'Livre',
+                  meta: 'Sem conta de pontos: o jogador monta no modo Editar e você conclui.',
+                },
               ]}
             />
           )}

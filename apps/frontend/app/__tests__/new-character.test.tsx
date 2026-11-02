@@ -191,6 +191,76 @@ describe('Nova ficha', () => {
 
 // L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
 // não abrir, a pessoa sabe que ela existe e não cria outra igual
+// T-29: a Nova ficha diz o modo em que a ficha vai abrir e o orçamento
+describe('Nova ficha: modo e orçamento da crônica', () => {
+  const chronicleWith = (
+    creation?: { approval: boolean; defaults: unknown },
+    role = 'player'
+  ) =>
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role,
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+        ...(creation && { creation: { ...creation, revision: 1 } }),
+      })
+    )
+  const intro = async () =>
+    (await screen.findByTestId('new-character-intro')).props.children
+
+  it('por pontos: o orçamento, o modo Criação e a aprovação', async () => {
+    chronicleWith({ approval: true, defaults: { freebies: 21 } })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toBe(
+      'Esta crônica usa criação por pontos: Atributos 7/5/3 · Habilidades 13/9/5 · Disciplinas 3 · Antecedentes 5 · Virtudes 7 · 21 de bônus. Comece pela identidade; os pontos você distribui depois, na ficha, no modo Criação. O narrador aprova a ficha antes de ela entrar em jogo.'
+    )
+  })
+
+  it('livre: o modo Editar e quem conclui', async () => {
+    chronicleWith({ approval: false, defaults: { mode: 'free' } })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const text = await intro()
+    expect(text).toMatch(/criação livre/)
+    expect(text).toMatch(/no modo Editar/)
+    expect(text).toMatch(/O narrador conclui a criação\.$/)
+  })
+
+  it('sem as regras da crônica, o texto de antes (nunca "criação livre")', async () => {
+    chronicleWith(undefined)
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toBe(
+      'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'
+    )
+  })
+
+  it('o NPC não muda', async () => {
+    chronicleWith({ approval: true, defaults: {} }, 'storyteller')
+    jest
+      .mocked(useLocalSearchParams)
+      .mockReturnValue({ id: CHRONICLE, kind: 'npc' })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toMatch(/^O NPC nasce oculto e em criação livre/)
+  })
+
+  it('na crônica, o jogador vê a linha sob "Suas fichas"; o narrador, não', async () => {
+    chronicleWith({ approval: false, defaults: {} })
+    calls.chronicle.charactersGet.mockResolvedValue(ok([]))
+    const session = await signedIn()
+    const first = renderWithSession(<ChronicleScreen />, session)
+    expect((await screen.findByTestId('creation-summary')).props.children).toBe(
+      'Criação por pontos · Atributos 7/5/3 · Habilidades 13/9/5 · Disciplinas 3 · Antecedentes 5 · Virtudes 7 · 15 de bônus · aprovação desligada'
+    )
+    first.unmount()
+    chronicleWith({ approval: false, defaults: {} }, 'storyteller')
+    renderWithSession(<ChronicleScreen />, session)
+    await screen.findByRole('header', { name: 'Fichas' })
+    expect(screen.queryByTestId('creation-summary')).toBeNull()
+  })
+})
+
 describe('Nova ficha: confirmação ao criar', () => {
   it('mostra "Ficha criada." e abre a ficha', async () => {
     calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
