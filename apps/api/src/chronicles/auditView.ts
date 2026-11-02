@@ -92,14 +92,13 @@ export function auditDetail(action: string, payload: unknown): AuditDetail {
 }
 
 // Ações em que o usuário alvo (o nome que o narrador já vê em
-// "Participantes") entra na linha
+// "Participantes") entra na linha. Recusar e cancelar a transferência não
+// gravam usuário alvo
 const WITH_USER: ReadonlySet<string> = new Set<AuditAction>([
   'member.remove',
   'member.leave',
   'chronicle.transfer.request',
   'chronicle.transfer.accept',
-  'chronicle.transfer.reject',
-  'chronicle.transfer.cancel',
 ])
 
 export const auditShowsUser = (action: string) => WITH_USER.has(action)

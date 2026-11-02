@@ -179,6 +179,17 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     },
     [chronicleId, remember, router]
   )
+  // A mesma linha nas duas seções (PCs e NPCs)
+  const row = (item: TableItem) => (
+    <TableRow
+      key={item.row.id}
+      item={item}
+      onOpen={open}
+      selecting={selecting}
+      selected={selected.has(item.row.id)}
+      onSelect={select}
+    />
+  )
 
   return (
     <View>
@@ -309,31 +320,13 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           </Text>
         ) : (
           <>
-            {sections.pcs.map(item => (
-              <TableRow
-                key={item.row.id}
-                item={item}
-                onOpen={open}
-                selecting={selecting}
-                selected={selected.has(item.row.id)}
-                onSelect={select}
-              />
-            ))}
+            {sections.pcs.map(row)}
             {sections.npcs.length ? (
               <>
                 <View style={styles.section} testID="table-npcs">
                   <SectionHeader title="NPCs" level="group" />
                 </View>
-                {sections.npcs.map(item => (
-                  <TableRow
-                    key={item.row.id}
-                    item={item}
-                    onOpen={open}
-                    selecting={selecting}
-                    selected={selected.has(item.row.id)}
-                    onSelect={select}
-                  />
-                ))}
+                {sections.npcs.map(row)}
               </>
             ) : null}
           </>

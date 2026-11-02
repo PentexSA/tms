@@ -99,11 +99,16 @@ describe('auditShowsUser', () => {
       'member.leave',
       'chronicle.transfer.request',
       'chronicle.transfer.accept',
+    ])
+      expect(auditShowsUser(action)).toBe(true)
+    for (const action of [
+      'character.status',
+      'xp.adjust',
+      'invite.create',
+      // Recusar e cancelar não gravam usuário alvo
       'chronicle.transfer.reject',
       'chronicle.transfer.cancel',
     ])
-      expect(auditShowsUser(action)).toBe(true)
-    for (const action of ['character.status', 'xp.adjust', 'invite.create'])
       expect(auditShowsUser(action)).toBe(false)
   })
 })

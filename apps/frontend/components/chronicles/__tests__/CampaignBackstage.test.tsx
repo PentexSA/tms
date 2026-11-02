@@ -604,7 +604,7 @@ describe('jogador', () => {
     expect(chronicle.historyGet).not.toHaveBeenCalled()
   })
 
-  it('a proposta disponível não aparece no Diário: ela fica no topo da crônica (U-03)', async () => {
+  it('o Diário do jogador não busca nem mostra a proposta: ela fica no topo da crônica (U-03)', async () => {
     chronicle.transferGet.mockResolvedValue(
       ok({
         id: 't1',
@@ -617,15 +617,29 @@ describe('jogador', () => {
     renderWithQueryClient(
       <CampaignBackstage chronicle={info()} narrating={false} />
     )
-    await waitFor(() => expect(chronicle.transferGet).toHaveBeenCalled())
     await screen.findByText('Diário da crônica')
+    await act(() => Promise.resolve())
+    expect(chronicle.transferGet).not.toHaveBeenCalled()
     expect(screen.queryByText(/Convite para narrar/)).toBeNull()
     expect(
       screen.queryByRole('button', { name: 'Aceitar narração' })
     ).toBeNull()
   })
 
-  it('pedido vencido não oferece aceite', async () => {
+  // T-74: "sem transferência" é 200 com null; o Elysia manda corpo vazio e o
+  // Eden entrega "" ao app
+  it.each([
+    ['null', null],
+    ['corpo vazio', ''],
+  ])('sem transferência (%s), o narrador não vê erro', async (_, data) => {
+    chronicle.transferGet.mockResolvedValue(ok(data))
+    renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
+    await waitFor(() => expect(chronicle.transferGet).toHaveBeenCalled())
+    expect(await screen.findByRole('button', { name: 'Propor' })).toBeTruthy()
+    expect(screen.queryByText(/erro|falhou/i)).toBeNull()
+  })
+
+  it('pedido vencido: o narrador volta a ver os membros para propor', async () => {
     chronicle.transferGet.mockResolvedValue(
       ok({
         id: 't1',
@@ -635,28 +649,9 @@ describe('jogador', () => {
         available: false,
       })
     )
-    renderWithQueryClient(
-      <CampaignBackstage chronicle={info()} narrating={false} />
-    )
-    await waitFor(() => expect(chronicle.transferGet).toHaveBeenCalled())
-    await screen.findByText('Diário da crônica')
-    expect(screen.queryByText('Convite para narrar')).toBeNull()
-  })
-
-  // T-74: "sem transferência" é 200 com null; o Elysia manda corpo vazio e o
-  // Eden entrega "" ao app
-  it.each([
-    ['null', null],
-    ['corpo vazio', ''],
-  ])('sem transferência (%s) não mostra erro nem aceite', async (_, data) => {
-    chronicle.transferGet.mockResolvedValue(ok(data))
-    renderWithQueryClient(
-      <CampaignBackstage chronicle={info()} narrating={false} />
-    )
-    await waitFor(() => expect(chronicle.transferGet).toHaveBeenCalled())
-    await act(() => Promise.resolve())
-    expect(screen.queryByText('Convite para narrar')).toBeNull()
-    expect(screen.queryByText(/erro|falhou/i)).toBeNull()
+    renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
+    expect(await screen.findByRole('button', { name: 'Propor' })).toBeTruthy()
+    expect(screen.queryByText(/Aguardando/)).toBeNull()
   })
 
   it('sem transferência, o narrador vê os membros para propor', async () => {

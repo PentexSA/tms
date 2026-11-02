@@ -296,6 +296,24 @@ export function chronicleRoutes(
         .leftJoin('chronicle_members as m', join =>
           join.onRef('m.chronicle_id', '=', 'c.id').on('m.user_id', '=', me)
         )
+        // A proposta de narrar pendente e válida para quem pergunta (U-03),
+        // numa consulta só por crônica: o filtro do destinatário fica no
+        // servidor, como no GET /transfer
+        .leftJoinLateral(
+          eb =>
+            eb
+              .selectFrom('chronicle_transfers as tr')
+              .select(['tr.id as offerId', 'tr.expires_at as offerExpiresAt'])
+              .whereRef('tr.chronicle_id', '=', 'c.id')
+              .where('tr.recipient_id', '=', me)
+              .where('tr.status', '=', 'pending')
+              .where('tr.expires_at', '>', now)
+              .orderBy('tr.requested_at', 'desc')
+              .orderBy('tr.id', 'desc')
+              .limit(1)
+              .as('offer'),
+          join => join.onTrue()
+        )
         // O ex-membro continua vendo a crônica em que tem ficha ("Você saiu")
         .where(eb =>
           eb.or([
@@ -311,68 +329,54 @@ export function chronicleRoutes(
             ),
           ])
         )
-        .select(eb => {
-          // A proposta de narrar pendente e válida para quem pergunta (U-03):
-          // o filtro do destinatário fica no servidor, como no GET /transfer
-          const offer = () =>
-            eb
-              .selectFrom('chronicle_transfers as tr')
-              .whereRef('tr.chronicle_id', '=', 'c.id')
-              .where('tr.recipient_id', '=', me)
-              .where('tr.status', '=', 'pending')
-              .where('tr.expires_at', '>', now)
-              .orderBy('tr.requested_at', 'desc')
-              .orderBy('tr.id', 'desc')
-              .limit(1)
-          return [
-            'c.id',
-            'c.name',
-            'c.storyteller_id',
-            'm.user_id as member',
-            'c.created_at',
-            'g.code as systemCode',
-            'g.name as systemName',
-            'st.username as storyteller',
-            // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
-            eb
-              .selectFrom('characters as ch')
-              .select(eb.fn.countAll<string>().as('n'))
-              .whereRef('ch.chronicle_id', '=', 'c.id')
-              .where('ch.deleted_at', 'is', null)
-              .where(eb =>
-                eb.or([
-                  eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
-                  eb('c.storyteller_id', '=', me),
-                  eb.and([
-                    eb('m.user_id', 'is not', null),
-                    eb('ch.kind', '=', 'npc'),
-                    eb('ch.visibility', 'in', ['identity', 'full']),
-                  ]),
-                ])
-              )
-              .as('characterCount'),
-            // Fichas que aguardam a revisão do narrador: só ele recebe a conta
-            eb
-              .selectFrom('characters as ch')
-              .select(eb.fn.countAll<string>().as('n'))
-              .whereRef('ch.chronicle_id', '=', 'c.id')
-              .where('ch.deleted_at', 'is', null)
-              .where('ch.status', '=', 'pending')
-              .where('c.storyteller_id', '=', me)
-              .as('pendingReview'),
-            // A data civil da última sessão (U-04), no formato do sessionDate.
-            // O índice chronicle_sessions_recent_idx atende
-            eb
-              .selectFrom('chronicle_sessions as s')
-              .select(
-                sql<string>`to_char(max(s.session_date), 'YYYY-MM-DD')`.as('d')
-              )
-              .whereRef('s.chronicle_id', '=', 'c.id')
-              .as('lastSession'),
-            offer().select('tr.id').as('offerId'),
-            offer().select('tr.expires_at').as('offerExpiresAt'),
-          ]
-        })
+        .select(eb => [
+          'c.id',
+          'c.name',
+          'c.storyteller_id',
+          'm.user_id as member',
+          'c.created_at',
+          'g.code as systemCode',
+          'g.name as systemName',
+          'st.username as storyteller',
+          // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
+          eb
+            .selectFrom('characters as ch')
+            .select(eb.fn.countAll<string>().as('n'))
+            .whereRef('ch.chronicle_id', '=', 'c.id')
+            .where('ch.deleted_at', 'is', null)
+            .where(eb =>
+              eb.or([
+                eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
+                eb('c.storyteller_id', '=', me),
+                eb.and([
+                  eb('m.user_id', 'is not', null),
+                  eb('ch.kind', '=', 'npc'),
+                  eb('ch.visibility', 'in', ['identity', 'full']),
+                ]),
+              ])
+            )
+            .as('characterCount'),
+          // Fichas que aguardam a revisão do narrador: só ele recebe a conta
+          eb
+            .selectFrom('characters as ch')
+            .select(eb.fn.countAll<string>().as('n'))
+            .whereRef('ch.chronicle_id', '=', 'c.id')
+            .where('ch.deleted_at', 'is', null)
+            .where('ch.status', '=', 'pending')
+            .where('c.storyteller_id', '=', me)
+            .as('pendingReview'),
+          // A data civil da última sessão (U-04), no formato do sessionDate.
+          // O índice chronicle_sessions_recent_idx atende
+          eb
+            .selectFrom('chronicle_sessions as s')
+            .select(
+              sql<string>`to_char(max(s.session_date), 'YYYY-MM-DD')`.as('d')
+            )
+            .whereRef('s.chronicle_id', '=', 'c.id')
+            .as('lastSession'),
+          'offer.offerId',
+          'offer.offerExpiresAt',
+        ])
         .orderBy('c.created_at', 'desc')
         .execute()
       return rows.map(r => {

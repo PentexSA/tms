@@ -78,7 +78,9 @@ export function CampaignBackstage({
   readonly narrating: boolean
 }) {
   const sessions = useSessions(chronicle.id)
-  const transfer = useTransfer(chronicle.id)
+  // Só o painel do narrador lê a transferência aqui; a proposta do jogador
+  // fica no topo da crônica (TransferOffer, U-03)
+  const transfer = useTransfer(chronicle.id, narrating)
   return (
     <View style={styles.root}>
       {/* Os títulos com a margem da página (T-67) */}
