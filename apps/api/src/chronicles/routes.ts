@@ -1,7 +1,7 @@
 import type { DB } from '@tms/db'
 import { effectiveChronicleOptions, isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
-import type { Kysely } from 'kysely'
+import { type Kysely, sql } from 'kysely'
 import { audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
@@ -270,6 +270,7 @@ export function chronicleRoutes(
     )
     .get('/chronicles', async ({ userId }) => {
       const me = requireUser(userId)
+      const now = options.now()
       const rows = await db
         .selectFrom('chronicles as c')
         .innerJoin('game_systems as g', 'g.id', 'c.system_id')
@@ -292,59 +293,95 @@ export function chronicleRoutes(
             ),
           ])
         )
-        .select(eb => [
-          'c.id',
-          'c.name',
-          'c.storyteller_id',
-          'm.user_id as member',
-          'c.created_at',
-          'g.code as systemCode',
-          'g.name as systemName',
-          'st.username as storyteller',
-          // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
-          eb
-            .selectFrom('characters as ch')
-            .select(eb.fn.countAll<string>().as('n'))
-            .whereRef('ch.chronicle_id', '=', 'c.id')
-            .where('ch.deleted_at', 'is', null)
-            .where(eb =>
-              eb.or([
-                eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
-                eb('c.storyteller_id', '=', me),
-                eb.and([
-                  eb('m.user_id', 'is not', null),
-                  eb('ch.kind', '=', 'npc'),
-                  eb('ch.visibility', 'in', ['identity', 'full']),
-                ]),
-              ])
-            )
-            .as('characterCount'),
-          // Fichas que aguardam a revisão do narrador: só ele recebe a conta
-          eb
-            .selectFrom('characters as ch')
-            .select(eb.fn.countAll<string>().as('n'))
-            .whereRef('ch.chronicle_id', '=', 'c.id')
-            .where('ch.deleted_at', 'is', null)
-            .where('ch.status', '=', 'pending')
-            .where('c.storyteller_id', '=', me)
-            .as('pendingReview'),
-        ])
+        .select(eb => {
+          // A proposta de narrar pendente e válida para quem pergunta (U-03):
+          // o filtro do destinatário fica no servidor, como no GET /transfer
+          const offer = () =>
+            eb
+              .selectFrom('chronicle_transfers as tr')
+              .whereRef('tr.chronicle_id', '=', 'c.id')
+              .where('tr.recipient_id', '=', me)
+              .where('tr.status', '=', 'pending')
+              .where('tr.expires_at', '>', now)
+              .orderBy('tr.requested_at', 'desc')
+              .orderBy('tr.id', 'desc')
+              .limit(1)
+          return [
+            'c.id',
+            'c.name',
+            'c.storyteller_id',
+            'm.user_id as member',
+            'c.created_at',
+            'g.code as systemCode',
+            'g.name as systemName',
+            'st.username as storyteller',
+            // Só o que quem pergunta vê: o narrador, todas; o jogador, as dele
+            eb
+              .selectFrom('characters as ch')
+              .select(eb.fn.countAll<string>().as('n'))
+              .whereRef('ch.chronicle_id', '=', 'c.id')
+              .where('ch.deleted_at', 'is', null)
+              .where(eb =>
+                eb.or([
+                  eb.and([eb('ch.kind', '=', 'pc'), eb('ch.user_id', '=', me)]),
+                  eb('c.storyteller_id', '=', me),
+                  eb.and([
+                    eb('m.user_id', 'is not', null),
+                    eb('ch.kind', '=', 'npc'),
+                    eb('ch.visibility', 'in', ['identity', 'full']),
+                  ]),
+                ])
+              )
+              .as('characterCount'),
+            // Fichas que aguardam a revisão do narrador: só ele recebe a conta
+            eb
+              .selectFrom('characters as ch')
+              .select(eb.fn.countAll<string>().as('n'))
+              .whereRef('ch.chronicle_id', '=', 'c.id')
+              .where('ch.deleted_at', 'is', null)
+              .where('ch.status', '=', 'pending')
+              .where('c.storyteller_id', '=', me)
+              .as('pendingReview'),
+            // A data civil da última sessão (U-04), no formato do sessionDate.
+            // O índice chronicle_sessions_recent_idx atende
+            eb
+              .selectFrom('chronicle_sessions as s')
+              .select(
+                sql<string>`to_char(max(s.session_date), 'YYYY-MM-DD')`.as('d')
+              )
+              .whereRef('s.chronicle_id', '=', 'c.id')
+              .as('lastSession'),
+            offer().select('tr.id').as('offerId'),
+            offer().select('tr.expires_at').as('offerExpiresAt'),
+          ]
+        })
         .orderBy('c.created_at', 'desc')
         .execute()
-      return rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        system: { code: r.systemCode, name: r.systemName },
-        role:
+      return rows.map(r => {
+        const role =
           r.storyteller_id === me
             ? ('storyteller' as const)
             : r.member
               ? ('player' as const)
-              : ('former' as const),
-        storyteller: { username: r.storyteller },
-        characterCount: Number(r.characterCount ?? 0),
-        pendingReview: Number(r.pendingReview ?? 0),
-      }))
+              : ('former' as const)
+        return {
+          id: r.id,
+          name: r.name,
+          system: { code: r.systemCode, name: r.systemName },
+          role,
+          storyteller: { username: r.storyteller },
+          characterCount: Number(r.characterCount ?? 0),
+          pendingReview: Number(r.pendingReview ?? 0),
+          // Só narrador e membro: o ex-membro não acompanha a crônica
+          // (plano v5 §3.5)
+          lastSession: role === 'former' ? null : (r.lastSession ?? null),
+          // Só o destinatário que ainda é membro: a decisão revalida tudo
+          transferOffer:
+            role === 'player' && r.offerId && r.offerExpiresAt
+              ? { id: r.offerId, expiresAt: r.offerExpiresAt }
+              : null,
+        }
+      })
     })
     .get(
       '/chronicles/:id',

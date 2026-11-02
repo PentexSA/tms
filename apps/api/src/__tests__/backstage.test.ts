@@ -595,6 +595,54 @@ describe('transferência: validade, decisões e autoridade', () => {
     expect(await storytellerOf()).toBe(storyteller.id)
   })
 
+  // U-03: a lista de crônicas leva a proposta só ao destinatário
+  const offerOf = async (user: TestUser) => {
+    const res = await as(ctx, user, 'GET', '/chronicles')
+    expect(res.status).toBe(200)
+    const list = (await res.json()) as {
+      id: string
+      transferOffer: { id: string; expiresAt: string } | null
+    }[]
+    return list.find(c => c.id === chronicleId)?.transferOffer
+  }
+
+  it('a lista de crônicas traz a proposta pendente só para o destinatário (U-03)', async () => {
+    expect(await offerOf(player)).toBeNull()
+    const one = (await (await propose()).json()) as { id: string }
+    const offer = await offerOf(player)
+    expect(offer).toEqual({ id: one.id, expiresAt: expect.any(String) })
+    expect(Object.keys(offer ?? {}).sort()).toEqual(['expiresAt', 'id'])
+    // Narrador e outro membro: null, nunca a proposta de outra pessoa
+    expect(await offerOf(storyteller)).toBeNull()
+    expect(await offerOf(other)).toBeNull()
+
+    // Recusada, cancelada ou vencida: sai da lista
+    expect((await decide(player, one.id, 'reject')).status).toBe(200)
+    expect(await offerOf(player)).toBeNull()
+    const two = (await (await propose()).json()) as { id: string }
+    expect((await offerOf(player))?.id).toBe(two.id)
+    expect((await decide(storyteller, two.id, 'cancel')).status).toBe(200)
+    expect(await offerOf(player)).toBeNull()
+    await propose()
+    ctx.clock.advance(7 * 24 * 60 * 60 * 1000)
+    expect(await offerOf(player)).toBeNull()
+  })
+
+  it('o destinatário que saiu não recebe a proposta na lista (U-03)', async () => {
+    await createCharacter(ctx, other, chronicleId)
+    expect((await propose(crypto.randomUUID(), other.id)).status).toBe(201)
+    expect(await offerOf(other)).toEqual(
+      expect.objectContaining({ id: expect.any(String) })
+    )
+    await ctx.db
+      .deleteFrom('chronicle_members')
+      .where('chronicle_id', '=', chronicleId)
+      .where('user_id', '=', other.id)
+      .execute()
+    // Continua vendo a crônica ("Você saiu"), sem a proposta
+    expect(await offerOf(other)).toBeNull()
+  })
+
   it('só propõe a membro atual, e o destinatário que saiu não aceita', async () => {
     const stranger = await createUser(ctx, 'estranha-v5')
     expect((await propose(crypto.randomUUID(), stranger.id)).status).toBe(409)
