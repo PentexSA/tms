@@ -7,6 +7,7 @@ import {
   creationInputOf,
   describeEvent,
   isReversible,
+  jsonEqual,
   ledgerPaths,
   MAX_EVENTS_PER_BATCH,
   parseCharacterCreation,
@@ -102,6 +103,35 @@ async function changedByOf(
 // text e longText entram no histórico sem conteúdo (contrato §10)
 const contentFree = (type: string | undefined) =>
   type === 'text' || type === 'longText'
+
+/**
+ * As ações do registro da crônica que viram "Criação concluída" no Histórico
+ * da ficha (T-80): o dono ou o narrador conclui, ou o narrador aprova. Só
+ * estas duas; o resto do registro continua só para o narrador, em Bastidores.
+ */
+const COMPLETION_ACTIONS = [
+  'character.creation.complete',
+  'character.creation.approve',
+] as const
+
+export interface HistoryEntry {
+  readonly id: string
+  readonly at: Date
+  readonly by: { readonly username: string } | null
+  readonly byRole: string
+  readonly sheetVersion: number | null
+  readonly operationId: string | null
+  readonly event?: 'creation.completed'
+  readonly reversible: boolean
+  readonly changes: readonly {
+    readonly label: string
+    readonly change: string
+  }[]
+}
+
+/** Ordem do Histórico: do mais novo ao mais antigo, por (quando, id). */
+const newestFirst = (a: HistoryEntry, b: HistoryEntry) =>
+  b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 export function eventRoutes(
   db: Kysely<DB>,
@@ -403,11 +433,13 @@ export function eventRoutes(
               )
             )
           )
+        let before: { readonly when: Date; readonly id: string } | null = null
         if (query.before) {
           const [at, id] = query.before.split('_')
           const when = new Date(at ?? '')
           if (Number.isNaN(when.getTime()) || !id)
             throw new ApiError(400, 'dados inválidos')
+          before = { when, id }
           q = q.where(eb =>
             eb.or([
               eb('b.created_at', '<', when),
@@ -433,14 +465,83 @@ export function eventRoutes(
               .execute()
           : []
         const roles: ReadonlySet<RoleName> = access.roles
-        const items = batches
+        const last = batches.at(-1)
+        const next =
+          batches.length === limit && last
+            ? `${new Date(last.created_at).toISOString()}_${last.id}`
+            : null
+        // "Criação concluída" (T-80) vem do registro da crônica, que é onde a
+        // conclusão é gravada. As páginas são intervalos contíguos de
+        // (quando, id): esta vai do último lote dela (inclusive) até o cursor
+        // pedido (exclusive), e a última página não tem piso. Assim cada
+        // conclusão aparece uma vez, na página certa. Só as duas ações, só
+        // desta ficha e da crônica dela, sem `payload` nem `target_user_id`
+        // na resposta
+        let audits = db
+          .selectFrom('chronicle_audit as a')
+          .leftJoin('users as u', 'u.id', 'a.actor_id')
+          .select([
+            'a.id',
+            'a.created_at',
+            'a.actor_id',
+            'a.target_user_id',
+            'u.username',
+          ])
+          .where('a.chronicle_id', '=', access.character.chronicleId)
+          .where('a.target_character_id', '=', params.id)
+          .where('a.action', 'in', COMPLETION_ACTIONS)
+        if (before) {
+          const { when, id } = before
+          audits = audits.where(eb =>
+            eb.or([
+              eb('a.created_at', '<', when),
+              eb.and([eb('a.created_at', '=', when), eb('a.id', '<', id)]),
+            ])
+          )
+        }
+        if (next !== null && last) {
+          const floor = new Date(last.created_at)
+          audits = audits.where(eb =>
+            eb.or([
+              eb('a.created_at', '>', floor),
+              eb.and([
+                eb('a.created_at', '=', floor),
+                eb('a.id', '>=', last.id),
+              ]),
+            ])
+          )
+        }
+        const completions: HistoryEntry[] = (await audits.execute()).map(a => ({
+          id: a.id,
+          at: new Date(a.created_at),
+          by: a.username === null ? null : { username: a.username },
+          // Calculado no servidor: o autor gravado contra o dono da ficha no
+          // momento da conclusão (o mesmo critério do `by_role` dos lotes)
+          byRole:
+            a.actor_id !== null && a.actor_id === a.target_user_id
+              ? 'owner'
+              : 'storyteller',
+          sheetVersion: null,
+          operationId: null,
+          event: 'creation.completed',
+          reversible: false,
+          changes: [],
+        }))
+        const items: HistoryEntry[] = batches
           .map(b => {
             const mine = events.filter(e => e.batch_id === b.id)
             const changes = mine
               .filter(e => {
                 // O jogador nunca vê nem o rótulo de um campo que não lê
                 const p = parsePath(e.path)
-                return p !== null && canRead(model, p.fieldId, roles)
+                if (p === null || !canRead(model, p.fieldId, roles))
+                  return false
+                // Sem mudança, sem linha (T-80): o freeze da conclusão grava
+                // o valor que já valia. Texto e especialização entram sem
+                // conteúdo (null → null) e continuam como "atualizado"
+                const type = model.fields.get(p.fieldId)?.def.type
+                const hide = contentFree(type) || p.scope === 'specialties'
+                return hide || !jsonEqual(e.from_value, e.to_value)
               })
               .map(e => {
                 const event: SheetEvent = {
@@ -452,7 +553,7 @@ export function eventRoutes(
               })
             return {
               id: b.id,
-              at: b.created_at,
+              at: new Date(b.created_at),
               // Null: "Conta excluída" (migration 0013)
               by: b.username === null ? null : { username: b.username },
               byRole: b.by_role,
@@ -472,13 +573,9 @@ export function eventRoutes(
             }
           })
           .filter(b => b.changes.length > 0)
-        const last = batches.at(-1)
         return {
-          items,
-          next:
-            batches.length === limit && last
-              ? `${new Date(last.created_at).toISOString()}_${last.id}`
-              : null,
+          items: [...items, ...completions].sort(newestFirst),
+          next,
         }
       },
       {
