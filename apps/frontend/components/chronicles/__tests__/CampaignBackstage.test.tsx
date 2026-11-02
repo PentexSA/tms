@@ -446,9 +446,9 @@ describe('jogador', () => {
     expect(chronicle.historyGet).not.toHaveBeenCalled()
   })
 
-  // T-40 (P09-C): aceitar volta as queries ao estado inicial (as montadas
-  // rebuscam com o papel novo, sem remontar a tela) e avisa
-  it('destinatário aceita a narração; as queries recomeçam e o aviso aparece', async () => {
+  // T-40 (P09-C): aceitar invalida tudo (as montadas rebuscam com o papel
+  // novo, sem voltar ao esqueleto) e avisa
+  it('destinatário aceita a narração; tudo é rebuscado e o aviso aparece', async () => {
     chronicle.transferGet.mockResolvedValue(
       ok({
         id: 't1',
@@ -466,12 +466,14 @@ describe('jogador', () => {
     )
     expect(await screen.findByText('Convite para narrar')).toBeTruthy()
     const clear = jest.spyOn(queryClient, 'clear')
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
     const reset = jest.spyOn(queryClient, 'resetQueries')
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Aceitar narração' }))
     })
-    await waitFor(() => expect(reset).toHaveBeenCalled())
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith())
     expect(clear).not.toHaveBeenCalled()
+    expect(reset).not.toHaveBeenCalled()
     expect(
       await screen.findByText('Agora você narra esta crônica.')
     ).toBeTruthy()

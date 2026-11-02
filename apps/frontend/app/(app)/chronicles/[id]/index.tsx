@@ -105,16 +105,29 @@ export default function ChronicleScreen() {
   // A rolagem de cada aba, em memória: volta ao mesmo ponto ao voltar de
   // uma ficha (no web, mesmo se a tela foi desmontada)
   const scrollRef = useRef<ScrollViewInstance>(null)
-  // A aba mostrada (a mesma chave da gravação): atualizada a cada render
+  // A aba mostrada (a mesma chave da gravação): atualizada a cada render,
+  // depois que a crônica carrega. A volta é pedida no foco e feita quando a
+  // rolagem existe e o conteúdo já cabe o ponto guardado mais a tela
   const scrollKey = useRef<ChronicleView>('sheets')
-  const restoring = useRef<number | null>(null)
+  const restoring = useRef(false)
+  const viewport = useRef(0)
+  const content = useRef(0)
+  const restore = useCallback(() => {
+    if (!restoring.current || !scrollRef.current) return
+    const y = scrollOf(id, scrollKey.current)
+    if (!y) {
+      restoring.current = false
+      return
+    }
+    if (content.current - viewport.current < y) return
+    restoring.current = false
+    scrollRef.current.scrollTo({ y, animated: false })
+  }, [id])
   useFocusEffect(
     useCallback(() => {
-      const y = scrollOf(id, scrollKey.current)
-      if (!y) return
-      restoring.current = y
-      scrollRef.current?.scrollTo({ y, animated: false })
-    }, [id])
+      restoring.current = true
+      restore()
+    }, [restore])
   )
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
@@ -173,19 +186,20 @@ export default function ChronicleScreen() {
             />
           }
           scrollEventThrottle={64}
-          onScroll={e =>
+          onScroll={e => {
+            // Quem rola antes de o conteúdo chegar decide (dedo, roda,
+            // teclado ou barra): nada de pular depois
+            restoring.current = false
             rememberScroll(id, showing, e.nativeEvent.contentOffset.y)
-          }
-          // Quem rola antes de o conteúdo chegar decide: nada de pular depois
-          onScrollBeginDrag={() => {
-            restoring.current = null
+          }}
+          onLayout={e => {
+            viewport.current = e.nativeEvent.layout.height
+            restore()
           }}
           // O conteúdo cresceu até a rolagem guardada: volta a ela uma vez
           onContentSizeChange={(_, height) => {
-            const y = restoring.current
-            if (y === null || height < y) return
-            restoring.current = null
-            scrollRef.current?.scrollTo({ y, animated: false })
+            content.current = height
+            restore()
           }}
         >
           {former ? (

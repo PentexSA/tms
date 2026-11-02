@@ -112,29 +112,25 @@ export function TableSelectionProvider({
     },
     [choose]
   )
-  // Só troca quando a lista muda de fato: a Mesa informa a cada render dela
-  const sync = useCallback((next: readonly TableItem[]) => {
-    setItems(old =>
-      old.length === next.length && old.every((item, i) => item === next[i])
-        ? old
-        : next
-    )
-  }, [])
+  // Só troca quando a lista muda de fato. A ficha que saiu da Mesa
+  // (arquivada, excluída, outro recorte) sai da seleção: a contagem e o
+  // limite de 20 contam só o que está na tela
+  const sync = useCallback(
+    (next: readonly TableItem[]) => {
+      setItems(old =>
+        old.length === next.length && old.every((item, i) => item === next[i])
+          ? old
+          : next
+      )
+      const shown = new Set(next.map(i => i.row.id))
+      const kept = [...current.current].filter(id => shown.has(id))
+      if (kept.length !== current.current.size) choose(new Set(kept))
+    },
+    [choose]
+  )
   const chosen = useMemo(
     () => items.filter(i => selected.has(i.row.id)),
     [items, selected]
-  )
-  // O voltar do Android desliga a seleção antes de sair da crônica, como a
-  // barra de ação contextual; só enquanto a tela está em foco
-  useFocusEffect(
-    useCallback(() => {
-      if (!selecting) return
-      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        stop()
-        return true
-      })
-      return () => sub.remove()
-    }, [selecting, stop])
   )
   const value = useMemo(
     () => ({
@@ -184,6 +180,21 @@ export function TableActionBar({
   const [granting, setGranting] = useState(false)
   const [height, setHeight] = useState(0)
   useToastOffset(selecting ? height : 0)
+  // O voltar do Android desliga a seleção antes de sair da crônica, como a
+  // barra de ação contextual. Só com a barra à vista (a aba Mesa) e com a
+  // tela em foco: em outra aba, ou com uma ficha aberta por cima, o voltar
+  // é o de sempre
+  const stop = selection.stop
+  useFocusEffect(
+    useCallback(() => {
+      if (!selecting) return
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        stop()
+        return true
+      })
+      return () => sub.remove()
+    }, [selecting, stop])
+  )
   const sheets = (
     <>
       {granting ? (

@@ -22,10 +22,10 @@ import {
 import type { TableItem } from './tableItems'
 import { useRevertOperation } from './useRevertOperation'
 
-/** A mesma folha para trilhas e recursos: alvos, tipos e rótulos vêm do template. */
 // O "Desfazer" da operação em grupo dura mais (T-76, P09-C)
 export const GROUP_TOAST_MS = 10_000
 
+/** A mesma folha para trilhas e recursos: alvos, tipos e rótulos vêm do template. */
 export function OperationSheet({
   chronicleId,
   items,

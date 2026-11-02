@@ -749,6 +749,33 @@ describe('Toast', () => {
       expect(visible()).toBe(false)
     })
 
+    it('o aviso que passa a um modal com o foco nele não fica preso', async () => {
+      const content = (modal: boolean) => (
+        <ToastProvider>
+          <Custom />
+          <BottomSheet visible={modal} title="Folha" onClose={() => undefined}>
+            <RNText>Folha aberta</RNText>
+          </BottomSheet>
+        </ToastProvider>
+      )
+      const { rerender } = render(content(false))
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      advance(1_000)
+      // O foco no "Desfazer" segura o prazo; o modal abre e o aviso muda de
+      // camada sem o blur
+      fireEvent(screen.getByTestId('toast'), 'focus')
+      rerender(content(true))
+      expect(
+        within(screen.UNSAFE_getByType(Modal)).getByText(TEXT)
+      ).toBeTruthy()
+      // Volta a contar com o que faltava (4 s)
+      advance(TOAST_MS - 1_000 - 1)
+      expect(visible()).toBe(true)
+      advance(1)
+      expect(visible()).toBe(false)
+    })
+
     it('com leitor de tela, durationMs menor dura os 10 s', async () => {
       await open(3_000, true)
       advance(TOAST_SCREEN_READER_MS - 1)

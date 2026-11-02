@@ -231,6 +231,17 @@ function ToastView({
 }) {
   const { colors } = useTheme()
   const insets = useInsets()
+  // Saiu da tela com o ponteiro, o foco ou o dedo em cima (o aviso passou
+  // para um modal, por exemplo): o leave, o blur e o touchEnd não chegam, e
+  // o prazo ficaria parado para sempre. Solta tudo ao desmontar
+  useEffect(
+    () => () => {
+      onHold('pointer', false)
+      onHold('focus', false)
+      onHold('touch', false)
+    },
+    [onHold]
+  )
   return (
     <View
       pointerEvents="box-none"

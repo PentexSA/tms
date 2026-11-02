@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react-native'
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { Dimensions, ScrollView } from 'react-native'
+import { Dimensions, ScrollView, StyleSheet } from 'react-native'
 
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
@@ -282,9 +282,9 @@ describe('Mesa do narrador', () => {
     await openTable()
     await waitFor(() => expect(calls.chronicle.tableGet).toHaveBeenCalled())
     const before = calls.chronicle.tableGet.mock.calls.length
-    // A volta para a tela (a montagem já buscou)
+    // A volta para a tela (a montagem já buscou): os efeitos de foco rodam
     act(() => {
-      focus.at(-1)?.()
+      for (const cb of focus) cb()
     })
     await waitFor(() =>
       expect(calls.chronicle.tableGet.mock.calls.length).toBe(before + 1)
@@ -351,10 +351,13 @@ describe('Mesa do narrador', () => {
         ])
       )
       await openTable()
-      const first = await screen.findByTestId('table-grid-row-0')
-      for (const id of ids)
-        expect(within(first).getByTestId(`table-row-${id}`)).toBeTruthy()
-      expect(screen.queryByTestId('table-grid-row-1')).toBeNull()
+      const grid = await screen.findByTestId('table-grid')
+      // Um contêiner só, com cada cartão em 1/3 da largura, na ordem da lista
+      for (const id of ids) {
+        const cell = within(grid).getByTestId(`table-cell-${id}`)
+        expect(StyleSheet.flatten(cell.props.style).width).toBe(`${100 / 3}%`)
+        expect(within(cell).getByTestId(`table-row-${id}`)).toBeTruthy()
+      }
     } finally {
       Dimensions.set({ window: before, screen: before })
     }
@@ -486,15 +489,28 @@ describe('a crônica volta na mesma aba e no mesmo ponto', () => {
       act(() => {
         for (const cb of focus) cb()
       })
-      // O conteúdo ainda curto não rola; quando cresce até a altura, rola
-      // uma vez, sem animação
-      scrollTo.mockClear()
-      fireEvent(scroll, 'contentSizeChange', 390, 300)
+      // O conteúdo que ainda não cabe o ponto guardado mais a tela não rola
+      // (o ScrollView pararia no máximo de agora); quando cabe, rola uma vez
+      fireEvent(scroll, 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 700 } },
+      })
+      fireEvent(scroll, 'contentSizeChange', 390, 1000)
       expect(scrollTo).not.toHaveBeenCalled()
       fireEvent(scroll, 'contentSizeChange', 390, 2000)
       expect(scrollTo).toHaveBeenCalledWith({ y: 640, animated: false })
       fireEvent(scroll, 'contentSizeChange', 390, 2400)
       expect(scrollTo).toHaveBeenCalledTimes(1)
+      // Quem rola antes de o conteúdo chegar decide: a volta não pula depois
+      fireEvent(scroll, 'contentSizeChange', 390, 500)
+      scrollTo.mockClear()
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      expect(scrollTo).not.toHaveBeenCalled()
+      fireEvent.scroll(scroll, { nativeEvent: { contentOffset: { y: 200 } } })
+      fireEvent(scroll, 'contentSizeChange', 390, 3000)
+      expect(scrollTo).not.toHaveBeenCalled()
+      expect(scrollOf(CHRONICLE_ID, 'table')).toBe(200)
     } finally {
       jest.mocked(useFocusEffect).mockReset()
       clearChronicleScroll()

@@ -71,9 +71,9 @@ export function tableColumns(width: number, stacked: boolean): number {
 }
 
 /**
- * As linhas da grade, na ordem da lista: a leitura e o Tab seguem linha a
- * linha. A última linha completa com espaços vazios, para os cartões terem a
- * mesma largura.
+ * A grade, na ordem da lista: a leitura e o Tab seguem linha a linha. Um
+ * contêiner só, com cada cartão numa célula de 1/colunas da largura e a key
+ * da ficha: trocar a ordem ou o filtro move os cartões sem remontá-los.
  */
 function TableGrid({
   items,
@@ -85,25 +85,16 @@ function TableGrid({
   readonly renderItem: (item: TableItem, framed: boolean) => ReactNode
 }) {
   if (columns <= 1) return <>{items.map(i => renderItem(i, false))}</>
-  const rows: TableItem[][] = []
-  for (let i = 0; i < items.length; i += columns)
-    rows.push(items.slice(i, i + columns))
+  const width = `${100 / columns}%` as const
   return (
     <View style={styles.grid} testID="table-grid">
-      {rows.map((row, r) => (
+      {items.map(item => (
         <View
-          key={row[0]?.row.id ?? r}
-          style={styles.gridRow}
-          testID={`table-grid-row-${r}`}
+          key={item.row.id}
+          style={[styles.cell, { width }]}
+          testID={`table-cell-${item.row.id}`}
         >
-          {row.map(item => (
-            <View key={item.row.id} style={styles.cell}>
-              {renderItem(item, true)}
-            </View>
-          ))}
-          {Array.from({ length: columns - row.length }, (_, k) => (
-            <View key={`empty-${k}`} style={styles.cell} />
-          ))}
+          {renderItem(item, true)}
         </View>
       ))}
     </View>
@@ -213,8 +204,12 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   })
   const rows = (table.data ?? NO_ROWS) as TableRowData[]
   const items = useItems(rows)
-  // A barra sabe o que está marcado pelos itens da Mesa
-  useEffect(() => sync(items), [items, sync])
+  // A barra sabe o que está marcado pelos itens da Mesa; enquanto a Mesa
+  // carrega, nada (o vazio do carregamento não é uma Mesa vazia)
+  const loaded = table.data !== undefined
+  useEffect(() => {
+    if (loaded) sync(items)
+  }, [loaded, items, sync])
   const shown = useMemo(
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
@@ -347,11 +342,12 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
     gap: tokens.space[2],
   },
+  // O espaço entre os cartões é o recuo de cada célula (metade de cada lado)
   grid: {
-    gap: tokens.space[3],
-    paddingHorizontal: tokens.layout.gutter,
-    paddingVertical: tokens.space[2],
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: tokens.layout.gutter - tokens.space[3] / 2,
+    paddingVertical: tokens.space[2] - tokens.space[3] / 2,
   },
-  gridRow: { flexDirection: 'row', gap: tokens.space[3] },
-  cell: { flex: 1, minWidth: 0 },
+  cell: { padding: tokens.space[3] / 2 },
 })

@@ -124,10 +124,13 @@ export const useAcceptTransfer = (id: string, transferId: string) => {
           .accept.post({ clientCommandId })
       ),
     onSuccess: () => {
-      // T-40: as queries voltam ao estado inicial e as montadas rebuscam com
-      // o papel novo, sem remontar a tela (o clear() deixava o dado antigo na
-      // tela). O logout continua com clear()
-      void queryClient.resetQueries()
+      // T-40: tudo fica velho e as queries montadas rebuscam com o papel
+      // novo; a tela continua com o dado de agora até a resposta, sem voltar
+      // ao esqueleto (o clear() deixava o dado antigo na tela para sempre, e
+      // o resetQueries() derrubava a crônica para o esqueleto). É o mesmo
+      // usuário, e o dado de jogador é o de menos acesso. O logout continua
+      // com clear()
+      void queryClient.invalidateQueries()
       toast.show({ message: 'Agora você narra esta crônica.' })
     },
   })

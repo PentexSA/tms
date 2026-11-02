@@ -401,6 +401,29 @@ describe('barra da seleção', () => {
     expect(screen.queryByText(SELECTION_FULL)).toBeNull()
   })
 
+  it('a ficha que sai da Mesa sai da seleção: a contagem e o limite batem', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => void)
+    })
+    try {
+      await render()
+      await start()
+      for (const box of screen.getAllByRole('checkbox')) fireEvent.press(box)
+      expect(within(bar()).getByText('2 selecionados (máx. 20)')).toBeTruthy()
+      // Caio foi arquivado em outra tela: a volta à Mesa já não o traz
+      calls.chronicle.tableGet.mockResolvedValue(ok([row('a')]))
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      await waitFor(() =>
+        expect(within(bar()).getByText('1 selecionado (máx. 20)')).toBeTruthy()
+      )
+    } finally {
+      jest.mocked(useFocusEffect).mockReset()
+    }
+  })
+
   it('Mesa vazia: sem "Selecionar personagens"', async () => {
     calls.chronicle.tableGet.mockResolvedValue(ok([]))
     await render()
