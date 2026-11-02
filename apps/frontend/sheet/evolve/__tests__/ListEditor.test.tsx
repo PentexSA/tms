@@ -251,15 +251,23 @@ describe('T-62: Enter e "✓" adicionam', () => {
     fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'fort')
     enter('Buscar Disciplina')
     expect(eventFor(live, 'disciplines')).toBeUndefined()
-    expect(screen.getByTestId('add-sheet-disciplines')).toBeTruthy()
+    // Com sugestões à vista, o campo diz o que tocar
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(sheet.getByRole('alert')).toHaveTextContent(
+      'Toque numa sugestão, ou em “Adicionar “fort”” para usar o nome como está.'
+    )
 
     // O que já está na ficha não entra de novo pelo Enter
     fireEvent.changeText(
       screen.getByLabelText('Buscar Disciplina'),
       'auspicios'
     )
+    expect(sheet.queryByRole('alert')).toBeNull()
     enter('Buscar Disciplina')
     expect(eventFor(live, 'disciplines')).toBeUndefined()
+    expect(sheet.getByRole('alert')).toHaveTextContent(
+      'Auspícios já está na ficha.'
+    )
 
     fireEvent.changeText(
       screen.getByLabelText('Buscar Disciplina'),
@@ -292,7 +300,7 @@ describe('outros sistemas, o mesmo editor', () => {
     )
     fireEvent.press(screen.getByRole('tab', { name: /^Poderes|Combate/ }))
     fireEvent.press(
-      screen.getByRole('button', { name: /^Bordão, Ataque 2, Dano/ })
+      screen.getByRole('button', { name: /^Bordão, Ataque mais 2, Dano/ })
     )
     fireEvent(
       screen.getByRole('adjustable', { name: 'Bordão, Ataque' }),

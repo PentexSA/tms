@@ -206,7 +206,7 @@ function AddItemSheet({
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
   const q = fold(query)
   const options = (def.catalog ?? []).filter(name => fold(name).includes(q))
-  const exact = (def.catalog ?? []).some(name => fold(name) === q)
+  const exact = (def.catalog ?? []).find(name => fold(name) === q)
   const custom = query.trim()
   // Recusado, o nome digitado fica (QAA-05); só limpa o que entrou
   const pick = (name: string, at: string) => {
@@ -222,15 +222,20 @@ function AddItemSheet({
   // Enter (web) e "✓" (teclado do app) fazem o que o botão à vista faria
   // (T-62): o nome exato do catálogo adiciona o item do catálogo; sem
   // catálogo, ou sem sugestão, o texto livre. Com sugestões à vista, o Enter
-  // não adiciona "Domi" como Disciplina: a pessoa toca a sugestão.
+  // não adiciona "Domi" como Disciplina: o campo diz o que tocar.
+  const explain = (message: string) => {
+    setRefused({ at: 'field', message })
+    announce(message)
+  }
   const submit = () => {
     if (!custom) return
-    const match = (def.catalog ?? []).find(name => fold(name) === q)
-    if (match) {
-      if (!have.has(fold(match))) pick(match, 'field')
-      return
-    }
-    if (!options.length) pick(custom, 'field')
+    if (exact && have.has(fold(exact)))
+      return explain(`${exact} já está na ficha.`)
+    if (exact) return pick(exact, 'field')
+    if (!options.length) return pick(custom, 'field')
+    explain(
+      `Toque numa sugestão, ou em “Adicionar “${custom}”” para usar o nome como está.`
+    )
   }
   const refusalAt = (at: string) =>
     refused?.at === at ? (
@@ -357,7 +362,11 @@ function ItemSheet({
         <Button
           title="Remover"
           variant="ghost"
-          onPress={() => setConfirming(true)}
+          onPress={() => {
+            // A recusa do Aplicar não vale para a remoção
+            setRefused(null)
+            setConfirming(true)
+          }}
         />
       )}
       <Button title="Aplicar" onPress={() => attempt(onSave(draft))} />

@@ -4,6 +4,7 @@ import {
   type ListItem,
   type ListMeta,
   type ResolvedList,
+  saySigned,
   short,
 } from '@tms/sheet-core'
 import { RatingDots, Text, tokens, useTheme } from '@tms/ui'
@@ -45,7 +46,13 @@ export function describeItem(list: ResolvedList, item: ListItem): string {
     parts.push(`${value} de ${def.item.value.max}`)
   for (const m of def.item.meta ?? []) {
     const v = item.meta?.[m.id]
-    if (v !== undefined && v !== '') parts.push(`${m.label} ${v}`)
+    if (v === undefined || v === '') continue
+    // O sinal falado ("Ataque mais 2"), como o número com `signed`
+    parts.push(
+      m.display === 'signed' && typeof v === 'number'
+        ? `${m.label} ${saySigned(v)}`
+        : `${m.label} ${v}`
+    )
   }
   if (item.specialty) parts.push(`especialização ${item.specialty}`)
   return parts.join(', ')

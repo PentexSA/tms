@@ -250,6 +250,24 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     ).toBeTruthy()
   })
 
+  it('a recusa do Aplicar não aparece sob "Remover X?"', async () => {
+    await open(THREE)
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Dominação, valor' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
+    // Só o "Remover Dominação?"; nada da recusa anterior
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
+      'Remover Dominação?'
+    )
+  })
+
   it('recusa do texto livre mantém o nome digitado; mudar a busca apaga a frase', async () => {
     await open({ merits: SPENT })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
