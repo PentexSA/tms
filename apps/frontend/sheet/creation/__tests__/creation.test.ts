@@ -18,6 +18,8 @@ import {
   creationInfoOf,
   creationRefusalOf,
   draftRefusal,
+  freebiesBalance,
+  freebiesLeftText,
   groupFor,
   reorder,
   stepAdvice,
@@ -534,5 +536,31 @@ describe('stepAdvice: o que o próximo ponto faria', () => {
   it('fora de qualquer conta, sem previsão', () => {
     expect(adviceOf(COMPLETE, 'values.name')).toBeNull()
     expect(adviceOf(COMPLETE, 'values.xpTotal')).toBeNull()
+  })
+})
+
+describe('bônus que sobram (T-18)', () => {
+  const left = (remaining: number, credit = 0) =>
+    ({
+      freebies: { available: 15, credit, spent: 15 - remaining, remaining },
+    }) as unknown as Parameters<typeof freebiesLeftText>[0]
+
+  it('a sobra na confirmação: nada com 0, singular com 1, plural com N', () => {
+    expect(freebiesLeftText(left(0))).toBeNull()
+    expect(freebiesLeftText(left(-2))).toBeNull()
+    expect(freebiesLeftText(null)).toBeNull()
+    expect(freebiesLeftText(left(1))).toBe(
+      'Sobra 1 ponto de bônus. Ele não vira XP.'
+    )
+    expect(freebiesLeftText(left(4))).toBe(
+      'Sobram 4 pontos de bônus. Eles não viram XP.'
+    )
+  })
+
+  it('o saldo diz o que resta, não o que foi usado', () => {
+    expect(freebiesBalance(left(15))).toBe('Bônus: restam 15 de 15')
+    expect(freebiesBalance(left(1, 3))).toBe('Bônus: resta 1 de 18')
+    expect(freebiesBalance(left(-3))).toBe('Bônus: 3 acima do saldo')
+    expect(freebiesBalance(null)).toBeNull()
   })
 })

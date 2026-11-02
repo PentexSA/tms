@@ -595,6 +595,33 @@ function pointBuyAdvice(
     : advice(null, `+1 = ${unit(step)}`, null, true)
 }
 
+const restam = (n: number) => (n === 1 ? 'resta 1' : `restam ${n}`)
+
+/**
+ * O saldo de bônus por extenso (T-18): "Bônus: restam 10 de 15", que não se
+ * lê como "usei 10"; acima do saldo, quanto passa. Null sem bônus.
+ */
+export function freebiesBalance(check: CreationCheck | null): string | null {
+  const f = check?.freebies
+  if (!f) return null
+  return f.remaining < 0
+    ? `Bônus: ${-f.remaining} acima do saldo`
+    : `Bônus: ${restam(f.remaining)} de ${f.available + f.credit}`
+}
+
+/**
+ * A sobra de bônus ao concluir ou enviar (T-18): "Sobram 4 pontos de bônus.
+ * Eles não viram XP." Concluir com sobra continua permitido (README §14,
+ * item 6: a sobra não vira XP). Null sem bônus ou sem sobra.
+ */
+export function freebiesLeftText(check: CreationCheck | null): string | null {
+  const n = check?.freebies?.remaining ?? 0
+  if (n <= 0) return null
+  return n === 1
+    ? 'Sobra 1 ponto de bônus. Ele não vira XP.'
+    : `Sobram ${n} pontos de bônus. Eles não viram XP.`
+}
+
 /**
  * Todos os pontos básicos distribuídos (cada grupo com a prioridade escolhida
  * e o orçamento cheio) e ainda há bônus para gastar: a hora de avisar que a

@@ -27,6 +27,7 @@ import {
   completeLabel,
   creationRefusalOf,
   errorBodyOf,
+  freebiesBalance,
   problemText,
   REFUSAL_TEXT,
 } from './creation'
@@ -55,16 +56,9 @@ export function useCreating(): boolean {
   )
 }
 
-/** "Bônus: 10 de 15", para a barra; null sem bônus. */
+/** "Bônus: restam 10 de 15", para a barra; null sem bônus (T-18). */
 export function useFreebiesText(): string | null {
-  return useSheetSelector(s => {
-    const f = s.check?.freebies
-    if (!f) return null
-    const total = f.available + f.credit
-    return f.remaining < 0
-      ? `Bônus: ${-f.remaining} acima`
-      : `Bônus: ${f.remaining} de ${total}`
-  })
+  return useSheetSelector(s => freebiesBalance(s.check))
 }
 
 /**
@@ -203,7 +197,7 @@ export function CreationPanel() {
         >
           {freebies.remaining < 0
             ? `Bônus: ${-freebies.remaining} acima do saldo (${freebies.spent} de ${freebies.available + freebies.credit}).`
-            : `Bônus: ${freebies.remaining} de ${freebies.available + freebies.credit} restantes.`}
+            : `${freebiesBalance(check)}.`}
         </Text>
       ) : null}
       {problems.length ? (
@@ -225,7 +219,9 @@ export function CreationPanel() {
         </View>
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
-          A conta fechou: conclua a criação pela barra de cima.
+          {freebies && freebies.remaining > 0
+            ? `Pontos básicos completos; ${freebies.remaining === 1 ? 'resta 1' : `restam ${freebies.remaining}`} de bônus. Gaste-os nos grupos ou conclua pela barra de cima.`
+            : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
       {storyteller ? <BudgetControls /> : null}

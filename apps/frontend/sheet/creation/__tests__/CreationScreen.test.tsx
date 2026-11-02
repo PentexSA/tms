@@ -241,7 +241,7 @@ describe('trava da distribuição', () => {
     )
     tab('Orçamento')
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
-      'Bônus: 10 de 15 restantes.'
+      'Bônus: restam 10 de 15.'
     )
   })
 })
@@ -349,6 +349,34 @@ describe('"+" com a previsão da conta', () => {
       screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
         .props.accessibilityHint
     ).toBe('+1 = 1 bônus')
+  })
+})
+
+// T-18: o saldo que sobra não se lê como gasto, e a conta fechada com bônus
+// livres diz que eles ainda podem ser gastos
+describe('bônus que sobram', () => {
+  it('com os básicos completos e 15 livres, o Orçamento e a barra dizem o que resta', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    expect(screen.getByText(/Bônus: restam 15 de 15/)).toBeTruthy()
+    tab('Orçamento')
+    expect(screen.getByTestId('creation-ready')).toHaveTextContent(
+      'Pontos básicos completos; restam 15 de bônus. Gaste-os nos grupos ou conclua pela barra de cima.'
+    )
+    expect(screen.getByTestId('creation-freebies').props.children).toBe(
+      'Bônus: restam 15 de 15.'
+    )
+  })
+
+  it('com o bônus zerado, a conta fechou', async () => {
+    // 15 de bônus: 3 pontos de atributo acima dos básicos (5 cada)
+    await open(PRIORITIES, { ...ALMOST, stamina: 3, strength: 5, dexterity: 5 })
+    tab('Orçamento')
+    expect(screen.getByTestId('creation-ready')).toHaveTextContent(
+      'A conta fechou: conclua a criação pela barra de cima.'
+    )
+    expect(screen.getByTestId('creation-freebies').props.children).toBe(
+      'Bônus: restam 0 de 15.'
+    )
   })
 })
 
