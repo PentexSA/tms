@@ -1,5 +1,12 @@
+import type { Ref } from 'react'
 import { useId } from 'react'
-import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native'
+import {
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  type TextInputProps,
+  View,
+} from 'react-native'
 import { hitTarget } from './metrics'
 import { Text } from './Text'
 import { textStyle, useTheme } from './theme'
@@ -14,6 +21,9 @@ export interface TextFieldProps
   readonly hint?: string
   // Mostra o contador "12/80" quando há maxLength.
   readonly counter?: boolean
+  // Com o React 19 o ref é prop: quem chama foca o campo (T-21). O `...rest`
+  // o leva ao TextInput
+  readonly ref?: Ref<TextInputInstance>
 }
 
 export function TextField({

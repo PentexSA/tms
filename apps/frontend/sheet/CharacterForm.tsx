@@ -1,7 +1,7 @@
 import { canWrite, type SheetModel, validateSheet } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, type TextInputInstance, View } from 'react-native'
 import { editors } from './editors'
 
 // Criação de ficha (Etapa 14): o formulário sai do template. São os campos de
@@ -24,6 +24,9 @@ export interface CharacterFormProps {
   readonly onSubmit: (values: Record<string, unknown>) => void
   // Algum campo preenchido (depois do trim): a tela segura a saída (T-56)
   readonly onDirtyChange?: (dirty: boolean) => void
+  // O primeiro campo com erro, na ordem da tela (T-21): `y` da linha dele
+  // dentro do formulário, para a tela rolar até ele antes do foco
+  readonly onInvalid?: (y: number) => void
 }
 
 // Linhas do formulário: o nome sozinho, textos curtos de dois em dois e os
@@ -52,6 +55,7 @@ export function CharacterForm({
   serverIssues = [],
   onSubmit,
   onDirtyChange,
+  onInvalid,
 }: CharacterFormProps) {
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -73,6 +77,27 @@ export function CharacterForm({
   const fromServer = Object.fromEntries(
     serverIssues.map(i => [fieldOfPath(i.path), i.message])
   )
+  const rows = rowsOf(model, fields, nameField)
+  // O `y` de cada linha e o campo de texto de cada editor (T-21)
+  const rowY = useRef(new Map<string, number>())
+  const inputs = useRef(new Map<string, TextInputInstance>())
+  // Leva ao primeiro campo com erro, na ordem da tela: rola até a linha e
+  // foca o campo, quando é de texto (no web, o foco também o traz à vista).
+  // Nenhuma validação nova: só o caminho até o erro
+  const goTo = (invalid: ReadonlySet<string>) => {
+    const row = rows.find(r => r.some(id => invalid.has(id)))
+    const id = row?.find(x => invalid.has(x))
+    if (!row || !id) return
+    onInvalid?.(rowY.current.get(row.join(':')) ?? 0)
+    inputs.current.get(id)?.focus()
+  }
+  // O 422 do servidor (serverIssues) faz o mesmo ao chegar
+  const serverKey = serverIssues.map(i => fieldOfPath(i.path)).join('|')
+  const reach = useRef(goTo)
+  reach.current = goTo
+  useEffect(() => {
+    if (serverKey) reach.current(new Set(serverKey.split('|')))
+  }, [serverKey])
 
   const submit = () => {
     const clean: Record<string, unknown> = {}
@@ -91,13 +116,21 @@ export function CharacterForm({
     }
     setErrors(found)
     if (Object.keys(found).length === 0) onSubmit(clean)
+    else goTo(new Set(Object.keys(found)))
   }
 
   return (
     <View style={styles.form}>
       {error ? <Banner tone="danger" message={error} /> : null}
-      {rowsOf(model, fields, nameField).map(row => (
-        <View key={row.join(':')} style={styles.row}>
+      {rows.map(row => (
+        <View
+          key={row.join(':')}
+          style={styles.row}
+          testID={`form-row-${row.join('-')}`}
+          onLayout={e => {
+            rowY.current.set(row.join(':'), e.nativeEvent.layout.y)
+          }}
+        >
           {row.map(id => {
             const def = model.fields.get(id)?.def
             const Editor = def ? editors[def.type] : undefined
@@ -110,6 +143,10 @@ export function CharacterForm({
                   value={values[id]}
                   required={id === nameField}
                   properName={id === nameField}
+                  inputRef={el => {
+                    if (el) inputs.current.set(id, el)
+                    else inputs.current.delete(id)
+                  }}
                   error={errors[id] ?? fromServer[id]}
                   onChange={next => {
                     setValues(v => ({ ...v, [id]: next }))

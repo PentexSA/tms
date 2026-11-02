@@ -6,12 +6,13 @@ import {
   renderHook,
   screen,
 } from '@testing-library/react-native'
-import { useLayoutEffect } from 'react'
+import { createRef, useLayoutEffect } from 'react'
 import {
   Modal,
   Platform,
   Text as RNText,
   StyleSheet,
+  type TextInputInstance,
   type ViewStyle,
 } from 'react-native'
 import {
@@ -545,6 +546,17 @@ describe('Stepper: "+" indisponível e dica (T-20)', () => {
     expect(more).toBeEnabled()
     expect(more.props.accessibilityDisabled).toBeUndefined()
     expect(more.props['aria-describedby']).toBeUndefined()
+  })
+})
+
+// T-21 (P05-C): com o React 19, o ref é prop; o TextField o leva ao campo
+describe('TextField: ref até o campo (T-21)', () => {
+  it('quem chama recebe o TextInput e pode focá-lo', () => {
+    const ref = createRef<TextInputInstance>()
+    render(
+      <TextField label="Nome" value="" onChangeText={jest.fn()} ref={ref} />
+    )
+    expect(ref.current?.focus).toEqual(expect.any(Function))
   })
 })
 
