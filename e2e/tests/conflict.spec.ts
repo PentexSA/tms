@@ -73,7 +73,9 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
     ],
   })
 
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
 
   // A faixa culpa só o Senhor e não reaplica às cegas
@@ -107,7 +109,9 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
   await expect(page.getByText('A ficha mudou em outro lugar')).toHaveCount(0)
 
   // As outras 6 se salvam; o Senhor do narrador fica
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await expect(page.getByText('Salvar 6 alterações?')).toBeVisible()
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await expect

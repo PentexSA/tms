@@ -218,6 +218,21 @@ export const MATRIX: readonly MatrixRow[] = [
     mutates: true,
     expect: { storyteller: 200, owner: 403, player: 404, ...denied },
   },
+  // Estado da criação (P04-D, D-04 e D-03). A ficha da matriz está em
+  // criação livre: o narrador pede ajuste; só a dona avisa que terminou
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/adjust',
+    body: () => ({ reason: 'Refaça os Antecedentes' }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/ready',
+    mutates: true,
+    expect: { storyteller: 403, owner: 200, player: 404, ...denied },
+  },
   {
     method: 'PATCH',
     route: '/chronicles/:id/creation-settings',

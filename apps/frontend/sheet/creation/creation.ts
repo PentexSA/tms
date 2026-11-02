@@ -19,6 +19,7 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
+import type { CharacterStateRow } from '../../components/chronicles/characterState'
 
 // A criação por pontos no app (doc/plano-v4.md, Etapa 5). A conta é a do core
 // (`checkCreation`), a mesma do servidor; aqui só se decide quando ela vale,
@@ -35,9 +36,22 @@ export interface CreationInfo {
   readonly config: Record<string, unknown>
   readonly effective: CreationConfig
   readonly returned: { readonly reason: string; readonly at: string } | null
+  // D-04: o narrador pediu ajuste (motivo e data); D-03: o dono avisou que
+  // terminou. Ausentes no cache antigo: valem como null (fail secure)
+  readonly adjust: { readonly reason: string; readonly at: string } | null
+  readonly ready: { readonly at: string } | null
   // A crônica pede aprovação de ficha nova
   readonly approval: boolean
   readonly activatedAt?: string | Date | null
+}
+
+const reasonOf = (
+  raw: unknown
+): { readonly reason: string; readonly at: string } | null => {
+  const r = raw as { reason?: unknown; at?: unknown } | null | undefined
+  return r && typeof r === 'object' && typeof r.reason === 'string'
+    ? { reason: r.reason, at: String(r.at) }
+    : null
 }
 
 /** Lê o que veio da API (input hostil): forma errada vale como sem criação. */
@@ -52,12 +66,38 @@ export function creationInfoOf(raw: unknown): CreationInfo | null {
     choices: (c.choices ?? {}) as CreationChoices,
     config: (c.config ?? {}) as Record<string, unknown>,
     effective: c.effective,
-    returned:
-      c.returned && typeof c.returned.reason === 'string'
-        ? { reason: c.returned.reason, at: String(c.returned.at) }
+    returned: reasonOf(c.returned),
+    adjust: reasonOf(c.adjust),
+    ready:
+      c.ready && typeof c.ready === 'object' && c.ready.at !== undefined
+        ? { at: String(c.ready.at) }
         : null,
     approval: c.approval === true,
     activatedAt: c.activatedAt ?? null,
+  }
+}
+
+/**
+ * A linha do estado (D-02) da ficha aberta, para o `characterState`: o modo
+ * e os marcadores que a API mandou. Sem `creation` (viewer, cache antigo),
+ * nada é inventado.
+ */
+export function sheetStateRow(args: {
+  readonly status: string
+  readonly kind?: 'pc' | 'npc'
+  readonly locked: boolean
+  readonly info: CreationInfo | null
+}): CharacterStateRow {
+  const { info } = args
+  return {
+    status: args.status,
+    kind: args.kind,
+    locked: args.locked,
+    creationMode: info?.mode ?? null,
+    returned: info?.returned != null,
+    adjust: info?.adjust != null,
+    ready: info?.ready != null,
+    activatedAt: info?.activatedAt ?? null,
   }
 }
 

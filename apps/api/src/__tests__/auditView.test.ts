@@ -80,6 +80,18 @@ describe('auditDetail', () => {
     ).toEqual({ maxUses: 10, expiresInDays: 7 })
   })
 
+  it('pedido de ajuste e aviso de "terminei": nunca o motivo (P04-D)', () => {
+    expect(
+      auditDetail('character.creation.adjust', {
+        reason: 'MOTIVO-DO-AJUSTE',
+        at: '2026-11-01T12:00:00Z',
+      })
+    ).toEqual({})
+    expect(
+      auditDetail('character.creation.ready', { at: '2026-11-01T12:00:00Z' })
+    ).toEqual({})
+  })
+
   it('as outras ações e payloads estranhos: vazio', () => {
     expect(auditDetail('chronicle.create', {})).toEqual({})
     expect(

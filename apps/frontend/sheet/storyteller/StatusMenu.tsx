@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { SheetModel } from '@tms/sheet-core'
+import { RETURN_REASON_MAX, type SheetModel } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
   Pressable,
   Text,
+  TextField,
   tokens,
   useTheme,
   useToast,
@@ -12,11 +13,14 @@ import {
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
-import { stateLabel } from '../../components/chronicles/tableItems'
+import type { CharacterState } from '../../components/chronicles/characterState'
 import { api } from '../../lib/api'
-import { messageOf } from '../../lib/errors'
+import { messageOf, statusOf } from '../../lib/errors'
 import { chronicleKeys } from '../../lib/queries/chronicles'
-import { useCompleteCreation } from '../../lib/queries/creation'
+import {
+  useAdjustCreation,
+  useCompleteCreation,
+} from '../../lib/queries/creation'
 import { CompletionMessage } from '../creation/CompletionMessage'
 import {
   completionCopy,
@@ -34,8 +38,8 @@ import { sheetKeys } from '../data'
 import { deadLabel } from '../policy'
 
 // O menu ⋯ do narrador na ficha (doc/plano-v3.md, Etapa 6): concluir a
-// criação, travar e destravar, arquivar, marcar com o rótulo de `dead` do
-// template e reativar. Só as ações válidas no estado; o servidor confere de
+// criação, pedir ajuste (D-04, P04-D), travar e destravar, arquivar, marcar
+// com o rótulo de `dead` do template e reativar. Só as ações válidas no estado; o servidor confere de
 // novo e grava cada uma no registro da crônica. Concluir, arquivar e `dead`
 // pedem confirmação. Concluir (T-32) usa o mesmo texto da barra de Criação,
 // manda a chave, a revisão e a versão da ficha, e não descarta em silêncio o
@@ -43,6 +47,7 @@ import { deadLabel } from '../policy'
 
 export type StatusActionId =
   | 'complete'
+  | 'adjust'
   | 'lock'
   | 'unlock'
   | 'archive'
@@ -68,7 +73,10 @@ export function statusActions(
   status: string,
   locked: boolean,
   // A crônica pede aprovação: o narrador conclui e aprova numa ação
-  approval = false
+  approval = false,
+  // A ficha aceita pedido de ajuste: PC de outra pessoa (o servidor recusa
+  // o NPC e a ficha do próprio narrador)
+  adjustable = false
 ): StatusAction[] {
   const dead = deadLabel(model)
   const keepsReading = 'O jogador continua lendo, mas só você muda a ficha.'
@@ -105,6 +113,7 @@ export function statusActions(
           confirmLabel: copy.confirm,
           done: copy.done,
         },
+        ...(adjustable ? [ADJUST] : []),
         archive,
         markDead,
       ]
@@ -126,9 +135,28 @@ export function statusActions(
   }
 }
 
+/** D-04: o pedido de ajuste, com motivo, em qualquer ficha em criação. */
+const ADJUST: StatusAction = {
+  id: 'adjust',
+  label: 'Pedir ajuste',
+  confirm:
+    'O jogador vê o motivo na ficha, como numa devolução. A ficha continua em criação.',
+  done: 'Ajuste pedido. O jogador vê o motivo na ficha.',
+}
+
+export const ADJUST_INVALID =
+  'Escreva o que precisa ser ajustado (até 500 caracteres, sem < nem >).'
+export const STALE_ADJUST =
+  'A ficha mudou desde que você abriu. Confira e peça de novo.'
+const ADJUST_REFUSED: Readonly<Record<string, string>> = {
+  CREATION_NOT_CREATING:
+    'A ficha não está mais em criação: o pedido de ajuste não vale aqui.',
+  CREATION_ADJUST_UNAVAILABLE: 'Esta ficha não recebe pedido de ajuste.',
+}
+
 async function run(
   characterId: string,
-  action: Exclude<StatusActionId, 'complete'>
+  action: Exclude<StatusActionId, 'complete' | 'adjust'>
 ) {
   const character = api.characters({ id: characterId })
   switch (action) {
@@ -168,6 +196,11 @@ export interface StatusMenuTarget {
   readonly model: SheetModel
   readonly status: string
   readonly locked: boolean
+  // O estado da ficha (D-02), sem "Concluída em": o mesmo da lista e da Mesa
+  readonly state: CharacterState | null
+  // PC de outra pessoa: o narrador pode pedir ajuste (D-04). É UX: o
+  // servidor recusa o NPC e a ficha própria
+  readonly adjustable?: boolean
 }
 
 /** O botão largo: a ficha e o rascunho aberto. */
@@ -186,15 +219,25 @@ export function StatusMenuButton({
   model,
   status,
   locked,
+  state,
+  adjustable,
   ...draft
 }: StatusMenuButtonProps) {
   const [open, setOpen] = useState(false)
-  const actions = statusActions(model, status, locked, draft.approval)
+  const actions = statusActions(
+    model,
+    status,
+    locked,
+    draft.approval,
+    adjustable
+  )
   if (!actions.length) return null
-  const state = stateLabel(model, status, locked)
   return (
     <>
-      <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
+      <StatusMenuTrigger
+        state={state?.label ?? null}
+        onPress={() => setOpen(true)}
+      />
       {open ? (
         <StatusMenu
           characterId={characterId}
@@ -257,8 +300,12 @@ export function StatusMenu({
   const queryClient = useQueryClient()
   const toast = useToast()
   const complete = useCompleteCreation(characterId, chronicleId)
+  const adjust = useAdjustCreation(characterId, chronicleId)
   const [asking, setAsking] = useState<StatusAction | null>(null)
   const [busy, setBusy] = useState(false)
+  // O motivo do pedido de ajuste e o erro dele, na própria folha
+  const [reason, setReason] = useState('')
+  const [invalid, setInvalid] = useState<string | null>(null)
   const unsaved = draft.unsaved ?? 0
   const queued = draft.queued ?? 0
 
@@ -299,11 +346,38 @@ export function StatusMenu({
     }
   }
 
-  const apply = async (action: StatusAction) => {
+  // D-04: o motivo aparado; o 422 fica na folha com o texto, o 409 rebusca
+  // (a mutação já rebusca a ficha, a Mesa e a lista)
+  const askAdjust = async (action: StatusAction, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    setInvalid(null)
+    try {
+      await adjust.mutateAsync({ reason: trimmed, revision: draft.revision })
+      applied(action, false)
+    } catch (error) {
+      const status = statusOf(error)
+      if (status === 422) setInvalid(ADJUST_INVALID)
+      else if (status === 409) {
+        const code = (errorBodyOf(error) as { code?: unknown } | null)?.code
+        toast.show({
+          message:
+            (typeof code === 'string' && ADJUST_REFUSED[code]) || STALE_ADJUST,
+        })
+        onClose()
+      } else setInvalid(messageOf(error, 'Não foi possível pedir o ajuste.'))
+    }
+  }
+
+  const apply = async (action: StatusAction, text = reason) => {
     setBusy(true)
     try {
       if (action.id === 'complete') {
         await finish(action)
+        return
+      }
+      if (action.id === 'adjust') {
+        await askAdjust(action, text)
         return
       }
       const res = await run(characterId, action.id)
@@ -347,7 +421,9 @@ export function StatusMenu({
               title={asking.confirmLabel ?? asking.label}
               testID={`status-${asking.id}-confirm`}
               busy={busy}
-              disabled={busy || blocked}
+              disabled={
+                busy || blocked || (asking.id === 'adjust' && !reason.trim())
+              }
               onPress={() => void apply(asking)}
             />
           </>
@@ -364,6 +440,34 @@ export function StatusMenu({
               body={asking.confirm ?? ''}
               notes={draft.notes}
             />
+          </View>
+        ) : asking.id === 'adjust' ? (
+          <View style={styles.list}>
+            <Text>{asking.confirm}</Text>
+            <TextField
+              label="O que precisa ser ajustado"
+              value={reason}
+              maxLength={RETURN_REASON_MAX}
+              autoFocus
+              returnKeyType="send"
+              testID="status-adjust-reason"
+              onChangeText={text => {
+                setReason(text)
+                setInvalid(null)
+              }}
+              // O "✓" chega antes do último onChangeText (e0a4078): envia o
+              // texto do evento
+              onSubmitEditing={e => {
+                const text = e.nativeEvent.text
+                setReason(text)
+                if (!busy && text.trim()) void apply(asking, text)
+              }}
+            />
+            {invalid ? (
+              <Text color="danger" accessibilityRole="alert">
+                {invalid}
+              </Text>
+            ) : null}
           </View>
         ) : (
           <Text>{asking.confirm}</Text>

@@ -81,6 +81,11 @@ export function auditDetail(action: string, payload: unknown): AuditDetail {
     case 'member.remove':
     case 'member.leave':
       return defined({ characters: count(p.characters) })
+    // D-04 e D-03 (P04-D): o pedido de ajuste e o aviso de "terminei" não
+    // têm detalhe. O motivo do ajuste fica na ficha, nunca no registro
+    case 'character.creation.adjust':
+    case 'character.creation.ready':
+      return {}
     case 'invite.create':
       return defined({
         maxUses: integer(p.maxUses),

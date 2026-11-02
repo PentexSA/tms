@@ -28,3 +28,18 @@ export async function sheetsDismissed() {
     await new Promise(resolve => setTimeout(resolve, 0))
   })
 }
+
+/**
+ * O "Salvar" do resumo ("Salvar N alterações?"). Na Criação, o "Salvar" da
+ * barra (D-01) tem o mesmo texto visível; o nome acessível dele é "Salvar
+ * alterações", mas no RNTL o `name` também casa pelo texto. O do resumo é o
+ * que não é o `mode-save`.
+ */
+export function summarySave() {
+  const found = screen
+    .getAllByRole('button', { name: 'Salvar' })
+    .filter(el => el.props.testID !== 'mode-save')
+  if (found.length !== 1)
+    throw new Error(`${found.length} botões "Salvar" fora da barra`)
+  return found[0] as (typeof found)[number]
+}

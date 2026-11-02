@@ -21,7 +21,7 @@ const useRefresh = (characterId: string, chronicleId?: string) => {
             queryClient.invalidateQueries({
               queryKey: chronicleKeys.table(chronicleId),
             }),
-            // A lista da crônica mostra "Devolvida" e "Aguarda" (T-06)
+            // A lista da crônica mostra o estado (T-06, P04-D)
             queryClient.invalidateQueries({
               queryKey: chronicleKeys.characters(chronicleId),
             }),
@@ -104,6 +104,55 @@ export function useReturnCreation(characterId: string, chronicleId: string) {
       unwrap(
         await api.characters({ id: characterId }).creation.return.post({
           reason,
+          clientCommandId: key.current(),
+        })
+      ),
+    onSettled: (_data, error) => {
+      key.settle(error)
+      return refresh()
+    },
+  })
+}
+
+export interface AdjustRequest {
+  readonly reason: string
+  // A revisão que o narrador viu: um pedido sobre metadados que mudaram é
+  // recusado com 409
+  readonly revision?: number
+}
+
+/** D-04: o narrador pede ajuste, com motivo, numa ficha em criação. */
+export function useAdjustCreation(characterId: string, chronicleId: string) {
+  const key = useCommandKey()
+  const refresh = useRefresh(characterId, chronicleId)
+  return useMutation({
+    mutationFn: async (request: AdjustRequest) =>
+      unwrap(
+        await api.characters({ id: characterId }).creation.adjust.post({
+          ...request,
+          clientCommandId: key.current(),
+        })
+      ),
+    onSettled: (_data, error) => {
+      key.settle(error)
+      return refresh()
+    },
+  })
+}
+
+/**
+ * D-03: na criação livre, o dono avisa que terminou. Manda só a revisão que
+ * viu: um pedido de ajuste do narrador no meio faz o servidor recusar (409),
+ * e a rebusca traz o pedido.
+ */
+export function useReadyCreation(characterId: string, chronicleId: string) {
+  const key = useCommandKey()
+  const refresh = useRefresh(characterId, chronicleId)
+  return useMutation({
+    mutationFn: async (request: { readonly revision?: number }) =>
+      unwrap(
+        await api.characters({ id: characterId }).creation.ready.post({
+          ...request,
           clientCommandId: key.current(),
         })
       ),

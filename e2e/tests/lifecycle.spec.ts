@@ -191,7 +191,11 @@ test('T-06, T-32 e T-80: devolver, ver o motivo em qualquer modo, aprovar e o Hi
 
     // A jogadora fica com a ficha aberta, aguardando
     await page.goto(`/characters/${id}`)
-    await expect(page.getByText('Aguardando aprovação')).toBeVisible()
+    // O painel e o selo sob o nome dizem o mesmo (P04-D)
+    await expect(page.getByTestId('creation-pending')).toBeVisible()
+    await expect(page.getByTestId('sheet-state')).toHaveText(
+      'Aguardando aprovação'
+    )
 
     // O narrador devolve com o motivo, pela tela
     const st = await desk.newPage()
@@ -223,7 +227,8 @@ test('T-06, T-32 e T-80: devolver, ver o motivo em qualquer modo, aprovar e o Hi
       .getByRole('button', { name: 'Voltar para Crônica com aprovação' })
       .click()
     await expect(
-      page.getByRole('button', { name: /Sua ficha · Devolvida$/ })
+      // O estado é um selo, e entra no nome acessível da linha (P04-D)
+      page.getByRole('button', { name: /Sua ficha, Devolvida$/ })
     ).toBeVisible()
     await expect(page.getByText(reason)).toHaveCount(0)
 
@@ -294,7 +299,7 @@ test('T-32: o narrador conclui pelo ⋯ só depois de confirmar', async ({
     // A 390, as ações do narrador ficam no "Mais opções", com o estado (T-11)
     await page.getByRole('button', { name: 'Mais opções' }).click()
     await page
-      .getByRole('button', { name: 'Ações do narrador · Em criação' })
+      .getByRole('button', { name: 'Ações do narrador · Em criação · livre' })
       .click()
     await page
       .getByRole('button', { name: 'Concluir criação', exact: true })

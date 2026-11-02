@@ -64,6 +64,9 @@ export function createFakeApi() {
     creationPatch: jest.fn(),
     creationApprovePost: jest.fn(),
     creationReturnPost: jest.fn(),
+    // Estado da criação (P04-D): pedir ajuste e avisar que terminei
+    creationAdjustPost: jest.fn(),
+    creationReadyPost: jest.fn(),
     statusPost: jest.fn(),
     // Visibilidade do NPC (v5): só o narrador
     visibilityPost: jest.fn(),
@@ -111,6 +114,12 @@ export function createFakeApi() {
         },
         return: {
           post: (...a: unknown[]) => calls.creationReturnPost(id, ...a),
+        },
+        adjust: {
+          post: (...a: unknown[]) => calls.creationAdjustPost(id, ...a),
+        },
+        ready: {
+          post: (...a: unknown[]) => calls.creationReadyPost(id, ...a),
         },
       },
       status: { post: (...a: unknown[]) => calls.statusPost(id, ...a) },

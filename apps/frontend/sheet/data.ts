@@ -55,10 +55,25 @@ const normalizeCharacter = (value: unknown) => {
 export const PENDING_REFETCH_MS = 30_000
 
 export const awaitsStoryteller = (data: unknown): boolean => {
-  const d = data as { status?: unknown; roles?: unknown } | null | undefined
+  const d = data as
+    | {
+        status?: unknown
+        roles?: unknown
+        creation?: { ready?: unknown } | null
+      }
+    | null
+    | undefined
   const roles: readonly unknown[] = Array.isArray(d?.roles) ? d.roles : []
+  // D-03 (P04-D): na criação livre, quem avisou que terminou também espera o
+  // narrador concluir ou pedir ajuste
+  const told =
+    d?.status === 'creating' &&
+    d.creation !== null &&
+    typeof d.creation === 'object' &&
+    d.creation.ready !== null &&
+    typeof d.creation.ready === 'object'
   return (
-    d?.status === 'pending' &&
+    (d?.status === 'pending' || told) &&
     roles.includes('owner') &&
     !roles.includes('storyteller')
   )

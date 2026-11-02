@@ -3,6 +3,7 @@ import {
   Avatar,
   Pressable,
   Skeleton,
+  StateBadge,
   Text,
   ThemeProvider,
   tokens,
@@ -60,7 +61,7 @@ export const TableRow = memo(function TableRow({
   const label = [
     [row.name, identity?.chip].filter(Boolean).join(', '),
     visibility,
-    state,
+    state?.label,
     ...alerts.map(a => a.label),
     ...described,
     problem,
@@ -107,20 +108,20 @@ export const TableRow = memo(function TableRow({
           ) : null}
           {visibility || state || alerts.length ? (
             <View style={styles.badges}>
+              {/* O selo de visibilidade do NPC (T-52), ao lado do estado */}
               {visibility ? (
-                <Text
-                  variant="caption"
-                  color="inkMuted"
+                <StateBadge
+                  label={visibility}
+                  tone="neutral"
                   testID={`visibility-${row.id}`}
-                  style={[styles.badge, { borderColor: colors.borderSubtle }]}
-                >
-                  {visibility}
-                </Text>
+                />
               ) : null}
               {state ? (
-                <Text variant="caption" color="inkMuted">
-                  {state}
-                </Text>
+                <StateBadge
+                  label={state.label}
+                  tone={state.tone}
+                  testID={`table-state-${row.id}`}
+                />
               ) : null}
               {alerts.map(a => (
                 <Text

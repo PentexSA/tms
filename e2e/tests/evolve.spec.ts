@@ -47,7 +47,9 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
   await page.getByRole('button', { name: 'Taumaturgia', exact: true }).click()
   await expect(page.getByText('Editando · 3 alterações')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await expect(page.getByText('Salvar 3 alterações?')).toBeVisible()
   const saved = page.waitForResponse(
     r =>

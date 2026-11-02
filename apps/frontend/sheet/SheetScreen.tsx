@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { characterState } from '../components/chronicles/characterState'
 import { messageOf, statusOf } from '../lib/errors'
 import {
   useSetNpcPresentation,
@@ -33,18 +34,25 @@ import {
 import { useRefetchOnFocus } from '../lib/queries/focus'
 import { CreationContext } from './creation/CreationContext'
 import {
+  type CreationInfo,
   completionFreebies,
   creationActive,
   creationInfoOf,
   creationInputOf,
   freebiesNotes,
+  sheetStateRow,
 } from './creation/creation'
 import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
-import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
+import {
+  blockedBy,
+  deadLabel,
+  LifecycleContext,
+  type SheetLifecycle,
+} from './policy'
 import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
 import {
@@ -233,7 +241,10 @@ export function SheetScreen({
             {state.status !== 'ready' ? null : wide ? (
               <>
                 {state.roles.includes('storyteller') ? (
-                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
+                  <StatusMenuButton
+                    {...narratorOf(id, state, creation)}
+                    {...draft}
+                  />
                 ) : null}
                 {xpLedgerFields(state.model).length ? (
                   <Button
@@ -255,7 +266,7 @@ export function SheetScreen({
               <SheetMenu
                 narrator={
                   state.roles.includes('storyteller')
-                    ? narratorOf(id, state)
+                    ? narratorOf(id, state, creation)
                     : null
                 }
                 draft={draft}
@@ -312,14 +323,30 @@ export function SheetScreen({
 /** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
 function narratorOf(
   id: string,
-  state: Extract<SheetState, { status: 'ready' }>
+  state: Extract<SheetState, { status: 'ready' }>,
+  // O mesmo `creationInfoOf` da tela: uma leitura só da criação
+  info: CreationInfo | null
 ): StatusMenuTarget {
+  const locked = state.character.lockedAt !== null
   return {
     characterId: id,
     chronicleId: state.character.chronicle.id,
     model: state.model,
     status: state.character.status,
-    locked: state.character.lockedAt !== null,
+    locked,
+    // D-04: o narrador pede ajuste em PC de outra pessoa
+    adjustable:
+      state.character.kind !== 'npc' && !state.roles.includes('owner'),
+    // O mesmo estado da lista e da Mesa, sem "Concluída em" no gatilho
+    state: characterState(
+      sheetStateRow({
+        status: state.character.status,
+        kind: state.character.kind === 'npc' ? 'npc' : 'pc',
+        locked,
+        info,
+      }),
+      { narrating: true, deadLabel: deadLabel(state.model), completed: false }
+    ),
   }
 }
 
@@ -406,6 +433,7 @@ function LiveSheet({
   const sync = useSync()
   const toast = useToast()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
+  const kind: 'pc' | 'npc' = state.character.kind === 'npc' ? 'npc' : 'pc'
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
     [status, lockedAt, member]
@@ -509,6 +537,29 @@ function LiveSheet({
   // O modo de abertura da renderização anterior: a ficha aberta no Editar da
   // criação livre (inclusive pelo cache persistido, antes da resposta do
   // servidor) segue o modo de abertura novo quando a criação acaba
+  // Nota do P04-C (P04-D §3.7): a criação acabou com a dona no Editar e
+  // alterações não salvas. O Editar fica, mas em silêncio ela não saberia que
+  // o próximo "Concluir" vira evolução. Antes do efeito do modo, que pode
+  // descartar o rascunho
+  const [completedWhileEditing, setCompletedWhileEditing] = useState(false)
+  const statusBefore = useRef(status)
+  useEffect(() => {
+    const before = statusBefore.current
+    statusBefore.current = status
+    if (before !== 'creating' || status !== 'active') return
+    const s = store.getState()
+    if (s.mode === 'evolve' && (s.draft?.size ?? 0) > 0)
+      setCompletedWhileEditing(true)
+  }, [store, status])
+  useEffect(() => {
+    if (!completedWhileEditing) return
+    const clear = (s: ReturnType<typeof store.getState>) => {
+      if (!isDraftMode(s.mode) || !s.draft?.size)
+        setCompletedWhileEditing(false)
+    }
+    clear(store.getState())
+    return store.subscribe(clear)
+  }, [store, completedWhileEditing])
   const openedAs = useRef(opening)
   useEffect(() => {
     const s = store.getState()
@@ -546,10 +597,20 @@ function LiveSheet({
       characterId: id,
       chronicleId: state.character.chronicle.id,
       status,
+      kind,
       info,
       active,
+      completedWhileEditing,
     }),
-    [id, state.character.chronicle.id, status, info, active]
+    [
+      id,
+      state.character.chronicle.id,
+      status,
+      kind,
+      info,
+      active,
+      completedWhileEditing,
+    ]
   )
   return (
     <>

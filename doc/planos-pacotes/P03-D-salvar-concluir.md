@@ -567,6 +567,47 @@ Ordem de merge proposta: **P03-D → P04-D → P11 → P09-C**, como no contrato
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+**Código:**
+
+1. **O `saveDraftNow` recebe só o store** (`saveDraftNow(store)`, não `(model, store)`). O rótulo sai do `model` do próprio store, o mesmo que valida e grava o lote. Por isso o `LeaveGuard` não recebe `model` (seção 3.2 e tabela da seção 3.5), e o `SheetScreen.tsx` não muda: um arquivo a menos em comum com o P04-D, o P11 e o P09-C. Veio do `/code-review`.
+2. **A saída da guarda tem mais duas proteções**, além do `onClosed` da seção 3.2. As duas vieram do `/code-review`:
+   - **A tela segue segura enquanto a folha sai.** Depois de "Descartar e sair" ou "Salvar e sair", o rascunho já está vazio (`when` falso). Sem a proteção, um segundo "voltar" no meio da animação passava sem guarda, e o `repeat` navegava de novo. O `usePreventRemove` recebe `when || leaving`, e o segundo "voltar" é ignorado.
+   - **A saída tem um teto de 2 s** (`EXIT_FALLBACK_MS`). Se o `onClosed` não vier, a saída acontece mesmo assim, em vez de a tela ficar presa. É a "volta" da pergunta 2, só para o caso de falha.
+   - Um erro lançado pelo `onSave` mostra "Não foi possível salvar." e solta a trava (fail secure).
+3. **A saída pelo `onClosed` vale também para a Nova ficha e as regras da crônica**, que usam a mesma guarda sem `onSave`. Lá, "Descartar e sair" também espera a folha sair. Os testes dessas telas esperam a folha fechar (`sheetsDismissed`): `app/__tests__/new-character.test.tsx` e `components/chronicles/__tests__/CreationSettings.test.tsx`, que a seção 8.5 não listava.
+4. **`testID`s novos:**
+   - `mode-bar`, a barra;
+   - `mode-bar-actions`, a linha das ações nas duas linhas;
+   - `leave-actions`, o rodapé da guarda com `onSave`.
+
+   Os testes de layout usam esses `testID`s.
+5. **O toast do "Salvar e sair"** diz "Salvo: {rótulo}" sem ponto final, igual ao da barra.
+6. **O "Salvar" do resumo usa `batchId !== null`** para mostrar o toast e iniciar a conclusão. No Jest, o `randomUUID` do `expo-crypto` é um mock que devolve `undefined`. O comportamento é o de antes (`result?.ok`).
+7. **O comentário "O botão único da criação" do `useFinishCreation`** (`CreationPanel.tsx`) ficou desatualizado. A seção 8.4 deixa o `CreationPanel` com o P04-D, e o ajuste é de uma linha, na integração ou no P04-D.
+
+**Testes:**
+
+8. **O nome acessível no RNTL.** Na Criação, o "Salvar" da barra (nome "Salvar alterações") e o "Salvar" do resumo têm o mesmo texto visível. O `getByRole('button', { name: 'Salvar' })` do RNTL casa também pelo texto e acha os dois. No DOM, o Playwright usa o `aria-label` e acha só o do resumo, como a seção 2 previa. O ajudante novo `summarySave()` (`apps/frontend/test/queries.ts`) escolhe o do resumo. O Editar não tem o problema, porque "Salvar alterações" não é igual a "Salvar".
+9. **Os casos de layout da barra de Criação** (360, 393, 1280, fonte de 130% e só "Salvar") ficaram no `CreationScreen.test.tsx`, que tem a ficha quase pronta. O `evolve.layout.test.tsx` ficou com os do Editar: uma linha a 360, e o botão embaixo com fonte de 130%.
+10. **O `e2e/support/creation.ts`** leva também `newCharacter`, `tab`, `plus` e o tipo `User`. O `pointsChronicle` devolve também o `storyteller`, que o `save-finish.spec.ts` usa para ligar a aprovação.
+11. **E2E e roteiro manual:** escritos e com typecheck, não rodados. Rodam na integração (portas fixas).
+
+**Seed (commit 7):**
+
+12. **Nome da opção:** `--fichas-criacao`, `creationSheets` no `SeedOptions`. O resultado ganha `sheets`, a lista impressa no fim, sem senha.
+13. **Fichas a mais:**
+    - "Ficha Livre R" e "Ficha Pontos R", só com o nome, que o P04-D §11.a (item 4, "as três fichas de J1") pede;
+    - "Ficha XP R", nome dado aqui à ficha do P09-C (pergunta 12, sem nome lá).
+14. **A conta fechada da "Ficha Aprovação R" usa números de M20.** A crônica é "Mago v4", e os números do `lifecycle.spec.ts:46-80`, que o P04-D cita, são de V20. Os números de M20:
+    - Atributos 7/5/3;
+    - Habilidades 13/9/5, até 3;
+    - Antecedentes 7;
+    - Esferas 6, até a Arete;
+    - 15 de bônus livres.
+
+    O `checkCreation` do core confere a conta no teste.
+15. **Onde o seed foi conferido:** no `apps/api/src/__tests__/seed-roteiro.test.ts`, em PGLite, num caso novo com teto de 30 s. Num Postgres de verdade, o seed não rodou nesta etapa. Num banco próprio, ele precisaria de migration, e a etapa não roda migration. Fica para a integração.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 O roteiro confere cada item na interface, nas três plataformas, com a API local e o seed do roteiro (só contas fictícias `@roteiro.test`). Ele detalha o passo 6 da seção 7. Roda na integração da onda, depois do merge do P03-D, num banco local de desenvolvimento (nunca de produção).

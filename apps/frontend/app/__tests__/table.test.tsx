@@ -189,6 +189,52 @@ describe('Mesa do narrador', () => {
     expect(router.push).toHaveBeenCalledWith(`/characters/${HELENA}`)
   })
 
+  // P04-D (R-12, R-13): o selo do estado no cartão, da mesma regra da lista
+  it('o selo diz o estado: aguardando aprovação, avisou, em criação e concluída', async () => {
+    const OTHER = '00000000-0000-4000-8000-00000000c003'
+    const DONE = '00000000-0000-4000-8000-00000000c004'
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(HELENA, 'helena', 'vtm-v20', {
+          status: 'pending',
+          creationMode: 'points',
+        }),
+        row(LIA, 'lia', 'dnd5e-2014', {
+          status: 'creating',
+          creationMode: 'free',
+          ready: true,
+        }),
+        row(OTHER, 'helena', 'vtm-v20', {
+          name: 'Caio',
+          status: 'creating',
+          creationMode: 'free',
+        }),
+        row(DONE, 'helena', 'vtm-v20', {
+          name: 'Dora',
+          status: 'active',
+          activatedAt: '2026-11-01T12:00:00Z',
+        }),
+      ])
+    )
+    await openTable()
+    expect(
+      await screen.findByTestId(`table-state-${HELENA}`)
+    ).toHaveTextContent('Aguardando aprovação')
+    expect(screen.getByTestId(`table-state-${LIA}`)).toHaveTextContent(
+      'Avisou que terminou'
+    )
+    expect(screen.getByTestId(`table-state-${OTHER}`)).toHaveTextContent(
+      'Em criação · livre'
+    )
+    expect(screen.getByTestId(`table-state-${DONE}`)).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    // O estado entra no nome da linha, que é um alvo só
+    expect(
+      screen.getByTestId(`table-row-${HELENA}`).props.accessibilityLabel
+    ).toContain('Aguardando aprovação')
+  })
+
   it('alteração de outro dia mostra a data', async () => {
     calls.chronicle.tableGet.mockResolvedValue(
       ok([

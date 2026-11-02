@@ -119,6 +119,11 @@ export const PHRASES: Record<HistoryAction, (item: PhraseItem) => string> = {
   'character.creation.complete': item => `Criação de ${sheet(item)} concluída`,
   'character.creation.update': item =>
     `Escolhas da criação de ${sheet(item)} alteradas`,
+  // D-04 e D-03 (P04-D): como no Histórico da ficha ("Ajuste pedido",
+  // "Avisou que terminou"). Nunca o motivo do ajuste: ele fica na ficha
+  'character.creation.adjust': item => `Ajuste pedido em ${sheet(item)}`,
+  'character.creation.ready': item =>
+    `O dono de ${sheet(item)} avisou que terminou`,
   // Membros
   'member.remove': item => {
     const count = n(item.detail.characters)

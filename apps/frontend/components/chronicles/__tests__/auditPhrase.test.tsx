@@ -26,7 +26,7 @@ const CODE = /^[a-z]+([.-][a-z-]+)+$/
 describe('auditPhrase', () => {
   it('cada código tem frase, e nenhuma frase é o código', () => {
     const actions = Object.keys(PHRASES) as HistoryAction[]
-    expect(actions.length).toBeGreaterThanOrEqual(37)
+    expect(actions.length).toBeGreaterThanOrEqual(39)
     for (const action of actions) {
       const phrase = auditPhrase(item(action))
       expect(phrase).not.toMatch(CODE)
@@ -90,6 +90,12 @@ describe('auditPhrase', () => {
     ['character.lock', {}, 'Helena travada'],
     ['character.creation.return', {}, 'Helena devolvida para correção'],
     ['character.creation.complete', {}, 'Criação de Helena concluída'],
+    [
+      'character.creation.adjust',
+      { detail: { reason: 'MOTIVO-DO-AJUSTE' } },
+      'Ajuste pedido em Helena',
+    ],
+    ['character.creation.ready', {}, 'O dono de Helena avisou que terminou'],
     [
       'member.remove',
       { detail: { characters: 2 } },

@@ -239,6 +239,7 @@ Conjunto de condições ou palavras-chave.
 - **Estados:** marcada, desmarcada, desabilitada (fora do modo permitido).
 - **A11y:** web `aria-pressed`; opção com efeito ganha texto oculto ", desvantagem nas rolagens". RN `accessibilityRole="checkbox"` + `checked`. No painel "Em jogo", as marcadas aparecem como `ds-tag` de leitura.
 - **Multi-sistema:** condições do D&D (Envenenado vira desvantagem automática na parada, com a origem); Ferimento grave e insanidade (CoC); condições de PbtA.
+- **Selo de estado (RN, P04-D):** o `StateBadge` do `@tms/ui` é a tag de leitura que diz o estado da ficha ("Em criação · por pontos", "Aguardando aprovação", "Aguardando ajuste", "Devolvida", "Concluída em dd/mm") e, no P11, a visibilidade do NPC. API `{ label: string; tone?: 'neutral' | 'attention' | 'done'; live?: boolean; testID?: string }`. Pílula de borda fina (`radius.pill`, `borderWidth.hair`), caption, sem corte de texto: quebra em vez de truncar. Cores do tema do app, nunca do accent da ficha: neutro `borderControl` e `inkMuted`; atenção `action` (o do `Banner` `warning`); concluído `success`. O texto é o estado, e o tom só reforça. A11y: não é um elemento à parte; o texto é lido como texto e, dentro de uma linha, entra no nome dela, sem foco próprio. Com `live`, região viva educada (`aria-live="polite"` no web, `accessibilityLiveRegion` no Android); no iOS, a troca é anunciada pelo `Banner` da ficha. Não é interativo: para filtro, `Chip`.
 - **Resolve:** C-07, C-12.
 
 ### TextField / TextArea / AspectField
@@ -513,6 +514,7 @@ Bloco de identidade recolhível no topo do corpo.
 - **Estados:** aberto, fechado.
 - **A11y:** `aria-expanded` + `aria-controls`; texto oculto ". Mostrar identidade" / ". Recolher identidade". RN `accessibilityState={{ expanded }}`.
 - **Multi-sistema:** Senhor, Natureza e Comportamento (Vampiro); raça, subclasse e antecedente (D&D); ocupação, idade e residência (CoC). No Fate, o conceito é aspecto e não se repete na voz.
+- **Selo do estado (RN, P04-D):** logo abaixo do nome grande e antes do `IdentityChip`, o `StateBadge` com `live` (`testID="sheet-state"`) diz o estado da ficha em qualquer modo. Fica aqui, e não no `subtitle` da `AppBar`: a 360 dp, com "N alterações não salvas", nenhum selo cabe no título, e a coluna do nome tem 240 dp. O `viewer` (NPC revelado) fica sem selo de estado.
 - **Resolve:** C-04, C-15, DS-10.
 
 ### IdentityChip
@@ -556,12 +558,16 @@ Estado de salvamento no header.
 Faixa que diz em que modo a ficha está.
 
 - **Classes:** `ds-modebar` (faixa `surface-raised` abaixo do header, caption), `strong` (rótulo em caixa alta), `__actions`.
-- **Variantes:** Evoluindo ("N alterações não salvas" + Concluir); Leitura ("Ficha de {dono}" + "Editar como narrador" para o narrador); Narrador ("As alterações ficam assinadas no histórico" + "Voltar à leitura"); Arquivada ("Somente leitura" + Restaurar para o dono). Em Jogo não aparece.
+- **Variantes:** Editando ("Editando · N alterações" + "Salvar alterações", desabilitado sem alterações; a saída do modo é o seletor); Criação ("Criação · N alterações · Bônus: …" + "Salvar" e, com a conta fechada, "Concluir criação", "Enviar para aprovação" ou, para o narrador, "Concluir e aprovar" ao lado); Leitura ("Ficha de {dono}" + "Editar como narrador" para o narrador); Narrador ("As alterações ficam assinadas no histórico" + "Voltar à leitura"); Arquivada ("Somente leitura" + Restaurar para o dono). Em Jogo não aparece.
+- **Salvar × Concluir (D-01, P03-D):** salvar o progresso nunca conclui. "Salvar" fica sempre na barra de Criação e grava o lote sem sair do modo; a ação seguinte (concluir ou enviar) aparece ao lado só quando a conta fecha, e salva antes de concluir. O "Salvar" visível da Criação tem o nome acessível "Salvar alterações", o mesmo do Editar (o texto visível começa o nome, WCAG 2.5.3). "Concluir" só aparece em "Concluir criação" e "Concluir e aprovar". Revê o "um botão só" e a barra "Editando · Concluir" da DS-04 (`doc/avaliacao-ui-ux.md`), e volta ao plano-v4 ("Separar 'Salvar alterações' de 'Concluir criação'").
+- **Ações (RN):** o `EvolveBar` recebe `save` (sempre), `next` (a ação seguinte, a principal, à direita) e `note` (uma linha sob o texto, para o próximo passo). No `compact` com duas ações ou com a nota, e com fonte de 130% (`stacked`), fica em duas linhas: o texto em cima e as ações embaixo, alinhadas à direita, numa linha que quebra se não couber. Nos outros casos, uma linha só.
+- **Sair com rascunho:** o "Sair sem salvar?" da ficha tem "Descartar e sair" (`danger`), "Continuar editando" (`ghost`) e "Salvar e sair" (principal). No `compact` ou `stacked`, em coluna, com a principal embaixo; a partir de 600, numa linha, com "Descartar e sair" à esquerda. A saída acontece depois que a folha sai da tela; recusada a gravação, a frase aparece na folha e nada sai.
 - **API RN:** `{ mode: 'read' | 'evolve' | 'storyteller' | 'archived'; title: string; message: string; actions?: ButtonProps[] }`.
 - **Estados:** as quatro variantes.
 - **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
-- **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e o botão) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `SheetView` monta as três juntas, fixas acima, como antes.
+- **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e as ações) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `SheetView` monta as três juntas, fixas acima, como antes.
+- **Próximo passo (RN, P04-D):** sob a contagem, uma linha em caption e `inkMuted` (`testID="next-step"`) diz o próximo passo e quem conclui, pelo modo da crônica e pelo papel ("Quando terminar, avise: o narrador conclui.", "Você conclui quando a conta fechar.", "Quando a conta fechar, envie ao narrador."). Ela não é região viva: muda pouco, e o banner da ficha anuncia o pedido do narrador. Ela entra pelo `note` do `EvolveBar`. Na criação livre, a dona tem "Avisar que terminei" no `next` do Editar, com a confirmação do resumo; com ele ao lado, o salvar do Editar mostra "Salvar" e mantém o nome acessível "Salvar alterações", como na Criação (onda-3 §4.1; a D-01 escreve "Salvar alterações" no Editar, e a regra ali é ponto para o PO). "Salvar" e "Avisar que terminei" somam ~292 dp e cabem numa linha a partir de 360 dp.
 - **Resolve:** C-01, C-19, DS-04.
 
 ### CombatDock / DockChip
@@ -702,6 +708,7 @@ Item de lista de crônicas, personagens e mesa.
 - **API RN:** `{ title: string; avatar: { name: string; accent?: AccentName }; chip?: string; meta?: string; stats?: { label: string; value: string }[]; onPress(): void; accessibilityLabel: string }`.
 - **Estados:** normal, pressionado.
 - **A11y:** um link por item com rótulo composto ("Helena Varga, Tremere. Vitalidade: …"); avatar e chevron ocultos. No `@tms/ui`, a linha sem `onPress` é um elemento só; com `trailing` (Revogar, Remover, Editar, Propor), o texto vira o elemento e o `trailing` fica fora dele, senão o botão some dentro da linha no app. `onPress` com `trailing` interativo não é suportado (botão dentro de botão).
+- **Selos (RN, P04-D):** `badges?: StateBadgeProps[]` desenha os selos de estado numa linha com quebra, sob o `meta`. O rótulo de cada um entra no nome acessível depois do `meta` ("Helena Varga, Tremere, Sua ficha, Aguardando ajuste"), e a linha continua um alvo só (os selos são texto dentro dela).
 - **Multi-sistema:** uma lista mistura Vampiro, D&D e CoC, cada linha com a própria skin e accent; a linha da Mesa reaproveita o `dock` do template ([Vitalidade, Sangue, FdV] ou [PV, SAN, Sorte]).
 - **Resolve:** C-13, C-19, C-20, §7.
 

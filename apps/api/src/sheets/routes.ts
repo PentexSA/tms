@@ -23,6 +23,7 @@ import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
 import { creationView } from './creation'
+import { creationStateOf } from './creation-state'
 import { latestTemplate, modelFor } from './models'
 import { lockCharacter, refusal, writeAccess } from './policy'
 
@@ -67,22 +68,6 @@ const idempotencyConflict = () =>
     'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
     { code: 'IDEMPOTENCY_CONFLICT' }
   )
-
-/**
- * A ficha foi devolvida (T-06): a mesma forma que `parseCharacterCreation`
- * aceita (motivo e data em texto), sem validar as escolhas e a configuração
- * de cada linha da lista só para um booleano.
- */
-export function isReturned(creation: unknown): boolean {
-  const c = creation as { returned?: unknown } | null
-  const r = c && typeof c === 'object' ? c.returned : null
-  return (
-    r !== null &&
-    typeof r === 'object' &&
-    typeof (r as { reason?: unknown }).reason === 'string' &&
-    typeof (r as { at?: unknown }).at === 'string'
-  )
-}
 
 export function sheetRoutes(
   db: Kysely<DB>,
@@ -361,6 +346,8 @@ export function sheetRoutes(
             'ch.portrait_url',
             'ch.status',
             'ch.creation',
+            'ch.activated_at',
+            'ch.locked_at',
             'u.username',
           ])
           .where('ch.chronicle_id', '=', params.id)
@@ -433,9 +420,15 @@ export function sheetRoutes(
             mine: r.user_id === me,
             // A lista avisa o narrador da ficha que aguarda a revisão dele
             status: r.status,
-            // A ficha devolvida (T-06): só o booleano. O motivo fica no
-            // GET /characters/:id, para o dono e o narrador
-            returned: r.status === 'creating' && isReturned(r.creation),
+            // O estado da criação (T-06; P04-D, R-12): o modo e os
+            // marcadores (devolvida, ajuste pedido, avisou que terminou), só
+            // booleanos. O motivo fica no GET /characters/:id, para o dono e
+            // o narrador
+            ...creationStateOf(model, r.status, r.creation),
+            // "Concluída em dd/mm": a data em que a ficha entrou em jogo; a
+            // trava vence a data, como na Mesa
+            activatedAt: r.activated_at,
+            lockedAt: r.locked_at,
             templateVersion: r.template_version,
             updatedAt: r.updated_at,
             values: Object.fromEntries(

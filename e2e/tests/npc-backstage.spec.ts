@@ -281,7 +281,8 @@ test('bastidores e NPC: revelar com confirmação, data civil, selo, proposta e 
       await narratorDesk.goto(`/chronicles/${chronicle.id}`)
       await expect(
         narratorDesk.getByRole('button', {
-          name: new RegExp(`^${NPC},.*NPC · Ficha revelada$`),
+          // O selo de visibilidade entra no nome acessível depois do meta
+          name: new RegExp(`^${NPC},.*NPC, Ficha revelada$`),
         })
       ).toBeVisible()
       await narratorDesk.getByRole('tab', { name: 'Mesa' }).click()

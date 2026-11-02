@@ -127,7 +127,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await expect(page.getByText('Salvar 7 alterações?')).toBeVisible()
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()

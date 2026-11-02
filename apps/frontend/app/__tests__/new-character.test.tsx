@@ -6,10 +6,10 @@ import {
   useRouter,
 } from 'expo-router'
 import { Platform } from 'react-native'
-import { characterStateText } from '../../components/chronicles/characterState'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { templateJson } from '../../test/fixtures'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -397,6 +397,8 @@ describe('Nova ficha: guarda de saída', () => {
     tryLeave(repeat)
     expect(screen.getByText('Sair sem salvar?')).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    // A saída vem depois que a folha sai da tela (onClosed, P03-D)
+    await sheetsDismissed()
     expect(repeat).toHaveBeenCalledTimes(1)
   })
 
@@ -501,7 +503,7 @@ describe('Fichas na crônica', () => {
     expect(await screen.findByText('1 ficha aguarda sua revisão')).toBeTruthy()
     expect(
       screen.getByRole('button', {
-        name: /^Helena Varga, .*de dona · Aguarda sua revisão$/,
+        name: /^Helena Varga, .*de dona, Aguardando aprovação$/,
       })
     ).toBeTruthy()
     expect(
@@ -521,19 +523,7 @@ describe('Fichas na crônica', () => {
     ...over,
   })
 
-  it.each([
-    [{ status: 'pending' }, false, 'Aguarda aprovação'],
-    [{ status: 'pending' }, true, 'Aguarda sua revisão'],
-    [{ status: 'creating', returned: true }, false, 'Devolvida'],
-    [{ status: 'creating', returned: true }, true, 'Devolvida'],
-    [{ status: 'creating', returned: false }, false, null],
-    [{ status: 'active', returned: true }, false, null],
-    [{}, false, null],
-  ])('characterStateText(%j, narra: %s) = %s', (r, narrating, expected) => {
-    expect(characterStateText(r, narrating)).toBe(expected)
-  })
-
-  it('a dona vê "Sua ficha · Devolvida"; "Aguarda aprovação" continua', async () => {
+  it('a dona vê "Sua ficha, Devolvida"; "Aguardando aprovação" no selo', async () => {
     calls.chronicle.charactersGet.mockResolvedValue(
       ok([
         row({ status: 'creating', returned: true }),
@@ -543,17 +533,17 @@ describe('Fichas na crônica', () => {
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(
       await screen.findByRole('button', {
-        name: /^Helena Varga, .*Sua ficha · Devolvida$/,
+        name: /^Helena Varga, .*Sua ficha, Devolvida$/,
       })
     ).toBeTruthy()
     expect(
       screen.getByRole('button', {
-        name: /^Caio, .*Sua ficha · Aguarda aprovação$/,
+        name: /^Caio, .*Sua ficha, Aguardando aprovação$/,
       })
     ).toBeTruthy()
   })
 
-  it('o narrador vê "de <jogador> · Devolvida"', async () => {
+  it('o narrador vê "de <jogador>, Devolvida"', async () => {
     calls.chronicle.get.mockResolvedValue(
       ok({
         id: CHRONICLE,
@@ -570,7 +560,107 @@ describe('Fichas na crônica', () => {
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(
       await screen.findByRole('button', {
-        name: /^Helena Varga, .*de dona · Devolvida$/,
+        name: /^Helena Varga, .*de dona, Devolvida$/,
+      })
+    ).toBeTruthy()
+  })
+
+  // P04-D (R-12): o estado vai no selo, sob o meta, e entra no nome
+  it('a linha diz o estado: em criação por pontos, ajuste pedido e concluída', async () => {
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        row({ status: 'creating', creationMode: 'points' }),
+        row({
+          id: 'ch2',
+          name: 'Caio',
+          status: 'creating',
+          creationMode: 'free',
+          adjust: true,
+        }),
+        row({
+          id: 'ch3',
+          name: 'Dora',
+          status: 'active',
+          activatedAt: '2026-11-01T12:00:00Z',
+        }),
+        // A trava vence a data, como na Mesa (achado do /code-review)
+        row({
+          id: 'ch4',
+          name: 'Eva',
+          status: 'active',
+          activatedAt: '2026-11-01T12:00:00Z',
+          lockedAt: '2026-11-02T12:00:00Z',
+        }),
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: /^Helena Varga, .*Sua ficha, Em criação · por pontos$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: /^Caio, .*Sua ficha, Aguardando ajuste$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: /^Dora, .*Sua ficha, Concluída em 01\/11$/,
+      })
+    ).toBeTruthy()
+    expect(screen.getByTestId('character-state-ch1')).toHaveTextContent(
+      'Em criação · por pontos'
+    )
+    expect(
+      screen.getByRole('button', { name: /^Eva, .*Sua ficha, Travada$/ })
+    ).toBeTruthy()
+  })
+
+  // P04-D (R-13): na criação livre, o narrador vê quem avisou que terminou
+  it('o narrador vê o banner de quem avisou que terminou', async () => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'storyteller',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        row({
+          mine: false,
+          status: 'creating',
+          creationMode: 'free',
+          ready: true,
+        }),
+        // A ficha do próprio narrador não entra no aviso
+        row({
+          id: 'ch2',
+          name: 'Da narradora',
+          mine: true,
+          status: 'creating',
+          creationMode: 'free',
+          ready: true,
+        }),
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByText('1 jogador avisou que terminou')
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Helena Varga: abra a ficha para concluir a criação ou pedir ajuste.'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('ready-review')).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: /^Helena Varga, .*de dona, Avisou que terminou$/,
       })
     ).toBeTruthy()
   })
@@ -609,11 +699,11 @@ describe('Fichas na crônica', () => {
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(
       await screen.findByRole('button', {
-        name: /^Figura Velada, .*Tremere · NPC · Oculto$/,
+        name: /^Figura Velada, .*Tremere · NPC, Oculto$/,
       })
     ).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: /^Oráculo, .*NPC · Ficha revelada$/ })
+      screen.getByRole('button', { name: /^Oráculo, .*NPC, Ficha revelada$/ })
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Sua ficha/ })).toBeNull()
   })
@@ -655,7 +745,7 @@ describe('Fichas na crônica', () => {
       ok([row({ status: 'pending' })])
     )
     renderWithSession(<ChronicleScreen />, await signedIn())
-    await screen.findByRole('button', { name: /Aguarda aprovação$/ })
+    await screen.findByRole('button', { name: /Aguardando aprovação$/ })
     const before = calls.chronicle.charactersGet.mock.calls.length
     calls.chronicle.charactersGet.mockResolvedValue(
       ok([row({ status: 'creating', returned: true })])
@@ -669,7 +759,7 @@ describe('Fichas na crônica', () => {
       )
     )
     expect(
-      await screen.findByRole('button', { name: /Sua ficha · Devolvida$/ })
+      await screen.findByRole('button', { name: /Sua ficha, Devolvida$/ })
     ).toBeTruthy()
   })
 

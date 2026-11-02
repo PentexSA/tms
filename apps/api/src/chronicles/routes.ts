@@ -356,13 +356,28 @@ export function chronicleRoutes(
               ])
             )
             .as('characterCount'),
-          // Fichas que aguardam a revisão do narrador: só ele recebe a conta
+          // Fichas que aguardam a revisão do narrador: as enviadas para
+          // aprovação e as da criação livre cujo dono avisou que terminou
+          // (P04-D, R-13). Só ele recebe a conta
           eb
             .selectFrom('characters as ch')
             .select(eb.fn.countAll<string>().as('n'))
             .whereRef('ch.chronicle_id', '=', 'c.id')
             .where('ch.deleted_at', 'is', null)
-            .where('ch.status', '=', 'pending')
+            .where(eb =>
+              eb.or([
+                eb('ch.status', '=', 'pending'),
+                eb.and([
+                  eb('ch.status', '=', 'creating'),
+                  // O banner da aba Fichas: PC de outra pessoa (depois de uma
+                  // transferência, a ficha do próprio narrador não conta)
+                  eb('ch.kind', '=', 'pc'),
+                  eb('ch.user_id', '<>', me),
+                  // A mesma forma que o parse aceita: a data em texto
+                  sql<boolean>`jsonb_typeof(ch.creation -> 'ready' -> 'at') = 'string'`,
+                ]),
+              ])
+            )
             .where('c.storyteller_id', '=', me)
             .as('pendingReview'),
           // A data civil da última sessão (U-04), no formato do sessionDate.

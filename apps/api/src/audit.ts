@@ -14,6 +14,10 @@ export type AuditAction =
   | 'character.creation.approve'
   | 'character.creation.return'
   | 'character.creation.update'
+  // D-04 e D-03 (P04-D): o pedido de ajuste do narrador e o aviso de
+  // "terminei" do dono. O motivo do ajuste também não entra: fica na ficha
+  | 'character.creation.adjust'
+  | 'character.creation.ready'
   | 'chronicle.creation.settings'
   | 'character.status'
   | 'character.lock'

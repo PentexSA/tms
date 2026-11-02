@@ -74,7 +74,7 @@ describe('Editar: o rascunho e o resumo', () => {
     // Nada saiu do aparelho enquanto evoluía
     expect(server.post).not.toHaveBeenCalled()
 
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(screen.getByText('Salvar 3 alterações?')).toBeTruthy()
     const summary = within(screen.getByTestId('evolve-summary'))
     // Com o caminho na ficha (T-54)
@@ -111,7 +111,7 @@ describe('Editar: o rascunho e o resumo', () => {
     const server = fakeServer(model, nova)
     await renderLive({ model, sheet: nova }, server.post)
     evolveThree()
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
     expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
     expect(screen.getByText('Nenhuma Disciplina')).toBeTruthy()
@@ -125,7 +125,7 @@ describe('Editar: o rascunho e o resumo', () => {
     await renderLive({ model, sheet: nova }, server.post)
     enterEvolve()
     increment('Força')
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
     fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
@@ -143,10 +143,36 @@ describe('Editar: o rascunho e o resumo', () => {
     expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
   })
 
-  it('Concluir sem alterações sai direto; trocar de modo com rascunho passa pelo resumo', async () => {
+  // R-05 (D-01): o botão do Editar só salva; "Concluir" lia-se como
+  // "concluir a criação"
+  it('R-05: no Editar, "Salvar alterações" e nenhum "Concluir"', async () => {
     await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
     enterEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    expect(screen.queryByText(/Concluir/)).toBeNull()
+    const save = screen.getByRole('button', { name: 'Salvar alterações' })
+    expect(save).toHaveTextContent('Salvar alterações')
+    expect(save.props.testID).toBe('mode-save')
+    increment('Força')
+    expect(save).toBeEnabled()
+    fireEvent.press(save)
+    expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    })
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
+    expect(screen.queryByText(/Concluir/)).toBeNull()
+  })
+
+  it('sem alterações, "Salvar alterações" fica desabilitado e o seletor sai; trocar de modo com rascunho passa pelo resumo', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    enterEvolve()
+    const save = screen.getByRole('button', { name: 'Salvar alterações' })
+    expect(save).toBeDisabled()
+    fireEvent.press(save)
+    expect(screen.queryByText('Salvar 0 alterações?')).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
+    // A saída do Editar sem alterações é o seletor de modo
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
     expect(screen.queryByText('Salvar 0 alterações?')).toBeNull()
     expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
 
@@ -179,7 +205,7 @@ describe('Editar: o resumo na ordem da ficha', () => {
     increment('Aparência')
     increment('Aparência')
     increment('Força de Vontade permanente')
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     const summary = within(screen.getByTestId('evolve-summary'))
     // A Aparência do Tremere vem do clã (1), não do mínimo (0)
     expect(
@@ -208,7 +234,7 @@ describe('Editar: o resumo na ordem da ficha', () => {
     const server = fakeServer(model, nova)
     await renderLive({ model, sheet: nova }, server.post)
     evolveThree()
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     const discard = screen.getByRole('button', { name: 'Descartar' })
     expect(discard.props.accessibilityHint).toBe('Descarta 3 alterações')
     // Sem fundo (ghost), não o vermelho cheio de antes
@@ -249,7 +275,7 @@ describe('Editar: o servidor recusa (422)', () => {
     await renderLive({ model, sheet: nova }, post)
     enterEvolve()
     increment('Força')
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     expect(
       await screen.findByText('acima do permitido nesta crônica')
@@ -277,7 +303,7 @@ describe('Editar: o servidor recusa (422)', () => {
         .getState()
         .received({ ...nova, values: { ...nova.values, strength: 4 } }, 2)
     })
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     expect(
       screen.getByText(/^Alguém mudou um destes campos enquanto você editava/)
