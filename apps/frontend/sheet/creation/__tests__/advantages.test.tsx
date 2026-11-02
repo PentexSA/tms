@@ -185,8 +185,6 @@ const SPENT = [
 
 const alertsIn = (testID: string) =>
   within(screen.getByTestId(testID)).queryAllByRole('alert')
-const announced = () =>
-  jest.mocked(AccessibilityInfo.announceForAccessibility).mock.calls.flat()
 
 describe('T-19: a recusa aparece dentro da folha tocada', () => {
   it('4ª Disciplina em Pontos básicos: a frase fica embaixo da opção, e nada sobra na ficha ao fechar', async () => {
@@ -201,13 +199,21 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(sheet[0]).toHaveTextContent(/Disciplinas/)
     // Só a da folha: nenhuma frase embaixo da lista, atrás do modal
     expect(alertsIn('editor-disciplines')).toHaveLength(1)
-    expect(announced()).toContain(sheet[0]?.props.children)
+    // É o aviso do store (R-20), com o id que o leitor de tela anuncia
+    expect(
+      within(screen.getByTestId('add-sheet-disciplines')).getByTestId(
+        'notice-disciplines'
+      )
+    ).toBeTruthy()
     // A opção continua lá, com a frase logo abaixo dela
     expect(screen.getByRole('button', { name: 'Ofuscação' })).toBeTruthy()
 
     fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
     expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
     expect(alertsIn('editor-disciplines')).toHaveLength(0)
+    // Fechar apaga o aviso do store: a folha do item não o herda
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
   })
 
   it('editor de Disciplina: + e Aplicar acima dos básicos avisa acima do Aplicar; o − apaga; com 1, Aplicar fecha', async () => {

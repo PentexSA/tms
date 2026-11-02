@@ -11,7 +11,8 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
+import { useSheetStore } from '../context'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -21,7 +22,8 @@ import {
   ListHeader,
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
-import { useFieldIssue, useSetDraft } from './hooks'
+import { DraftNoticeText } from './DraftNoticeText'
+import { useDraftNotice, useFieldIssue, useSetDraft } from './hooks'
 import { withItemDefaults } from './listItem'
 import { fold, nextItemId, noneOf } from './text'
 
@@ -38,6 +40,21 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] }
 
 /** A recusa da conta (ou do validador) para quem tocou; `null` se entrou. */
 type Write = string | null
+
+/**
+ * O aviso do toque recusado na lista (o do store, R-20) e como apagá-lo. O
+ * store não vê o rascunho local da folha: a folha apaga o aviso quando muda
+ * o que estava tentando e ao fechar, para ele não sobrar na ficha.
+ */
+function useListNotice(list: ResolvedList) {
+  const store = useSheetStore()
+  const notice = useDraftNotice(`values.${list.id}`)
+  const clear = () => store.getState().clearNotice()
+  const text = notice ? (
+    <DraftNoticeText notice={notice} field={list.id} />
+  ) : null
+  return { text, clear }
+}
 
 /** Item sem campos vazios: o validador do core recusa chave sem esquema. */
 function cleanItem(item: ListItem): ListItem {
@@ -161,29 +178,6 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   )
 }
 
-/** A frase da recusa dentro da folha, perto do toque; o app a anuncia. */
-function Refusal({
-  message,
-  testID,
-}: {
-  readonly message: string
-  readonly testID: string
-}) {
-  return (
-    <Text
-      variant="caption"
-      color="danger"
-      accessibilityRole="alert"
-      testID={testID}
-    >
-      {message}
-    </Text>
-  )
-}
-
-const announce = (message: string) =>
-  AccessibilityInfo.announceForAccessibility(message)
-
 function AddItemSheet({
   visible,
   list,
@@ -196,12 +190,13 @@ function AddItemSheet({
   readonly onAdd: (name: string) => Write
 }) {
   const [query, setQuery] = useState('')
-  // Onde a recusa aparece: `option:<nome>` (a opção tocada), `custom` (o
-  // botão do texto livre) ou `field` (o Enter no campo)
-  const [refused, setRefused] = useState<{
-    readonly at: string
-    readonly message: string
-  } | null>(null)
+  // Onde o aviso da recusa aparece (T-19): `option:<nome>` (a opção tocada),
+  // `custom` (o botão do texto livre) ou `field` (o Enter no campo). O texto
+  // é o do store (useDraftNotice), que some quando a causa some
+  const [at, setAt] = useState<string | null>(null)
+  // Por que o Enter não adicionou (sugestões à vista, nome já na ficha)
+  const [guide, setGuide] = useState<string | null>(null)
+  const notice = useListNotice(list)
   const def = list.field.def
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
   const q = fold(query)
@@ -209,23 +204,23 @@ function AddItemSheet({
   const exact = (def.catalog ?? []).find(name => fold(name) === q)
   const custom = query.trim()
   // Recusado, o nome digitado fica (QAA-05); só limpa o que entrou
-  const pick = (name: string, at: string) => {
-    const message = onAdd(name)
-    if (message) {
-      setRefused({ at, message })
-      announce(message)
+  const pick = (name: string, where: string) => {
+    setGuide(null)
+    if (onAdd(name)) {
+      setAt(where)
       return
     }
     setQuery('')
-    setRefused(null)
+    setAt(null)
   }
   // Enter (web) e "✓" (teclado do app) fazem o que o botão à vista faria
   // (T-62): o nome exato do catálogo adiciona o item do catálogo; sem
   // catálogo, ou sem sugestão, o texto livre. Com sugestões à vista, o Enter
   // não adiciona "Domi" como Disciplina: o campo diz o que tocar.
   const explain = (message: string) => {
-    setRefused({ at: 'field', message })
-    announce(message)
+    notice.clear()
+    setAt(null)
+    setGuide(message)
   }
   const submit = () => {
     if (!custom) return
@@ -237,10 +232,7 @@ function AddItemSheet({
       `Toque numa sugestão, ou em “Adicionar “${custom}”” para usar o nome como está.`
     )
   }
-  const refusalAt = (at: string) =>
-    refused?.at === at ? (
-      <Refusal message={refused.message} testID={`refusal-${list.id}`} />
-    ) : null
+  const noticeAt = (where: string) => (at === where ? notice.text : null)
   return (
     <BottomSheet
       visible={visible}
@@ -248,7 +240,9 @@ function AddItemSheet({
       testID={`add-sheet-${list.id}`}
       onClose={() => {
         setQuery('')
-        setRefused(null)
+        setAt(null)
+        setGuide(null)
+        notice.clear()
         onClose()
       }}
     >
@@ -258,17 +252,20 @@ function AddItemSheet({
           value={query}
           onChangeText={text => {
             setQuery(text)
-            setRefused(null)
+            setAt(null)
+            setGuide(null)
+            notice.clear()
           }}
           maxLength={ITEM_NAME_MAX}
           autoFocus
-          // Recusado pelo Enter, a frase fica no campo, com o foco nele
-          error={refused?.at === 'field' ? refused.message : null}
+          error={guide}
           returnKeyType="done"
           submitBehavior="submit"
           {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
           onSubmitEditing={submit}
         />
+        {/* Recusado pelo Enter, o aviso fica logo abaixo do campo */}
+        {noticeAt('field')}
         {options.map(name => {
           const taken = have.has(fold(name))
           return (
@@ -287,7 +284,7 @@ function AddItemSheet({
                   </Text>
                 ) : null}
               </Pressable>
-              {refusalAt(`option:${name}`)}
+              {noticeAt(`option:${name}`)}
             </View>
           )
         })}
@@ -298,7 +295,7 @@ function AddItemSheet({
               variant="secondary"
               onPress={() => pick(custom, 'custom')}
             />
-            {refusalAt('custom')}
+            {noticeAt('custom')}
           </View>
         ) : null}
       </View>
@@ -316,8 +313,8 @@ function ItemSheet({
   readonly list: ResolvedList
   readonly item: ListItem
   readonly onClose: () => void
-  readonly onSave: (item: ListItem) => Write
-  readonly onRemove: () => Write
+  readonly onSave: (item: ListItem) => void
+  readonly onRemove: () => void
 }) {
   const def = list.field.def
   const schema = def.item
@@ -326,20 +323,15 @@ function ItemSheet({
     withItemDefaults(def, item)
   )
   const [confirming, setConfirming] = useState(false)
-  // A recusa fica na folha, acima do Aplicar, até o próximo ajuste (T-19)
-  const [refused, setRefused] = useState<string | null>(null)
+  // O aviso do store fica na folha, acima do Aplicar (ou sob "Remover X?"),
+  // até o próximo ajuste (T-19)
+  const notice = useListNotice(list)
   const title = itemTitle(list, item) || def.itemLabel
   const patch = (p: Partial<Mutable<ListItem>>) => {
-    setRefused(null)
+    notice.clear()
     setDraft(d => ({ ...d, ...p }))
   }
-  const attempt = (message: Write) => {
-    setRefused(message)
-    if (message) announce(message)
-  }
-  const refusal = refused ? (
-    <Refusal message={refused} testID={`refusal-${list.id}`} />
-  ) : null
+  const refusal = notice.text
   const footer = confirming ? (
     <>
       <Button
@@ -347,14 +339,10 @@ function ItemSheet({
         variant="ghost"
         onPress={() => {
           setConfirming(false)
-          setRefused(null)
+          notice.clear()
         }}
       />
-      <Button
-        title="Remover"
-        variant="danger"
-        onPress={() => attempt(onRemove())}
-      />
+      <Button title="Remover" variant="danger" onPress={onRemove} />
     </>
   ) : (
     <>
@@ -364,19 +352,22 @@ function ItemSheet({
           variant="ghost"
           onPress={() => {
             // A recusa do Aplicar não vale para a remoção
-            setRefused(null)
+            notice.clear()
             setConfirming(true)
           }}
         />
       )}
-      <Button title="Aplicar" onPress={() => attempt(onSave(draft))} />
+      <Button title="Aplicar" onPress={() => onSave(draft)} />
     </>
   )
   return (
     <BottomSheet
       visible
       title={title}
-      onClose={onClose}
+      onClose={() => {
+        notice.clear()
+        onClose()
+      }}
       footer={footer}
       testID={`item-sheet-${list.id}`}
     >
