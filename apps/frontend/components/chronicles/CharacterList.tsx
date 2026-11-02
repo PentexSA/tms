@@ -25,7 +25,7 @@ import {
 } from '../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate, useTemplate } from '../../sheet/data'
 import type { ChronicleCreationInfo } from './CreationSettings'
-import { characterStateText } from './characterState'
+import { characterStateText, npcVisibilityText } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -85,14 +85,21 @@ function CharacterRow({
       (model
         ? identityOf(resolve(model, { values: row.values } as SheetData))
         : null))
+  // T-52: o NPC do narrador diz "NPC" (o dono dele é o narrador, e "Sua
+  // ficha" confundia) e a visibilidade. O jogador continua com "NPC
+  // revelado", sem a visibilidade
+  const npc = !partial && row.kind === 'npc' && narrating
   const owner = partial
     ? 'NPC revelado'
-    : row.mine
-      ? 'Sua ficha'
-      : `de ${row.owner.username}`
+    : npc
+      ? 'NPC'
+      : row.mine
+        ? 'Sua ficha'
+        : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
+  const visibility = npc ? npcVisibilityText(row.visibility) : null
   const state = partial ? null : characterStateText(row, narrating)
-  const who = state ? `${owner} · ${state}` : owner
+  const who = [owner, visibility, state].filter(Boolean).join(' · ')
   return (
     <ThemeProvider
       accent={

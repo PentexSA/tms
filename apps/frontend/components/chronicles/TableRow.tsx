@@ -35,7 +35,7 @@ export const TableRow = memo(function TableRow({
   readonly selected?: boolean
   readonly onSelect?: (id: string) => void
 }) {
-  const { row, model, store, alerts, state } = item
+  const { row, model, store, alerts, state, visibility } = item
   const { colors } = useTheme()
   const resolved = store?.getState()
   const identity = resolved ? identityOf(resolved.resolved) : null
@@ -59,6 +59,7 @@ export const TableRow = memo(function TableRow({
     : []
   const label = [
     [row.name, identity?.chip].filter(Boolean).join(', '),
+    visibility,
     state,
     ...alerts.map(a => a.label),
     ...described,
@@ -104,8 +105,18 @@ export const TableRow = memo(function TableRow({
               {identity.chip}
             </Text>
           ) : null}
-          {state || alerts.length ? (
+          {visibility || state || alerts.length ? (
             <View style={styles.badges}>
+              {visibility ? (
+                <Text
+                  variant="caption"
+                  color="inkMuted"
+                  testID={`visibility-${row.id}`}
+                  style={[styles.badge, { borderColor: colors.borderSubtle }]}
+                >
+                  {visibility}
+                </Text>
+              ) : null}
               {state ? (
                 <Text variant="caption" color="inkMuted">
                   {state}

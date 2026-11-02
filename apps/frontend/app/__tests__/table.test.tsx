@@ -3,6 +3,7 @@ import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import * as apiModule from '../../lib/api'
+import { useTableOrder } from '../../lib/tableOrder'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import {
@@ -130,6 +131,51 @@ describe('Mesa do narrador', () => {
     expect(line.props.accessibilityLabel).toContain(helena.join('. '))
     expect(line.props.accessibilityLabel).toMatch(/dona · alterada às 14:05$/)
     expect(screen.getAllByText('dona · alterada às 14:05')).toHaveLength(2)
+  })
+
+  it('os NPCs ficam numa seção própria, depois dos PCs, com a visibilidade (T-52)', async () => {
+    const NPC = '00000000-0000-4000-8000-00000000c009'
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        // A API manda em qualquer ordem: o NPC antes de um PC
+        row(NPC, 'helena', 'vtm-v20', {
+          name: 'Figura Velada',
+          kind: 'npc',
+          visibility: 'hidden',
+        }),
+        row(HELENA, 'helena', 'vtm-v20', { kind: 'pc', visibility: 'hidden' }),
+        row(LIA, 'lia', 'dnd5e-2014', { kind: 'pc', visibility: 'hidden' }),
+      ])
+    )
+    await openTable()
+    const header = await screen.findByRole('header', { name: 'NPCs' })
+    expect(header).toBeTruthy()
+    const lines = screen
+      .getAllByRole('button')
+      .map(b => String(b.props.accessibilityLabel ?? ''))
+      .filter(l => /^(Figura Velada|Helena Varga|Lia)/.test(l))
+    // PCs antes, NPC depois do cabeçalho
+    expect(lines.at(-1)).toMatch(/^Figura Velada, Tremere\. Oculto\./)
+    expect(lines.slice(0, -1).every(l => !l.includes('Oculto'))).toBe(true)
+    expect(screen.getByTestId(`visibility-${NPC}`)).toHaveTextContent('Oculto')
+    expect(screen.queryByTestId(`visibility-${HELENA}`)).toBeNull()
+
+    // A navegação da Mesa lembra a ordem da tela: PCs e depois o NPC
+    fireEvent.press(
+      screen.getByRole('button', { name: /^Figura Velada, Tremere\./ })
+    )
+    const ids = useTableOrder.getState().ids
+    expect(ids.at(-1)).toBe(NPC)
+    expect(ids.slice(0, 2).sort()).toEqual([HELENA, LIA].sort())
+  })
+
+  it('sem NPC, a seção não aparece', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([row(HELENA, 'helena', 'vtm-v20', { kind: 'pc' })])
+    )
+    await openTable()
+    await screen.findByRole('button', { name: /^Helena Varga, Tremere\./ })
+    expect(screen.queryByRole('header', { name: 'NPCs' })).toBeNull()
   })
 
   it('tocar na linha abre a ficha (em Leitura)', async () => {
