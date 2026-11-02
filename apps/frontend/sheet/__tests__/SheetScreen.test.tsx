@@ -74,6 +74,7 @@ const npcIdentity = () =>
     kind: 'npc',
     visibility: 'identity',
     identity,
+    chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
   })
 const npcFull = () =>
   ok({
@@ -135,6 +136,22 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
       WAIT
     )
     expect(screen.queryByText('Oráculo')).toBeNull()
+  })
+
+  it('o "‹" do NPC com a identidade revelada volta para a crônica (T-81)', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcIdentity())
+    renderWithSession(<SheetScreen id={NPC} />, await signedIn())
+    expect(
+      await screen.findByText(
+        'O narrador revelou apenas a identidade.',
+        {},
+        WAIT
+      )
+    ).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
+    )
+    expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
   })
 
   it('a ficha revelada ocupa a tela: o contêiner do viewer tem flex 1 (T-15)', async () => {

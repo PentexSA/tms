@@ -122,9 +122,12 @@ export function SheetScreen({
       void sync.drafts.remove(id).catch(() => undefined)
     }
   }, [id, queryClient, state, sync])
+  // O NPC com a identidade revelada também volta para a crônica dele (T-81)
   const chronicle =
-    state.status === 'ready' || state.status === 'viewer'
-      ? state.character.chronicle
+    state.status === 'ready' ||
+    state.status === 'viewer' ||
+    state.status === 'identity'
+      ? (state.character.chronicle ?? null)
       : null
   const back = chronicle
     ? {
