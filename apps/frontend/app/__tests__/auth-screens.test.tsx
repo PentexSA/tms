@@ -126,6 +126,30 @@ describe('RegisterScreen', () => {
     expect(router.replace).toHaveBeenCalledWith('/')
   })
 
+  // Integração da onda 2: o "Ir" da senha pode chegar antes do último
+  // onChangeText; a conta não pode nascer com a senha cortada
+  it('o Enter da senha cria a conta com a senha que chega com ele', async () => {
+    const { session, fetch } = testSession(() => json(201, tokens()))
+    renderWithSession(<RegisterScreen />, session)
+    fireEvent.changeText(
+      screen.getByTestId('register-email'),
+      'ana@example.test'
+    )
+    fireEvent.changeText(screen.getByTestId('register-username'), 'ana')
+    fireEvent.changeText(
+      screen.getByTestId('register-password'),
+      'correct horse'
+    )
+    await act(async () => {
+      fireEvent(screen.getByTestId('register-password'), 'submitEditing', {
+        nativeEvent: { text: 'correct horse battery staple' },
+      })
+    })
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
+    expect(body.password).toBe('correct horse battery staple')
+    expect(session.getState().status).toBe('signedIn')
+  })
+
   it('conta existente: mensagem genérica da API', async () => {
     const { session } = testSession(() =>
       json(409, { error: 'não foi possível criar a conta com esses dados' })

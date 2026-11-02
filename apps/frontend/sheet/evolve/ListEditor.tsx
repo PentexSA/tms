@@ -204,10 +204,15 @@ function AddItemSheet({
   const notice = useListNotice(list)
   const def = list.field.def
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
-  const q = fold(query)
-  const options = (def.catalog ?? []).filter(name => fold(name).includes(q))
-  const exact = (def.catalog ?? []).find(name => fold(name) === q)
-  const custom = query.trim()
+  const match = (text: string) => {
+    const q = fold(text)
+    return {
+      options: (def.catalog ?? []).filter(name => fold(name).includes(q)),
+      exact: (def.catalog ?? []).find(name => fold(name) === q),
+      custom: text.trim(),
+    }
+  }
+  const { options, exact, custom } = match(query)
   // Recusado, o nome digitado fica (QAA-05); só limpa o que entrou
   const pick = (name: string, where: string) => {
     setGuide(null)
@@ -227,7 +232,11 @@ function AddItemSheet({
     setAt(null)
     setGuide(message)
   }
-  const submit = () => {
+  // O texto que chega com o Enter, não o do estado: no app, o "✓" pode vir
+  // antes do último onChangeText (digitação rápida, sugestão do teclado), e
+  // o nome entraria cortado ("Ambi" no lugar de "Ambidestro")
+  const submit = (text: string) => {
+    const { options, exact, custom } = match(text)
     if (!custom) return
     if (exact && have.has(fold(exact)))
       return explain(`${exact} já está na ficha.`)
@@ -269,7 +278,7 @@ function AddItemSheet({
           returnKeyType="done"
           submitBehavior="submit"
           {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
-          onSubmitEditing={submit}
+          onSubmitEditing={e => submit(e?.nativeEvent?.text ?? query)}
         />
         {options.map(name => {
           const taken = have.has(fold(name))

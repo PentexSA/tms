@@ -37,14 +37,22 @@ export default function RegisterScreen() {
   const set = (key: keyof RegisterInput) => (value: string) =>
     setForm(f => ({ ...f, [key]: value }))
 
-  const submit = async () => {
-    const problems = validateRegister(form)
+  // `latest`: o valor que chega com o Enter da senha. No app, o "Ir" pode
+  // vir antes do último onChangeText, e a conta seria criada com a senha
+  // cortada (mais fraca do que a digitada)
+  const submit = async (latest: Partial<typeof form> = {}) => {
+    const current = { ...form, ...latest }
+    const problems = validateRegister(current)
     setFields(problems)
     if (Object.keys(problems).length) return
     setBusy(true)
     setError(null)
     try {
-      await session.register(form.email.trim(), form.username, form.password)
+      await session.register(
+        current.email.trim(),
+        current.username,
+        current.password
+      )
       router.replace('/')
     } catch (e) {
       setError(
@@ -113,10 +121,12 @@ export default function RegisterScreen() {
             maxLength={128}
             counter={false}
             returnKeyType="go"
-            onSubmitEditing={submit}
+            onSubmitEditing={e =>
+              submit({ password: e?.nativeEvent?.text ?? form.password })
+            }
             testID="register-password"
           />
-          <Button title="Criar conta" onPress={submit} busy={busy} />
+          <Button title="Criar conta" onPress={() => submit()} busy={busy} />
           <Button
             title="Já tenho conta"
             variant="ghost"

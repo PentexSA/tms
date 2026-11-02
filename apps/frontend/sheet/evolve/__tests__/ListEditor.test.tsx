@@ -221,9 +221,10 @@ describe('T-62: Enter e "✓" adicionam', () => {
       .getState()
       .draftEvents()
       .find(e => e.path === `values.${field}`)?.to as ListItem[] | undefined
-  const enter = (label: string) =>
+  // Como no app: o Enter traz o texto do campo
+  const enter = (label: string, text?: string) =>
     fireEvent(textInput(label), 'submitEditing', {
-      nativeEvent: { text: '' },
+      nativeEvent: { text: text ?? textInput(label).props.value },
     })
 
   it('lista sem catálogo (Qualidade): o Enter adiciona o texto livre', async () => {
@@ -241,6 +242,20 @@ describe('T-62: Enter e "✓" adicionam', () => {
     })
     // Entrou: a folha fechou
     expect(screen.queryByTestId('add-sheet-merits')).toBeNull()
+  })
+
+  // Integração da onda 2, no AVD: o "✓" chegou antes do último
+  // onChangeText, e a Qualidade entrou como "Ambi"
+  it('o Enter usa o texto que chega com ele, não o do último onChangeText', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'Ambi')
+    enter('Nome', 'Ambidestro')
+    expect(eventFor(live, 'merits')?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Ambidestro',
+      meta: { cost: 1 },
+    })
   })
 
   it('nome exato do catálogo adiciona a Disciplina; sugestão parcial não vira texto livre', async () => {
