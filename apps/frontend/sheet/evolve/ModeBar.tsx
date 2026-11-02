@@ -198,9 +198,16 @@ export function useModeBar({
   const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
   const actionBar =
     mode === 'evolve' ? (
+      // R-05 (D-01): o botão só salva; sem alterações, não há o que salvar,
+      // e a saída do modo é o seletor
       <EvolveBar
         count={count}
-        save={{ title: 'Concluir', onPress: () => go(returnTo.current) }}
+        save={{
+          title: 'Salvar alterações',
+          testID: 'mode-save',
+          disabled: count === 0,
+          onPress: () => go(returnTo.current),
+        }}
       />
     ) : mode === 'create' ? (
       // D-01: "Salvar" sempre; com a conta fechada, a conclusão ao lado

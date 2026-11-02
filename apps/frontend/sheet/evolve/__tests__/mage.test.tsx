@@ -52,7 +52,7 @@ describe('Esferas acima do Arete', () => {
   it('baixar o Arete: o resumo avisa quem fica inativo, e nenhuma Esfera muda', async () => {
     const server = await evolveSpheres()
     step('Arete', 'decrement')
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     const inactive = within(screen.getByTestId('evolve-inactive'))
     expect(
       inactive.getByLabelText('Forças, 2 inativo, máx. pelo Arete 1')
@@ -69,7 +69,7 @@ describe('Esferas acima do Arete', () => {
   it('subir o Arete: o que estava inativo volta a valer', async () => {
     await evolveSpheres()
     step('Arete', 'increment')
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(
       within(screen.getByTestId('evolve-inactive')).getByLabelText(
         'Forças, volta a valer'
@@ -102,7 +102,7 @@ describe('rotinas (lista sem valor)', () => {
       screen.getByRole('button', { name: 'Adicionar “Escudo de estática”' })
     )
     expect(screen.queryByRole('adjustable', { name: /Escudo/ })).toBeNull()
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
     expect(server.current().values.rotes).toEqual([

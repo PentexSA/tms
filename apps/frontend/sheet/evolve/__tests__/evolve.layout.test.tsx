@@ -1,6 +1,11 @@
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import type { SheetData } from '@tms/sheet-core'
-import { AccessibilityInfo, Platform } from 'react-native'
+import {
+  AccessibilityInfo,
+  Dimensions,
+  Platform,
+  StyleSheet,
+} from 'react-native'
 import { modelOf } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
@@ -21,6 +26,41 @@ beforeEach(() => {
 
 const enterEvolve = () =>
   fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+
+// P03-D (D-01): no Editar a barra tem uma ação só ("Salvar alterações") e
+// fica numa linha no celular; com fonte de 130%, o botão desce para baixo
+// do texto. As duas linhas da Criação estão no CreationScreen.test.
+describe('barra do Editar (D-01)', () => {
+  const at = (width: number, fontScale = 1) =>
+    act(() => {
+      const size = { width, height: 844, scale: 3, fontScale }
+      Dimensions.set({ window: size, screen: size })
+    })
+  afterEach(() => at(750))
+
+  it('a 360, uma linha: "Editando · N alterações" e "Salvar alterações"', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    at(360)
+    enterEvolve()
+    expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
+    expect(
+      StyleSheet.flatten(screen.getByTestId('mode-bar').props.style)
+        .flexDirection
+    ).toBe('row')
+    expect(screen.getByTestId('mode-save')).toHaveTextContent(
+      'Salvar alterações'
+    )
+  })
+
+  it('com fonte de 130%, o botão desce para a linha de baixo', async () => {
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    at(390, 1.3)
+    enterEvolve()
+    expect(
+      within(screen.getByTestId('mode-bar-actions')).getByTestId('mode-save')
+    ).toBeTruthy()
+  })
+})
 
 describe('T-10: Enter aplica na folha de uma linha', () => {
   it('Conceito: o "✓" aplica e fecha a folha', async () => {
