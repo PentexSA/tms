@@ -427,6 +427,127 @@ describe('Stepper: o número falado e o rótulo visível (T-34, T-09)', () => {
   })
 })
 
+// T-20 (P05-C): o "+" mostra a trava antes do toque, sem tirar o toque. A
+// previsão da conta pode errar para o lado bloqueado; quem decide é o toque.
+describe('Stepper: "+" indisponível e dica (T-20)', () => {
+  const renderBlocked = (increase = {}, onChange = jest.fn()) => {
+    render(
+      <Stepper
+        label="Raciocínio"
+        value={4}
+        min={1}
+        max={5}
+        onChange={onChange}
+        testID="wits"
+        increase={{
+          blocked: true,
+          hint: 'Mentais: os 3 pontos básicos já foram usados.',
+          hintID: 'notice-wits',
+          ...increase,
+        }}
+      />
+    )
+    return onChange
+  }
+  const flat = (el: { props: { style?: unknown } }): ViewStyle =>
+    StyleSheet.flatten(
+      typeof el.props.style === 'function'
+        ? (el.props.style as (s: { pressed: boolean }) => ViewStyle)({
+            pressed: false,
+          })
+        : (el.props.style as ViewStyle)
+    ) ?? {}
+
+  it('no web: o "+" bloqueado é aria-disabled, apagado, aponta a dica e continua tocável', () => {
+    setOS('web')
+    const onChange = renderBlocked()
+    const more = screen.getByRole('button', { name: 'Aumentar Raciocínio' })
+    // Vira aria-disabled="true" no DOM (createDOMProps), sem o `disabled`
+    expect(more.props.accessibilityDisabled).toBe(true)
+    expect(more.props.accessibilityState).toMatchObject({ disabled: false })
+    expect(more.props['aria-describedby']).toBe('notice-wits')
+    expect(flat(more).opacity).toBe(0.5)
+    fireEvent.press(more)
+    expect(onChange).toHaveBeenCalledWith(5)
+    // O "−" não muda
+    const less = screen.getByRole('button', { name: 'Diminuir Raciocínio' })
+    expect(less.props.accessibilityDisabled).toBeUndefined()
+    expect(less.props['aria-describedby']).toBeUndefined()
+  })
+
+  it('segurar o "+" bloqueado não repete nem grava; o "−" continua', () => {
+    setOS('web')
+    const onChange = renderBlocked()
+    const more = screen.getByRole('button', { name: 'Aumentar Raciocínio' })
+    fireEvent(more, 'longPress')
+    fireEvent(more, 'pressOut')
+    expect(onChange).not.toHaveBeenCalled()
+    const less = screen.getByRole('button', { name: 'Diminuir Raciocínio' })
+    fireEvent(less, 'longPress')
+    fireEvent(less, 'pressOut')
+    expect(onChange).toHaveBeenCalledWith(3)
+  })
+
+  it('no app: a dica vai para o controle ajustável, e o incremento chega ao onChange', () => {
+    setOS('ios')
+    const onChange = renderBlocked()
+    const control = screen.getByRole('adjustable', { name: 'Raciocínio' })
+    expect(control.props.accessibilityHint).toBe(
+      'Mentais: os 3 pontos básicos já foram usados.'
+    )
+    fireEvent(control, 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    expect(onChange).toHaveBeenCalledWith(5)
+    // O botão visual também fica apagado, e o toque chega
+    const more = screen.getByTestId('wits-inc', { includeHiddenElements: true })
+    expect(flat(more).opacity).toBe(0.5)
+  })
+
+  it('só o custo: o "+" fica normal e a dica diz quanto custa', () => {
+    setOS('android')
+    renderBlocked({ blocked: false, hint: '+1 = 2 bônus', hintID: null })
+    const control = screen.getByRole('adjustable', { name: 'Raciocínio' })
+    expect(control.props.accessibilityHint).toBe('+1 = 2 bônus')
+    const more = screen.getByTestId('wits-inc', { includeHiddenElements: true })
+    expect(flat(more).opacity).toBeUndefined()
+  })
+
+  it('no máximo, o "+" fica desabilitado de verdade, com ou sem previsão', () => {
+    setOS('web')
+    render(
+      <Stepper
+        label="Raciocínio"
+        value={5}
+        min={1}
+        max={5}
+        onChange={jest.fn()}
+        increase={{ blocked: true }}
+      />
+    )
+    const more = screen.getByRole('button', { name: 'Aumentar Raciocínio' })
+    expect(more).toBeDisabled()
+    expect(more.props.accessibilityDisabled).toBeUndefined()
+  })
+
+  it('sem `increase`, nada muda', () => {
+    setOS('web')
+    render(
+      <Stepper
+        label="Raciocínio"
+        value={4}
+        min={1}
+        max={5}
+        onChange={jest.fn()}
+      />
+    )
+    const more = screen.getByRole('button', { name: 'Aumentar Raciocínio' })
+    expect(more).toBeEnabled()
+    expect(more.props.accessibilityDisabled).toBeUndefined()
+    expect(more.props['aria-describedby']).toBeUndefined()
+  })
+})
+
 const ZONES = [
   { id: 'sheet', label: 'Ficha' },
   { id: 'powers', label: 'Poderes' },
