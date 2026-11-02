@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { characterState } from '../components/chronicles/characterState'
 import { messageOf, statusOf } from '../lib/errors'
 import {
   useSetNpcPresentation,
@@ -38,13 +39,19 @@ import {
   creationInfoOf,
   creationInputOf,
   freebiesNotes,
+  sheetStateRow,
 } from './creation/creation'
 import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
-import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
+import {
+  blockedBy,
+  deadLabel,
+  LifecycleContext,
+  type SheetLifecycle,
+} from './policy'
 import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
 import {
@@ -299,12 +306,23 @@ function narratorOf(
   id: string,
   state: Extract<SheetState, { status: 'ready' }>
 ): StatusMenuTarget {
+  const locked = state.character.lockedAt !== null
   return {
     characterId: id,
     chronicleId: state.character.chronicle.id,
     model: state.model,
     status: state.character.status,
-    locked: state.character.lockedAt !== null,
+    locked,
+    // O mesmo estado da lista e da Mesa, sem "Concluída em" no gatilho
+    state: characterState(
+      sheetStateRow({
+        status: state.character.status,
+        kind: state.character.kind === 'npc' ? 'npc' : 'pc',
+        locked,
+        info: creationInfoOf(state.character.creation),
+      }),
+      { narrating: true, deadLabel: deadLabel(state.model), completed: false }
+    ),
   }
 }
 

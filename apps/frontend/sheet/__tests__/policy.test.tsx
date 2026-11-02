@@ -414,6 +414,7 @@ describe('a tela da ficha com o estado', () => {
         model={vtm}
         status="creating"
         locked={false}
+        state={null}
         unsaved={0}
         queued={1}
       />,

@@ -24,8 +24,9 @@ import {
   summaryLine,
 } from '../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate, useTemplate } from '../../sheet/data'
+import { deadLabel } from '../../sheet/policy'
 import type { ChronicleCreationInfo } from './CreationSettings'
-import { characterStateText } from './characterState'
+import { characterState } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -47,8 +48,12 @@ interface FullRow {
   readonly identity?: PublicIdentity
   // creating, pending (aguarda o narrador), active...
   readonly status?: string
-  // Devolvida pelo narrador (T-06), sem o motivo
+  // O estado da criação (T-06, P04-D): o modo e os marcadores, sem o motivo
+  readonly creationMode?: 'free' | 'points' | null
   readonly returned?: boolean
+  readonly adjust?: boolean
+  readonly ready?: boolean
+  readonly activatedAt?: string | Date | null
 }
 
 interface IdentityRow {
@@ -91,8 +96,13 @@ function CharacterRow({
       ? 'Sua ficha'
       : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
-  const state = partial ? null : characterStateText(row, narrating)
-  const who = state ? `${owner} · ${state}` : owner
+  // O estado vai no selo, sob o meta, e entra no nome acessível (D-02)
+  const state = partial
+    ? null
+    : characterState(row, {
+        narrating,
+        deadLabel: model ? deadLabel(model) : undefined,
+      })
   return (
     <ThemeProvider
       accent={
@@ -108,7 +118,18 @@ function CharacterRow({
               : (identity.subtitle ?? undefined)
             : undefined
         }
-        meta={identity?.chip ? `${identity.chip} · ${who}` : who}
+        meta={identity?.chip ? `${identity.chip} · ${owner}` : owner}
+        badges={
+          state
+            ? [
+                {
+                  label: state.label,
+                  tone: state.tone,
+                  testID: `character-state-${row.id}`,
+                },
+              ]
+            : undefined
+        }
         leading={
           <Avatar
             name={name}
@@ -183,6 +204,11 @@ export function CharacterList({
   const shown = narrating ? pcs : pcs.filter(r => r.mine)
   // A ficha enviada para aprovação espera o narrador: o aviso fica no topo
   const review = narrating ? shown.filter(r => r.status === 'pending') : []
+  // Na criação livre, o jogador avisou que terminou (D-03): o narrador
+  // conclui ou pede ajuste
+  const told = narrating
+    ? shown.filter(r => r.status === 'creating' && r.ready === true && !r.mine)
+    : []
   const create = (
     <Button
       title="Nova ficha"
@@ -222,6 +248,19 @@ export function CharacterList({
                 : `${review.length} fichas aguardam sua revisão`
             }
             message={`${review.map(r => r.name).join(', ')}: abra a ficha para aprovar ou devolver para correção.`}
+          />
+        </View>
+      ) : null}
+      {told.length ? (
+        <View style={styles.header} testID="ready-review">
+          <Banner
+            tone="warning"
+            title={
+              told.length === 1
+                ? '1 jogador avisou que terminou'
+                : `${told.length} jogadores avisaram que terminaram`
+            }
+            message={`${told.map(r => r.name).join(', ')}: abra a ficha para concluir a criação ou pedir ajuste.`}
           />
         </View>
       ) : null}

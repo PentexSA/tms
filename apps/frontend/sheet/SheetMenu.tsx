@@ -2,7 +2,6 @@ import { BottomSheet, Button, IconButton, tokens } from '@tms/ui'
 import { useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
-import { stateLabel } from '../components/chronicles/tableItems'
 import {
   StatusMenu,
   type StatusMenuDraft,
@@ -45,9 +44,7 @@ export function SheetMenu({
         draft.approval
       )
     : []
-  const state = narrator
-    ? stateLabel(narrator.model, narrator.status, narrator.locked)
-    : null
+  const state = narrator?.state?.label ?? null
   const next = useRef<(() => void) | null>(null)
   const pick = (then: () => void) => () => {
     next.current = then

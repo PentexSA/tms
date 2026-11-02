@@ -12,7 +12,7 @@ import {
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
-import { stateLabel } from '../../components/chronicles/tableItems'
+import type { CharacterState } from '../../components/chronicles/characterState'
 import { api } from '../../lib/api'
 import { messageOf } from '../../lib/errors'
 import { chronicleKeys } from '../../lib/queries/chronicles'
@@ -168,6 +168,8 @@ export interface StatusMenuTarget {
   readonly model: SheetModel
   readonly status: string
   readonly locked: boolean
+  // O estado da ficha (D-02), sem "Concluída em": o mesmo da lista e da Mesa
+  readonly state: CharacterState | null
 }
 
 /** O botão largo: a ficha e o rascunho aberto. */
@@ -186,15 +188,18 @@ export function StatusMenuButton({
   model,
   status,
   locked,
+  state,
   ...draft
 }: StatusMenuButtonProps) {
   const [open, setOpen] = useState(false)
   const actions = statusActions(model, status, locked, draft.approval)
   if (!actions.length) return null
-  const state = stateLabel(model, status, locked)
   return (
     <>
-      <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
+      <StatusMenuTrigger
+        state={state?.label ?? null}
+        onPress={() => setOpen(true)}
+      />
       {open ? (
         <StatusMenu
           characterId={characterId}

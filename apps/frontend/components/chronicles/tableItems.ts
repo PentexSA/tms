@@ -7,6 +7,7 @@ import {
 
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
+import { type CharacterState, characterState } from './characterState'
 
 // O que cada linha da Mesa mostra, calculado uma vez por ficha (doc/plano-v3.md,
 // Etapa 9). Puro: o mesmo item enquanto a linha e o modelo não mudam, para
@@ -19,7 +20,14 @@ export interface TableRowData {
   readonly systemCode: string
   readonly templateVersion: string
   readonly sheetVersion: number
+  readonly kind?: 'pc' | 'npc'
   readonly status?: string
+  // O estado da criação (P04-D): o modo e os marcadores, sem o motivo
+  readonly creationMode?: 'free' | 'points' | null
+  readonly returned?: boolean
+  readonly adjust?: boolean
+  readonly ready?: boolean
+  readonly activatedAt?: string | Date | null
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
   readonly sheet: unknown
@@ -32,28 +40,9 @@ export interface TableItem {
   // Store só de leitura (sem fila) para desenhar o dock com o registry
   readonly store: SheetStore | null
   readonly alerts: readonly ActiveAlert[]
-  // O estado quando ele importa: "Em criação", "Travada", "Arquivada"...
-  readonly state: string | null
-}
-
-/** O rótulo do estado da ficha na Mesa; null em `active` sem trava. */
-export function stateLabel(
-  model: SheetModel | null | undefined,
-  status: string | undefined,
-  locked: boolean
-): string | null {
-  switch (status) {
-    case 'creating':
-      return 'Em criação'
-    case 'active':
-      return locked ? 'Travada' : null
-    case 'archived':
-      return 'Arquivada'
-    case 'dead':
-      return model ? deadLabel(model) : 'Fora de jogo'
-    default:
-      return null
-  }
+  // O estado da ficha (D-02): "Em criação · livre", "Aguardando aprovação",
+  // "Avisou que terminou", "Concluída em dd/mm", "Travada"...
+  readonly state: CharacterState | null
 }
 
 export function buildItem(
@@ -81,7 +70,11 @@ export function buildItem(
       model && store
         ? alertsOf(model, store.getState().resolved, ['storyteller'])
         : [],
-    state: stateLabel(model, row.status, Boolean(row.lockedAt)),
+    // A Mesa é só do narrador
+    state: characterState(
+      { ...row, locked: Boolean(row.lockedAt) },
+      { narrating: true, deadLabel: model ? deadLabel(model) : undefined }
+    ),
   }
 }
 
