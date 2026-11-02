@@ -11,7 +11,7 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { AccessibilityInfo, StyleSheet, View } from 'react-native'
+import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
 import {
   describeItem,
   ItemLine,
@@ -193,8 +193,8 @@ function AddItemSheet({
   readonly onAdd: (name: string) => Write
 }) {
   const [query, setQuery] = useState('')
-  // Onde a recusa aparece: `option:<nome>` (a opção tocada) ou `custom`
-  // (o botão do texto livre)
+  // Onde a recusa aparece: `option:<nome>` (a opção tocada), `custom` (o
+  // botão do texto livre) ou `field` (o Enter no campo)
   const [refused, setRefused] = useState<{
     readonly at: string
     readonly message: string
@@ -215,6 +215,19 @@ function AddItemSheet({
     }
     setQuery('')
     setRefused(null)
+  }
+  // Enter (web) e "✓" (teclado do app) fazem o que o botão à vista faria
+  // (T-62): o nome exato do catálogo adiciona o item do catálogo; sem
+  // catálogo, ou sem sugestão, o texto livre. Com sugestões à vista, o Enter
+  // não adiciona "Domi" como Disciplina: a pessoa toca a sugestão.
+  const submit = () => {
+    if (!custom) return
+    const match = (def.catalog ?? []).find(name => fold(name) === q)
+    if (match) {
+      if (!have.has(fold(match))) pick(match, 'field')
+      return
+    }
+    if (!options.length) pick(custom, 'field')
   }
   const refusalAt = (at: string) =>
     refused?.at === at ? (
@@ -241,6 +254,12 @@ function AddItemSheet({
           }}
           maxLength={ITEM_NAME_MAX}
           autoFocus
+          // Recusado pelo Enter, a frase fica no campo, com o foco nele
+          error={refused?.at === 'field' ? refused.message : null}
+          returnKeyType="done"
+          submitBehavior="submit"
+          {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
+          onSubmitEditing={submit}
         />
         {options.map(name => {
           const taken = have.has(fold(name))

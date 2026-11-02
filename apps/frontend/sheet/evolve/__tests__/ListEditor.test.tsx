@@ -211,6 +211,77 @@ describe('T-23: o item nasce com o valor que o editor mostra', () => {
   })
 })
 
+describe('T-62: Enter e "✓" adicionam', () => {
+  const eventFor = (
+    live: Awaited<ReturnType<typeof helenaInEvolve>>,
+    field: string
+  ) =>
+    live
+      .store()
+      .getState()
+      .draftEvents()
+      .find(e => e.path === `values.${field}`)?.to as ListItem[] | undefined
+  const enter = (label: string) =>
+    fireEvent(textInput(label), 'submitEditing', {
+      nativeEvent: { text: '' },
+    })
+
+  it('lista sem catálogo (Qualidade): o Enter adiciona o texto livre', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    const name = textInput('Nome')
+    expect(name.props.returnKeyType).toBe('done')
+    expect(name.props.submitBehavior).toBe('submit')
+    fireEvent.changeText(name, ' Ambidestro ')
+    enter('Nome')
+    expect(eventFor(live, 'merits')?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Ambidestro',
+      meta: { cost: 1 },
+    })
+    // Entrou: a folha fechou
+    expect(screen.queryByTestId('add-sheet-merits')).toBeNull()
+  })
+
+  it('nome exato do catálogo adiciona a Disciplina; sugestão parcial não vira texto livre', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'fort')
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')).toBeUndefined()
+    expect(screen.getByTestId('add-sheet-disciplines')).toBeTruthy()
+
+    // O que já está na ficha não entra de novo pelo Enter
+    fireEvent.changeText(
+      screen.getByLabelText('Buscar Disciplina'),
+      'auspicios'
+    )
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')).toBeUndefined()
+
+    fireEvent.changeText(
+      screen.getByLabelText('Buscar Disciplina'),
+      'fortitude'
+    )
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')?.at(-1)).toEqual({
+      id: 'i4',
+      name: 'Fortitude',
+      value: 1,
+    })
+  })
+
+  it('campo vazio: o Enter não faz nada', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    enter('Nome')
+    expect(eventFor(live, 'merits')).toBeUndefined()
+    expect(screen.getByTestId('add-sheet-merits')).toBeTruthy()
+  })
+})
+
 describe('outros sistemas, o mesmo editor', () => {
   it('D&D: ataque com meta numérica e de texto', async () => {
     const c = example('lia')

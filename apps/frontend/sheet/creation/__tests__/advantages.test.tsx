@@ -247,4 +247,23 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     fireEvent.changeText(textInput('Nome'), 'Ambidestra')
     expect(alertsIn('add-sheet-merits')).toHaveLength(0)
   })
+
+  it('Enter recusado: a frase vai para o campo, e o nome fica (T-62)', async () => {
+    await open(THREE)
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    fireEvent.changeText(
+      screen.getByLabelText('Buscar Disciplina'),
+      'Ofuscação'
+    )
+    fireEvent(textInput('Buscar Disciplina'), 'submitEditing', {
+      nativeEvent: { text: '' },
+    })
+    expect(textInput('Buscar Disciplina').props.value).toBe('Ofuscação')
+    expect(alertsIn('add-sheet-disciplines')).toHaveLength(1)
+    expect(alertsIn('add-sheet-disciplines')[0]).toHaveTextContent(
+      /Disciplinas/
+    )
+  })
 })
