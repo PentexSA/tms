@@ -105,8 +105,8 @@ export default function ChronicleScreen() {
   // A rolagem de cada aba, em memória: volta ao mesmo ponto ao voltar de
   // uma ficha (no web, mesmo se a tela foi desmontada)
   const scrollRef = useRef<ScrollViewInstance>(null)
+  // A aba mostrada (a mesma chave da gravação): atualizada a cada render
   const scrollKey = useRef<ChronicleView>('sheets')
-  scrollKey.current = viewOf(view, true)
   const restoring = useRef<number | null>(null)
   useFocusEffect(
     useCallback(() => {
@@ -156,6 +156,7 @@ export default function ChronicleScreen() {
   const former = c.role === 'former'
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
   const showing: ChronicleView = former ? 'sheets' : viewOf(view, narrating)
+  scrollKey.current = showing
   return (
     <Screen>
       <AppBar title={c.name} back={back} />

@@ -11,7 +11,7 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { FlatList, StyleSheet, View } from 'react-native'
 
 import { LogoutButton } from '../../components/session/LogoutButton'
 import { messageOf } from '../../lib/errors'
@@ -69,12 +69,6 @@ export default function ChroniclesScreen() {
         keyExtractor={c => c.id}
         refreshing={pull.refreshing}
         onRefresh={pull.onRefresh}
-        refreshControl={
-          <RefreshControl
-            refreshing={pull.refreshing}
-            onRefresh={pull.onRefresh}
-          />
-        }
         ListHeaderComponent={
           <View style={styles.header}>
             <SectionHeader title="Suas crônicas" />
