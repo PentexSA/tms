@@ -16,6 +16,7 @@ import {
 } from 'react-native'
 import { IconButton } from './IconButton'
 import { useInsets } from './insets'
+import { keyboardBehavior } from './keyboard'
 import { Pressable } from './Pressable'
 import { keyOf } from './roving'
 import { Text } from './Text'
@@ -25,8 +26,10 @@ import { tokens } from './tokens'
 
 // Sheet modal (design system §9.5): o voltar do Android fecha, o fundo fica
 // inerte para o leitor de tela (aria-modal) e o título é heading.
-// Com "reduzir movimento", aparece sem animar. A raiz evita o teclado: no
-// iOS a folha inteira (campo e rodapé) sobe acima dele.
+// Com "reduzir movimento", aparece sem animar. A raiz evita o teclado no iOS
+// e no Android (T-10): a folha inteira (campo e rodapé) sobe acima dele. No
+// Android a janela do Modal é edge-to-edge e não redimensiona com o
+// teclado; sem o `padding`, o teclado cobria o campo e o "Aplicar".
 //
 // Um "Fechar" só: o fundo fecha no toque, mas fica fora da árvore e do Tab
 // (no web o react-native-web não esconde os irmãos do modal). No iOS, o
@@ -153,7 +156,7 @@ export function BottomSheet({
       <KeyboardAvoidingView
         testID="bottom-sheet-root"
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={keyboardBehavior()}
         {...(web
           ? {
               onKeyDownCapture: (e: KeyDownEvent) => {

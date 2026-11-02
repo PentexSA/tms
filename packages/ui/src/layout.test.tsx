@@ -1,7 +1,20 @@
-import { render, screen } from '@testing-library/react-native'
-import { Text as RNText, StyleSheet, type ViewStyle } from 'react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Text as RNText,
+  StyleSheet,
+  type ViewStyle,
+} from 'react-native'
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context'
-import { AppBar, Screen, TextField } from './index'
+import {
+  AppBar,
+  BottomSheet,
+  KeyboardArea,
+  keyboardBehavior,
+  Screen,
+  TextField,
+} from './index'
 
 // P08 (onda 2): layout e teclado nos primitivos do @tms/ui. Cada caso é a
 // regressão de um achado da matriz (doc/testes/2026-11-01/matriz-achados.md).
@@ -16,6 +29,20 @@ const hostViewAbove = (el: Node): Node => {
   while (at && at.type !== 'View') at = at.parent
   if (!at) throw new Error('sem View acima')
   return at
+}
+
+type OS = typeof Platform.OS
+function withOS<T>(os: OS, run: () => T): T {
+  const previous = Platform.OS
+  Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+  try {
+    return run()
+  } finally {
+    Object.defineProperty(Platform, 'OS', {
+      value: previous,
+      configurable: true,
+    })
+  }
 }
 
 const INSETS = { top: 47, right: 0, bottom: 34, left: 0 }
@@ -93,5 +120,64 @@ describe('T-64: contador do campo sem colar na dica nem sair da tela', () => {
       />
     )
     expect(screen.getByLabelText('0 de 80 caracteres')).toBeTruthy()
+  })
+})
+
+describe('T-10: a folha acompanha o teclado no Android', () => {
+  it('keyboardBehavior: padding no iOS e no Android; nada no web', () => {
+    expect(withOS('ios', keyboardBehavior)).toBe('padding')
+    expect(withOS('android', keyboardBehavior)).toBe('padding')
+    expect(withOS('web', keyboardBehavior)).toBeUndefined()
+  })
+
+  const sheetRootBehavior = () => {
+    render(
+      <BottomSheet visible title="Conceito" onClose={() => undefined}>
+        <TextField label="Conceito" value="" onChangeText={() => undefined} />
+      </BottomSheet>
+    )
+    return screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior
+  }
+
+  it.each([
+    ['android', 'padding'],
+    ['ios', 'padding'],
+    ['web', undefined],
+  ] as const)('no %s, a raiz da folha usa behavior %s', (os, expected) => {
+    expect(withOS(os, sheetRootBehavior)).toBe(expected)
+  })
+
+  it('KeyboardArea: KeyboardAvoidingView com flex 1 e o behavior da plataforma', () => {
+    withOS('android', () =>
+      render(
+        <KeyboardArea testID="area" style={{ padding: 4 }}>
+          <RNText>campo</RNText>
+        </KeyboardArea>
+      )
+    )
+    const area = screen.UNSAFE_getByType(KeyboardAvoidingView)
+    expect(area.props.behavior).toBe('padding')
+    expect(StyleSheet.flatten(area.props.style)).toEqual({
+      flex: 1,
+      padding: 4,
+    })
+    expect(screen.getByTestId('area')).toBeTruthy()
+    expect(screen.getByText('campo')).toBeTruthy()
+  })
+
+  it('o Esc no web continua fechando a folha (T-71)', () => {
+    const onClose = jest.fn()
+    withOS('web', () => {
+      render(
+        <BottomSheet visible title="Conceito" onClose={onClose}>
+          <RNText>x</RNText>
+        </BottomSheet>
+      )
+      fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
+        nativeEvent: { key: 'Escape' },
+        preventDefault: () => undefined,
+      })
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
