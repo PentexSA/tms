@@ -380,6 +380,26 @@ describe('bônus que sobram', () => {
   })
 })
 
+describe('extrato do bônus (R-17)', () => {
+  it('o Orçamento mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
+    await open(PRIORITIES, {
+      ...ALMOST,
+      stamina: 3,
+      alertness: 4,
+      willpower: { permanent: 4, current: 4 },
+    })
+    tab('Orçamento')
+    const ledger = screen.getByTestId('creation-ledger')
+    expect(ledger).toHaveTextContent(/Habilidades › Talentos: 1 × 2 = 2/)
+    expect(ledger).toHaveTextContent(/Prontidão acima de 3: 1/)
+    expect(ledger).toHaveTextContent(/Força de Vontade: 1 × 1 = 1/)
+    expect(ledger).toHaveTextContent(/parte de 3, que vem de Coragem/)
+    expect(screen.getByTestId('creation-ledger-total')).toHaveTextContent(
+      'Gastos 3 · restam 12 de 15'
+    )
+  })
+})
+
 describe('aba Orçamento e botão único', () => {
   it('a conta fica na aba, e a barra tem um botão só', async () => {
     await open(PRIORITIES)

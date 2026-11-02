@@ -27,6 +27,7 @@ import {
   completeLabel,
   creationRefusalOf,
   errorBodyOf,
+  freebieLedger,
   freebiesBalance,
   problemText,
   REFUSAL_TEXT,
@@ -200,6 +201,7 @@ export function CreationPanel() {
             : `${freebiesBalance(check)}.`}
         </Text>
       ) : null}
+      <Ledger />
       {problems.length ? (
         <View
           style={styles.block}
@@ -225,6 +227,36 @@ export function CreationPanel() {
         </Text>
       )}
       {storyteller ? <BudgetControls /> : null}
+    </View>
+  )
+}
+
+/** "Onde foram os bônus" (R-17), logo abaixo do saldo. */
+function Ledger() {
+  const { model } = useSheet()
+  const check = useSheetSelector(s => s.check)
+  const ledger = freebieLedger(model, check)
+  if (!ledger) return null
+  return (
+    <View
+      style={styles.block}
+      accessibilityLabel="Onde foram os bônus"
+      testID="creation-ledger"
+    >
+      <SectionHeader title="Onde foram os bônus" level="group" />
+      {ledger.entries.map(e => (
+        <View key={e.key} style={styles.entry}>
+          <Text variant="caption">{e.text}</Text>
+          {e.detail ? (
+            <Text variant="caption" color="inkMuted">
+              {e.detail}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+      <Text variant="caption" color="inkMuted" testID="creation-ledger-total">
+        {ledger.total}
+      </Text>
     </View>
   )
 }
@@ -473,6 +505,7 @@ const styles = StyleSheet.create({
     paddingTop: tokens.space[4],
   },
   block: { gap: tokens.space[2] },
+  entry: { gap: tokens.space['0.5'] },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

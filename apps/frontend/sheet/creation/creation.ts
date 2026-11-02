@@ -464,6 +464,8 @@ const advice = (
 
 const bonus = (n: number) => `+1 = ${n} bônus`
 
+const restam = (n: number) => (n === 1 ? 'resta 1' : `restam ${n}`)
+
 /**
  * A previsão do "+", pela conta que o store já tem e pelo preço de tabela,
  * sem reavaliar a ficha. É uma previsão, não a decisão: os descontos
@@ -536,7 +538,7 @@ export function stepAdvice(
       return price > left
         ? advice(
             'freebies',
-            `${bonus(price)}; ${left === 1 ? 'resta 1' : `restam ${Math.max(0, left)}`}.`,
+            `${bonus(price)}; ${restam(Math.max(0, left))}.`,
             price,
             inline
           )
@@ -554,7 +556,7 @@ export function stepAdvice(
     return l.price > freebies.remaining
       ? advice(
           'freebies',
-          `${bonus(l.price)}; ${freebies.remaining === 1 ? 'resta 1' : `restam ${Math.max(0, freebies.remaining)}`}.`,
+          `${bonus(l.price)}; ${restam(Math.max(0, freebies.remaining))}.`,
           l.price,
           true
         )
@@ -595,8 +597,6 @@ function pointBuyAdvice(
     : advice(null, `+1 = ${unit(step)}`, null, true)
 }
 
-const restam = (n: number) => (n === 1 ? 'resta 1' : `restam ${n}`)
-
 /**
  * O saldo de bônus por extenso (T-18): "Bônus: restam 10 de 15", que não se
  * lê como "usei 10"; acima do saldo, quanto passa. Null sem bônus.
@@ -620,6 +620,126 @@ export function freebiesLeftText(check: CreationCheck | null): string | null {
   return n === 1
     ? 'Sobra 1 ponto de bônus. Ele não vira XP.'
     : `Sobram ${n} pontos de bônus. Eles não viram XP.`
+}
+
+/** Uma linha do extrato do bônus: a fonte e, às vezes, o porquê. */
+export interface LedgerEntry {
+  readonly key: string
+  readonly text: string
+  readonly detail: string | null
+}
+
+export interface FreebieLedger {
+  readonly entries: readonly LedgerEntry[]
+  readonly total: string
+}
+
+/** "que vem de Consciência + Autocontrole": a fonte do valor de partida. */
+function startSource(model: SheetModel, field: FieldId): string | null {
+  const def = model.fields.get(field)?.def
+  const formula =
+    def?.type === 'rating'
+      ? def.default
+      : def?.type === 'resource'
+        ? def.permanent?.default
+        : undefined
+  if (!formula || typeof formula !== 'object') return null
+  const from: readonly FieldId[] = Array.isArray(formula.from)
+    ? formula.from
+    : [formula.from as FieldId]
+  const labels = from.map(id => model.fields.get(id)?.def.label ?? id)
+  return labels.length ? labels.join(' + ') : null
+}
+
+/**
+ * O extrato dos pontos de bônus (R-17): de onde veio cada gasto e cada
+ * crédito, com o total igual ao saldo da conta. Tudo vem da `CreationCheck`,
+ * a mesma conta do servidor: nada aqui só o servidor sabe. Sem nome de item
+ * (texto da ficha), só contagem. Null sem bônus ou sem nada gasto.
+ */
+export function freebieLedger(
+  model: SheetModel,
+  check: CreationCheck | null
+): FreebieLedger | null {
+  const f = check?.freebies
+  if (!check || !f) return null
+  const label = (id: FieldId) => model.fields.get(id)?.def.label ?? id
+  const entries: LedgerEntry[] = []
+  for (const b of check.budgets)
+    for (const g of b.groups) {
+      if (g.freebieCost <= 0 || g.price === null) continue
+      const name =
+        b.rule === 'priority-budget' ? `${b.label} › ${g.label}` : g.label
+      // O que passou do teto dos básicos foi pago com bônus mesmo com o
+      // grupo incompleto (T-07)
+      const over = g.components
+        .filter(c => c.cap !== undefined && c.invested > c.eligible)
+        .map(
+          c => `${label(c.field)} acima de ${c.cap}: ${c.invested - c.eligible}`
+        )
+      entries.push({
+        key: `${b.id}.${g.id}`,
+        text: `${name}: ${g.extra} × ${g.price} = ${g.freebieCost}`,
+        detail: over.length ? over.join(' · ') : null,
+      })
+    }
+  for (const l of check.lines) {
+    if (l.units <= 0 && l.cost <= 0) continue
+    const fields = [
+      ...new Set(
+        (l.components ?? []).filter(c => c.invested > 0).map(c => c.field)
+      ),
+    ]
+    const first = l.paths[0]?.replace(/^values\./, '').split('#')[0] ?? ''
+    const name = fields.length
+      ? fields.map(label).join(', ')
+      : label(first as FieldId)
+    if (l.rule === 'flat') {
+      // O valor de partida derivado (a FdV que parte da Coragem): é o
+      // desconto que ninguém via (IA-12, NW-22)
+      const starts = (l.components ?? [])
+        .filter(c => c.invested > 0)
+        .map(c => {
+          const source = startSource(model, c.field)
+          return source ? `parte de ${c.initial}, que vem de ${source}` : null
+        })
+        .filter((x): x is string => x !== null)
+      entries.push({
+        key: l.id,
+        text: `${name}: ${l.units} × ${l.price ?? 0} = ${l.cost}`,
+        detail: starts.length ? starts.join(' · ') : null,
+      })
+    } else if (l.rule === 'item-meta') {
+      const n = l.paths.length
+      entries.push({
+        key: l.id,
+        text: `${name} (${n === 1 ? '1 item' : `${n} itens`}): ${l.cost}`,
+        detail: null,
+      })
+    } else
+      entries.push({
+        key: l.id,
+        text:
+          l.units === l.cost
+            ? `${name}: devolvem ${l.units}`
+            : `${name}: devolvem ${l.units}, contam ${l.cost}`,
+        detail: null,
+      })
+  }
+  if (!entries.length) return null
+  const total = f.available + f.credit
+  return {
+    entries,
+    total: [
+      `Gastos ${f.spent}`,
+      f.credit ? `crédito ${f.credit}` : null,
+      f.remaining < 0
+        ? `${-f.remaining} acima do saldo de ${total}`
+        : `${restam(f.remaining)} de ${total}`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  }
 }
 
 /**

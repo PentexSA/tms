@@ -18,6 +18,7 @@ import {
   creationInfoOf,
   creationRefusalOf,
   draftRefusal,
+  freebieLedger,
   freebiesBalance,
   freebiesLeftText,
   groupFor,
@@ -562,5 +563,85 @@ describe('bônus que sobram (T-18)', () => {
     expect(freebiesBalance(left(1, 3))).toBe('Bônus: resta 1 de 18')
     expect(freebiesBalance(left(-3))).toBe('Bônus: 3 acima do saldo')
     expect(freebiesBalance(null)).toBeNull()
+  })
+})
+
+// R-17: o extrato do bônus, todo calculado da conta que o app já tem
+describe('freebieLedger: onde foram os bônus', () => {
+  const ledgerOf = (values: Record<string, unknown>, freebies?: number) => {
+    const config = {
+      ...effectiveCreationConfig(model),
+      ...(freebies === undefined ? {} : { freebies }),
+    }
+    const check = checkCreation(model, { values } as SheetData, {
+      config,
+      choices: PRIORITIES,
+    })
+    return { ledger: freebieLedger(model, check), check }
+  }
+
+  it('cada fonte numa linha, e o total bate com o saldo da conta', () => {
+    const { ledger, check } = ledgerOf(
+      {
+        ...COMPLETE,
+        // Talentos 6/5, com Prontidão 4 acima do teto
+        alert: 4,
+        brawl: 2,
+        will: { permanent: 4, current: 4 },
+        merits: [
+          { id: 'm1', name: 'Q1', meta: { cost: 1 } },
+          { id: 'm2', name: 'Q2', meta: { cost: 2 } },
+        ],
+        flaws: [{ id: 'f1', name: 'D1', meta: { bonus: 5 } }],
+      },
+      30
+    )
+    expect(ledger?.entries).toEqual([
+      {
+        key: 'abilities.talents',
+        text: 'Habilidades › Talentos: 1 × 2 = 2',
+        detail: 'Prontidão acima de 3: 1',
+      },
+      {
+        key: 'will',
+        text: 'Vontade: 1 × 1 = 1',
+        detail: 'parte de 3, que vem de Consciência',
+      },
+      { key: 'merits', text: 'Qualidades (2 itens): 3', detail: null },
+      { key: 'flaws', text: 'Defeitos: devolvem 5, contam 3', detail: null },
+    ])
+    // 2 + 1 + 3 gastos, 3 de crédito: 30 + 3 − 6
+    expect(check.freebies).toMatchObject({ spent: 6, credit: 3, remaining: 27 })
+    expect(ledger?.total).toBe('Gastos 6 · crédito 3 · restam 27 de 33')
+  })
+
+  it('grupo de orçamento fixo leva só o rótulo; o crédito igual diz uma vez', () => {
+    const { ledger } = ledgerOf({
+      ...COMPLETE,
+      con: 4,
+      flaws: [{ id: 'f1', name: 'D1', meta: { bonus: 1 } }],
+    })
+    expect(ledger?.entries.map(e => e.text)).toEqual([
+      'Virtudes: 1 × 2 = 2',
+      'Defeitos: devolvem 1',
+    ])
+    expect(ledger?.total).toBe('Gastos 2 · crédito 1 · restam 9 de 11')
+  })
+
+  it('acima do saldo, o total diz quanto passa', () => {
+    const { ledger } = ledgerOf({ ...COMPLETE, str: 5 }, 5)
+    expect(ledger?.total).toBe('Gastos 10 · 5 acima do saldo de 5')
+  })
+
+  it('sem gasto, ou sem bônus no template, não há extrato', () => {
+    expect(ledgerOf(COMPLETE).ledger).toBeNull()
+    expect(freebieLedger(model, null)).toBeNull()
+    const dnd = modelOf('dnd5e-2014')
+    const check = checkCreation(
+      dnd,
+      { values: { name: 'Lia', str: 15 } } as SheetData,
+      { config: effectiveCreationConfig(dnd) }
+    )
+    expect(freebieLedger(dnd, check)).toBeNull()
   })
 })
