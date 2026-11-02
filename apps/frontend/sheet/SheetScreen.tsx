@@ -322,11 +322,17 @@ function LiveSheet({
       mode: forced ?? mode,
       sync,
       creation,
+      editable: forced === null,
     })
     if (!forced && isDraftMode(mode)) created.getState().startDraft()
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
+  // A política (travada, arquivada, de quem saiu): sem edição, o rascunho
+  // que volta do servidor fica guardado no aparelho em vez de abrir Editar
+  useEffect(() => {
+    store.getState().setEditable(forced === null)
+  }, [store, forced])
   // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero
   useEffect(() => {
     if (!onUnsaved) return

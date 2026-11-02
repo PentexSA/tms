@@ -144,7 +144,7 @@ it('409: o store guarda o conflito e a ficha é rebuscada', async () => {
   await flush()
   store.getState().commit([blood(9, 8)], 'Sangue −1')
   await flush()
-  expect(store.getState().conflict?.paths).toEqual(['values.blood'])
+  expect(store.getState().conflict?.play?.paths).toEqual(['values.blood'])
   expect(invalidate).toHaveBeenCalledWith({ queryKey: sheetKeys.character(ID) })
 })
 
@@ -474,5 +474,5 @@ it('o 409 chega ao store só com os caminhos em conflito', async () => {
     .getState()
     .commit([blood(9, 8), { path: 'values.strength', from: 2, to: 3 }], 'Ação')
   await flush()
-  expect(store.getState().conflict?.paths).toEqual(['values.blood'])
+  expect(store.getState().conflict?.play?.paths).toEqual(['values.blood'])
 })

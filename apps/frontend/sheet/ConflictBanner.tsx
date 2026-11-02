@@ -1,4 +1,4 @@
-import { jsonEqual } from '@tms/sheet-core'
+import { jsonEqual, type SheetModel } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -17,26 +17,45 @@ const names = (labels: readonly string[]) =>
     : (labels[0] ?? '')
 
 function messageOf(
+  model: SheetModel,
   conflict: SheetConflict,
-  labels: readonly string[],
   others: number
 ): string {
-  const many = labels.length > 1
-  // Quem mudou, quando é um campo só e se sabe ("pelo narrador")
-  const only = conflict.paths.length === 1 ? conflict.paths[0] : undefined
-  const by = only ? conflict.changedBy?.[only] : null
-  const who = by ? ` ${changedByText(by)}` : ''
-  if (conflict.origin === 'play')
-    return `${names(labels)} ${many ? 'mudaram' : 'mudou'} antes de a sua alteração chegar. A ficha mostra o valor de agora.`
-  if (conflict.origin === 'recovery')
-    return `${names(labels)} ${many ? 'mudaram' : 'mudou'} desde o seu rascunho.`
-  const rest =
-    others === 1
-      ? ' A outra continua no rascunho.'
-      : others > 1
-        ? ` As outras ${others} continuam no rascunho.`
-        : ''
-  return `${names(labels)} ${many ? 'foram alterados' : 'foi alterado'}${who} antes de a sua alteração chegar.${rest}`
+  const labelsOf = (paths: readonly string[]) => [
+    ...new Set(paths.map(p => conflictLabel(model, p))),
+  ]
+  const parts: string[] = []
+  const draft = conflict.draft
+  if (draft) {
+    const labels = labelsOf(draft.paths)
+    const many = labels.length > 1
+    if (draft.origin === 'recovery')
+      parts.push(
+        `${names(labels)} ${many ? 'mudaram' : 'mudou'} desde o seu rascunho.`
+      )
+    else {
+      // Quem mudou, quando é um campo só e se sabe ("pelo narrador")
+      const only = draft.paths.length === 1 ? draft.paths[0] : undefined
+      const by = only ? conflict.changedBy?.[only] : null
+      const who = by ? ` ${changedByText(by)}` : ''
+      const rest =
+        others === 1
+          ? ' A outra continua no rascunho.'
+          : others > 1
+            ? ` As outras ${others} continuam no rascunho.`
+            : ''
+      parts.push(
+        `${names(labels)} ${many ? 'foram alterados' : 'foi alterado'}${who} antes de a sua alteração chegar.${rest}`
+      )
+    }
+  }
+  if (conflict.play) {
+    const labels = labelsOf(conflict.play.paths)
+    parts.push(
+      `${names(labels)} ${labels.length > 1 ? 'mudaram' : 'mudou'} antes de a sua alteração chegar. A ficha mostra o valor de agora.`
+    )
+  }
+  return parts.join(' ')
 }
 
 export function ConflictBanner() {
@@ -45,17 +64,13 @@ export function ConflictBanner() {
   const drafted = useSheetSelector(s => s.draft?.size ?? 0)
   const [open, setOpen] = useState(false)
   if (!conflict) return null
-  const labels = [...new Set(conflict.paths.map(p => conflictLabel(model, p)))]
+  const others = Math.max(0, drafted - (conflict.draft?.paths.length ?? 0))
   return (
     <View style={styles.wrap}>
       <Banner
         tone="warning"
         title="A ficha mudou em outro lugar"
-        message={messageOf(
-          conflict,
-          labels,
-          Math.max(0, drafted - conflict.paths.length)
-        )}
+        message={messageOf(model, conflict, others)}
         action={
           <Button
             title="Revisar"

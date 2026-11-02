@@ -45,7 +45,11 @@ type Phase = 'loading' | 'paused' | 'active'
 export interface DraftPersistence {
   // O registro guardado que espera a decisão da pessoa
   readonly offer: DraftRecord | null
-  recover(): RestorePlan | null
+  /**
+   * Recupera com o plano já calculado (o que a oferta mostrou). Devolve null
+   * quando a política não deixa editar: o registro fica.
+   */
+  recover(plan?: RestorePlan): RestorePlan | null
   discard(): void
   // Fechar a oferta: o registro fica e o rascunho continua pausado
   later(): void
@@ -140,12 +144,14 @@ export function useDraftPersistence({
 
   return {
     offer,
-    recover() {
+    recover(ready) {
       const found = record.current
       if (!found) return null
       const s = store.getState()
-      const plan = planDraftRestore(s.model, s.values, s.roles, found)
-      if (plan.events.length) s.restoreDraft(plan)
+      const plan = ready ?? planDraftRestore(s.model, s.values, s.roles, found)
+      // O modo do registro, se ainda vale; sem permissão de edição, nada
+      // muda e o registro continua guardado
+      if (plan.events.length && !s.restoreDraft(plan, found.mode)) return null
       record.current = null
       phase.current = 'active'
       setOffer(null)

@@ -53,20 +53,70 @@ export function ConflictSheet({
   const { model } = useSheet()
   const store = useSheetStore()
   const conflict = useSheetSelector(s => s.conflict, jsonEqual)
-  const rows = useSheetSelector(
-    s =>
-      (s.conflict?.paths ?? []).map(path => {
-        // O seu: a entrada do rascunho, ou o último `to` do lote do Jogo
-        let mine: unknown = s.draft?.get(path)?.to
-        if (s.conflict?.origin === 'play')
-          for (const b of s.conflict.batches)
-            for (const e of b.events) if (e.path === path) mine = e.to
-        return { path, mine, current: valueAt(s.values, path) }
-      }),
-    jsonEqual
-  )
+  const rows = useSheetSelector(s => {
+    const out: {
+      kind: 'draft' | 'play'
+      path: string
+      mine: unknown
+      current: unknown
+    }[] = []
+    // Os do rascunho: o seu é a entrada dele, e cada um se resolve sozinho
+    for (const path of s.conflict?.draft?.paths ?? [])
+      out.push({
+        kind: 'draft',
+        path,
+        mine: s.draft?.get(path)?.to,
+        current: valueAt(s.values, path),
+      })
+    // Os do Jogo: o seu é o último `to` dos lotes, que voltam juntos
+    for (const path of s.conflict?.play?.paths ?? []) {
+      let mine: unknown
+      for (const b of s.conflict?.play?.batches ?? [])
+        for (const e of b.events) if (e.path === path) mine = e.to
+      out.push({ kind: 'play', path, mine, current: valueAt(s.values, path) })
+    }
+    return out
+  }, jsonEqual)
   if (!conflict) return null
-  const play = conflict.origin === 'play'
+  const play = conflict.play !== null
+  const row = (r: (typeof rows)[number]) => {
+    const mine = describeValue(model, r.path, r.mine)
+    const current = `${describeValue(model, r.path, r.current)} · alterado ${changedByText(conflict.changedBy?.[r.path])}`
+    const place = placeOf(model, r.path)
+    return (
+      <View
+        key={`${r.kind}:${r.path}`}
+        style={styles.row}
+        testID="conflict-row"
+      >
+        <Text variant="fieldLabel">{place}</Text>
+        <View
+          accessible
+          accessibilityLabel={`${place}. Seu valor: ${mine}. Valor atual: ${current}.`}
+          style={styles.values}
+        >
+          <Text>{`Seu valor: ${mine}`}</Text>
+          <Text color="inkMuted">{`Valor atual: ${current}`}</Text>
+        </View>
+        {r.kind === 'play' ? null : (
+          <View style={styles.actions}>
+            <Button
+              title="Ficar com o atual"
+              variant="ghost"
+              accessibilityHint={`${place}: tira a sua alteração do rascunho`}
+              onPress={() => store.getState().resolveConflict(r.path, 'theirs')}
+            />
+            <Button
+              title="Usar o meu"
+              variant="secondary"
+              accessibilityHint={`${place}: o seu valor substitui o atual ao salvar`}
+              onPress={() => store.getState().resolveConflict(r.path, 'mine')}
+            />
+          </View>
+        )}
+      </View>
+    )
+  }
   return (
     <BottomSheet
       visible={visible}
@@ -80,17 +130,19 @@ export function ConflictSheet({
               <Button
                 title="Manter como está"
                 variant="ghost"
+                accessibilityHint="Os lotes do Jogo em conflito saem; a ficha fica com o valor de agora"
                 onPress={() => {
                   store.getState().dismissConflict()
-                  onClose()
+                  if (!store.getState().conflict) onClose()
                 }}
               />
             </View>
             <Button
               title="Reaplicar tudo"
+              accessibilityHint="Os lotes do Jogo em conflito voltam inteiros, sobre o valor de agora"
               onPress={() => {
                 store.getState().reapply()
-                onClose()
+                if (!store.getState().conflict) onClose()
               }}
             />
           </>
@@ -98,50 +150,14 @@ export function ConflictSheet({
       }
     >
       <View style={styles.rows}>
+        {rows.filter(r => r.kind === 'draft').map(row)}
         {play ? (
           <Text color="inkMuted">
             Uma ação do Jogo mexe em campos ligados: ela volta inteira ou não
             volta.
           </Text>
         ) : null}
-        {rows.map(row => {
-          const mine = describeValue(model, row.path, row.mine)
-          const current = `${describeValue(model, row.path, row.current)} · alterado ${changedByText(conflict.changedBy?.[row.path])}`
-          const place = placeOf(model, row.path)
-          return (
-            <View key={row.path} style={styles.row} testID="conflict-row">
-              <Text variant="fieldLabel">{place}</Text>
-              <View
-                accessible
-                accessibilityLabel={`${place}. Seu valor: ${mine}. Valor atual: ${current}.`}
-                style={styles.values}
-              >
-                <Text>{`Seu valor: ${mine}`}</Text>
-                <Text color="inkMuted">{`Valor atual: ${current}`}</Text>
-              </View>
-              {play ? null : (
-                <View style={styles.actions}>
-                  <Button
-                    title="Ficar com o atual"
-                    variant="ghost"
-                    accessibilityHint={`${place}: tira a sua alteração do rascunho`}
-                    onPress={() =>
-                      store.getState().resolveConflict(row.path, 'theirs')
-                    }
-                  />
-                  <Button
-                    title="Usar o meu"
-                    variant="secondary"
-                    accessibilityHint={`${place}: o seu valor substitui o atual ao salvar`}
-                    onPress={() =>
-                      store.getState().resolveConflict(row.path, 'mine')
-                    }
-                  />
-                </View>
-              )}
-            </View>
-          )
-        })}
+        {rows.filter(r => r.kind === 'play').map(row)}
       </View>
     </BottomSheet>
   )
