@@ -366,8 +366,9 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
       screen.getByLabelText('Buscar Disciplina'),
       'Ofuscação'
     )
+    // Como no app: o Enter traz o texto do campo
     fireEvent(textInput('Buscar Disciplina'), 'submitEditing', {
-      nativeEvent: { text: '' },
+      nativeEvent: { text: 'Ofuscação' },
     })
     expect(textInput('Buscar Disciplina').props.value).toBe('Ofuscação')
     expect(alertsIn('add-sheet-disciplines')).toHaveLength(1)
