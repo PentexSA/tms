@@ -466,3 +466,48 @@ Se a onda precisar cortar, o commit 7 (T-29) sai sozinho sem quebrar os outros.
 7. **Resumo da crônica para o jogador.** A linha do `creationSummary` sob "Suas fichas" cabe a 360 dp sem quebrar mal com os orçamentos do Mago e do Lobisomem? Conferir no AVD. Se não couber, a linha encurta (por exemplo, só "Por pontos · 15 de bônus · ver na Nova ficha"), sem mudar o que a Nova ficha mostra.
 
 Pontos para o PO (não decididos aqui): a aba lembrada da R-02 e o nome único da etapa do T-29 (§2).
+
+## 10. Desvios
+
+O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
+
+**Código:**
+
+- **`openingMode` (T-05) deixa de fora o NPC, não o papel de narrador.** A primeira versão (`d7239b0`) excluía toda ficha com o papel de narrador. O commit `abd9ec6` corrigiu para a regra da casa ("a ficha do próprio narrador é dele: vale o fluxo do dono", `StorytellerBar`): a ficha do narrador na própria crônica também abre na montagem, e só o NPC (`kind === 'npc'`) fica de fora (pergunta 4).
+- **O `StatusMenuButton` recebe mais que `revision`, `sheetVersion` e `unsaved`:**
+  - `approval`, para a folha dizer "Concluir e aprovar?" quando a aprovação está ligada;
+  - `queued` (achado do `/code-review`): com lotes salvos ainda na fila, concluir pelo menu fica desabilitado, como a barra, que já esperava a fila;
+  - `notes`, a linha extra do P05-C (T-18).
+
+  O `onDraftState` leva `{ unsaved, queued }`, e o P05-C acrescenta `freebiesLeft`.
+- **O autor de "Criação concluída" vem do que o servidor gravou** (achado do `/code-review`). Aprovar é sempre do narrador. Concluir usa o `approved` do registro, que é o mesmo papel do lote do freeze, inclusive na ficha do próprio narrador e com a conta excluída. Registros sem o campo voltam a "autor contra o dono". O `payload` continua fora da resposta.
+- **A lista lê `returned` com `isReturned`**, a mesma forma que o `parseCharacterCreation` aceita, sem validar as escolhas e a configuração de cada ficha só para um booleano.
+- **"Aprovar ficha?" e o corpo das confirmações** usam um componente `CompletionMessage`, com as `notes`. O `layerOf` do padrão da crônica passou a ter uma cópia só, em `sheet/creation/summary.ts`.
+- **Concluir pelo menu não rebusca duas vezes:** a mutação de concluir já rebusca a ficha, a Mesa e a lista.
+
+**Testes:**
+
+- Os casos da lista (T-06 e a linha do T-29 sob "Suas fichas") ficaram em `app/__tests__/new-character.test.tsx`, no bloco "Fichas na crônica", onde a lista já era testada, e não em `chronicles.test.tsx`.
+- O "passa por você" da barra está em `CreationScreen.test.tsx` ("confirmação da barra"), e não em `evolve.test.tsx`.
+- **E2E (escritos, não rodados; rodam na integração):**
+  - `completeCreation` conclui pela API as fichas de `play`, `dice`, `offline`, `sheet` e `table`;
+  - `a11y-keyboard`, `conflict` e `draft` não mudaram: abrem em Editar pelo `?mode` ou não dependem do modo;
+  - `evolve` confere o Editar ao recarregar (EW-08) e depois toca "Jogo";
+  - as jornadas que jogam com a ficha ainda em criação livre (`journey`, `journey-mage`, `journey-werewolf`) tocam "Jogo" depois de recarregar;
+  - `journey-storyteller` confirma a conclusão pelo menu;
+  - `table` espera três linhas "(narrador)": os dois lotes e a conclusão;
+  - o rádio "Ligada" de `template-unsupported` passou a ser buscado por `/^Ligada, /`, porque a opção ganhou o efeito no nome (T-29).
+
+**Revisões:**
+
+- **`/security-review`:** nenhuma vulnerabilidade. Conferidos:
+  - o Histórico, que lê o `chronicle_audit` da ficha e da crônica só nas duas ações, sem `payload` e sem `target_user_id`, com o `viewer` em 404;
+  - a lista, que manda só o booleano;
+  - o freeze, que só muda a exibição;
+  - o app, onde é tudo UX.
+- **`/code-review` (nível `high`, 10 achados):** 5 corrigidos (`e61c31d`). Os outros 5:
+  - **Na criação livre, a dona em Editar continua em Editar quando o narrador conclui.** Não corrigido: já acontecia vindo da Nova ficha com `?mode=evolve`, e o servidor recusa com o motivo o que passou a ser evolução. Fica como nota para o P04-D (estados).
+  - **O cursor do Histórico corta em milissegundo.** É anterior ao pacote, e a API grava o `created_at` dos lotes e do registro com o relógio dela, em milissegundos.
+  - **Os lotes de freeze antigos continuam com o "de" nulo.** É a pergunta 1, sem migration.
+  - **Índice do `chronicle_audit` por ficha.** É a pergunta 5, sem migration.
+  - **As `notes` vazias.** São o contrato com o P05-C ([onda-2.md](onda-2.md) §4.1).
