@@ -1,7 +1,8 @@
 import { isDraftMode, type SheetMode } from '@tms/sheet-core'
 import { BottomSheet, Button, Text, tokens, useToast } from '@tms/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { useStore } from 'zustand'
 import { planDraftRestore, type RestorePlan } from './store/draftRestore'
 import type { SheetActions, SheetState, SheetStore } from './store/sheetStore'
 import type { DraftRecord, DraftStore } from './sync/draftStore'
@@ -213,10 +214,17 @@ export function DraftRecovery({
 }) {
   const toast = useToast()
   const { offer } = persistence
-  if (!offer) return null
+  // O plano muda só com a oferta e com os valores da ficha: o mesmo que a
+  // tela mostra é o que "Recuperar" aplica
+  const values = useStore(store, s => s.values)
+  const plan = useMemo(() => {
+    if (!offer) return null
+    const { model, roles } = store.getState()
+    return planDraftRestore(model, values, roles, offer)
+  }, [offer, values, store])
+  if (!offer || !plan) return null
   const s = store.getState()
   const n = offer.edits.length
-  const plan = planDraftRestore(s.model, s.values, s.roles, offer)
   // Só sobra "Descartar", com o motivo, quando não há o que recuperar
   const reason = blocked
     ? 'A ficha não pode ser editada agora.'
@@ -228,7 +236,7 @@ export function DraftRecovery({
           : 'Nenhuma dessas alterações vale mais para esta ficha.'
         : null
   const recover = () => {
-    const done = persistence.recover()
+    const done = persistence.recover(plan)
     if (!done) return
     const restored = done.events.length
     const notes = [

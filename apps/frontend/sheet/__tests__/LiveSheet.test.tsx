@@ -18,6 +18,7 @@ import {
 import { SheetProvider, useResolvedField } from '../context'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
+import * as draftRestore from '../store/draftRestore'
 import { createSheetStore, type SheetStore } from '../store/sheetStore'
 import { createPersistedDraftStore, type DraftStore } from '../sync/draftStore'
 import { createMemoryStorage } from '../sync/kv'
@@ -362,6 +363,20 @@ describe('rascunho guardado no aparelho', () => {
       screen.getByRole('adjustable', { name: 'Força' })
     ).toHaveAccessibilityValue({ now: 3 })
     expect(await screen.findByText('3 alterações recuperadas.')).toBeTruthy()
+  })
+
+  // Achado do /code-review: o plano rodava a cada render e de novo no clique
+  it('o plano da recuperação é calculado uma vez e reaproveitado no "Recuperar"', async () => {
+    const drafts = createPersistedDraftStore(createMemoryStorage())
+    ;(await editThree(drafts)).unmount()
+    const plan = jest.spyOn(draftRestore, 'planDraftRestore')
+    await reopen(drafts)
+    const shown = plan.mock.calls.length
+    expect(shown).toBe(1)
+    fireEvent.press(screen.getByRole('button', { name: 'Recuperar' }))
+    expect(plan).toHaveBeenCalledTimes(shown)
+    expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
+    plan.mockRestore()
   })
 
   it('"Descartar" apaga o registro', async () => {
