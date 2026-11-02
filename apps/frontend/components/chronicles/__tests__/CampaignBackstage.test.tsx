@@ -354,16 +354,36 @@ describe('narrador', () => {
             {
               id: 'a1',
               source: 'audit',
-              action: 'chronicle.update',
+              action: 'chronicle.creation.settings',
               at: '2026-10-22T10:00:00Z',
-              by: { id: 'u1', username: 'ana' },
+              by: { username: 'ana' },
+              byRole: null,
+              character: null,
+              user: null,
+              detail: { approval: true, approvalFrom: false, defaults: false },
             },
             {
               id: 'b1',
               source: 'batch',
-              action: 'sheet.events',
+              action: 'sheet.change',
               at: '2026-10-21T10:00:00Z',
               by: null,
+              byRole: 'owner',
+              character: { id: PC, name: 'Helena', deleted: false },
+              user: null,
+              detail: {},
+            },
+            {
+              // Registro antigo de uma ação que saiu: nunca o código
+              id: 'a0',
+              source: 'audit',
+              action: 'chronicle.update',
+              at: '2026-10-20T10:00:00Z',
+              by: { username: 'ana' },
+              byRole: null,
+              character: null,
+              user: null,
+              detail: {},
             },
           ],
           nextCursor: 'cursor-1',
@@ -371,8 +391,15 @@ describe('narrador', () => {
       )
       .mockResolvedValue(ok({ items: [], nextCursor: null }))
     renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
-    expect(await screen.findByText('chronicle.update')).toBeTruthy()
-    expect(screen.getByText('Conta excluída')).toBeTruthy()
+    // T-63: frases, com a ficha e o que mudou; autor e hora em pt-BR
+    expect(
+      await screen.findByText('Regras da criação: aprovação Desligada → Ligada')
+    ).toBeTruthy()
+    expect(screen.getByText('Helena alterada pelo dono')).toBeTruthy()
+    expect(screen.getByText('Ação registrada')).toBeTruthy()
+    expect(screen.getByText(/^Conta excluída · em 21\/10 às /)).toBeTruthy()
+    expect(screen.getAllByText(/^ana · em 2\d\/10 às /)).toHaveLength(2)
+    expect(screen.queryByText(/^[a-z]+([.-][a-z-]+)+$/)).toBeNull()
 
     fireEvent.press(
       screen.getByRole('button', { name: 'Carregar histórico anterior' })

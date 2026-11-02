@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
-import { civilDate } from '../../lib/format'
+import { civilDate, whenLabel } from '../../lib/format'
 import {
   useCancelTransfer,
   useChronicleHistory,
@@ -25,6 +25,7 @@ import {
   useUpdateSession,
 } from '../../lib/queries/backstage'
 import { useChronicleCharacters } from '../../lib/queries/chronicles'
+import { auditPhrase } from './auditPhrase'
 
 interface ChronicleInfo {
   readonly id: string
@@ -543,12 +544,13 @@ function History({ chronicleId }: { readonly chronicleId: string }) {
           </View>
         </View>
       </View>
+      {/* T-63: a frase com a ficha e o que mudou; o autor e a hora no fuso
+          de quem lê, em pt-BR. Nenhum código interno na tela */}
       {items.map(item => (
         <ListItem
           key={`${item.source}:${item.id}`}
-          title={item.action}
-          subtitle={item.by?.username ?? 'Conta excluída'}
-          meta={new Date(item.at).toLocaleString()}
+          title={auditPhrase(item)}
+          subtitle={`${item.by?.username ?? 'Conta excluída'} · ${whenLabel(item.at)}`}
         />
       ))}
       {history.hasNextPage ? (
