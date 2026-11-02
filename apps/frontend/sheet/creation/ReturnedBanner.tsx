@@ -63,6 +63,24 @@ export function ReturnedBanner() {
   )
 }
 
+/**
+ * Nota do P04-C (P04-D §3.7): o narrador concluiu a criação livre com a dona
+ * no Editar e alterações não salvas. O Editar e o rascunho ficam (o servidor
+ * decide o lote), mas ela fica sabendo que agora é evolução. Some quando o
+ * rascunho esvazia ou a ficha sai do Editar.
+ */
+export function CompletedWhileEditingBanner() {
+  const creation = useCreation()
+  if (!creation?.completedWhileEditing) return null
+  return (
+    <NarratorReasonBanner
+      title="O narrador concluiu a criação"
+      reason="As alterações não salvas agora são evolução: subir um traço passa pelo narrador. Salve ou descarte."
+      testID="completed-while-editing"
+    />
+  )
+}
+
 const styles = StyleSheet.create({
   panel: {
     paddingHorizontal: tokens.layout.gutter,

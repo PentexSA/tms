@@ -516,6 +516,29 @@ function LiveSheet({
   // O modo de abertura da renderização anterior: a ficha aberta no Editar da
   // criação livre (inclusive pelo cache persistido, antes da resposta do
   // servidor) segue o modo de abertura novo quando a criação acaba
+  // Nota do P04-C (P04-D §3.7): a criação acabou com a dona no Editar e
+  // alterações não salvas. O Editar fica, mas em silêncio ela não saberia que
+  // o próximo "Concluir" vira evolução. Antes do efeito do modo, que pode
+  // descartar o rascunho
+  const [completedWhileEditing, setCompletedWhileEditing] = useState(false)
+  const statusBefore = useRef(status)
+  useEffect(() => {
+    const before = statusBefore.current
+    statusBefore.current = status
+    if (before !== 'creating' || status !== 'active') return
+    const s = store.getState()
+    if (s.mode === 'evolve' && (s.draft?.size ?? 0) > 0)
+      setCompletedWhileEditing(true)
+  }, [store, status])
+  useEffect(() => {
+    if (!completedWhileEditing) return
+    const clear = (s: ReturnType<typeof store.getState>) => {
+      if (!isDraftMode(s.mode) || !s.draft?.size)
+        setCompletedWhileEditing(false)
+    }
+    clear(store.getState())
+    return store.subscribe(clear)
+  }, [store, completedWhileEditing])
   const openedAs = useRef(opening)
   useEffect(() => {
     const s = store.getState()
@@ -556,8 +579,17 @@ function LiveSheet({
       kind,
       info,
       active,
+      completedWhileEditing,
     }),
-    [id, state.character.chronicle.id, status, kind, info, active]
+    [
+      id,
+      state.character.chronicle.id,
+      status,
+      kind,
+      info,
+      active,
+      completedWhileEditing,
+    ]
   )
   return (
     <>

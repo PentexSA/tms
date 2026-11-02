@@ -14,6 +14,9 @@ export interface CreationContextValue {
   readonly info: CreationInfo | null
   // A conta vale: criação por pontos em creating ou pending
   readonly active: boolean
+  // O narrador concluiu a criação com a dona no Editar e alterações não
+  // salvas (nota do P04-C, no P04-D): elas agora são evolução
+  readonly completedWhileEditing?: boolean
 }
 
 export const CreationContext = createContext<CreationContextValue | null>(null)

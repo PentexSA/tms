@@ -481,6 +481,91 @@ describe('modo de abertura (T-05)', () => {
     expect(await radio('Editar')).toBeChecked()
     expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
   })
+
+  // Nota do P04-C (P04-D §3.7): o Editar fica, mas a dona fica sabendo
+  it('com alterações no Editar, a conclusão avisa; descartar tira o aviso', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Força' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    calls.characterGet.mockResolvedValue(
+      creating({
+        status: 'active',
+        creation: { ...creation('free'), activatedAt: '2026-11-01T12:00:00Z' },
+      })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    const banner = await screen.findByTestId(
+      'completed-while-editing',
+      {},
+      WAIT
+    )
+    expect(banner.props.accessibilityLabel).toBe(
+      'O narrador concluiu a criação. As alterações não salvas agora são evolução: subir um traço passa pelo narrador. Salve ou descarte.'
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    // Sair do Editar descartando: o aviso some
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
+    await waitFor(() =>
+      expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    )
+  })
+
+  it('montada do cache com o aviso e a resposta já ativa: nada fica preso', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({
+        creation: {
+          ...creation('free'),
+          ready: { at: '2026-11-01T10:00:00Z' },
+        },
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Você avisou que terminou'
+    )
+    calls.characterGet.mockResolvedValue(
+      creating({
+        status: 'active',
+        creation: { ...creation('free'), activatedAt: '2026-11-01T12:00:00Z' },
+      })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    await waitFor(
+      () => expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked(),
+      WAIT
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+  })
 })
 
 // T-06: a devolução aparece em qualquer modo, e a ficha aberta em `pending`
