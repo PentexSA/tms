@@ -423,3 +423,77 @@ describe('BottomSheet.onClosed: a folha seguinte abre depois que esta sai', () =
     expect(onClosed).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('Esc no web com o foco fora da folha (aberta pelo teclado)', () => {
+  type Listener = (e: {
+    key?: string
+    preventDefault?: () => void
+    stopPropagation?: () => void
+  }) => void
+  const doc = globalThis as { document?: unknown }
+  let keydown: Listener | undefined
+  beforeEach(() => {
+    keydown = undefined
+    // O foco ainda no gatilho, fora da folha: o trap do react-native-web só
+    // o move depois da animação de entrada
+    doc.document = {
+      activeElement: { focus: jest.fn(), isConnected: true },
+      body: {},
+      addEventListener: (type: string, listener: Listener) => {
+        if (type === 'keydown') keydown = listener
+      },
+    }
+  })
+  afterEach(() => {
+    delete doc.document
+  })
+
+  const sheets = (top: boolean, onBase: () => void, onTop: () => void) => (
+    <>
+      <BottomSheet visible title="Base" onClose={onBase}>
+        <RNText>base</RNText>
+      </BottomSheet>
+      <BottomSheet visible={top} title="Convidar" onClose={onTop}>
+        <RNText>convite</RNText>
+      </BottomSheet>
+    </>
+  )
+
+  it('fecha a folha de cima, e só ela; depois, a de baixo', () => {
+    const onBase = jest.fn()
+    const onTop = jest.fn()
+    withOS('web', () => {
+      const { rerender } = render(sheets(true, onBase, onTop))
+      const stop = jest.fn()
+      keydown?.({
+        key: 'Escape',
+        preventDefault: jest.fn(),
+        stopPropagation: stop,
+      })
+      expect(onTop).toHaveBeenCalledTimes(1)
+      expect(onBase).not.toHaveBeenCalled()
+      // O Esc não chega também à raiz da folha (fecharia duas vezes)
+      expect(stop).toHaveBeenCalled()
+      rerender(sheets(false, onBase, onTop))
+      keydown?.({ key: 'Escape' })
+      expect(onBase).toHaveBeenCalledTimes(1)
+      expect(onTop).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('outra tecla, ou nenhuma folha aberta, não faz nada', () => {
+    const onClose = jest.fn()
+    withOS('web', () => {
+      const { unmount } = render(
+        <BottomSheet visible title="Convidar" onClose={onClose}>
+          <RNText>convite</RNText>
+        </BottomSheet>
+      )
+      keydown?.({ key: 'Enter' })
+      expect(onClose).not.toHaveBeenCalled()
+      unmount()
+      keydown?.({ key: 'Escape' })
+      expect(onClose).not.toHaveBeenCalled()
+    })
+  })
+})
