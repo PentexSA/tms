@@ -10,8 +10,15 @@ import { useMemo, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { useSheet, useSheetSelector } from '../context'
+import { useCreation } from '../creation/CreationContext'
 import { TextEditor } from '../editors/TextEditor'
 import { useCommit } from '../useCommit'
+import {
+  ADJUST_HINT,
+  hiddenFromOwner,
+  PRIVATE_NOTE_A11Y,
+  PRIVATE_NOTE_SHEET,
+} from './privacy'
 
 // O narrador abre a ficha de um jogador em Leitura; editar é explícito
 // ("Editar como narrador", design/telas/prototipo.js) e fica assinado no
@@ -67,6 +74,9 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
                 key={f.id}
                 title={`Editar ${f.def.label}`}
                 variant="secondary"
+                accessibilityHint={
+                  hiddenFromOwner(model, f.id) ? PRIVATE_NOTE_A11Y : undefined
+                }
                 onPress={() => setEditing(f.id)}
               />
             ))
@@ -93,6 +103,7 @@ function TextFieldSheet({
 }) {
   const { model } = useSheet()
   const commit = useCommit()
+  const creating = useCreation()?.status === 'creating'
   const field = model.fields.get(id)
   const stored = useSheetSelector(s => s.values.values[id])
   const [text, setText] = useState(typeof stored === 'string' ? stored : '')
@@ -117,6 +128,16 @@ function TextFieldSheet({
         </>
       }
     >
+      {hiddenFromOwner(model, id) ? (
+        <View style={styles.notice}>
+          <Text variant="caption">{PRIVATE_NOTE_SHEET}</Text>
+          {creating ? (
+            <Text variant="caption" color="inkMuted">
+              {ADJUST_HINT}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       <TextEditor
         id={id}
         def={field.def}
@@ -139,4 +160,5 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, minWidth: 160, gap: tokens.space['0.5'] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
+  notice: { gap: tokens.space[1], marginBottom: tokens.space[3] },
 })

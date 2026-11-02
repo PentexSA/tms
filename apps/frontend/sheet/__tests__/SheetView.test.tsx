@@ -21,6 +21,7 @@ import {
 import { layoutFor, layouts } from '../layouts'
 import { ListLayout } from '../layouts/ListLayout'
 import { SheetView } from '../SheetView'
+import { hiddenFromOwner, PRIVATE_NOTE_A11Y } from '../storyteller/privacy'
 import { resolveView } from '../views'
 import { FieldDetail } from '../views/FieldDetail'
 import { GenericChip } from '../views/GenericChip'
@@ -55,8 +56,14 @@ function expectEveryField(
         if (s.restricted && !roles.includes('storyteller')) continue
         const r = resolved.get(id)
         if (!r) continue
+        // R-09: o campo que o dono não lê diz, para o narrador, que é privado
+        const label = fieldDescribe(r, resolved)
         expect(
-          screen.getAllByLabelText(fieldDescribe(r, resolved)).length
+          screen.getAllByLabelText(
+            roles.includes('storyteller') && hiddenFromOwner(model, id)
+              ? `${label}. ${PRIVATE_NOTE_A11Y}`
+              : label
+          ).length
         ).toBeGreaterThan(0)
         seen.add(id)
       }
