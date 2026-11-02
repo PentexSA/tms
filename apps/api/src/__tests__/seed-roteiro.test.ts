@@ -5,11 +5,18 @@
 // só valia com TRUST_PROXY=true).
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import {
+  type CreationChoices,
+  checkCreation,
+  compileTemplate,
+  effectiveCreationConfig,
+} from '@tms/sheet-core'
+import {
   checkSeedDatabase,
   type Handle,
   type Key,
   runSeed,
 } from '../../../../scripts/seed-roteiro'
+import { template } from '../test/factories'
 import {
   createTestContext,
   createTestContextOn,
@@ -119,7 +126,93 @@ describe('seed-roteiro (S-04)', () => {
   it('a segunda rodada entra nas mesmas contas e troca as crônicas', async () => {
     const result = await runSeed({ api: inProcess(), base: 'http://localhost' })
     expect(result.chronicles).toHaveLength(7)
+    expect(result.sheets).toEqual([])
     expect(await narrated('roteiro_narrador@roteiro.test')).toHaveLength(7)
+  })
+
+  // Onda 3 (onda-3.md §4.9): as fichas de J1 dos roteiros manuais do P03-D,
+  // do P04-D e do P09-C, pela API, sem convite nem crônica a mais
+  it('--fichas-criacao: as fichas de J1 dos roteiros manuais da onda 3', async () => {
+    const result = await runSeed({
+      api: inProcess(),
+      base: 'http://localhost',
+      creationSheets: true,
+    })
+    expect(result.chronicles).toHaveLength(7)
+    expect(result.sheets.map(f => f.name)).toEqual([
+      'Isadora Web',
+      'Otto Web',
+      'Isadora Android',
+      'Otto Android',
+      'Isadora iOS',
+      'Otto iOS',
+      'Ficha Livre R',
+      'Ficha Pontos R',
+      'Ficha Aprovação R',
+      'Ficha XP R',
+    ])
+    const rows = await ctx.db
+      .selectFrom('characters as ch')
+      .innerJoin('users as u', 'u.id', 'ch.user_id')
+      .innerJoin('chronicles as c', 'c.id', 'ch.chronicle_id')
+      .where('u.email', '=', 'roteiro_jogador1@roteiro.test')
+      .where('c.name', 'not like', 'Vampiro limite 20%')
+      .select([
+        'ch.id',
+        'ch.name',
+        'ch.status',
+        'ch.sheet_data',
+        'ch.creation',
+        'c.name as chronicle',
+        'c.character_approval',
+      ])
+      .execute()
+    const sheet = (name: string) => {
+      const row = rows.find(r => r.name === name)
+      if (!row) throw new Error(`sem a ficha ${name}`)
+      return row
+    }
+    expect(rows).toHaveLength(10)
+
+    // P03-D: falta 1 de Vigor, ainda em criação por pontos; Otto, livre
+    const isadora = sheet('Isadora iOS')
+    expect(isadora.chronicle).toStartWith('Vampiro v4 · ')
+    expect(isadora.status).toBe('creating')
+    const values = (isadora.sheet_data as { values: Record<string, unknown> })
+      .values
+    expect(values).toMatchObject({ clan: 'tremere', strength: 4, stamina: 2 })
+    expect(sheet('Otto Web').chronicle).toStartWith('Vampiro v3/v5 · ')
+
+    // P04-D: a aprovação ligada em Mago v4 e a conta fechada, sem enviar
+    const approval = sheet('Ficha Aprovação R')
+    expect(approval.chronicle).toStartWith('Mago v4 · ')
+    expect(approval.character_approval).toBe(true)
+    expect(approval.status).toBe('creating')
+    const mage = compileTemplate(template('mta-m20'))
+    const check = checkCreation(mage, approval.sheet_data, {
+      config: effectiveCreationConfig(mage),
+      choices: (approval.creation as unknown as { choices: CreationChoices })
+        .choices,
+    })
+    expect(check.complete).toBe(true)
+    expect(sheet('Ficha Pontos R').chronicle).toStartWith('Vampiro v4 · ')
+    expect(sheet('Ficha Livre R').chronicle).toStartWith('Vampiro v3/v5 · ')
+
+    // P09-C: concluída pelo N, 10 de XP e um pedido pendente
+    const xp = sheet('Ficha XP R')
+    expect(xp.status).toBe('active')
+    const entries = await ctx.db
+      .selectFrom('xp_entries')
+      .where('character_id', '=', xp.id)
+      .select(['total_delta'])
+      .execute()
+    expect(entries.reduce((n, e) => n + e.total_delta, 0)).toBe(10)
+    const requests = await ctx.db
+      .selectFrom('xp_requests')
+      .where('character_id', '=', xp.id)
+      .select(['status', 'target_field'])
+      .execute()
+    expect(requests).toEqual([{ status: 'pending', target_field: 'strength' }])
   })
 })
 
