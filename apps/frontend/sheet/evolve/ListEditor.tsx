@@ -21,6 +21,7 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { useFieldIssue, useSetDraft } from './hooks'
+import { withItemDefaults } from './listItem'
 import { fold, nextItemId, noneOf } from './text'
 
 // list em Evoluir (DS: Repeater / ListEditor). O esquema do item vem do
@@ -73,9 +74,11 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
     const value = def.item.value
       ? Math.min(def.item.value.max, Math.max(def.item.value.min ?? 0, 1))
       : undefined
-    const item: ListItem = def.item.aspect
-      ? { id, text: name }
-      : { id, name, value }
+    // Com o mínimo dos metas numéricos: o valor que o editor mostra (T-23)
+    const item = withItemDefaults(
+      def,
+      def.item.aspect ? { id, text: name } : { id, name, value }
+    )
     if (write([...items, item])) setAdding(false)
   }
   const current = items.find(i => i.id === editing)
@@ -235,7 +238,10 @@ function ItemSheet({
 }) {
   const def = list.field.def
   const schema = def.item
-  const [draft, setDraft] = useState<ListItem>(item)
+  // Item antigo sem meta: começa do que a folha mostra, e "Aplicar" o grava
+  const [draft, setDraft] = useState<ListItem>(() =>
+    withItemDefaults(def, item)
+  )
   const [confirming, setConfirming] = useState(false)
   const title = itemTitle(list, item) || def.itemLabel
   const patch = (p: Partial<Mutable<ListItem>>) =>

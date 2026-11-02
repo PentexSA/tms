@@ -1,6 +1,8 @@
 import {
   describe,
+  fmtSigned,
   type ListItem,
+  type ListMeta,
   type ResolvedList,
   short,
 } from '@tms/sheet-core'
@@ -68,6 +70,15 @@ export function ListHeader({
   )
 }
 
+/**
+ * Um meta na linha do item: o número com o rótulo ("Bônus 2", "Ataque +5"),
+ * como o leitor de tela já fala; o texto só com o valor ("Social").
+ */
+function metaText(m: ListMeta, v: number | string): string {
+  if (m.type !== 'number' || typeof v !== 'number') return String(v)
+  return `${m.label} ${m.display === 'signed' ? fmtSigned(v) : v}`
+}
+
 export function ItemLine({
   list,
   item,
@@ -77,8 +88,10 @@ export function ItemLine({
 }) {
   const def = list.field.def
   const meta = (def.item.meta ?? [])
-    .map(m => item.meta?.[m.id])
-    .filter(v => v !== undefined && v !== '')
+    .flatMap(m => {
+      const v = item.meta?.[m.id]
+      return v === undefined || v === '' ? [] : [metaText(m, v)]
+    })
     .join(' · ')
   const value = itemValue(list, item)
   return (

@@ -137,6 +137,80 @@ describe('ListEditor', () => {
   })
 })
 
+describe('T-23: o item nasce com o valor que o editor mostra', () => {
+  const flawsOf = (live: { store: () => { getState: () => unknown } }) =>
+    (
+      live.store().getState() as {
+        draftEvents: () => { path: string; to: unknown }[]
+      }
+    )
+      .draftEvents()
+      .find(e => e.path === 'values.flaws')?.to as ListItem[] | undefined
+
+  it('Defeito novo grava o Bônus 1 que a folha mostra; a linha diz "Bônus 1"', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
+    fireEvent.changeText(textInput('Nome'), 'Pesadelos')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Pesadelos”' })
+    )
+    expect(flawsOf(live)?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Pesadelos',
+      meta: { bonus: 1 },
+    })
+    const flaws = within(screen.getByTestId('editor-flaws'))
+    expect(flaws.getByText('Bônus 1')).toBeTruthy()
+    // O meta de texto continua só com o valor; o número ganha o rótulo
+    expect(flaws.getByText('Social · Bônus 2')).toBeTruthy()
+  })
+
+  it('Defeito gravado sem bônus: abrir e Aplicar grava o 1 que a folha mostra', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: { ...helena.values, flaws: [{ id: 'f1', name: 'Inimigo' }] },
+    }
+    const live = await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Inimigo' }))
+    expect(
+      screen.getByRole('adjustable', { name: 'Inimigo, Bônus' })
+    ).toHaveAccessibilityValue({ now: 1 })
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(flawsOf(live)).toEqual([
+      { id: 'f1', name: 'Inimigo', meta: { bonus: 1 } },
+    ])
+  })
+
+  it('D&D: meta numérico sem mínimo (Ataque) não ganha valor inventado', async () => {
+    const c = example('lia')
+    const model = modelOf(c.system)
+    const { store } = await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: /^Poderes|Combate/ }))
+    // A linha do ataque mostra o rótulo e o sinal do template
+    expect(
+      within(screen.getByTestId('editor-attacks')).getByText(
+        'Ataque +2 · 1d6 − 1 contundente'
+      )
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Ataque' }))
+    fireEvent.changeText(textInput('Nome'), 'Adaga')
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Adaga”' }))
+    const attacks = store()
+      .getState()
+      .draftEvents()
+      .find(e => e.path === 'values.attacks')?.to as ListItem[]
+    expect(attacks.at(-1)).toEqual({ id: 'i3', name: 'Adaga' })
+  })
+})
+
 describe('outros sistemas, o mesmo editor', () => {
   it('D&D: ataque com meta numérica e de texto', async () => {
     const c = example('lia')
