@@ -993,9 +993,13 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
   // (setCreation), a fase trocada, a ficha que chega do servidor, a fila
   // confirmada, outra pessoa mudando um campo. A mesma avaliação do toque,
   // sem gravar nada: se a tentativa agora passaria, o aviso sai (o ponto não
-  // entra sozinho); se é recusada por outro motivo, o texto muda.
+  // entra sozinho); se é recusada por outro motivo, o texto muda. Só a
+  // recusa da conta é reavaliada: a do core (`invalid`) e a do tamanho do
+  // lote (`limit`) não mudam com o resto da ficha e saem no próximo toque
+  // aceito.
   store.subscribe((s, prev) => {
     if (!s.notice || !tried || !s.draft) return
+    if (s.notice.cause === 'invalid' || s.notice.cause === 'limit') return
     if (
       s.check === prev.check &&
       s.values === prev.values &&
@@ -1014,7 +1018,13 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       return
     }
     const { notice } = s
-    if (notice.text === attempt.notice.text) return
+    const next = attempt.notice
+    if (
+      notice.text === next.text &&
+      notice.cause === next.cause &&
+      notice.action === next.action
+    )
+      return
     noticeId += 1
     store.setState({
       notice: { id: noticeId, paths: notice.paths, ...attempt.notice },
