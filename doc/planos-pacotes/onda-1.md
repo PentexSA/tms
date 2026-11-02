@@ -220,6 +220,8 @@ Os quatro pacotes foram implementados em paralelo, um agente por plano, cada um 
 - **E2E escritos nos pacotes e rodados pela primeira vez aqui** (`b7c26f6`, `3441c55`): abas de Atributos a 390 px, o aviso de "Sair" com rascunho e seletores exatos depois do T-61. O T-12 passou a medir o que importa: texto com 200 px ou mais e a ação sem espremê-lo. Depois do T-31 sobra só "Revisar", que cabe ao lado.
 - **T-71:** o Esc não fechava a folha durante a animação de entrada do Modal do react-native-web, e o foco não voltava ao gatilho. A correção foi feita no P06 e mesclada de novo (`3f0b496`).
 - **Teste da migration 0021:** com a 0022 depois dela, o teste passou a descer até a 0020 (no merge do P03-C).
+- **S-01 no nativo** (`b75a744`): no emulador, os botões do `@tms/ui` apareciam sem fundo nem padding, e "Conta" media 42×22 dp. O Metro passou a ler o `src` do `@tms/ui`, e o babel do app o compilava com o JSX do NativeWind, que perde o `style` em função do `Pressable` no nativo. Nem o web nem o Jest mostravam o defeito. Agora o `src` do `@tms/ui` compila com o JSX do React, como o `dist`, e há teste do `babel.config.js`.
+- **Restauração da sessão** (`1f69d73`, defeito anterior à onda): no simulador do iOS, sem o direito do Keychain (build sem assinatura), a leitura falhava e o app ficava preso no esqueleto. Agora a falha termina em `signedOut` e o app pede login (falha segura).
 
 **Resultado na onda com os quatro pacotes:**
 
@@ -232,18 +234,20 @@ Os quatro pacotes foram implementados em paralelo, um agente por plano, cada um 
 | db | 33 testes |
 | api | 1646 testes |
 | ui | 153 testes |
-| frontend | 854 testes |
+| frontend | 858 testes |
 | `*.pg.test` | 43 testes |
 | E2E Chromium e WebKit | 84 testes |
+| No aparelho (API local com o seed do roteiro, só dados fictícios) | Android (Pixel 3a, 393 e 360 dp): o app abre, entra e abre a ficha. Os alvos da lista e do cabeçalho da ficha têm 48 dp ("Conta" 85×48, "Sair" 71×48). iOS (iPhone SE): o app abre e mostra o login. O Info.plist tem `CFBundleLocalizations` pt-BR, e o bundle de textos do React Native tem `pt.lproj` |
 | Build nativo (local, como nos jobs do CI) | Android: `assembleDebug` em 1min47s; iOS: `xcodebuild` Debug para o simulador em 32 min (primeiro build, Pods do zero). Nos dois, compilou o módulo `http-cache` do P02 |
 
 **Fica para depois da integração local:**
 
 - **Os jobs nativos do CI** no primeiro PR: tempo e runner `macos-26`.
-- **As conferências ⚙ da seção 7:**
+- **As conferências ⚙ da seção 7 que dependem de ouvir o leitor de tela:**
   - VoiceOver em pt-BR e "aba N de M";
   - TalkBack nos −/+;
-  - cabeçalho a 48 dp no Android;
   - QAA-02 no simulador.
-- **Os fluxos Maestro `08` e `09`:** o Maestro não está instalado nesta máquina, então vão para o roteiro manual antes do release.
+
+  O cabeçalho a 48 dp foi conferido no emulador. A 360 dp, o cabeçalho da ficha transborda ("Experiência" sai pela borda), como já acontecia antes da onda: é o T-11, do P08. Os 48 dp ficam.
+- **Os fluxos Maestro `08` e `09`:** o Maestro não está instalado, e a instalação nesta sessão foi negada, então vão para o roteiro manual antes do release.
 - **Os pontos para o PO da seção 6:** continuam sem decisão.
