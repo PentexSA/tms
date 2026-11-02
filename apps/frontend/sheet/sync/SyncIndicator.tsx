@@ -55,8 +55,9 @@ export function SyncIndicator({
 }) {
   const { colors } = useTheme()
   const { state, text } = describeSync(useSyncStatus(), useOnline(), unsaved)
-  // T-11: no celular, o texto quebra em até 2 linhas ("2 alterações / não
-  // salvas") numa largura fixa, e o cabeçalho cabe na tela
+  // T-11: no celular, o texto quebra em linhas ("2 alterações / não
+  // salvas") numa largura fixa, e o cabeçalho cabe na tela. Sem cortar: o
+  // erro com rascunho ("… · 2 alterações não salvas") não perde a contagem
   const compact = useLayout().breakpoint === 'compact'
   const dot = {
     unsaved: colors.action,
@@ -79,12 +80,7 @@ export function SyncIndicator({
       ]}
     >
       <View style={[styles.dot, { backgroundColor: dot }]} />
-      <Text
-        variant="caption"
-        color="inkMuted"
-        numberOfLines={compact ? 2 : undefined}
-        style={styles.text}
-      >
+      <Text variant="caption" color="inkMuted" style={styles.text}>
         {text}
       </Text>
     </View>

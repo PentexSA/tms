@@ -373,12 +373,14 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(inScroll()).toBeNull()
   })
 
-  it('no celular, o "N alterações não salvas" quebra em 2 linhas numa largura fixa', async () => {
+  it('no celular, o texto da sincronização quebra numa largura fixa, sem cortar', async () => {
     resize(PHONE)
     await openSheet(['owner'], 'creating')
     const sync = screen.getByTestId(/^sync-/)
     expect(StyleSheet.flatten(sync.props.style).maxWidth).toBe(112)
-    expect(within(sync).getByText(/^Salvo|alteraç/).props.numberOfLines).toBe(2)
+    expect(
+      within(sync).getByText(/^Salvo|alteraç/).props.numberOfLines
+    ).toBeUndefined()
   })
 })
 

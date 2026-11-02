@@ -547,7 +547,7 @@ Estado de salvamento no header.
 - **API RN:** `type SyncState = 'saved' | 'saving' | 'offline' | 'error'`; `{ state: SyncState; pending?: number; onPress(): void }`.
 - **Estados:** os quatro acima.
 - **A11y:** `aria-label` por extenso ("Sem conexão. 3 alterações serão enviadas quando a conexão voltar."); forma do ponto + texto, nunca só cor. Anunciar a passagem para offline ou erro: proposta.
-- **No celular (RN, T-11):** até 112 de largura e 2 linhas ("2 alterações / não salvas"); o texto não muda.
+- **No celular (RN, T-11):** até 112 de largura, com o texto quebrando em linhas ("2 alterações / não salvas"), sem cortar: o erro com rascunho mantém a contagem. O texto não muda.
 - **Multi-sistema:** o evento é por caminho (`{ id, from, to }`) e não depende do tipo: pips, PV, %, texto e listas usam a mesma fila.
 - **Resolve:** C-08, DS-04.
 
