@@ -150,6 +150,28 @@ describe('narrador', () => {
     )
   })
 
+  it('mostra a data civil em pt-BR e a reenvia como chegou (T-16)', async () => {
+    chronicle.sessionsGet.mockResolvedValue(ok({ items: [session] }))
+    chronicle.sessionPatch.mockResolvedValue(ok({ ...session, revision: 3 }))
+    renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
+    expect(await screen.findByText('20/10/2026')).toBeTruthy()
+    expect(screen.queryByText('2026-10-20')).toBeNull()
+
+    fireEvent.press(screen.getByRole('button', { name: 'Editar' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar sessão' }))
+    await waitFor(() => expect(chronicle.sessionPatch).toHaveBeenCalled())
+    expect(bodyOf(chronicle.sessionPatch).date).toBe('2026-10-20')
+  })
+
+  it('omite a data fora do formato civil, sem inventar outra (T-16)', async () => {
+    chronicle.sessionsGet.mockResolvedValue(
+      ok({ items: [{ ...session, date: 'Sat Oct 31 2026' }] })
+    )
+    renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
+    expect(await screen.findByText(session.title)).toBeTruthy()
+    expect(screen.queryByText(/Oct/)).toBeNull()
+  })
+
   it('cancelar a edição não envia nada; erro aparece no formulário', async () => {
     chronicle.sessionsGet.mockResolvedValue(
       ok({ items: [{ ...session, summary: '', privateNotes: undefined }] })

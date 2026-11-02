@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
+import { civilDate } from '../../lib/format'
 import {
   useAcceptTransfer,
   useCancelTransfer,
@@ -147,7 +148,7 @@ function SessionEntry({
       <ListItem
         title={session.title}
         subtitle={session.summary || 'Sem resumo público.'}
-        meta={String(session.date)}
+        meta={civilDate(session.date) ?? undefined}
         trailing={
           narrating ? (
             <Button
@@ -195,7 +196,8 @@ function SessionEntry({
               {
                 clientCommandId: (key.current ??= randomUUID()),
                 revision: session.revision,
-                date: String(session.date),
+                // A data civil volta como chegou (AAAA-MM-DD), sem Date
+                date: session.date,
                 title,
                 summary,
                 privateNotes: notes,
