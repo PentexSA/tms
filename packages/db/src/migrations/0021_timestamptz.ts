@@ -18,8 +18,14 @@ import { logger } from '../logger'
 //
 // O fuso do processo não está no banco: vem de TMS_LEGACY_APP_TZ (o fuso em
 // que rodava a API que gravou os dados). Sem ela, vale o fuso do processo que
-// roda a migration, que em dev é a mesma máquina da API e no CI é UTC. A
-// migration loga os dois fusos usados, sem dado de usuário.
+// roda a migration. Isso é o certo onde a migration roda hoje:
+// - deploy (deploy/render/start.sh): no mesmo container da API, logo antes
+//   de subi-la, com o mesmo fuso (o Dockerfile não define TZ: UTC);
+// - dev (scripts/backend.sh, pnpm db:migrate): na mesma máquina da API;
+// - CI e testes: UTC.
+// Quem rodar a migration fora da máquina ou do container da API que gravou os
+// dados define TMS_LEGACY_APP_TZ. A migration loga os dois fusos usados, sem
+// dado de usuário.
 
 const DEFAULT_ONLY = [
   ['users', 'created_at'],

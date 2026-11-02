@@ -344,7 +344,11 @@ describe('GET /systems/:code/template', () => {
       'GET',
       '/systems/vtm-v20/template?version=1.8.0'
     )
-    expect(res.headers.get('cache-control')).toContain('immutable')
+    // Exceção ao no-store do T-13: o template não tem dado de usuário, e a
+    // versão publicada é imutável. Nunca public
+    expect(res.headers.get('cache-control')).toBe(
+      'private, max-age=31536000, immutable'
+    )
     const again = await ctx.app.handle(
       new Request('http://localhost/systems/vtm-v20/template?version=1.8.0', {
         headers: { ...player.headers, 'if-none-match': '"vtm-v20@1.8.0"' },
