@@ -2,7 +2,7 @@ import type { CompiledGroup, CompiledSection } from '@tms/sheet-core'
 import { Tabs, tabPanelProps, tokens, useLayout } from '@tms/ui'
 import { type ReactNode, useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useGroupTabsContext } from './groupTabsState'
+import { useGroupTabsContext, useSelectedGroup } from './groupTabsState'
 
 // `groupTabs` no template: no celular, os grupos da seção viram abas e só um
 // aparece por vez (Físicos | Sociais | Mentais). Quem chama diz quando: no
@@ -42,7 +42,9 @@ export function useGroupTabs(
     groups.length > 1
   const tabsId = `groups-${section.id}`
   const inStrip = on && shared?.strip === true
-  const register = shared?.register
+  const store = shared?.store
+  const chosen = useSelectedGroup(store, section.id)
+  const register = store?.register
   const title = section.def.title
   useEffect(() => {
     if (!inStrip || !register) return
@@ -50,7 +52,7 @@ export function useGroupTabs(
   }, [inStrip, register, section.id, title, tabsId, groups])
   if (!on)
     return { bar: null, groups, panelProps: {}, tabbed: false, inStrip: false }
-  const tab = shared ? (shared.selected[section.id] ?? '') : local
+  const tab = store ? (chosen ?? '') : local
   const active = groups.find(g => g.id === tab) ?? groups[0]
   const bar = inStrip ? null : (
     <GroupTabsBar
@@ -58,7 +60,7 @@ export function useGroupTabs(
       title={title}
       groups={groups}
       selected={active?.id ?? ''}
-      onSelect={id => (shared ? shared.select(section.id, id) : setLocal(id))}
+      onSelect={id => (store ? store.select(section.id, id) : setLocal(id))}
     />
   )
   return {

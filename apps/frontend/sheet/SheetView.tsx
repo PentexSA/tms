@@ -270,7 +270,7 @@ function SheetBody({
       <View
         key="panel"
         testID="sheet-panel"
-        onLayout={e => groupTabs.panelAt(e.nativeEvent.layout.y)}
+        onLayout={e => groupTabs.store.panelAt(e.nativeEvent.layout.y)}
       >
         {paneled && shownTab !== undefined ? (
           <TabPanel tabsId="sheet-parts" tab={shownTab}>
@@ -310,7 +310,7 @@ function SheetBody({
             scrollEventThrottle={16}
             onScroll={
               phone
-                ? e => groupTabs.scrolled(e.nativeEvent.contentOffset.y)
+                ? e => groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
                 : undefined
             }
           >

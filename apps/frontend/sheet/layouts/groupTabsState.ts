@@ -1,12 +1,10 @@
 import type { CompiledGroup } from '@tms/sheet-core'
 import {
   createContext,
-  useCallback,
   useContext,
   useMemo,
-  useReducer,
-  useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 
 // A escolha das sub-abas por ficha e a seção que está no topo da tela
@@ -16,6 +14,10 @@ import {
 // nas Habilidades. As seções continuam filtrando o corpo pelo grupo
 // escolhido. Sem provedor (prévias e testes), cada seção guarda a própria
 // aba, como antes.
+//
+// O estado mora num store pequeno, fora do React: rolar a ficha e trocar a
+// seção atual re-renderizam só a faixa, e trocar a sub-aba, só a seção dela
+// e a faixa. A ficha inteira não re-renderiza a cada rolagem.
 
 /** Uma seção com sub-abas ativas, que a faixa pode mostrar. */
 export interface StripSection {
@@ -26,16 +28,10 @@ export interface StripSection {
   readonly groups: readonly CompiledGroup[]
 }
 
-export interface GroupTabsState {
-  /** A faixa fixa desenha as sub-abas: o corpo não desenha a barra. */
-  readonly strip: boolean
-  /** O grupo escolhido por seção. */
-  readonly selected: Readonly<Record<string, string>>
-  readonly select: (sectionId: string, groupId: string) => void
-  /** A seção com sub-abas que está no topo da tela (ou a primeira). */
-  readonly current: StripSection | null
+export interface GroupTabsStore {
   /** Uma seção com sub-abas ativas entra na faixa; devolve a saída. */
   readonly register: (section: StripSection) => () => void
+  readonly select: (sectionId: string, groupId: string) => void
   /** O `y` da seção dentro do painel da zona (onLayout). */
   readonly sectionAt: (sectionId: string, y: number) => void
   /** O `y` do painel da zona dentro da rolagem. */
@@ -44,9 +40,20 @@ export interface GroupTabsState {
   readonly navHeight: (height: number) => void
   /** A posição da rolagem. */
   readonly scrolled: (y: number) => void
+  readonly subscribe: (listener: () => void) => () => void
+  /** O grupo escolhido na seção (sem escolha, o primeiro). */
+  readonly selected: (sectionId: string) => string | undefined
+  /** A seção com sub-abas que está no topo da tela (ou a primeira). */
+  readonly current: () => StripSection | null
 }
 
-export const GroupTabsContext = createContext<GroupTabsState | null>(null)
+export interface GroupTabsShared {
+  /** A faixa fixa desenha as sub-abas: o corpo não desenha a barra. */
+  readonly strip: boolean
+  readonly store: GroupTabsStore
+}
+
+export const GroupTabsContext = createContext<GroupTabsShared | null>(null)
 
 export const useGroupTabsContext = () => useContext(GroupTabsContext)
 
@@ -64,98 +71,97 @@ export function currentSection(
   return at
 }
 
-/** O estado do contexto, para o SheetView prover. */
-export function useGroupTabsState(strip: boolean): GroupTabsState {
-  const [selected, setSelected] = useState<Record<string, string>>({})
-  const [currentId, setCurrentId] = useState<string | null>(null)
-  // As seções registradas mudam a faixa; posições e rolagem, não: só a
-  // conta da seção atual as lê
-  const sections = useRef(new Map<string, StripSection>())
-  const [, changed] = useReducer((n: number) => n + 1, 0)
-  const ys = useRef(new Map<string, number>())
-  const panel = useRef(0)
-  const nav = useRef(0)
-  const scroll = useRef(0)
-
-  const recompute = useCallback(() => {
-    const list = [...sections.current.keys()].map(id => ({
+export function createGroupTabsStore(): GroupTabsStore {
+  const sections = new Map<string, StripSection>()
+  const chosen = new Map<string, string>()
+  const ys = new Map<string, number>()
+  const listeners = new Set<() => void>()
+  let panel = 0
+  let nav = 0
+  let scroll = 0
+  let currentId: string | null = null
+  const notify = () => {
+    for (const listener of listeners) listener()
+  }
+  const recompute = () => {
+    const list = [...sections.keys()].map(id => ({
       id,
-      y: panel.current + (ys.current.get(id) ?? Number.POSITIVE_INFINITY),
+      y: panel + (ys.get(id) ?? Number.POSITIVE_INFINITY),
     }))
-    setCurrentId(currentSection(list, scroll.current + nav.current))
-  }, [])
-
-  const register = useCallback(
-    (section: StripSection) => {
-      sections.current.set(section.id, section)
-      changed()
+    const next = currentSection(list, scroll + nav)
+    if (next === currentId) return false
+    currentId = next
+    return true
+  }
+  return {
+    register(section) {
+      sections.set(section.id, section)
       recompute()
+      notify()
       return () => {
-        if (sections.current.get(section.id) !== section) return
-        sections.current.delete(section.id)
-        changed()
+        if (sections.get(section.id) !== section) return
+        sections.delete(section.id)
         recompute()
+        notify()
       }
     },
-    [recompute]
-  )
-  const select = useCallback((sectionId: string, groupId: string) => {
-    setSelected(s =>
-      s[sectionId] === groupId ? s : { ...s, [sectionId]: groupId }
-    )
-  }, [])
-  const sectionAt = useCallback(
-    (sectionId: string, y: number) => {
-      ys.current.set(sectionId, y)
-      recompute()
+    select(sectionId, groupId) {
+      if (chosen.get(sectionId) === groupId) return
+      chosen.set(sectionId, groupId)
+      notify()
     },
-    [recompute]
-  )
-  const panelAt = useCallback(
-    (y: number) => {
-      panel.current = y
-      recompute()
+    sectionAt(sectionId, y) {
+      ys.set(sectionId, y)
+      if (recompute()) notify()
     },
-    [recompute]
-  )
-  const navHeight = useCallback(
-    (height: number) => {
-      nav.current = height
-      recompute()
+    panelAt(y) {
+      panel = y
+      if (recompute()) notify()
     },
-    [recompute]
-  )
-  const scrolled = useCallback(
-    (y: number) => {
-      scroll.current = y
-      recompute()
+    navHeight(height) {
+      nav = height
+      if (recompute()) notify()
     },
-    [recompute]
-  )
+    scrolled(y) {
+      scroll = y
+      if (recompute()) notify()
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    selected: sectionId => chosen.get(sectionId),
+    current: () => (currentId ? (sections.get(currentId) ?? null) : null),
+  }
+}
 
-  const current = currentId ? (sections.current.get(currentId) ?? null) : null
-  return useMemo(
-    () => ({
-      strip,
-      selected,
-      select,
-      current,
-      register,
-      sectionAt,
-      panelAt,
-      navHeight,
-      scrolled,
-    }),
-    [
-      strip,
-      selected,
-      select,
-      current,
-      register,
-      sectionAt,
-      panelAt,
-      navHeight,
-      scrolled,
-    ]
+/** O valor do contexto, para o SheetView prover: o store é um por ficha. */
+export function useGroupTabsState(strip: boolean): GroupTabsShared {
+  const [store] = useState(createGroupTabsStore)
+  return useMemo(() => ({ strip, store }), [strip, store])
+}
+
+const noSubscribe = () => () => undefined
+
+/** O grupo escolhido numa seção; re-renderiza só quando ele muda. */
+export function useSelectedGroup(
+  store: GroupTabsStore | null | undefined,
+  sectionId: string | undefined
+): string | undefined {
+  return useSyncExternalStore(
+    store?.subscribe ?? noSubscribe,
+    () => (store && sectionId ? store.selected(sectionId) : undefined),
+    () => undefined
+  )
+}
+
+/** A seção da faixa; re-renderiza só quando ela muda. */
+export function useCurrentStripSection(
+  store: GroupTabsStore | null | undefined
+): StripSection | null {
+  return useSyncExternalStore(
+    store?.subscribe ?? noSubscribe,
+    () => store?.current() ?? null,
+    () => null
   )
 }

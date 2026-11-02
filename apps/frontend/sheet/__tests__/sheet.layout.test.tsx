@@ -25,7 +25,7 @@ import {
 import { CharacterForm } from '../CharacterForm'
 import { SheetProvider } from '../context'
 import { identityColumnsPerRow } from '../IdentityBlock'
-import { currentSection } from '../layouts/groupTabsState'
+import { createGroupTabsStore, currentSection } from '../layouts/groupTabsState'
 import { SectionView } from '../SectionView'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
@@ -556,6 +556,49 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
     expect(nav().queryByLabelText(/^Grupos de/)).toBeNull()
     expect(screen.queryByTestId('group-tabs-attributes')).toBeNull()
+  })
+})
+
+describe('groupTabsState: o store avisa só o que mudou', () => {
+  const groups = vtm.zones
+    .flatMap(z => z.sections)
+    .find(s => s.id === 'attributes')!.groups!
+  const section = (id: string) => ({
+    id,
+    title: id,
+    tabsId: `groups-${id}`,
+    groups,
+  })
+
+  it('rolar sem trocar de seção não avisa ninguém; trocar avisa uma vez', () => {
+    const store = createGroupTabsStore()
+    const listener = jest.fn()
+    store.subscribe(listener)
+    const leave = store.register(section('attributes'))
+    store.register(section('abilities'))
+    expect(store.current()?.id).toBe('attributes')
+    store.panelAt(600)
+    store.navHeight(120)
+    store.sectionAt('attributes', 0)
+    store.sectionAt('abilities', 900)
+    listener.mockClear()
+    for (const y of [10, 200, 800]) store.scrolled(y)
+    expect(listener).not.toHaveBeenCalled()
+    store.scrolled(1450)
+    expect(store.current()?.id).toBe('abilities')
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    // A escolha é por seção, e repetir a mesma não avisa
+    store.select('abilities', 'skills')
+    store.select('abilities', 'skills')
+    expect(listener).toHaveBeenCalledTimes(2)
+    expect(store.selected('abilities')).toBe('skills')
+    expect(store.selected('attributes')).toBeUndefined()
+
+    // A seção que sai da faixa: a outra assume; a saída repetida não faz nada
+    leave()
+    leave()
+    expect(store.current()?.id).toBe('abilities')
   })
 })
 

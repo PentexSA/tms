@@ -2,7 +2,11 @@ import { Tabs, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { CreationCounter } from './creation/CreationCounter'
 import { GroupTabsBar } from './layouts/groupTabs'
-import { useGroupTabsContext } from './layouts/groupTabsState'
+import {
+  useCurrentStripSection,
+  useGroupTabsContext,
+  useSelectedGroup,
+} from './layouts/groupTabsState'
 
 // A faixa de navegação fixa da ficha (T-27, parte 2; DS: SectionTabs). Fica
 // presa no topo da rolagem (stickyHeaderIndices): as abas da zona ("Partes
@@ -25,15 +29,17 @@ export function SheetNav({
 }) {
   const { colors } = useTheme()
   const shared = useGroupTabsContext()
-  const current = shared?.strip ? shared.current : null
+  const store = shared?.store
+  const strip = useCurrentStripSection(store)
+  const current = shared?.strip ? strip : null
+  const chosen = useSelectedGroup(store, current?.id)
   const active = current
-    ? (current.groups.find(g => g.id === shared?.selected[current.id]) ??
-      current.groups[0])
+    ? (current.groups.find(g => g.id === chosen) ?? current.groups[0])
     : undefined
   return (
     <View
       testID="sheet-nav"
-      onLayout={e => shared?.navHeight(e.nativeEvent.layout.height)}
+      onLayout={e => store?.navHeight(e.nativeEvent.layout.height)}
       style={[
         styles.nav,
         { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle },
@@ -55,7 +61,7 @@ export function SheetNav({
             title={current.title}
             groups={current.groups}
             selected={active.id}
-            onSelect={id => shared?.select(current.id, id)}
+            onSelect={id => store?.select(current.id, id)}
           />
           <CreationCounter fieldIds={active.fieldIds} line />
         </View>

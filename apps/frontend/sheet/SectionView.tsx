@@ -30,7 +30,7 @@ export function SectionView({
       testID={`section-${section.id}`}
       onLayout={
         reportsPlace
-          ? e => shared.sectionAt(section.id, e.nativeEvent.layout.y)
+          ? e => shared.store.sectionAt(section.id, e.nativeEvent.layout.y)
           : undefined
       }
     >
