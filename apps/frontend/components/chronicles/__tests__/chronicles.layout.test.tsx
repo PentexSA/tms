@@ -9,6 +9,7 @@ import { renderWithQueryClient } from '../../../test/utils'
 import { CampaignBackstage } from '../CampaignBackstage'
 import { RollFeed } from '../RollFeed'
 import { TableRow } from '../TableRow'
+import { tableColumns } from '../TableView'
 import { buildItem } from '../tableItems'
 
 // P08 (onda 2), T-67: os títulos dos Bastidores e da Mesa ficam com a
@@ -112,6 +113,18 @@ describe('T-48: cartão da Mesa', () => {
         'Em criação'
       )
     ).toBeTruthy()
+  })
+
+  it('a grade: 1 coluna a 390, 2 a 750, 3 a 1280; fonte grande, 1', () => {
+    expect(tableColumns(390, false)).toBe(1)
+    expect(tableColumns(750, false)).toBe(2)
+    expect(tableColumns(1024, false)).toBe(2)
+    expect(tableColumns(1280, false)).toBe(3)
+    // A largura do conteúdo para em 1200: nunca mais de 3
+    expect(tableColumns(2560, false)).toBe(3)
+    // Fonte ≥ 130% ou tela estreita: uma coluna
+    expect(tableColumns(1280, true)).toBe(1)
+    expect(tableColumns(320, false)).toBe(1)
   })
 
   it('na grade, o cartão tem borda e raio; na coluna, o separador', () => {

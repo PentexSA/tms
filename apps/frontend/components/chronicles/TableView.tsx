@@ -1,8 +1,24 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
-import { Button, Chip, Skeleton, TabPanel, Tabs, Text, tokens } from '@tms/ui'
+import {
+  Button,
+  Chip,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  Text,
+  tokens,
+  useLayout,
+} from '@tms/ui'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
@@ -37,6 +53,63 @@ import { GrantXpSheet, grantable, XpRequestsSheet } from './XpSheets'
 // arquivadas e fora de jogo vêm pelo filtro, do servidor.
 
 export type { TableRowData } from './tableItems'
+
+// T-48 (P09-C): a Mesa em grade nas telas largas. Cada cartão pede ~340 de
+// largura; até 3 colunas, na largura do conteúdo (limitada a 1200 pelo
+// Screen), menos as margens. Com fonte grande ou tela estreita (`stacked`),
+// uma coluna.
+export const TABLE_CARD_MIN = 340
+export const TABLE_COLUMNS_MAX = 3
+
+export function tableColumns(width: number, stacked: boolean): number {
+  if (stacked) return 1
+  const usable =
+    Math.min(width, tokens.layout.contentMaxExpanded) - 2 * tokens.layout.gutter
+  return Math.max(
+    1,
+    Math.min(TABLE_COLUMNS_MAX, Math.floor(usable / TABLE_CARD_MIN))
+  )
+}
+
+/**
+ * As linhas da grade, na ordem da lista: a leitura e o Tab seguem linha a
+ * linha. A última linha completa com espaços vazios, para os cartões terem a
+ * mesma largura.
+ */
+function TableGrid({
+  items,
+  columns,
+  renderItem,
+}: {
+  readonly items: readonly TableItem[]
+  readonly columns: number
+  readonly renderItem: (item: TableItem, framed: boolean) => ReactNode
+}) {
+  if (columns <= 1) return <>{items.map(i => renderItem(i, false))}</>
+  const rows: TableItem[][] = []
+  for (let i = 0; i < items.length; i += columns)
+    rows.push(items.slice(i, i + columns))
+  return (
+    <View style={styles.grid} testID="table-grid">
+      {rows.map((row, r) => (
+        <View
+          key={row[0]?.row.id ?? r}
+          style={styles.gridRow}
+          testID={`table-grid-row-${r}`}
+        >
+          {row.map(item => (
+            <View key={item.row.id} style={styles.cell}>
+              {renderItem(item, true)}
+            </View>
+          ))}
+          {Array.from({ length: columns - row.length }, (_, k) => (
+            <View key={`empty-${k}`} style={styles.cell} />
+          ))}
+        </View>
+      ))}
+    </View>
+  )
+}
 
 // Fora do componente: com a mesma função, o TanStack não refaz o array
 const dataOf = (results: readonly { readonly data: unknown }[]) =>
@@ -122,6 +195,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [sort, setSort] = useState<TableSort>('name')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
   const online = useOnline()
+  const { width, stacked } = useLayout()
+  const columns = tableColumns(width, stacked)
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [operation, setOperation] = useState<{
@@ -296,16 +371,21 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 : 'Nenhuma ficha na crônica ainda.'}
           </Text>
         ) : (
-          shown.map(item => (
-            <TableRow
-              key={item.row.id}
-              item={item}
-              onOpen={open}
-              selecting={selecting}
-              selected={selected.has(item.row.id)}
-              onSelect={select}
-            />
-          ))
+          <TableGrid
+            items={shown}
+            columns={columns}
+            renderItem={(item, framed) => (
+              <TableRow
+                key={item.row.id}
+                item={item}
+                onOpen={open}
+                selecting={selecting}
+                selected={selected.has(item.row.id)}
+                onSelect={select}
+                framed={framed}
+              />
+            )}
+          />
         )}
       </TabPanel>
       {xpSheet === 'grant' ? (
@@ -347,4 +427,11 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
     gap: tokens.space[2],
   },
+  grid: {
+    gap: tokens.space[3],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingVertical: tokens.space[2],
+  },
+  gridRow: { flexDirection: 'row', gap: tokens.space[3] },
+  cell: { flex: 1, minWidth: 0 },
 })

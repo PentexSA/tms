@@ -1,6 +1,13 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { Dimensions } from 'react-native'
 
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
@@ -276,6 +283,46 @@ describe('Mesa do narrador', () => {
       expect(calls.chronicle.tableGet.mock.calls.length).toBe(before + 1)
     )
     jest.mocked(useFocusEffect).mockReset()
+  })
+
+  // T-48 (P09-C): a Mesa em grade nas telas largas, na ordem da lista
+  it('a 1280, a Mesa vira uma grade de 3 colunas, linha a linha', async () => {
+    const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
+    const before = Dimensions.get('window')
+    Dimensions.set({ window: DESKTOP, screen: DESKTOP })
+    try {
+      const ids = [HELENA, LIA, '00000000-0000-4000-8000-00000000c003']
+      calls.chronicle.tableGet.mockResolvedValue(
+        ok([
+          row(ids[0] as string, 'helena', 'vtm-v20'),
+          row(ids[1] as string, 'lia', 'dnd5e-2014'),
+          row(ids[2] as string, 'helena', 'vtm-v20', { name: 'Zélia' }),
+        ])
+      )
+      await openTable()
+      const first = await screen.findByTestId('table-grid-row-0')
+      for (const id of ids)
+        expect(within(first).getByTestId(`table-row-${id}`)).toBeTruthy()
+      expect(screen.queryByTestId('table-grid-row-1')).toBeNull()
+    } finally {
+      Dimensions.set({ window: before, screen: before })
+    }
+  })
+
+  it('a 390, uma coluna, sem grade', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([row(HELENA, 'helena', 'vtm-v20'), row(LIA, 'lia', 'dnd5e-2014')])
+    )
+    const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
+    const before = Dimensions.get('window')
+    Dimensions.set({ window: PHONE, screen: PHONE })
+    try {
+      await openTable()
+      expect(await screen.findByTestId(`table-row-${LIA}`)).toBeTruthy()
+      expect(screen.queryByTestId('table-grid')).toBeNull()
+    } finally {
+      Dimensions.set({ window: before, screen: before })
+    }
   })
 
   it('a aba Fichas continua com as fichas e o convite', async () => {
