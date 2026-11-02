@@ -399,10 +399,24 @@ Implementado nos commits 1 a 6 da seção 8.1, em paralelo com o P05-C. As pergu
   - o texto livre igual a um item da ficha continua entrando (o botão já fazia isso antes da onda; não existe regra de nome repetido no template). Fica como nota para o P07-D.
 - **`GroupBlock`:** fica como componente, para o diff do `GroupsLayout` não reindentar o trecho das colunas do P08.
 
-**Depende do P05-C** (rebase depois do merge dele, como na seção 3.1):
+**Depois do P05-C** (merge da onda `fa8ecfa` na branch, `6d7932a`):
 
-- trocar o `useState` da frase nas duas folhas pelo `useDraftNotice('values.<lista>')` e o `DraftNoticeText`, e chamar o `clearNotice()` no `patch`, ao cancelar a remoção e ao fechar;
-- o anúncio passa a ser o do P05-C (pergunta 5);
-- o commit 7 (opcional): o "+" do Valor no `ItemSheet` com o `useStepAdvice('values.<lista>#<item>')` e o `Stepper.increase`.
+- **Merge:** um conflito, em `apps/api/src/__tests__/creation.test.ts`: os casos das listas do P07-C e o `describe` "o servidor recusa o que o app só sinaliza" do P05-C ficam juntos em `/events: avaliação parcial`. O `CreationCounter.tsx` mesclou sozinho. No `advantages.test.tsx`, a busca da frase passa a `/bônus/i`, porque o T-57 do P05-C reescreveu o texto ("Faltaria 1 de bônus: custa 1, restam 0.").
+- **T-19 pelo aviso do store** (`ab7fc22`):
+  - as folhas leem o `useDraftNotice('values.<lista>')` e desenham o `DraftNoticeText` dentro da folha. A folha guarda só onde foi o toque: embaixo da opção ou do botão do texto livre, acima do "Aplicar" ou sob "Remover X?";
+  - recusado pelo Enter, o texto do aviso vai como `error` do próprio campo, marcado inválido e ligado à frase;
+  - o `clearNotice()` roda no `patch`, ao cancelar a remoção, ao trocar a busca e ao fechar, e só quando o aviso é desta lista: o aviso de uma linha de Atributo continua;
+  - a dica do Enter (sugestões à vista, nome já na ficha) fica como `error` local do campo, porque não é recusa da conta;
+  - o anúncio é o do P05-C: `role="alert"` com `key` por aviso, sem o `announceForAccessibility` que o pacote usava antes.
+- **Commit 7** (`d971b44`): o "+" do Valor no `ItemSheet` usa o `useStepAdvice('values.<lista>#<item>')` e o `Stepper.increase`, com o motivo ou o custo escrito sob o Valor. O contrato do P05-C serve sem mudar o core, com um limite: a previsão é do valor que o store tem. Com o Valor já mudado na folha, ela sai, e o toque decide. Item sem Valor (Dons do W20) não tem previsão.
+- **`/code-review` (nível medium) do merge e dos dois commits:** 6 achados.
+  - **Corrigidos (4):**
+    - a previsão em item sem Valor;
+    - o `clearNotice()` apagava o aviso de outra linha;
+    - o "+" sem `aria-describedby` para o aviso aberto;
+    - a recusa do Enter fora do `error` do campo.
+  - **Não corrigidos (2):**
+    - a lógica repetida com o `useRowFeedback`: juntar as duas mexeria no arquivo do P05-C, e o caminho do item não casa com o aviso da lista. Fica para o P07-D;
+    - **o anúncio no app:** sem o `announceForAccessibility`, o aviso depende do `role="alert"`, que o iOS e o Android não falam sozinhos. Vale para as linhas do P05-C também. Conferir no VoiceOver e no TalkBack na integração. Se não falar, o `DraftNoticeText` ganha o anúncio, num lugar só.
 
 **Não rodado no pacote** (portas fixas e aparelho só na integração): o `advantages.spec.ts` (só typecheck) e a conferência da seção 7 no Android, no iOS e no web.
