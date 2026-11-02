@@ -66,8 +66,13 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
   await expect(page.getByRole('alert')).toHaveCount(0)
 
   // T-62 e T-23: Enter adiciona o Defeito, com o Bônus 1 que a folha mostra
+  // Cada folha pelo testID: a anterior ainda sai (animação) quando a
+  // próxima abre, e as duas têm um campo "Nome"
   await page.getByRole('button', { name: 'Adicionar Defeito' }).click()
-  await page.getByRole('textbox', { name: 'Nome', exact: true }).fill('Inimigo')
+  await page
+    .getByTestId('add-sheet-flaws')
+    .getByRole('textbox', { name: 'Nome', exact: true })
+    .fill('Inimigo')
   await page.keyboard.press('Enter')
   await expect(
     page.getByRole('button', { name: /^Inimigo, Bônus 1/ })
@@ -76,6 +81,7 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
   // A Qualidade entra com o Custo 1 do template, paga com bônus
   await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
   await page
+    .getByTestId('add-sheet-merits')
     .getByRole('textbox', { name: 'Nome', exact: true })
     .fill('Ambidestro')
   await page.keyboard.press('Enter')
