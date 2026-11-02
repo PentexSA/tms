@@ -207,7 +207,13 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   const row = st.getByRole('button', { name: /^Helena Varga, Tremere\./ })
   await expect(row).toHaveAccessibleName(/Pontos de Sangue, 13 de 15/)
   await row.click()
+  // T-33 (P09-C): a ficha está em criação livre, e o "Editar como narrador"
+  // abre o Editar; o dano na sessão é no Jogo
   await st.getByRole('button', { name: 'Editar como narrador' }).click()
+  await expect(
+    st.getByRole('radio', { name: 'Editar', exact: true })
+  ).toBeChecked()
+  await st.getByRole('radio', { name: 'Jogo', exact: true }).click()
   await st.getByRole('button', { name: /^Vitalidade: / }).click()
   const hurt = batchSaved(st, id)
   await st.getByRole('button', { name: 'Aumentar Dano contusivo' }).click()
