@@ -61,7 +61,7 @@ export const changesLabel = (n: number): string =>
 export interface ModeBarParts {
   /** O seletor de modo (Leitura · Jogo · Editar). */
   readonly switcher: ReactNode
-  /** A barra de ação do rascunho ("Criação · N alterações" e o botão). */
+  /** A barra de ação do rascunho ("Criação · N alterações" e as ações). */
   readonly actionBar: ReactNode
   /** O resumo antes de salvar (folha). */
   readonly summary: ReactNode
