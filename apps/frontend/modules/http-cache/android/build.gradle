@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.tms.httpcache'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.tmshttpcache"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // OkHttpClientProvider e o OkHttp vêm do React Native (sem versão própria)
+  implementation 'com.facebook.react:react-android'
+}

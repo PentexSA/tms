@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=../../.env run --hot src/server.ts",
+    "dev": "node ../../scripts/check-dev-env.mjs --dist config logger db sheet-core && bun --env-file=../../.env run --hot src/server.ts",
     "build": "bun build src/server.ts --outdir dist --target bun",
     "start": "bun run dist/server.js",
     "lint": "biome check .",
@@ -12,7 +12,7 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
-    "templates:publish": "bun --env-file=../../.env src/scripts/publish-template.cli.ts"
+    "templates:publish": "node ../../scripts/check-dev-env.mjs --dist config logger db sheet-core && bun --env-file=../../.env src/scripts/publish-template.cli.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "1.4.2",

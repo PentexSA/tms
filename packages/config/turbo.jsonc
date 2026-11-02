@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Os testes conferem o .env.example, o docker-compose.yml e a imagem do
+    // Postgres no CI: mudar algum deles invalida o cache dos testes.
+    "test": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/.env.example",
+        "$TURBO_ROOT$/docker-compose.yml",
+        "$TURBO_ROOT$/.github/workflows/ci.yml"
+      ]
+    },
+    "test:coverage": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/.env.example",
+        "$TURBO_ROOT$/docker-compose.yml",
+        "$TURBO_ROOT$/.github/workflows/ci.yml"
+      ]
+    }
+  }
+}

@@ -102,3 +102,30 @@ test('clique duplo em "Criar crônica" cria uma crônica só', async ({
   )
   expect(list.filter(c => c.name === 'Crônica do clique duplo')).toHaveLength(1)
 })
+
+// T-74: "nenhuma transferência" era 404, um erro de recurso no console a cada
+// vez que os Bastidores abriam
+test('abrir os Bastidores sem transferência não gera 4xx de /transfer', async ({
+  page,
+}) => {
+  const context = page.context()
+  const user = await signUp(context, 'narra')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica sem Transferência', systemCode: 'vtm-v20' }
+  )
+  const statuses: number[] = []
+  page.on('response', res => {
+    if (new URL(res.url()).pathname.endsWith('/transfer'))
+      statuses.push(res.status())
+  })
+  await page.goto(`/chronicles/${chronicle.id}`)
+  await page.getByRole('tab', { name: 'Bastidores' }).click()
+  await expect(page.getByText('Diário da crônica')).toBeVisible()
+  await expect(page.getByText('Transferir narração')).toBeVisible()
+  await expect.poll(() => statuses.length).toBeGreaterThan(0)
+  expect(statuses.every(status => status < 400)).toBe(true)
+})

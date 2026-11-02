@@ -35,8 +35,9 @@ export function createFakeApi() {
     ),
     sessionsPost: jest.fn(),
     sessionPatch: jest.fn(),
+    // Sem transferência: 200 com null (T-74)
     transferGet: jest.fn(
-      async (..._args: unknown[]): Promise<unknown> => fail(404)
+      async (..._args: unknown[]): Promise<unknown> => ok(null)
     ),
     transferPost: jest.fn(),
     transferDecision: jest.fn(),

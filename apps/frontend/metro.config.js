@@ -25,4 +25,21 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, 'cjs'],
 }
 
+// S-01: o app roda o mesmo código que o Jest testa. Os pacotes do monorepo
+// vêm do src, sem build e sem dist velho; os mapeamentos andam junto com os
+// do Jest (jest.config.js e @tms/jest-config). Vem antes do withNativeWind,
+// que embrulha este resolver.
+const SOURCE = {
+  '@tms/sheet-core': path.join(
+    workspaceRoot,
+    'packages/sheet-core/src/index.ts'
+  ),
+  '@tms/ui': path.join(workspaceRoot, 'packages/ui/src/index.ts'),
+}
+const upstream = config.resolver.resolveRequest
+config.resolver.resolveRequest = (context, name, platform) =>
+  SOURCE[name]
+    ? { type: 'sourceFile', filePath: SOURCE[name] }
+    : (upstream ?? context.resolveRequest)(context, name, platform)
+
 module.exports = withNativeWind(config, { input: './global.css' })

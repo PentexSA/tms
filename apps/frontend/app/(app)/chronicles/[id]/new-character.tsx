@@ -1,4 +1,13 @@
-import { AppBar, EmptyState, Screen, Skeleton, Text, tokens } from '@tms/ui'
+import {
+  AppBar,
+  Button,
+  EmptyState,
+  Screen,
+  Skeleton,
+  Text,
+  tokens,
+  useToast,
+} from '@tms/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import {
@@ -19,6 +28,7 @@ import {
   type ServerIssue,
 } from '../../../../sheet/CharacterForm'
 import { useCompiled, useLatestTemplate } from '../../../../sheet/data'
+import { UnsupportedTemplate } from '../../../../sheet/UnsupportedTemplate'
 
 const issuesOf = (error: unknown): ServerIssue[] => {
   const value = (error as { value?: { issues?: unknown } } | null)?.value
@@ -32,9 +42,11 @@ export default function NewCharacterScreen() {
   const template = useLatestTemplate(chronicle.data?.system.code)
   const model = useCompiled(template.data)
   const create = useCreateCharacter(id)
+  const toast = useToast()
   // Trava síncrona (T-02): dois toques no mesmo quadro chamam onSubmit duas
   // vezes antes de o `busy` chegar. Só destrava no erro; no sucesso a tela
-  // navega para a ficha nova
+  // navega para a ficha nova. A chave do comando (clientCommandId) fica no
+  // useCreateCharacter, que a troca quando a resposta chega
   const submitting = useRef(false)
   // Guarda de saída (T-56): o formulário preenchido segura voltar, o F5 e o
   // Voltar do Android. Depois de criar, a ida para a ficha passa direto
@@ -52,15 +64,19 @@ export default function NewCharacterScreen() {
       <EmptyState
         title="Não foi possível abrir a criação de ficha"
         message={messageOf(chronicle.error ?? template.error)}
+        actions={
+          <Button
+            title="Tentar de novo"
+            onPress={() => {
+              if (chronicle.isError) chronicle.refetch()
+              if (template.isError) template.refetch()
+            }}
+          />
+        }
       />
     )
-  else if (model === null)
-    body = (
-      <EmptyState
-        title="Atualize o app"
-        message="Este sistema usa uma versão que este app ainda não conhece."
-      />
-    )
+  // L-02: template mais novo que o app; a tela dá a saída
+  else if (model === null) body = <UnsupportedTemplate onBack={back.onPress} />
   else if (!model) body = <Skeleton lines={6} label="Carregando o sistema" />
   else
     body = (
@@ -90,7 +106,11 @@ export default function NewCharacterScreen() {
               // A ficha nova abre no rascunho: na Criação, quando o sistema
               // tem criação por pontos; senão, em Evoluir
               onSuccess: c => {
+                // T-56: a ida para a ficha nova passa pela guarda sem perguntar
                 created.current = true
+                // L-03: a confirmação vem antes de abrir a ficha; mesmo que
+                // ela não abra, a pessoa sabe que a ficha existe
+                toast.show({ message: 'Ficha criada.' })
                 router.replace(
                   `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
                 )
