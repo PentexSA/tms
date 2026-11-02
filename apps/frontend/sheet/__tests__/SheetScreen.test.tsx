@@ -1,9 +1,9 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { effectiveCreationConfig } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
-
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
-import { example, templateJson } from '../../test/fixtures'
+import { example, modelOf, templateJson } from '../../test/fixtures'
 import {
   json,
   memoryStore,
@@ -11,7 +11,7 @@ import {
   testSession,
   tokens,
 } from '../../test/session'
-import { SheetScreen } from '../SheetScreen'
+import { openingMode, SheetScreen } from '../SheetScreen'
 
 jest.mock('../../lib/api', () => {
   const { createFakeApi } = require('../../test/fake-api')
@@ -47,7 +47,8 @@ const character = (sheet = example('helena').sheet) =>
     templateVersion: '1.0.0',
     sheetVersion: 3,
     roles: ['owner'],
-    status: 'creating',
+    // Ficha em uso: a dona abre em Jogo (a em criação abre na montagem, T-05)
+    status: 'active',
     lockedAt: null,
     member: true,
     updatedAt: '2026-10-18T12:00:00Z',
@@ -268,4 +269,147 @@ describe('SheetScreen', () => {
       )
     }
   )
+})
+
+// T-05: a ficha em criação da dona abre na montagem por qualquer entrada
+// (lista, link, recarga), não só logo depois de "Criar ficha"
+describe('modo de abertura (T-05)', () => {
+  const vtm = modelOf('vtm-v20')
+  const creation = (mode: 'points' | 'free', extra = {}) => ({
+    revision: 1,
+    mode,
+    accounting: true,
+    choices: {},
+    config: mode === 'free' ? { mode: 'free' } : {},
+    effective: { ...effectiveCreationConfig(vtm), mode },
+    returned: null,
+    approval: false,
+    ...extra,
+  })
+  const creating = (over: Record<string, unknown> = {}) =>
+    ok({
+      id: ID,
+      name: 'Nova',
+      chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+      owner: { id: 'u1', username: 'dona' },
+      systemCode: 'vtm-v20',
+      templateVersion: '1.0.0',
+      sheetVersion: 1,
+      roles: ['owner'],
+      status: 'creating',
+      lockedAt: null,
+      member: true,
+      updatedAt: '2026-10-18T12:00:00Z',
+      sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+      creation: creation('points'),
+      ...over,
+    })
+  const radio = (name: string) => screen.findByRole('radio', { name }, WAIT)
+
+  it.each([
+    [['owner'], 'creating', true, true, 'create'],
+    [['owner'], 'creating', false, true, 'evolve'],
+    [['owner'], 'creating', true, false, 'play'],
+    [['owner'], 'active', false, true, 'play'],
+    [['owner'], 'pending', true, true, 'play'],
+    [['storyteller'], 'creating', true, true, 'read'],
+    // O NPC do narrador em criação não muda
+    [['owner', 'storyteller'], 'creating', false, true, 'play'],
+  ] as const)(
+    'openingMode(%j, %s, conta %s, escreve %s) = %s',
+    (roles, status, active, writer, expected) => {
+      expect(openingMode({ roles, status, active, writer })).toBe(expected)
+    }
+  )
+
+  it('por pontos, sem ?mode=, abre em Criação', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await radio('Criação')).toBeChecked()
+    expect(screen.getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+  })
+
+  it('na criação livre, sem ?mode=, abre em Editar', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
+  })
+
+  it('pending abre em Leitura, com "Aguardando aprovação"; ex-membro, em Leitura', async () => {
+    calls.characterGet.mockResolvedValue(creating({ status: 'pending' }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { unmount } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(
+      await screen.findByText('Aguardando aprovação', {}, WAIT)
+    ).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: 'Criação' })).toBeNull()
+    unmount()
+    calls.characterGet.mockResolvedValue(creating({ member: false }))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await screen.findByTestId('policy-banner', {}, WAIT)).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: 'Criação' })).toBeNull()
+    expect(screen.queryByText(/^Editando/)).toBeNull()
+  })
+
+  it('devolvida (pending → creating), vai à Criação', async () => {
+    calls.characterGet.mockResolvedValue(creating({ status: 'pending' }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    calls.characterGet.mockResolvedValue(
+      creating({
+        creation: creation('points', {
+          returned: { reason: 'Falta o Clã', at: '2026-11-02T12:00:00Z' },
+        }),
+      })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    expect(await radio('Criação')).toBeChecked()
+  })
+
+  it('liberar a criação livre com 2 alterações em Criação leva a Editar com as 2', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({
+        creation: {
+          ...creation('points'),
+          choices: {
+            priorities: { attributes: ['physical', 'social', 'mental'] },
+          },
+        },
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Criação')).toBeChecked()
+    for (const name of ['Força', 'Destreza'])
+      fireEvent(
+        screen.getByRole('adjustable', { name }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByText('Editando · 2 alterações')).toBeTruthy()
+  })
 })

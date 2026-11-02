@@ -255,6 +255,30 @@ export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
   roles.includes('owner') ? 'play' : 'read'
 
 /**
+ * O modo em que a ficha abre sem pedido na URL (T-05): a ficha em criação da
+ * dona abre na montagem, por qualquer entrada (lista, link, recarga, troca de
+ * estado). Criação quando a conta por pontos vale; Editar na criação livre.
+ * Nos demais casos, o padrão do papel. O narrador não muda, nem no NPC dele.
+ * É UX: o servidor valida cada escrita.
+ */
+export function openingMode(args: {
+  readonly roles: readonly RoleName[]
+  readonly status: string
+  readonly active: boolean
+  readonly writer: boolean
+}): SheetMode {
+  const { roles, status, active, writer } = args
+  if (
+    status === 'creating' &&
+    writer &&
+    roles.includes('owner') &&
+    !roles.includes('storyteller')
+  )
+    return active ? 'create' : 'evolve'
+  return defaultMode(roles)
+}
+
+/**
  * O modo que a política deixa, quando ela tira algum (doc/plano-v3.md, Etapa
  * 6): travada, a ficha fica em Jogo sem nada editável (a rolagem sem custo
  * continua); arquivada, fora de jogo ou de quem saiu, em Leitura. Null: o
@@ -301,17 +325,22 @@ function LiveSheet({
     () => (inputJson ? JSON.parse(inputJson) : null),
     [inputJson]
   )
+  // Só quem escreve algum campo começa num modo de rascunho
+  const writer = useMemo(
+    () => canEditSomething(state.model, new Set(state.roles)),
+    [state.model, state.roles]
+  )
+  const opening = openingMode({ roles: state.roles, status, active, writer })
   const [store] = useState(() => {
-    // Só quem escreve algum campo começa em Evoluir (ficha recém-criada); sem
-    // pedido, o modo padrão do papel
-    const writer = canEditSomething(state.model, new Set(state.roles))
+    // Com pedido de rascunho (ficha recém-criada), o modo de montagem; sem
+    // pedido, o modo de abertura da ficha (T-05)
     const draftMode: SheetMode = active ? 'create' : 'evolve'
     const mode: SheetMode =
       initialMode && isDraftMode(initialMode)
         ? writer
           ? draftMode
           : defaultMode(state.roles)
-        : (initialMode ?? defaultMode(state.roles))
+        : (initialMode ?? opening)
     const created = createSheetStore({
       characterId: id,
       model: state.model,
@@ -360,22 +389,23 @@ function LiveSheet({
     if (!jsonEqual(s.creation, creation)) s.setCreation(creation)
   }, [store, creation])
   // O estado mudou (o narrador travou, arquivou, reativou; a criação foi
-  // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha do
-  // dono volta ao Jogo
+  // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha vai
+  // ao modo de abertura: a montagem, se ainda em criação (T-05); o Jogo, para
+  // a dona da ficha em uso
   useEffect(() => {
     const s = store.getState()
-    let next = forced ?? (s.mode === 'read' ? defaultMode(state.roles) : null)
-    // A criação acabou (ou virou livre): o modo dela não vale mais
-    if (!next && s.mode === 'create' && !active) next = defaultMode(state.roles)
+    let next = forced ?? (s.mode === 'read' ? opening : null)
+    // A criação por pontos acabou (ou virou livre): o modo dela não vale mais
+    if (!next && s.mode === 'create' && !active) next = opening
     // Voltou à criação por pontos com Evoluir aberto: o rascunho continua
-    if (!next && s.mode === 'evolve' && active) {
-      s.setMode('create')
-      return
-    }
+    if (!next && s.mode === 'evolve' && active) next = 'create'
     if (!next || next === s.mode) return
-    if (isDraftMode(s.mode)) s.discardDraft()
+    // Entre modos de rascunho, o rascunho continua (liberar a criação livre
+    // leva da Criação ao Editar sem perder o que não foi salvo)
+    if (isDraftMode(s.mode) && !isDraftMode(next)) s.discardDraft()
+    else if (!isDraftMode(s.mode) && isDraftMode(next)) s.startDraft()
     s.setMode(next)
-  }, [store, forced, state.roles, active])
+  }, [store, forced, opening, active])
   // Rebuscada (foco, conflito): o store confere a versão e valida
   useEffect(() => {
     store.getState().received(sheet, sheetVersion)

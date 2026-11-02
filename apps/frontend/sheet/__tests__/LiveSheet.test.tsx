@@ -354,7 +354,12 @@ describe('rascunho guardado no aparelho', () => {
     const first = await editThree(drafts)
     first.unmount()
     expect(await reopen(drafts)).toBeTruthy()
-    // Pausado até decidir: a abertura em Jogo não apaga o registro
+    // T-05 com o QAA-03 e o IA-04: a ficha em criação já reabre em Editar,
+    // com o rascunho vazio, e a oferta aparece ali. Pausado até decidir: a
+    // abertura não apaga o registro
+    expect(
+      screen.getByRole('radio', { name: 'Editar', hidden: true })
+    ).toBeChecked()
     expect(await saved(drafts)).toBe(3)
     fireEvent.press(screen.getByRole('button', { name: 'Recuperar' }))
     expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()

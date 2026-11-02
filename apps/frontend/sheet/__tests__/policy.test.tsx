@@ -260,7 +260,7 @@ describe('a tela da ficha com o estado', () => {
   )
 
   it('o dono não tem o menu do narrador', async () => {
-    await open(['owner'], 'creating')
+    await open(['owner'], 'active')
     expect(screen.queryByLabelText('Ações do narrador')).toBeNull()
     expect(screen.queryByTestId('policy-banner')).toBeNull()
   })
