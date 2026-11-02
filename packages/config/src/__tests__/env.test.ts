@@ -191,10 +191,59 @@ describe('@tms/config - Environment Configuration', () => {
       expect(config.TRUST_PROXY).toBe(true)
     })
 
+    // T-86: o IP simulado do E2E é outra flag, desligada por padrão, e só
+    // vale com NODE_ENV=test (allowlist)
+    it('should default TEST_CLIENT_IP to false and accept it only with NODE_ENV=test', async () => {
+      delete process.env.TEST_CLIENT_IP
+      expect((await import('../env')).config.TEST_CLIENT_IP).toBe(false)
+      process.env.NODE_ENV = 'test'
+      delete process.env.TRUST_PROXY
+      process.env.TEST_CLIENT_IP = 'true'
+      expect((await import('../env')).config.TEST_CLIENT_IP).toBe(true)
+    })
+
+    // Um deploy que esquece o NODE_ENV cai em development: a flag não liga
+    it.each([
+      ['development', 'development'],
+      ['produção', 'production'],
+      ['NODE_ENV ausente (vira development)', undefined],
+    ])('should reject TEST_CLIENT_IP with %s', async (_, nodeEnv) => {
+      if (nodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = nodeEnv
+      process.env.JWT_SECRET = 'x'.repeat(48)
+      process.env.TEST_CLIENT_IP = 'true'
+      delete process.env.TRUST_PROXY
+      const error = spyOn(console, 'error').mockImplementation(() => undefined)
+      const exit = spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('exit')
+      })
+      try {
+        const { config } = await import('../env')
+        expect(() => config.TEST_CLIENT_IP).toThrow()
+        expect(error).toHaveBeenCalled()
+      } finally {
+        error.mockRestore()
+        exit.mockRestore()
+      }
+    })
+
     it.each([
       ['JWT_SECRET curto', { JWT_SECRET: 'curto' }],
       ['CORS com *', { CORS_ORIGINS: '*' }],
       ['produção sem JWT_SECRET', { NODE_ENV: 'production' }],
+      ['TRUST_PROXY que não é true nem false', { TRUST_PROXY: '1' }],
+      [
+        'TEST_CLIENT_IP em produção',
+        {
+          NODE_ENV: 'production',
+          JWT_SECRET: 'x'.repeat(48),
+          TEST_CLIENT_IP: 'true',
+        },
+      ],
+      [
+        'TEST_CLIENT_IP junto do TRUST_PROXY',
+        { TEST_CLIENT_IP: 'true', TRUST_PROXY: 'true' },
+      ],
     ])('should reject %s', async (_, env) => {
       delete process.env.JWT_SECRET
       Object.assign(process.env, { NODE_ENV: 'test', ...env })

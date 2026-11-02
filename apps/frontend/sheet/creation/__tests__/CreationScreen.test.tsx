@@ -175,6 +175,8 @@ describe('prioridades no grupo', () => {
         },
       })
     )
+    // T-17: a prioridade é gravada na hora; os pontos, só no "Salvar"
+    expect(await screen.findByText('Prioridades salvas')).toBeTruthy()
   })
 
   it('com a prioridade escolhida, o bloco mostra a conta e a escolha marcada', async () => {
@@ -299,5 +301,36 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus'
     )
+  })
+})
+
+// T-31 (nota do QA app às 15:51): o formulário de devolução reaparecia
+// preenchido, porque o painel fica montado fora de `pending`
+describe('devolver para correção', () => {
+  it('depois de devolver, o formulário fecha e o motivo zera', async () => {
+    const pending = character(PRIORITIES) as { data: Record<string, unknown> }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...pending.data, status: 'pending', roles: ['storyteller'] })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    calls.creationReturnPost.mockResolvedValue(ok({}))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    fireEvent.press(await screen.findByTestId('creation-return-open'))
+    fireEvent.changeText(
+      screen.getByTestId('creation-return-reason'),
+      'Falta o Clã'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-return'))
+    })
+    expect(calls.creationReturnPost).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('creation-return-reason')).toBeNull()
+    fireEvent.press(screen.getByTestId('creation-return-open'))
+    expect(screen.getByTestId('creation-return-reason').props.value).toBe('')
   })
 })

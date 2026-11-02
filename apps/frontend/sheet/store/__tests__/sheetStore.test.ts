@@ -1,7 +1,14 @@
 import type { RoleName, SheetData } from '@tms/sheet-core'
 import { clone, example, modelOf, sheetFor } from '../../../test/fixtures'
+import type { DraftRecord } from '../../sync/draftStore'
 import { MAX_PENDING_PER_CHARACTER } from '../../sync/outbox'
-import { createSheetStore, fieldOfIssuePath, MAX_UNDO } from '../sheetStore'
+import { planDraftRestore } from '../draftRestore'
+import {
+  createSheetStore,
+  draftLimit,
+  fieldOfIssuePath,
+  MAX_UNDO,
+} from '../sheetStore'
 
 // Etapa 16: o SheetStore (doc/arquitetura §6.5): otimista, confirmação,
 // rejeição, conflito, Desfazer e o rascunho de Evoluir.
@@ -179,7 +186,7 @@ describe('respostas do servidor', () => {
     const r = s().commit([blood(9, 8)], 'Sangue −1')
     if (!r.ok) throw new Error('commit')
     s().conflicted(r.batch.clientBatchId)
-    expect(s().conflict?.paths).toEqual(['values.blood'])
+    expect(s().conflict?.play?.paths).toEqual(['values.blood'])
     expect(bloodOf(s().values)).toBe(9)
     // A ficha rebuscada: a narradora gastou 3
     expect(
@@ -220,7 +227,10 @@ describe('respostas do servidor', () => {
     s().conflicted(a.batch.clientBatchId)
     s().conflicted(b.batch.clientBatchId)
     s().conflicted('desconhecido')
-    expect(s().conflict?.paths).toEqual(['values.blood', 'values.strength'])
+    expect(s().conflict?.play?.paths).toEqual([
+      'values.blood',
+      'values.strength',
+    ])
   })
 })
 
@@ -517,5 +527,437 @@ describe('Editar (Etapa 18): setDraftValue e o 422', () => {
     ['events.0.path', null],
   ])('o caminho %s marca %s', (path, field) => {
     expect(fieldOfIssuePath(path)).toBe(field)
+  })
+})
+
+// T-03: o rascunho volta do aparelho revalidado com os papéis e a ficha de
+// agora; o que mudou desde então fica marcado, e nada sobrescreve às cegas
+describe('rascunho recuperado do aparelho', () => {
+  const strength = (from: number, to: number) => ({
+    path: 'values.strength',
+    from,
+    to,
+  })
+  const record = (edits: DraftRecord['edits']): DraftRecord => ({
+    v: 1,
+    characterId: ID,
+    templateVersion: model.version,
+    baseVersion: 2,
+    mode: 'evolve',
+    savedAt: Date.now(),
+    edits,
+  })
+
+  it('separa o que entra, o que já está salvo, o que mudou e o que o papel não escreve', () => {
+    const { s } = setup()
+    const plan = planDraftRestore(
+      model,
+      s().values,
+      s().roles,
+      record([
+        // Igual ao `from`: entra como estava
+        { path: 'values.strength', from: 2, to: 3 },
+        // Já salvo (valor atual = `to`): sai em silêncio
+        { path: 'values.dexterity', from: 1, to: 2 },
+        // Mudou desde então (atual 4, nem `from` nem `to`): conflito
+        { path: 'values.occult', from: 2, to: 3 },
+        // O dono não escreve as Notas do Narrador
+        { path: 'values.storytellerNotes', from: null, to: 'x' },
+        // Projeção do extrato de XP: nunca por evento
+        { path: 'values.xpTotal', from: null, to: 99 },
+        // Campo que o template não tem
+        { path: 'values.inexistente', from: null, to: 1 },
+      ])
+    )
+    expect(plan).toEqual({
+      events: [
+        { path: 'values.strength', from: 2, to: 3 },
+        { path: 'values.occult', from: 2, to: 3 },
+      ],
+      conflicts: ['values.occult'],
+      applied: 1,
+      dropped: 3,
+    })
+  })
+
+  it('o que não passa na validação sai; o resto volta', () => {
+    const { s } = setup()
+    const plan = planDraftRestore(
+      model,
+      s().values,
+      s().roles,
+      record([
+        { path: 'values.strength', from: 2, to: 9 },
+        { path: 'values.dexterity', from: 2, to: 3 },
+      ])
+    )
+    expect(plan.events).toEqual([{ path: 'values.dexterity', from: 2, to: 3 }])
+    expect(plan.dropped).toBe(1)
+  })
+
+  it('restoreDraft entra em Editar com o rascunho; o conflito segura o Salvar até escolher', () => {
+    const { s, enqueue } = setup()
+    s().restoreDraft(
+      planDraftRestore(
+        model,
+        s().values,
+        s().roles,
+        record([
+          { path: 'values.strength', from: 2, to: 3 },
+          { path: 'values.occult', from: 2, to: 3 },
+        ])
+      )
+    )
+    expect(s().mode).toBe('evolve')
+    expect(s().draft?.size).toBe(2)
+    expect(s().conflict).toEqual({
+      play: null,
+      draft: { paths: ['values.occult'], origin: 'recovery' },
+    })
+    // A tela mostra o valor do rascunho
+    expect(value(s(), 'occult')?.value).toBe(3)
+    // Com o `from` antigo, o Salvar é recusado (o mesmo aviso do conflito)
+    expect(s().saveDraft('x')).toMatchObject({ ok: false, kind: 'conflict' })
+    expect(enqueue).not.toHaveBeenCalled()
+    // "Ficar com o atual": fica o valor de agora; a entrada sai
+    s().resolveConflict('values.occult', 'theirs')
+    expect(s().conflict).toBeNull()
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.strength', from: 2, to: 3 },
+    ])
+  })
+
+  it('"Usar o meu" no rascunho recuperado fica com o seu valor sobre o de agora', () => {
+    const { s } = setup()
+    s().restoreDraft(
+      planDraftRestore(
+        model,
+        s().values,
+        s().roles,
+        record([{ path: 'values.occult', from: 2, to: 3 }])
+      )
+    )
+    s().resolveConflict('values.occult', 'mine')
+    expect(s().conflict).toBeNull()
+    expect(s().draftEvents()).toEqual([
+      { path: 'values.occult', from: 4, to: 3 },
+    ])
+    expect(s().saveDraft('Ocultismo')).toMatchObject({ ok: true })
+  })
+
+  it('draftExit: salvo leva a Promise do outbox; descartado não', async () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().editDraft([strength(2, 3)])
+    expect(s().draftExit).toBeNull()
+    s().saveDraft('Força')
+    const exit = s().draftExit
+    expect(exit?.kind).toBe('saved')
+    expect(exit?.kind === 'saved' && (await exit.queued)).toBe(true)
+    s().startDraft()
+    s().editDraft([strength(3, 4)])
+    s().discardDraft()
+    expect(s().draftExit).toEqual({ kind: 'discarded' })
+  })
+})
+
+// T-31: um campo em conflito recusava o lote e o aviso culpava os 7;
+// "Reaplicar" sobrescrevia o valor do outro sem mostrá-lo
+describe('conflito por campo no "Salvar"', () => {
+  /** Rascunho de 7 alterações salvo: o lote está no outbox. */
+  function savedSeven() {
+    const ctx = setup()
+    const { s } = ctx
+    s().setMode('evolve')
+    s().startDraft()
+    for (const [path, to] of [
+      ['values.strength', 3],
+      ['values.dexterity', 3],
+      ['values.appearance', 3],
+      ['values.occult', 5],
+      ['values.sire', 'Meerlinda'],
+      ['values.concept', 'Arquivista'],
+      ['values.demeanor', 'Galã'],
+    ] as const)
+      expect(s().setDraftValue(path, to)).toMatchObject({ ok: true })
+    const saved = s().saveDraft('7 alterações')
+    if (!saved?.ok) throw new Error('não salvou')
+    return { ...ctx, batch: saved.batch }
+  }
+  // O narrador mudou o Senhor antes de o lote chegar
+  const withSire = (sire: string) => ({
+    ...example('helena').sheet,
+    values: { ...example('helena').sheet.values, sire },
+  })
+
+  it('as 7 voltam ao rascunho; só o Senhor fica marcado e segura o Salvar', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    expect(s().pending).toEqual([])
+    expect(s().mode).toBe('evolve')
+    expect(s().draft?.size).toBe(7)
+    expect(s().conflict).toEqual({
+      play: null,
+      draft: { paths: ['values.sire'], origin: 'draft' },
+    })
+    s().received(withSire('Etrius'), 4)
+    expect(s().saveDraft('x')).toMatchObject({ ok: false, kind: 'conflict' })
+  })
+
+  it('"Ficar com o atual" tira a entrada; as outras 6 se salvam', () => {
+    const { s, batch, enqueue } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    s().received(withSire('Etrius'), 4)
+    s().resolveConflict('values.sire', 'theirs')
+    expect(s().conflict).toBeNull()
+    expect(s().draft?.size).toBe(6)
+    const result = s().saveDraft('6 alterações')
+    expect(result).toMatchObject({ ok: true })
+    expect(
+      enqueue.mock.calls.at(-1)?.[1].events.map((e: { path: string }) => e.path)
+    ).not.toContain('values.sire')
+  })
+
+  it('"Usar o meu" refaz o `from` sobre o valor de agora', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId, { paths: ['values.sire'] })
+    s().received(withSire('Etrius'), 4)
+    s().resolveConflict('values.sire', 'mine')
+    expect(s().conflict).toBeNull()
+    expect(s().draft?.get('values.sire')).toEqual({
+      from: 'Etrius',
+      to: 'Meerlinda',
+    })
+    expect(s().saveDraft('7 alterações')).toMatchObject({ ok: true })
+  })
+
+  it('sem caminhos no 409, o lote inteiro fica marcado (como antes)', () => {
+    const { s, batch } = savedSeven()
+    s().conflicted(batch.clientBatchId)
+    expect(s().conflict?.draft?.paths).toHaveLength(7)
+  })
+
+  it('lote do Jogo: só os campos do 409, e "Reaplicar" refaz o lote inteiro', () => {
+    const { s } = setup()
+    const r = s().commit(
+      [blood(9, 8), { path: 'values.strength', from: 2, to: 3 }],
+      'Ação'
+    )
+    if (!r.ok) throw new Error('não enfileirou')
+    s().conflicted(r.batch.clientBatchId, { paths: ['values.blood'] })
+    expect(s().conflict).toMatchObject({
+      play: { paths: ['values.blood'] },
+      draft: null,
+    })
+    expect(s().draft).toBeNull()
+    // resolveConflict não vale no Jogo: a ação volta inteira ou não volta
+    s().resolveConflict('values.blood', 'mine')
+    expect(s().conflict).not.toBeNull()
+    expect(s().reapply()).toMatchObject({ ok: true })
+    expect(
+      s()
+        .pending.at(-1)
+        ?.events.map(e => e.path)
+    ).toEqual(['values.blood', 'values.strength'])
+  })
+})
+
+// Achados do /code-review: as duas partes do conflito não se misturam, e a
+// política manda no que entra em edição
+describe('conflito do Jogo e do rascunho juntos', () => {
+  const sevenSaved = () => {
+    const ctx = setup()
+    const { s } = ctx
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    s().setDraftValue('values.sire', 'Meerlinda')
+    const saved = s().saveDraft('2 alterações')
+    if (!saved?.ok) throw new Error('não salvou')
+    return { ...ctx, saved: saved.batch }
+  }
+
+  it('o 409 do rascunho não apaga os lotes do Jogo já em conflito', () => {
+    const { s, saved } = sevenSaved()
+    const play = s().commit([blood(9, 8)], 'Sangue −1')
+    if (!play.ok) throw new Error('commit')
+    s().conflicted(play.batch.clientBatchId, { paths: ['values.blood'] })
+    expect(s().conflict?.play?.batches).toHaveLength(1)
+    expect(
+      s().conflicted(saved.clientBatchId, { paths: ['values.sire'] })
+    ).toBe(true)
+    expect(s().conflict?.play?.batches).toHaveLength(1)
+    expect(s().conflict?.draft?.paths).toEqual(['values.sire'])
+    // "Reaplicar tudo" refaz o Jogo; o campo do rascunho continua marcado
+    expect(s().reapply()).toMatchObject({ ok: true })
+    expect(
+      s()
+        .pending.at(-1)
+        ?.events.map(e => e.path)
+    ).toEqual(['values.blood'])
+    expect(s().conflict).toMatchObject({
+      play: null,
+      draft: { paths: ['values.sire'] },
+    })
+  })
+
+  it('o 409 do Jogo dentro de um conflito do rascunho continua reaplicável', () => {
+    const { s, saved } = sevenSaved()
+    s().conflicted(saved.clientBatchId, { paths: ['values.sire'] })
+    const play = s().commit([blood(9, 8)], 'Sangue −1')
+    if (!play.ok) throw new Error('commit')
+    s().conflicted(play.batch.clientBatchId, { paths: ['values.blood'] })
+    expect(s().conflict?.draft).toEqual({
+      paths: ['values.sire'],
+      origin: 'draft',
+    })
+    expect(s().conflict?.play?.paths).toEqual(['values.blood'])
+    // "Usar o meu" no campo do rascunho não engole o lote do Jogo
+    s().resolveConflict('values.sire', 'mine')
+    expect(s().conflict?.draft).toBeNull()
+    expect(s().conflict?.play?.batches).toHaveLength(1)
+    // resolveConflict não vale para o caminho do Jogo
+    s().resolveConflict('values.blood', 'mine')
+    expect(s().conflict?.play?.batches).toHaveLength(1)
+    expect(s().reapply()).toMatchObject({ ok: true })
+    expect(s().conflict).toBeNull()
+  })
+
+  it('"Manter como está" tira só os lotes do Jogo', () => {
+    const { s, saved } = sevenSaved()
+    s().conflicted(saved.clientBatchId, { paths: ['values.sire'] })
+    const play = s().commit([blood(9, 8)], 'Sangue −1')
+    if (!play.ok) throw new Error('commit')
+    s().conflicted(play.batch.clientBatchId, { paths: ['values.blood'] })
+    s().dismissConflict()
+    expect(s().conflict).toEqual({
+      play: null,
+      draft: { paths: ['values.sire'], origin: 'draft' },
+    })
+  })
+})
+
+describe('a política manda no que volta para a edição', () => {
+  it('sem permissão de edição, o 409 do "Salvar" não abre Editar e devolve false', () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    const saved = s().saveDraft('Força')
+    if (!saved?.ok) throw new Error('não salvou')
+    s().setEditable(false)
+    s().setMode('play')
+    expect(
+      s().conflicted(saved.batch.clientBatchId, { paths: ['values.strength'] })
+    ).toBe(false)
+    expect(s().mode).toBe('play')
+    expect(s().draft).toBeNull()
+    expect(s().pending).toEqual([])
+  })
+
+  it('sem permissão de edição, o 422 do "Salvar" não abre Editar', () => {
+    const { s } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    const saved = s().saveDraft('Força')
+    if (!saved?.ok) throw new Error('não salvou')
+    s().setEditable(false)
+    s().setMode('read')
+    s().rejected(saved.batch.clientBatchId, [
+      { path: 'values.strength', message: 'x' },
+    ])
+    expect(s().mode).toBe('read')
+    expect(s().draft).toBeNull()
+  })
+
+  it('restoreDraft respeita a política e o modo do registro', () => {
+    const { s } = setup()
+    const plan = {
+      events: [{ path: 'values.strength', from: 2, to: 3 }],
+      conflicts: [],
+      applied: 0,
+      dropped: 0,
+    }
+    s().setEditable(false)
+    expect(s().restoreDraft(plan, 'evolve')).toBe(false)
+    expect(s().draft).toBeNull()
+    s().setEditable(true)
+    // Sem a conta por pontos, "create" do registro não vale mais: Editar
+    expect(s().restoreDraft(plan, 'create')).toBe(true)
+    expect(s().mode).toBe('evolve')
+  })
+
+  it('o lote do "Salvar" leva a versão do template e o modo', () => {
+    const { s, enqueue } = setup()
+    s().setMode('evolve')
+    s().startDraft()
+    s().setDraftValue('values.strength', 3)
+    s().saveDraft('Força')
+    expect(enqueue.mock.calls.at(-1)?.[1]).toMatchObject({
+      draft: true,
+      draftMeta: { templateVersion: model.version, mode: 'evolve' },
+    })
+  })
+})
+
+// Achado do /code-review: o rascunho não passa do lote que a API aceita
+describe('limite do rascunho', () => {
+  it('a 51ª alteração é recusada com o motivo; as 50 continuam', () => {
+    const { s } = setup(['owner', 'storyteller'])
+    s().setMode('evolve')
+    s().startDraft()
+    // Traços e as especializações deles: mais de 50 caminhos
+    const ratings = [...model.fields.values()].filter(
+      f => f.def.type === 'rating' && !f.readOnly
+    )
+    const edits: [string, (before: unknown) => unknown][] = [
+      ...ratings.map(
+        f =>
+          [
+            `values.${f.id}`,
+            (before: unknown) =>
+              typeof before === 'number' && before > 1 ? before - 1 : 2,
+          ] as [string, (before: unknown) => unknown]
+      ),
+      ...ratings
+        .filter(f => (f.def as { specialty?: boolean }).specialty)
+        .map(
+          f =>
+            [`specialties.${f.id}`, () => 'Treino'] as [
+              string,
+              (before: unknown) => unknown,
+            ]
+        ),
+    ]
+    expect(edits.length).toBeGreaterThan(50)
+    let refused: ReturnType<ReturnType<typeof s>['setDraftValue']> = null
+    for (const [path, next] of edits) {
+      const [scope, id] = path.split('.') as ['values' | 'specialties', string]
+      const bucket = (s().values[scope] ?? {}) as Record<string, unknown>
+      const r = s().setDraftValue(path, next(bucket[id]))
+      if (r && !r.ok && r.kind === 'limit') {
+        refused = r
+        break
+      }
+    }
+    expect(s().draft?.size).toBe(50)
+    expect(refused).toMatchObject({
+      ok: false,
+      kind: 'limit',
+      issues: [{ message: expect.stringContaining('50 alterações') }],
+    })
+  })
+
+  it('draftLimit mede também os bytes do lote', () => {
+    expect(
+      draftLimit(
+        new Map([['values.notes', { from: null, to: 'x'.repeat(70_000) }]])
+      )
+    ).toMatch(/grandes demais/)
+    expect(
+      draftLimit(new Map([['values.strength', { from: 2, to: 3 }]]))
+    ).toBeNull()
   })
 })

@@ -3,7 +3,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
-import { render, waitFor } from '@testing-library/react-native'
+import { act, render, waitFor } from '@testing-library/react-native'
 import { Text } from 'react-native'
 import { useSession } from '../../lib/session/SessionProvider'
 import {
@@ -322,6 +322,31 @@ describe('OfflineProvider', () => {
     await first.view.findByText('signedOut')
     await new Promise(r => setTimeout(r, 1200))
     expect(await storage.keys(userPrefix(A.id))).toEqual([])
+    first.view.unmount()
+  })
+
+  // T-14: a limpeza era disparada sem esperar; o logout resolvia antes de o
+  // storage do usuário ser apagado
+  it('o logout espera a limpeza do storage do usuário, inclusive chaves draft:', async () => {
+    // Um disco lento: apagar leva tempo, como no IndexedDB e no SQLCipher
+    const memory = createMemoryStorage()
+    const storage: KeyValueStorage = {
+      ...memory,
+      removeItem: async key => {
+        await new Promise(r => setTimeout(r, 30))
+        await memory.removeItem(key)
+      },
+    }
+    const session = sessionFor(A)
+    const first = app(storage, session)
+    await first.view.findByText('signedIn')
+    const prefix = userPrefix(A.id)
+    // Um rascunho persistido (P03-C) e uma fila: tudo no escopo do usuário
+    await storage.setItem(`${prefix}draft:ficha-1`, '{"values":{}}')
+    await storage.setItem(`${prefix}outbox:x`, '[]')
+    await act(() => session.logout())
+    // Logo depois do logout resolver, sem esperar nada a mais
+    expect(await storage.keys(prefix)).toEqual([])
     first.view.unmount()
   })
 

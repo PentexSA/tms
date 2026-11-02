@@ -13,15 +13,14 @@ import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 import { FlatList, StyleSheet, View } from 'react-native'
 
+import { LogoutButton } from '../../components/session/LogoutButton'
 import { messageOf } from '../../lib/errors'
 import { plural } from '../../lib/format'
 import { useChronicles } from '../../lib/queries/chronicles'
-import { useSession } from '../../lib/session/SessionProvider'
 
 // Crônicas (design/telas/cronicas.html): as que eu narro e as de que participo.
 export default function ChroniclesScreen() {
   const router = useRouter()
-  const { session } = useSession()
   const chronicles = useChronicles()
 
   const actions = (
@@ -102,11 +101,7 @@ export default function ChroniclesScreen() {
               variant="ghost"
               onPress={() => router.push('/account')}
             />
-            <Button
-              title="Sair"
-              variant="ghost"
-              onPress={() => session.logout()}
-            />
+            <LogoutButton />
           </View>
         }
       />

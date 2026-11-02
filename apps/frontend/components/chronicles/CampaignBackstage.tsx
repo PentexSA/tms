@@ -417,6 +417,7 @@ function TransferPanel({
         expiresAt: string | Date
         available: boolean
       }
+    | null
     | undefined
 }) {
   const propose = useProposeTransfer(chronicleId)

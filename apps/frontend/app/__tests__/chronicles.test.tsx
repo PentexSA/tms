@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
+import { createMemoryDraftStore } from '../../sheet/sync/draftStore'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import {
   json,
@@ -23,6 +24,10 @@ jest.mock('../../lib/api', () => {
   const fake = createFakeApi()
   return { ...jest.requireActual('../../lib/api'), api: fake.api, fake }
 })
+// Uma chave de verdade por intenção (T-02)
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => require('node:crypto').randomUUID(),
+}))
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }))
 
 const calls = (
@@ -128,6 +133,34 @@ describe('Crônicas (lista)', () => {
   })
 })
 
+// P03-C (T-03): o rascunho guardado também entra no aviso de "Sair"
+describe('Crônicas: sair com rascunho guardado', () => {
+  it('pergunta antes de descartar o rascunho', async () => {
+    calls.chroniclesGet.mockResolvedValue(ok([]))
+    const drafts = createMemoryDraftStore()
+    await drafts.write({
+      v: 1,
+      characterId: '00000000-0000-4000-8000-00000000c001',
+      templateVersion: '1.0.0',
+      baseVersion: 1,
+      mode: 'create',
+      savedAt: Date.now(),
+      edits: [{ path: 'values.strength', from: 1, to: 3 }],
+    })
+    const session = await signedIn()
+    renderWithSession(<ChroniclesScreen />, session, { drafts })
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Sair' }))
+    })
+    expect(
+      await screen.findByText(
+        'O rascunho não salvo de 1 ficha será descartado neste aparelho.'
+      )
+    ).toBeTruthy()
+    expect(session.getState().status).toBe('signedIn')
+  })
+})
+
 describe('Nova crônica', () => {
   it('com um sistema só, ele já vem escolhido; criar abre a crônica', async () => {
     calls.systemsGet.mockResolvedValue(ok([VTM]))
@@ -149,6 +182,7 @@ describe('Nova crônica', () => {
     expect(calls.chroniclesPost).toHaveBeenCalledWith({
       name: 'Liberdade',
       systemCode: 'vtm-v20',
+      clientCommandId: expect.any(String),
     })
     expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
@@ -174,6 +208,94 @@ describe('Nova crônica', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'dados inválidos'
     )
+  })
+
+  // T-02: dois toques em "Criar crônica" criavam duas crônicas
+  it('dois toques seguidos antes da resposta mandam um POST, com a chave', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    let answer: (value: unknown) => void = () => undefined
+    calls.chroniclesPost.mockReturnValue(
+      new Promise(resolve => {
+        answer = resolve
+      })
+    )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    const button = screen.getByRole('button', { name: 'Criar crônica' })
+    await act(async () => {
+      fireEvent.press(button)
+      fireEvent.press(button)
+    })
+    expect(calls.chroniclesPost).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      answer(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    })
+    expect(router.replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('504 do proxy: a nova tentativa usa a mesma chave', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    calls.chroniclesPost
+      .mockResolvedValueOnce(fail(504, 'Gateway Timeout'))
+      .mockResolvedValueOnce(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    for (let i = 0; i < 2; i++)
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
+      })
+    const keys = calls.chroniclesPost.mock.calls.map(
+      c => (c[0] as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('depois de erro de rede a nova tentativa usa a mesma chave; depois de recusa, outra', async () => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    calls.chroniclesPost
+      .mockResolvedValueOnce({
+        data: null,
+        error: { status: 0, value: new TypeError('Network request failed') },
+      })
+      .mockResolvedValueOnce(fail(400, 'dados inválidos'))
+      .mockResolvedValueOnce(
+        ok({
+          id: CHRONICLE_ID,
+          name: 'Liberdade',
+          system: VTM,
+          role: 'storyteller',
+        })
+      )
+    renderWithSession(<NewChronicleScreen />, await signedIn())
+    await screen.findByRole('radio', { name: VTM.name })
+    fireEvent.changeText(screen.getByTestId('chronicle-name'), 'Liberdade')
+    for (let i = 0; i < 3; i++)
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
+      })
+    const keys = calls.chroniclesPost.mock.calls.map(
+      c => (c[0] as { clientCommandId: string }).clientCommandId
+    )
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).not.toBe(keys[1])
   })
 
   it('com vários sistemas, escolher antes de criar', async () => {

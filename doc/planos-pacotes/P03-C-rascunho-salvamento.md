@@ -533,3 +533,21 @@ Depois da onda: o P03-D (D-01) e o P04-D mexem no `ModeBar` e no `LeaveGuard`, p
 7. **Cifra no web.** Manter a paridade com o outbox e o cache (IndexedDB sem cifra, apagado no logout) ou cifrar com WebCrypto? A chave ficaria na mesma origem, e o ganho contra XSS é pequeno.
 8. **Valor de texto na folha de conflito.** O `describeValue` mostra o texto só ali. Confirmar na revisão que isso respeita o README §10/§11, que proíbe conteúdo em aviso, histórico e log, não na tela de decisão.
 9. **Rodar o Maestro `09`.** Precisa de dev build e conta de homologação (README do Maestro). Ele roda na integração da onda, junto do build nativo da D-00, ou fica no roteiro manual antes do release?
+
+## 10. Desvios na implementação
+
+Implementado na `pacote/p03-c-rascunho` (12 commits sobre `67b592e`, este incluído). O que saiu diferente do desenho acima, e por quê:
+
+1. **Migration `0022_user_commands`, não `0021`.** O teste "a lista registra todo arquivo" só exige a lista igual aos arquivos, não numeração contínua. O P02 fica com o `0021` e ninguém renomeia na integração. Um banco local que já rodou o `0022` antes de existir o `0021` precisa ser recriado (o Kysely recusa migration fora de ordem); em produção as duas chegam juntas, na ordem.
+2. **O T-31 virou dois commits.** O commit 8 é só do cliente (corpo do 409, conflito por campo, folha, `describeValue`, formulário de devolução). O `changedBy` da API veio num commit à parte, que sai sozinho se o `/security-review` recusar: sem ele, a tela diz "em outro lugar".
+3. **O conflito do rascunho recuperado nasceu no commit 6** (origem `recovery`), com as ações da faixa de então: "Reaplicar" ficava com o seu valor e "Manter como está" com o atual. O commit 8 trocou a faixa por "Revisar" e a escolha campo a campo.
+4. **`restoreDraft` recebe o plano já revalidado** (`planDraftRestore`, em `sheet/store/draftRestore.ts`), não o registro. O persistidor (`useDraftPersistence`) mora em `DraftRecovery.tsx`.
+5. **Sem gravação pendente no `AppState`.** Sem timer, cada mudança grava na hora (uma em voo e a última pendente). Não sobra nada para "sair na hora" ao ir para o fundo.
+6. **A `baseVersion` é guardada, mas a recuperação sempre compara caminho a caminho**, sem o atalho de "mesma versão": o resultado é o mesmo e há um caminho só para testar.
+7. **O 409 do "Salvar" volta ao rascunho também com um rascunho vazio aberto** (`!s.draft?.size`), porque a Criação reabre um rascunho vazio logo depois de salvar. O 422 continua com `!s.draft`, como antes. Fica registrado o mesmo caso no 422, fora do escopo.
+8. **Registro com mais de 50 alterações ou 64 KiB não é gravado** (o anterior fica). O store também não salva um lote desse tamanho.
+9. **O `draftStore` ganhou uma contagem assinável** (`count`), que é o que o `useLocalChanges()` lê sem ir ao disco a cada render.
+10. **`POST /chronicles` responde com `duplicate`** e, na repetição, com o papel de agora (`player` ou `former` se a narração foi transferida). O `user_commands` também entrou no `doc/database.dbml`.
+11. **`useCreateCharacter` recebe `{ values, kind? }`.** Antes era uma união com o corpo cru; só a Nova ficha usa.
+12. **O E2E do conflito usa "Salvar" em Editar, numa crônica de criação livre**, e não "Concluir" na criação por pontos. A "conclusão com dado velho" fica coberta pelo `useFinishCreation`, que desiste com o rascunho sujo, e não tem E2E próprio.
+13. **O Maestro `09` toca "Aumentar Força"/"Destreza"/"Vigor" pelo rótulo acessível** e usa uma ficha em criação por pontos (`DRAFT_CHARACTER_ID`). Ainda não rodou: se os botões "+" estiverem ocultos da acessibilidade no nativo (pergunta 8 do P06), o fluxo precisa de outro seletor.

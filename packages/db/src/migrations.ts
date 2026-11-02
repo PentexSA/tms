@@ -19,6 +19,8 @@ import * as m0017 from './migrations/0017_xp_ledger'
 import * as m0018 from './migrations/0018_xp_requests'
 import * as m0019 from './migrations/0019_backstage'
 import * as m0020 from './migrations/0020_product_templates'
+import * as m0021 from './migrations/0021_timestamptz'
+import * as m0022 from './migrations/0022_user_commands'
 
 /**
  * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
@@ -46,6 +48,8 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0018_xp_requests': m0018,
   '0019_backstage': m0019,
   '0020_product_templates': m0020,
+  '0021_timestamptz': m0021,
+  '0022_user_commands': m0022,
 }
 
 export const migrationProvider: MigrationProvider = {

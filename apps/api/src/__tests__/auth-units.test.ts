@@ -77,22 +77,63 @@ describe('rate limit', () => {
 
 describe('clientIp', () => {
   const server = { requestIP: () => ({ address: '10.0.0.9' }) }
-  const request = (xff?: string) =>
+  const request = (xff?: string, test?: string) =>
     new Request('http://localhost/', {
-      headers: xff ? { 'x-forwarded-for': xff } : {},
+      headers: {
+        ...(xff ? { 'x-forwarded-for': xff } : {}),
+        ...(test ? { 'x-tms-test-client-ip': test } : {}),
+      },
     })
+  const none = { trustProxy: false, testClientIp: false }
+  const proxy = { trustProxy: true, testClientIp: false }
+  const e2e = { trustProxy: false, testClientIp: true }
 
   it('sem proxy confiável, ignora o X-Forwarded-For (o cliente forja)', () => {
-    expect(clientIp(request('1.1.1.1'), server, false)).toBe('10.0.0.9')
+    expect(clientIp(request('1.1.1.1'), server, none)).toBe('10.0.0.9')
   })
 
   it('com proxy confiável, usa o último endereço (o que o proxy acrescentou)', () => {
-    expect(clientIp(request('6.6.6.6, 1.1.1.1'), server, true)).toBe('1.1.1.1')
-    expect(clientIp(request(), server, true)).toBe('10.0.0.9')
+    expect(clientIp(request('6.6.6.6, 1.1.1.1'), server, proxy)).toBe('1.1.1.1')
+    expect(clientIp(request(), server, proxy)).toBe('10.0.0.9')
+  })
+
+  // T-86: o último hop é validado; o que não é IP cai na conexão
+  it.each([
+    ['vazio', '1.1.1.1, '],
+    ['texto', '1.1.1.1, qualquer-coisa'],
+    ['com porta', '1.1.1.1, 2.2.2.2:443'],
+    ['IP com lixo', '1.1.1.1, 2.2.2.2 x'],
+  ])('último hop inválido (%s) cai no IP do socket', (_, xff) => {
+    expect(clientIp(request(xff), server, proxy)).toBe('10.0.0.9')
+  })
+
+  it('IPv6 no último hop', () => {
+    expect(clientIp(request('1.1.1.1, 2001:db8::7'), server, proxy)).toBe(
+      '2001:db8::7'
+    )
+  })
+
+  it('header de teste só com testClientIp, e validado', () => {
+    expect(clientIp(request(undefined, '10.1.2.3'), server, none)).toBe(
+      '10.0.0.9'
+    )
+    expect(clientIp(request('9.9.9.9', '10.1.2.3'), server, e2e)).toBe(
+      '10.1.2.3'
+    )
+    expect(clientIp(request(undefined, 'lixo'), server, e2e)).toBe('10.0.0.9')
+  })
+
+  it('com trustProxy, o header de teste é ignorado', () => {
+    expect(
+      clientIp(request('1.1.1.1', '10.1.2.3'), server, {
+        trustProxy: true,
+        testClientIp: true,
+      })
+    ).toBe('1.1.1.1')
   })
 
   it('sem servidor (testes), uma chave fixa', () => {
-    expect(clientIp(request(), null, false)).toBe('local')
+    expect(clientIp(request(), null, none)).toBe('local')
   })
 })
 

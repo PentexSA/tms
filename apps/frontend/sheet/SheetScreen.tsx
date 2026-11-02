@@ -17,6 +17,7 @@ import {
   Text,
   TextField,
   tokens,
+  useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
@@ -36,6 +37,7 @@ import {
   creationInfoOf,
   creationInputOf,
 } from './creation/creation'
+import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
@@ -48,6 +50,7 @@ import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
+import { UnsupportedTemplate } from './UnsupportedTemplate'
 import { ExperienceSheet } from './xp/ExperienceSheet'
 
 export function SheetScreen({
@@ -61,9 +64,12 @@ export function SheetScreen({
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const sync = useSync()
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
+  // Alterações do rascunho aberto (T-17): o cabeçalho não diz "Salvo"
+  const [unsaved, setUnsaved] = useState(0)
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -72,9 +78,12 @@ export function SheetScreen({
     )
   )
   useEffect(() => {
-    if (state.status === 'error' && statusOf(state.error) === 404)
+    if (state.status === 'error' && statusOf(state.error) === 404) {
       queryClient.removeQueries({ queryKey: sheetKeys.character(id) })
-  }, [id, queryClient, state])
+      // Sem acesso à ficha: o rascunho guardado dela também sai (T-03)
+      void sync.drafts.remove(id).catch(() => undefined)
+    }
+  }, [id, queryClient, state, sync])
   const chronicle =
     state.status === 'ready' || state.status === 'viewer'
       ? state.character.chronicle
@@ -98,12 +107,7 @@ export function SheetScreen({
       body = <Skeleton lines={6} label="Carregando a ficha" />
       break
     case 'unsupported':
-      body = (
-        <EmptyState
-          title="Atualize o app"
-          message="Esta ficha usa uma versão do sistema que este app ainda não conhece."
-        />
-      )
+      body = <UnsupportedTemplate onBack={back.onPress} />
       break
     case 'invalid':
       body = (
@@ -157,6 +161,7 @@ export function SheetScreen({
           key={`${state.character.templateVersion}:${state.roles.join(',')}`}
           state={state}
           initialMode={initialMode}
+          onUnsaved={setUnsaved}
         />
       )
   }
@@ -168,7 +173,10 @@ export function SheetScreen({
         back={back}
         actions={
           <View style={styles.actions}>
-            <SyncIndicator />
+            {/* Só com a ficha aberta: nada de "Salvo" na tela sem acesso */}
+            {state.status === 'ready' ? (
+              <SyncIndicator unsaved={unsaved} />
+            ) : null}
             {state.status === 'ready' && state.roles.includes('storyteller') ? (
               <StatusMenuButton
                 characterId={id}
@@ -265,11 +273,14 @@ export function policyMode(
 function LiveSheet({
   state,
   initialMode,
+  onUnsaved,
 }: {
   readonly state: Extract<SheetState, { status: 'ready' }>
   readonly initialMode?: SheetMode
+  readonly onUnsaved?: (count: number) => void
 }) {
   const sync = useSync()
+  const toast = useToast()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
@@ -310,11 +321,40 @@ function LiveSheet({
       mode: forced ?? mode,
       sync,
       creation,
+      editable: forced === null,
     })
     if (!forced && isDraftMode(mode)) created.getState().startDraft()
     return created
   })
   useEffect(() => sync.register(id, store), [sync, id, store])
+  // A política (travada, arquivada, de quem saiu): sem edição, o rascunho
+  // que volta do servidor fica guardado no aparelho em vez de abrir Editar
+  useEffect(() => {
+    store.getState().setEditable(forced === null)
+  }, [store, forced])
+  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero
+  useEffect(() => {
+    if (!onUnsaved) return
+    onUnsaved(store.getState().draft?.size ?? 0)
+    const unsubscribe = store.subscribe(s => onUnsaved(s.draft?.size ?? 0))
+    return () => {
+      unsubscribe()
+      onUnsaved(0)
+    }
+  }, [store, onUnsaved])
+  // O rascunho guardado no aparelho, e a oferta de recuperá-lo (T-03)
+  const persistence = useDraftPersistence({
+    store,
+    drafts: sync.drafts,
+    characterId: id,
+    templateVersion: state.model.version,
+    idleMode: forced ?? defaultMode(state.roles),
+    onLost: () =>
+      toast.show({
+        message:
+          'O rascunho ficou grande demais para guardar neste aparelho e não poderá ser recuperado. Salve para não perder.',
+      }),
+  })
   useEffect(() => {
     const s = store.getState()
     if (!jsonEqual(s.creation, creation)) s.setCreation(creation)
@@ -360,6 +400,11 @@ function LiveSheet({
           </SheetProvider>
           <SheetView store={store} editable />
           <LeaveGuard store={store} />
+          <DraftRecovery
+            persistence={persistence}
+            store={store}
+            blocked={forced !== null}
+          />
         </CreationContext.Provider>
       </LifecycleContext.Provider>
     </>
