@@ -5,6 +5,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 
+import { whenLabel } from '../../lib/format'
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
 
@@ -12,9 +13,17 @@ import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
 // Etapa 9). Puro: o mesmo item enquanto a linha e o modelo não mudam, para
 // que filtrar e ordenar não redesenhem as linhas que continuam na tela.
 
+// Quem fez a última alteração (P09-C, T-83), calculado no servidor contra quem
+// pede: a resposta não leva id nem nome de quem fez
+export interface TableLastChange {
+  readonly at: string | Date
+  readonly by: 'you' | 'owner' | 'other'
+}
+
 export interface TableRowData {
   readonly id: string
   readonly name: string
+  readonly kind?: 'pc' | 'npc'
   readonly owner: { readonly id: string; readonly username: string }
   readonly systemCode: string
   readonly templateVersion: string
@@ -22,6 +31,7 @@ export interface TableRowData {
   readonly status?: string
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
+  readonly lastChange?: TableLastChange | null
   readonly sheet: unknown
 }
 
@@ -53,6 +63,32 @@ export function stateLabel(
       return model ? deadLabel(model) : 'Fora de jogo'
     default:
       return null
+  }
+}
+
+/**
+ * A meta do cartão: quem alterou por último e quando (T-83). O nome do dono
+ * aparece uma vez. Sem `lastChange` (ficha sem lote, ou a API antiga) ou com
+ * um `by` desconhecido, fica o texto de antes, pelo `updatedAt` e sem autor
+ * (fail secure).
+ */
+export function changeLabel(row: TableRowData, now = new Date()): string {
+  const owner = row.owner.username
+  const change = row.lastChange
+  if (!change) return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
+  const when = whenLabel(change.at, now)
+  switch (change.by) {
+    case 'you':
+      // O NPC é do próprio narrador: o nome dele não diz nada
+      return row.kind === 'npc'
+        ? `alterada por você ${when}`
+        : `${owner} · alterada por você ${when}`
+    case 'owner':
+      return `alterada por ${owner} ${when}`
+    case 'other':
+      return `${owner} · alterada ${when}`
+    default:
+      return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
   }
 }
 

@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
+import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
@@ -130,6 +131,72 @@ describe('Mesa do narrador', () => {
     expect(line.props.accessibilityLabel).toContain(helena.join('. '))
     expect(line.props.accessibilityLabel).toMatch(/dona · alterada às 14:05$/)
     expect(screen.getAllByText('dona · alterada às 14:05')).toHaveLength(2)
+  })
+
+  // T-83: quem alterou por último, do último lote, sem id de ninguém
+  it('o narrador salvou uma nota: "dona · alterada por você às 14:05"', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(HELENA, 'helena', 'vtm-v20', {
+          lastChange: { at: today(), by: 'you' },
+        }),
+      ])
+    )
+    await openTable()
+    expect(
+      await screen.findByText('dona · alterada por você às 14:05')
+    ).toBeTruthy()
+    const line = screen.getByRole('button', {
+      name: /^Helena Varga, Tremere\./,
+    })
+    expect(line.props.accessibilityLabel).toMatch(
+      /dona · alterada por você às 14:05$/
+    )
+  })
+
+  it('changeLabel: você, o dono, outro, NPC e sem lote', () => {
+    const now = new Date()
+    now.setHours(18, 0, 0, 0)
+    const base = {
+      id: HELENA,
+      name: 'Helena Varga',
+      owner: { id: 'u-dona', username: 'dona' },
+      systemCode: 'vtm-v20',
+      templateVersion: '1.0.0',
+      sheetVersion: 2,
+      updatedAt: today(),
+      sheet: {},
+    }
+    const at = new Date(now)
+    at.setHours(13, 15, 0, 0)
+    expect(changeLabel({ ...base, lastChange: { at, by: 'you' } }, now)).toBe(
+      'dona · alterada por você às 13:15'
+    )
+    expect(changeLabel({ ...base, lastChange: { at, by: 'owner' } }, now)).toBe(
+      'alterada por dona às 13:15'
+    )
+    expect(changeLabel({ ...base, lastChange: { at, by: 'other' } }, now)).toBe(
+      'dona · alterada às 13:15'
+    )
+    expect(
+      changeLabel(
+        {
+          ...base,
+          kind: 'npc',
+          lastChange: { at: at.toISOString(), by: 'you' },
+        },
+        now
+      )
+    ).toBe('alterada por você às 13:15')
+    // Sem lote (ou a API antiga): o texto de antes, pelo updatedAt
+    expect(changeLabel({ ...base, lastChange: null }, now)).toBe(
+      'dona · alterada às 14:05'
+    )
+    expect(changeLabel(base, now)).toBe('dona · alterada às 14:05')
+    // `by` desconhecido não inventa autor (fail secure)
+    expect(
+      changeLabel({ ...base, lastChange: { at, by: 'admin' as never } }, now)
+    ).toBe('dona · alterada às 14:05')
   })
 
   it('tocar na linha abre a ficha (em Leitura)', async () => {

@@ -11,11 +11,10 @@ import {
 import { memo } from 'react'
 import { StyleSheet, View } from 'react-native'
 
-import { whenLabel } from '../../lib/format'
 import { SheetProvider } from '../../sheet/context'
 import { FieldSlot } from '../../sheet/FieldSlot'
 import { unsupportedShort } from '../../sheet/UnsupportedTemplate'
-import type { TableItem } from './tableItems'
+import { changeLabel, type TableItem } from './tableItems'
 
 // Uma linha da Mesa (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9): os
 // campos do dock do template na variante `chip`, os alertas do template como
@@ -40,7 +39,7 @@ export const TableRow = memo(function TableRow({
   const resolved = store?.getState()
   const identity = resolved ? identityOf(resolved.resolved) : null
   const dock = model?.template.dock ?? []
-  const meta = `${row.owner.username} · alterada ${whenLabel(row.updatedAt)}`
+  const meta = changeLabel(row)
   const problem =
     model === null
       ? unsupportedShort('ficha')
