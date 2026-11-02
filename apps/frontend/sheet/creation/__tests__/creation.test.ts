@@ -22,6 +22,7 @@ import {
   freebiesBalance,
   freebiesLeftText,
   groupFor,
+  priorityNote,
   reorder,
   stepAdvice,
 } from '../creation'
@@ -643,5 +644,55 @@ describe('freebieLedger: onde foram os bônus', () => {
       { config: effectiveCreationConfig(dnd) }
     )
     expect(freebieLedger(dnd, check)).toBeNull()
+  })
+})
+
+// R-28: escolher a prioridade de um grupo mexe nos outros sem aviso
+describe('priorityNote: quem mudou de lugar junto', () => {
+  const budget = {
+    groups: [
+      { id: 'phys', label: 'Físicos', targets: [] },
+      { id: 'soc', label: 'Sociais', targets: [] },
+      { id: 'men', label: 'Mentais', targets: [] },
+    ],
+  }
+  const groups = ['phys', 'soc', 'men']
+  const values = [7, 5, 3]
+
+  it('sem ordem salva, cita os outros grupos marcados sozinhos', () => {
+    const after = reorder(undefined, groups, 'phys', 0)
+    expect(priorityNote(budget, values, undefined, after, 'phys')).toBe(
+      'Prioridades salvas. Sociais ficou Secundária (5) e Mentais, Terciária (3): toque no grupo para trocar.'
+    )
+    const third = reorder(undefined, groups, 'men', 0)
+    expect(priorityNote(budget, values, undefined, third, 'men')).toBe(
+      'Prioridades salvas. Sociais ficou Secundária (5) e Físicos, Terciária (3): toque no grupo para trocar.'
+    )
+  })
+
+  it('com ordem salva, a troca cita só o outro grupo', () => {
+    const before = ['phys', 'soc', 'men']
+    const after = reorder(before, groups, 'men', 0)
+    expect(priorityNote(budget, values, before, after, 'men')).toBe(
+      'Prioridades salvas. Físicos ficou Terciária (3): toque no grupo para trocar.'
+    )
+  })
+
+  it('sem outro grupo afetado, só "Prioridades salvas"', () => {
+    const before = ['phys', 'soc', 'men']
+    expect(priorityNote(budget, values, before, before, 'phys')).toBe(
+      'Prioridades salvas'
+    )
+  })
+
+  it('quatro grupos: a lista fecha com "e"', () => {
+    const four = {
+      groups: [...budget.groups, { id: 'x', label: 'Extra', targets: [] }],
+    }
+    const ids = ['phys', 'soc', 'men', 'x']
+    const after = reorder(undefined, ids, 'phys', 0)
+    expect(priorityNote(four, [7, 5, 3, 1], undefined, after, 'phys')).toBe(
+      'Prioridades salvas. Sociais ficou Secundária (5), Mentais, Terciária (3) e Extra, Quarta (1): toque no grupo para trocar.'
+    )
   })
 })

@@ -181,8 +181,13 @@ describe('prioridades no grupo', () => {
         },
       })
     )
-    // T-17: a prioridade é gravada na hora; os pontos, só no "Salvar"
-    expect(await screen.findByText('Prioridades salvas')).toBeTruthy()
+    // T-17: a prioridade é gravada na hora; os pontos, só no "Salvar".
+    // R-28: e o aviso diz quais grupos foram marcados junto
+    expect(
+      await screen.findByText(
+        'Prioridades salvas. Sociais ficou Secundária (5) e Mentais, Terciária (3): toque no grupo para trocar.'
+      )
+    ).toBeTruthy()
   })
 
   it('com a prioridade escolhida, o bloco mostra a conta e a escolha marcada', async () => {

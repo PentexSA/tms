@@ -10,6 +10,7 @@ import {
   checkCreationBatch,
   type FieldId,
   type PointBuyBudget,
+  type PriorityBudget,
   type ResolvedSheet,
   type RoleName,
   type SheetData,
@@ -243,6 +244,36 @@ export function reorder(
   order[rank] = group
   order[from] = other
   return order
+}
+
+/**
+ * O aviso da prioridade escolhida (R-28): escolher um grupo põe ou troca os
+ * outros de lugar sozinho, e o toast passa a dizer quem mudou. "Prioridades
+ * salvas. Sociais ficou Secundária (5) e Mentais, Terciária (3): toque no
+ * grupo para trocar." Rótulos do template e números do orçamento efetivo.
+ */
+export function priorityNote(
+  budget: Pick<PriorityBudget, 'groups'>,
+  values: readonly number[],
+  before: readonly string[] | undefined,
+  after: readonly string[],
+  group: string
+): string {
+  const saved = before && before.length === after.length ? before : null
+  const moved = after
+    .map((id, rank) => ({ id, rank }))
+    .filter(({ id, rank }) => id !== group && saved?.indexOf(id) !== rank)
+  if (!moved.length) return 'Prioridades salvas'
+  const parts = moved.map(({ id, rank }, i) => {
+    const label = budget.groups.find(g => g.id === id)?.label ?? id
+    const place = `${rankLabel(rank)} (${values[rank] ?? 0})`
+    return i === 0 ? `${label} ficou ${place}` : `${label}, ${place}`
+  })
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)}`
+  return `Prioridades salvas. ${list}: toque no grupo para trocar.`
 }
 
 /**
