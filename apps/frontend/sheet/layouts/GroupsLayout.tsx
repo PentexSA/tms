@@ -62,12 +62,12 @@ export function GroupsLayout({ section }: LayoutProps) {
     all: searching,
   })
   // O título do grupo some quando a aba já diz qual é
-  const titled = !tabs.bar || searching
+  const titled = !tabs.tabbed || searching
   // T-28 (C-10): no desktop, os grupos lado a lado, cada um com pelo menos
   // minColWidth; a busca e o "Mostrando" ficam acima, na largura toda
   const { breakpoint, stacked } = useLayout()
   const columns =
-    breakpoint === 'expanded' && !stacked && !tabs.bar && groups.length > 1
+    breakpoint === 'expanded' && !stacked && !tabs.tabbed && groups.length > 1
 
   return (
     <View testID={`groups-${section.id}`}>
@@ -104,7 +104,7 @@ export function GroupsLayout({ section }: LayoutProps) {
       >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
-          if (searching && tabs.bar && !ids.length) return null
+          if (searching && tabs.tabbed && !ids.length) return null
           return (
             <View key={g.id} style={columns ? styles.column : undefined}>
               {g.title && titled ? (
@@ -116,7 +116,10 @@ export function GroupsLayout({ section }: LayoutProps) {
                   />
                 </View>
               ) : null}
-              {titled ? null : <CreationCounter fieldIds={g.fieldIds} line />}
+              {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
+              {titled || tabs.inStrip ? null : (
+                <CreationCounter fieldIds={g.fieldIds} line />
+              )}
               {ids.length && filtered && ids.every(id => !isList(id)) ? (
                 <ChipFlow ids={ids} />
               ) : ids.length ? (

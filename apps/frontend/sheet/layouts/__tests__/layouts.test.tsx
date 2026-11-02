@@ -12,7 +12,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { RatingDots } from '@tms/ui'
-import { StyleSheet } from 'react-native'
+import { ScrollView, StyleSheet } from 'react-native'
 import {
   example,
   modelOf,
@@ -42,6 +42,23 @@ const dims = (width: number, fontScale = 1) =>
   })
 
 beforeEach(() => dims(800))
+
+// No celular, as sub-abas e o contador ficam na faixa fixa da ficha (T-27)
+const nav = () => within(screen.getByTestId('sheet-nav'))
+const layout = (testID: string, y: number, height = 400) =>
+  fireEvent(screen.getByTestId(testID), 'layout', {
+    nativeEvent: { layout: { x: 0, y, width: 390, height } },
+  })
+/** Rola até as Habilidades: a faixa passa a mostrar as abas delas. */
+const scrollToAbilities = () => {
+  layout('sheet-panel', 600)
+  layout('sheet-nav', 500, 120)
+  layout('section-attributes', 0)
+  layout('section-abilities', 900)
+  fireEvent.scroll(screen.UNSAFE_getByType(ScrollView), {
+    nativeEvent: { contentOffset: { x: 0, y: 1450 } },
+  })
+}
 
 const renderSheet = (
   model: SheetModel,
@@ -116,18 +133,20 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(
       section.queryAllByTestId('pip-on', { includeHiddenElements: true })
     ).toHaveLength(0)
-    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar
+    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar;
+    // as abas ficam na faixa fixa (T-27)
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('tab')).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
     expect(
       section.getAllByTestId('pip-on', { includeHiddenElements: true }).length
     ).toBeGreaterThan(0)
     expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
     // A busca procura em todas as abas
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -136,7 +155,7 @@ describe('groups: filtro e busca (Habilidades)', () => {
     // Religar o filtro tira as abas: chips de todos os grupos
     fireEvent.changeText(section.getByLabelText('Buscar em Habilidades'), '')
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.queryByRole('tab')).toBeNull()
+    expect(screen.queryByTestId('group-tabs-abilities')).toBeNull()
   })
 
   it('no Editar do celular, abas por grupo; a busca procura em todos', async () => {
@@ -146,12 +165,16 @@ describe('groups: filtro e busca (Habilidades)', () => {
       fakeServer(model, sheet).post
     )
     const section = within(screen.getByTestId('groups-abilities'))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    // No topo, a faixa mostra os Atributos; rolando, as Habilidades
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    scrollToAbilities()
+    expect(nav().queryByRole('tab', { name: 'Físicos' })).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('adjustable', { name: 'Ocultismo' })).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
 
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -295,7 +318,7 @@ describe('grid: Atributos', () => {
       fakeServer(model, sheet).post
     )
     let grid = within(screen.getByTestId('grid-attributes'))
-    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
     screen.unmount()
 

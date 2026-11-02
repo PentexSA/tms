@@ -431,6 +431,7 @@ Navegação da ficha: **3 abas fixas, uma por zona do template** (Ficha · Poder
   - As 3 dividem a largura em grade e **nunca rolam de lado**: com fonte muito grande, o rótulo quebra em 2 linhas, com hífen.
   - Caixa normal, 15 px, peso 700.
   - Em `.ds-header.is-collapsed`, a faixa some ao rolar para baixo e volta ao rolar para cima ou com foco.
+- **Faixa fixa no app (RN, T-27):** as abas ficam numa faixa (`SheetNav`) presa no topo da rolagem (`stickyHeaderIndices`; no web, `position: sticky`), em todos os tamanhos. No celular, a faixa leva também as sub-abas e o contador da seção com grupos que está no topo da tela (Físicos | Sociais | Mentais perto dos Atributos; Talentos | Perícias | Conhecimentos nas Habilidades), e o corpo continua filtrando pelo grupo escolhido. A escolha fica num contexto por ficha (`GroupTabsContext`); sem ele (prévias), cada seção guarda a própria aba. A versão que recolhe ao rolar, com animação, fica para depois.
 - **Comportamento:**
   - Os painéis existem todos; os inativos ficam `hidden`. Na impressão aparecem todos.
   - Cada personagem lembra a aba ativa e a rolagem de cada aba.

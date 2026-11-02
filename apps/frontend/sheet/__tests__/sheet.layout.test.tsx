@@ -5,6 +5,7 @@ import {
   screen,
   within,
 } from '@testing-library/react-native'
+import { effectiveCreationConfig } from '@tms/sheet-core'
 import { KeyboardArea } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { Dimensions, ScrollView, StyleSheet, TextInput } from 'react-native'
@@ -22,6 +23,7 @@ import {
 } from '../../test/session'
 import { CharacterForm } from '../CharacterForm'
 import { identityColumnsPerRow } from '../IdentityBlock'
+import { currentSection } from '../layouts/groupTabsState'
 import { SheetScreen } from '../SheetScreen'
 import { SheetView } from '../SheetView'
 
@@ -412,5 +414,129 @@ describe('T-27 (parte 1): no celular, os controles de modo rolam com a ficha', (
     )
     expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     expect(screen.queryByTestId('sheet-scroll-header')).toBeNull()
+  })
+})
+
+describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
+  const ID = '00000000-0000-4000-8000-00000000c201'
+  beforeEach(() => {
+    jest
+      .mocked(useRouter)
+      .mockReturnValue({ push: jest.fn(), replace: jest.fn() } as never)
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+  })
+
+  async function openCreation() {
+    calls.characterGet.mockResolvedValue(
+      ok({
+        id: ID,
+        name: 'Nova',
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        owner: { id: 'u1', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 1,
+        roles: ['owner'],
+        status: 'creating',
+        lockedAt: null,
+        member: true,
+        updatedAt: '2026-10-18T12:00:00Z',
+        sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+        creation: {
+          revision: 1,
+          mode: 'points',
+          accounting: true,
+          choices: {
+            priorities: {
+              attributes: ['physical', 'social', 'mental'],
+              abilities: ['talents', 'skills', 'knowledges'],
+            },
+          },
+          config: {},
+          effective: effectiveCreationConfig(vtm),
+          returned: null,
+          approval: false,
+        },
+      })
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Orçamento' })
+  }
+  const nav = () => within(screen.getByTestId('sheet-nav'))
+  const layout = (testID: string, y: number, height = 400) =>
+    fireEvent(screen.getByTestId(testID), 'layout', {
+      nativeEvent: { layout: { x: 0, y, width: 390, height } },
+    })
+  const scrollTo = (y: number) =>
+    fireEvent.scroll(
+      screen.UNSAFE_getByType(KeyboardArea).findAllByType(ScrollView)[0]!,
+      { nativeEvent: { contentOffset: { x: 0, y } } }
+    )
+
+  it('a 390, Criação: a faixa é fixa e leva as abas, as sub-abas da seção no topo e o contador', async () => {
+    resize(PHONE)
+    await openCreation()
+    const scroll = screen
+      .UNSAFE_getByType(KeyboardArea)
+      .findAllByType(ScrollView)[0]!
+    const children = scroll.props.children as { key: string }[]
+    const sticky = scroll.props.stickyHeaderIndices as number[]
+    expect(children[sticky[0]!]!.key).toBe('nav')
+    // No topo da zona: os Atributos
+    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
+    expect(nav().getByTestId('counter-physical')).toBeTruthy()
+    // O corpo não repete a barra
+    expect(
+      within(screen.getByTestId('grid-attributes')).queryByRole('tab')
+    ).toBeNull()
+
+    // Rolando até as Habilidades, a faixa troca de seção
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    layout('section-attributes', 0)
+    layout('section-abilities', 900)
+    scrollTo(1450)
+    expect(nav().queryByLabelText('Grupos de Atributos')).toBeNull()
+    expect(nav().getByLabelText('Grupos de Habilidades')).toBeTruthy()
+    expect(nav().getByTestId('counter-talents')).toBeTruthy()
+    // Trocar a sub-aba na faixa filtra o corpo
+    expect(screen.queryByRole('adjustable', { name: 'Condução' })).toBeNull()
+    fireEvent.press(nav().getByRole('tab', { name: 'Perícias' }))
+    expect(screen.getByRole('adjustable', { name: 'Condução' })).toBeTruthy()
+    expect(nav().getByTestId('counter-skills')).toBeTruthy()
+    // De volta ao topo: os Atributos, com a escolha das Habilidades guardada
+    scrollTo(0)
+    expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
+    // "Orçamento" a um toque, sem voltar ao topo
+    scrollTo(1450)
+    fireEvent.press(nav().getByRole('tab', { name: 'Orçamento' }))
+    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+  })
+
+  it('a 750: as abas da zona continuam fixas; sub-abas não há', async () => {
+    resize(TABLET)
+    await openCreation()
+    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().queryByLabelText(/^Grupos de/)).toBeNull()
+    expect(screen.queryByTestId('group-tabs-attributes')).toBeNull()
+  })
+})
+
+describe('groupTabsState: a seção atual', () => {
+  it('a última que passou da faixa; no topo, a primeira; sem seções, nenhuma', () => {
+    const list = [
+      { id: 'b', y: 900 },
+      { id: 'a', y: 0 },
+    ]
+    expect(currentSection(list, 100)).toBe('a')
+    expect(currentSection(list, 950)).toBe('b')
+    expect(currentSection([{ id: 'a', y: 400 }], 10)).toBe('a')
+    expect(currentSection([], 10)).toBeNull()
   })
 })

@@ -25,7 +25,7 @@ export function GridLayout({ section }: LayoutProps) {
   // Abas só no Editar: em Jogo e Leitura a grade cabe inteira
   const tabs = useGroupTabs(section, groups, { enabled: isDraftMode(mode) })
   const columns =
-    !tabs.bar && !stacked && !(isDraftMode(mode) && breakpoint === 'compact')
+    !tabs.tabbed && !stacked && !(isDraftMode(mode) && breakpoint === 'compact')
 
   if (!columns)
     return (
@@ -35,7 +35,7 @@ export function GridLayout({ section }: LayoutProps) {
           {tabs.groups.map(g => (
             <View key={g.id}>
               {/* Com abas, o título do grupo é a própria aba */}
-              {g.title && !tabs.bar ? (
+              {g.title && !tabs.tabbed ? (
                 <View style={styles.title}>
                   <SectionHeader
                     title={g.title}
@@ -44,7 +44,10 @@ export function GridLayout({ section }: LayoutProps) {
                   />
                 </View>
               ) : null}
-              {tabs.bar ? <CreationCounter fieldIds={g.fieldIds} line /> : null}
+              {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
+              {tabs.tabbed && !tabs.inStrip ? (
+                <CreationCounter fieldIds={g.fieldIds} line />
+              ) : null}
               {g.fieldIds.map(id => (
                 <FieldSlot key={id} id={id} variant="row" />
               ))}
