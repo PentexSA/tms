@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
+import {
+  apiAs,
+  completeCreation,
+  eighthGeneration,
+  freeCreation,
+  signUp,
+} from '../support/users'
 
 // Etapa 19: a Mesa do narrador. O narrador vê o dock de cada personagem,
 // abre a ficha em Leitura, edita como narrador (assinado no histórico) e a
@@ -41,6 +47,9 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
     }
   )
   await eighthGeneration(playerContext, player, character.id)
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador, sem lote de freeze
+  await completeCreation(context, storyteller, character.id)
 
   // A jogadora está com a ficha aberta, sem ferimentos
   const sheet = await playerContext.newPage()
@@ -100,11 +109,13 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
   await hurt
   await page.getByRole('button', { name: 'Fechar' }).last().click()
 
-  // O histórico mostra quem alterou e com que papel
+  // O histórico mostra quem alterou e com que papel: os dois lotes e a
+  // conclusão da criação (T-80)
   await page.getByRole('button', { name: 'Histórico' }).click()
+  await expect(page.getByText('Criação concluída')).toBeVisible()
   await expect(
     page.getByText(`${storyteller.username} (narrador)`, { exact: false })
-  ).toHaveCount(2)
+  ).toHaveCount(3)
 
   // A jogadora volta para a ficha (sai e entra): a ficha é rebuscada
   await sheet

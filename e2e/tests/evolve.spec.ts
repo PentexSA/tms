@@ -58,8 +58,12 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
   expect((await saved).status()).toBe(200)
   await expect(page.getByText('Salvo: 3 alterações')).toBeVisible()
 
-  // Recarregar (sem rascunho, sem aviso do navegador): a dona abre em Jogo
+  // Recarregar (sem rascunho, sem aviso do navegador): a ficha ainda em
+  // criação abre em Editar (T-05, EW-08); os valores salvos estão no Jogo
   await page.goto(`/characters/${id}`)
+  await expect(page.getByRole('radio', { name: 'Editar' })).toBeChecked()
+  await expect(page.getByText('Editando · 0 alterações')).toBeVisible()
+  await page.getByRole('radio', { name: 'Jogo' }).click()
   await expect(page.getByRole('radio', { name: 'Jogo' })).toBeChecked()
   await expect(page.getByLabel('Força, 2 de 5')).toBeVisible()
   await expect(page.getByLabel(/^Ocultismo, 1 de 5/)).toBeVisible()
