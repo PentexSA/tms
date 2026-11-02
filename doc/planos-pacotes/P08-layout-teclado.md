@@ -642,3 +642,30 @@ Registrados na implementação (branch `pacote/p08-layout`, 2026-11-02). Nenhum 
 - **2 não aplicados:**
   - a ficha atrás da folha também encolhe com o teclado: sem efeito visível, e a posição da rolagem se mantém. Fica para a conferência no aparelho;
   - a prop `inset` no `SectionHeader`: escolha do plano, §3.6.
+
+**Merge da onda com P04-C, P05-C e P07-C (`29c02d7`, onda em `c7c1423`):**
+
+- Conflitos resolvidos no próprio merge:
+  - `SheetView`: o `ReturnedBanner` entra na rolagem nova, e o `openBudget` fica no `SheetProvider`.
+  - `ModeBar`: a confirmação do P04-C (`completionCopy` com `notes`) vai para o `SummarySheet` do `useModeBar`, sem mudar textos.
+  - `SheetScreen`, `SheetMenu` e `StatusMenu`: as props do `StatusMenuDraft` vêm do rascunho. O `onDraftState`, a troca de modo do `LiveSheet` e o fix da criação livre ficam.
+  - `GroupsLayout`: o `GroupBlock`/`HeadedList` do P07-C dentro das colunas do T-28, com a regra `tabbed`.
+  - `TextEditor` e `CharacterForm`: `inputRef` e `chain` juntos. O "Próximo" usa os mesmos campos da rolagem até o erro do T-21.
+  - `new-character`: o `KeyboardArea` substitui o `KeyboardAvoidingView` do P05-C.
+- Testes da onda que mudaram:
+  - `policy` e `storyteller` passam pelo "Mais opções" e esperam o `sheetsDismissed`.
+  - `CreationScreen` rola até as Habilidades para usar as sub-abas da faixa e abre "Em jogo" para a Força de Vontade (T-59).
+  - Os E2E `lifecycle` e `creation-feedback` foram ajustados (`6153866`, `722e215`). O `advantages` não mudou.
+- `/code-review` (medium) do merge: 10 achados.
+  - 7 corrigidos em `8cd251f`, `722e215` e `bc9c65c`:
+    - o rascunho do narrador vai em prop própria (`StatusMenuTarget`), sem o `draftOf`;
+    - o resumo fecha quando o Editar sai;
+    - trocar de aba com a faixa presa leva ao topo do painel;
+    - só as seções do painel sobem para a faixa (`StripScope`);
+    - voltou a cobertura da dona em criação;
+    - o teste a 1280 fecha o Histórico antes de abrir a Experiência;
+    - o E2E rola a seção para logo abaixo da faixa.
+  - 3 não aplicados:
+    - o mapa de sub-abas do `creation-feedback.spec.ts`: é só do V20 e documentado; um nome fora dele é aba da zona;
+    - a ida e volta das props: resolvida junto com o `draftOf`;
+    - o narrador cruzando 900 com a confirmação aberta: caso raro, de redimensionar no meio da confirmação. Fica para a conferência no tablet.
