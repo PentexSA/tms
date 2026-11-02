@@ -143,8 +143,8 @@ Os testes rodam no CI:
 
 - **Defesa:**
   - o logout registra a revogação pendente, apaga tudo do aparelho e só então avisa o servidor; sem rede, a pendência fica e vai na reconexão e na próxima abertura, e nada renova a sessão até ela chegar;
-  - no nativo, a pendência é o refresh token numa chave à parte do keychain (`tms.pendingLogout`, `WHEN_UNLOCKED_THIS_DEVICE_ONLY`), lida só pelo logout e nunca enviada a `/auth/refresh`;
-  - no web, um marcador sem segredo no IndexedDB (`session:state`: `signed-in`, `signed-out`, `logout-pending`), lido a cada renovação; um `BroadcastChannel` tira as outras abas;
+  - no nativo, as pendências são refresh tokens numa lista à parte no keychain (`tms.pendingLogout`, `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, até 5), lidas só pelo logout e nunca enviadas a `/auth/refresh`; cada uma sai da lista no 2xx ou no 4xx;
+  - no web, um marcador sem segredo no IndexedDB (`session:state`: `signed-in:<id da sessão>`, `signed-out`, `logout-pending`), lido a cada renovação; o 401 só marca `signed-out` se o marcador ainda for da sessão que renovou; um `BroadcastChannel` com o id do usuário tira as abas dele;
   - o servidor apaga o cookie com os mesmos atributos com que o gravou (`Path=/auth`, HttpOnly, Secure, SameSite=Strict), também no refresh recusado e na exclusão de conta;
   - login e cadastro no web revogam a família do cookie anterior (filtro de `Origin`, sem recusar o login);
   - `POST /auth/logout` não tem rate limit: só revoga com posse do token, de alta entropia, e um 429 nele deixaria a sessão viva no servidor (falha aberta); com `Origin` fora da allowlist e cookie, é 403 e não apaga o cookie (CSRF);
@@ -152,7 +152,7 @@ Os testes rodam no CI:
   - sem sessão no web (`signed-out`), abrir o app não chama `/auth/refresh` (T-74).
 - **Testes:**
   - `api/__tests__/auth.test.ts`: atributos do cookie apagado (com e sem `secureCookies`), refresh recusado, login e cadastro web revogam o cookie anterior, login nativo não mexe em cookie, logout sem rate limit e o 403 de `Origin` que não apaga o cookie;
-  - `app/lib/__tests__/logout.test.ts`: pendência no keychain, token pendente nunca vai a `/auth/refresh`, app morto no meio, marcador do web, outra aba, 429 e 5xx mantêm a pendência;
+  - `app/lib/__tests__/logout.test.ts`: pendências em lista no keychain (A e B revogadas), token pendente nunca vai a `/auth/refresh`, app morto no meio, marcador do web com compare-and-set entre abas, aviso entre abas por usuário, 4xx encerra e 5xx mantém a pendência;
   - `app/lib/__tests__/persist.test.tsx`: "o logout espera a limpeza do storage do usuário, inclusive chaves draft:";
   - `app/components/session/__tests__/LogoutButton.test.tsx`;
   - `e2e/offline.spec.ts` (QAW-33, com recarregar e com aba fechada) e `e2e/auth.spec.ts` (cookie apagado, nenhum refresh depois de sair).
@@ -214,6 +214,7 @@ Os testes rodam no CI:
   - a API manda `no-store` em toda resposta, e o app nativo pede `no-store` em toda requisição (no web não, para não sair do safelist do CORS);
   - o módulo local `apps/frontend/modules/http-cache` desliga o cache HTTP em disco na abertura, antes do JS (iOS: `URLCache` sem capacidade; Android: OkHttp sem `Cache`), e apaga o que uma versão anterior gravou; o logout apaga de novo.
 - **Testes:** `app/lib/__tests__/httpCache.test.tsx` (no-store só no nativo, purga no logout, configuração do módulo para iOS e Android).
+- **Exceção:** a versão publicada do template (`GET /systems/:code/template?version=`), que não tem dado de usuário, sai `private, max-age=31536000, immutable` (nunca `public`; `characters.test.ts` confere o `immutable`); o app a guarda no cache persistido e não a baixa de novo.
 - **Residual:** o que o Bun responde antes do Elysia (413, HTTP malformado) sai sem os cabeçalhos, sem dado. O cache de imagens do RN (retratos) não passa por aqui. A prova no aparelho (QAA-02: `Cache.db` e `cache/http-cache` sem resposta da API) depende do build nativo.
 
 ### Concorrência na escrita (ASVS V11)
