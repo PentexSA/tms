@@ -11,9 +11,10 @@ import {
   type SheetMode,
   type SheetModel,
 } from '@tms/sheet-core'
-import { ToastProvider } from '@tms/ui'
+import { ToastProvider, tokens } from '@tms/ui'
 import * as Haptics from 'expo-haptics'
-import { AccessibilityInfo, Dimensions } from 'react-native'
+import { AccessibilityInfo, Dimensions, StyleSheet } from 'react-native'
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context'
 import {
   example,
   modelOf,
@@ -194,6 +195,32 @@ describe('CombatDock', () => {
     expect(
       screen.getByRole('header', { name: 'Força de Vontade' })
     ).toBeTruthy()
+  })
+
+  it('T-37: o dock não soma o inset de baixo, que já vem do Screen', () => {
+    const enqueue = jest.fn()
+    const store = createSheetStore({
+      characterId: 'c1',
+      model: vtm,
+      sheet: helena(),
+      sheetVersion: 1,
+      roles: ['owner'],
+      mode: 'play',
+      sync: { enqueue },
+    })
+    render(
+      <SafeAreaInsetsContext.Provider
+        value={{ top: 47, right: 0, bottom: 34, left: 0 }}
+      >
+        <ToastProvider>
+          <SheetView store={store} />
+        </ToastProvider>
+      </SafeAreaInsetsContext.Provider>
+    )
+    const dock = StyleSheet.flatten(
+      screen.getByLabelText('Em jogo').props.style
+    )
+    expect(dock.paddingBottom).toBe(tokens.space[2])
   })
 
   it('a partir de 600, sem dock: a seção Em jogo tem os mesmos campos', () => {

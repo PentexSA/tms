@@ -6,6 +6,7 @@ import {
 } from '@tms/sheet-core'
 import { type PipSegment, RatingDots, Text, tokens, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { useDenseCells } from './dense'
 import { FieldTarget } from './FieldTarget'
 import type { FieldViewProps } from './types'
 
@@ -73,6 +74,7 @@ export function RatingCell({
   pip = 'sm',
 }: FieldViewProps & { readonly pip?: 'sm' | 'md' }) {
   const { colors } = useTheme()
+  const dense = useDenseCells()
   if (resolved.type !== 'rating') return null
   const specialty = sheet.specialty(resolved.id)
   return (
@@ -80,12 +82,16 @@ export function RatingCell({
       id={resolved.id}
       label={describe(resolved, sheet)}
       value={short(resolved, sheet)}
-      style={[styles.cell, { borderColor: colors.borderSubtle }]}
+      style={[
+        styles.cell,
+        dense && styles.cellDense,
+        { borderColor: colors.borderSubtle },
+      ]}
     >
       <Text variant="fieldLabel" numberOfLines={1}>
         {resolved.field.def.label}
       </Text>
-      <View style={styles.cellValue}>
+      <View style={[styles.cellValue, dense && styles.cellValueDense]}>
         <RatingDots segments={pipSegments(resolved)} size={pip} />
         <Text variant="number">{short(resolved, sheet)}</Text>
       </View>
@@ -140,4 +146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.space[2],
   },
+  // T-68: a 360, 104 − 8 − 2 = 94 dp úteis para 76 + 4 + 10
+  cellDense: { padding: tokens.space[1] },
+  cellValueDense: { gap: tokens.space[1] },
 })

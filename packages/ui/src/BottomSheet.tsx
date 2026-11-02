@@ -16,17 +16,20 @@ import {
 } from 'react-native'
 import { IconButton } from './IconButton'
 import { useInsets } from './insets'
+import { keyboardBehavior } from './keyboard'
 import { Pressable } from './Pressable'
 import { keyOf } from './roving'
 import { Text } from './Text'
 import { ModalToastHost } from './Toast'
-import { useTheme } from './theme'
+import { useLayout, useTheme } from './theme'
 import { tokens } from './tokens'
 
 // Sheet modal (design system §9.5): o voltar do Android fecha, o fundo fica
 // inerte para o leitor de tela (aria-modal) e o título é heading.
-// Com "reduzir movimento", aparece sem animar. A raiz evita o teclado: no
-// iOS a folha inteira (campo e rodapé) sobe acima dele.
+// Com "reduzir movimento", aparece sem animar. A raiz evita o teclado no iOS
+// e no Android (T-10): a folha inteira (campo e rodapé) sobe acima dele. No
+// Android a janela do Modal é edge-to-edge e não redimensiona com o
+// teclado; sem o `padding`, o teclado cobria o campo e o "Aplicar".
 //
 // Um "Fechar" só: o fundo fecha no toque, mas fica fora da árvore e do Tab
 // (no web o react-native-web não esconde os irmãos do modal). No iOS, o
@@ -92,6 +95,13 @@ export interface BottomSheetProps {
   readonly children: ReactNode
   readonly footer?: ReactNode
   readonly testID?: string
+  /**
+   * Depois que a folha sai da tela (fim da animação de saída), com o foco
+   * já de volta ao gatilho no web. É onde se abre a folha seguinte: no iOS,
+   * apresentar um Modal enquanto outro ainda sai falha, e no web a folha
+   * seguinte guarda o gatilho certo para devolver o foco.
+   */
+  readonly onClosed?: () => void
 }
 
 export function BottomSheet({
@@ -101,9 +111,13 @@ export function BottomSheet({
   children,
   footer,
   testID,
+  onClosed,
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
+  // T-69 (DS: "a partir de 600 vira modal centralizado de até 560"): no
+  // compact a folha fica presa embaixo; fora dele, é um diálogo central
+  const dialog = useLayout().breakpoint !== 'compact'
   // Quem tinha o foco antes de abrir (web), lido antes do autoFocus de
   // qualquer campo da folha e antes do trap do modal
   const trigger = useRef<Focusable | null>(null)
@@ -136,6 +150,21 @@ export function BottomSheet({
     }, 0)
   }, [])
   useEffect(() => () => restoreFocus(), [restoreFocus])
+  const closed = useRef(onClosed)
+  closed.current = onClosed
+  // iOS e web: o onDismiss do Modal; o aviso vem depois da devolução do
+  // foco, que espera um tick
+  const dismissed = useCallback(() => {
+    restoreFocus()
+    setTimeout(() => closed.current?.(), 0)
+  }, [restoreFocus])
+  // Android: sem onDismiss, o Modal sai assim que fica invisível
+  const wasVisible = useRef(visible)
+  useEffect(() => {
+    const closing = wasVisible.current && !visible
+    wasVisible.current = visible
+    if (closing && Platform.OS === 'android') closed.current?.()
+  }, [visible])
   const web = Platform.OS === 'web'
   const scrimStyle = [
     StyleSheet.absoluteFill,
@@ -145,15 +174,15 @@ export function BottomSheet({
     <Modal
       visible={visible}
       transparent
-      animationType={reduceMotion ? 'none' : 'slide'}
+      animationType={reduceMotion ? 'none' : dialog ? 'fade' : 'slide'}
       onRequestClose={web ? undefined : onClose}
-      onDismiss={restoreFocus}
+      onDismiss={dismissed}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
         testID="bottom-sheet-root"
-        style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[styles.root, dialog && styles.rootDialog]}
+        behavior={keyboardBehavior()}
         {...(web
           ? {
               onKeyDownCapture: (e: KeyDownEvent) => {
@@ -188,10 +217,12 @@ export function BottomSheet({
           onAccessibilityEscape={onClose}
           style={[
             styles.sheet,
+            dialog ? styles.dialog : styles.bottom,
             {
               backgroundColor: colors.surfaceRaised,
               borderColor: colors.borderSubtle,
-              paddingBottom: tokens.space[5] + insets.bottom,
+              // O inset de baixo só vale para a folha presa embaixo
+              paddingBottom: tokens.space[5] + (dialog ? 0 : insets.bottom),
             },
           ]}
         >
@@ -224,13 +255,26 @@ export function BottomSheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
+  rootDialog: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: tokens.space[6],
+  },
   sheet: {
-    maxHeight: '90%',
-    borderTopLeftRadius: tokens.radius.lg,
-    borderTopRightRadius: tokens.radius.lg,
     borderWidth: tokens.borderWidth.hair,
     paddingHorizontal: tokens.space[5],
     paddingTop: tokens.space[3],
+  },
+  bottom: {
+    maxHeight: '90%',
+    borderTopLeftRadius: tokens.radius.lg,
+    borderTopRightRadius: tokens.radius.lg,
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '85%',
+    borderRadius: tokens.radius.lg,
   },
   header: { flexDirection: 'row', alignItems: 'center' },
   title: { flex: 1 },

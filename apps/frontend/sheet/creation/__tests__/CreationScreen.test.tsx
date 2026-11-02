@@ -9,7 +9,7 @@ import {
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
-import { AccessibilityInfo, Dimensions } from 'react-native'
+import { AccessibilityInfo, Dimensions, ScrollView } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
@@ -117,6 +117,22 @@ async function open(
 }
 
 const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
+
+// No celular, as sub-abas ficam na faixa fixa e são as da seção no topo da
+// tela (T-27): para as Habilidades, a ficha rola até elas
+const layout = (testID: string, y: number, height = 400) =>
+  fireEvent(screen.getByTestId(testID), 'layout', {
+    nativeEvent: { layout: { x: 0, y, width: 390, height } },
+  })
+const scrollToAbilities = () => {
+  layout('sheet-panel', 600)
+  layout('sheet-nav', 500, 120)
+  layout('section-attributes', 0)
+  layout('section-abilities', 900)
+  fireEvent.scroll(screen.UNSAFE_getAllByType(ScrollView)[0]!, {
+    nativeEvent: { contentOffset: { x: 0, y: 1450 } },
+  })
+}
 
 const PRIORITIES = {
   attributes: ['physical', 'social', 'mental'],
@@ -255,6 +271,7 @@ describe('trava da distribuição', () => {
 describe('o motivo certo da recusa (T-07)', () => {
   it('o 4º ponto em Prontidão diz o teto, e o contador continua 3/13', async () => {
     await open(PRIORITIES)
+    scrollToAbilities()
     tab('Talentos')
     for (let i = 0; i < 3; i++) step('Prontidão')
     expect(screen.getByTestId('counter-talents').props.children).toBe('3/13')
@@ -348,6 +365,8 @@ describe('"+" com a previsão da conta', () => {
 
   it('a Força de Vontade diz o custo do próximo ponto na linha (R-17)', async () => {
     await open(PRIORITIES)
+    // Na Criação, "Em jogo" começa recolhido (T-59)
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
     expect(screen.getByTestId('advice-willpower')).toHaveTextContent(
       '+1 = 1 bônus'
     )

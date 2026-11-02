@@ -6,7 +6,7 @@ import {
   type Roles,
   type SheetModel,
 } from '@tms/sheet-core'
-import { Pressable, Text, tokens, useInsets, useTheme, useToast } from '@tms/ui'
+import { Pressable, Text, tokens, useTheme, useToast } from '@tms/ui'
 import { memo } from 'react'
 import {
   type AccessibilityActionEvent,
@@ -42,7 +42,6 @@ export function dockFields(model: SheetModel, roles: Roles): FieldId[] {
 export function CombatDock() {
   const { model, roles } = useSheet()
   const { colors } = useTheme()
-  const insets = useInsets()
   const sheets = useFieldSheet()
   const ids = dockFields(model, roles)
   if (!ids.length) return null
@@ -55,7 +54,8 @@ export function CombatDock() {
         {
           backgroundColor: colors.surfaceRaised,
           borderTopColor: colors.borderSubtle,
-          paddingBottom: tokens.space[2] + insets.bottom,
+          // O inset de baixo já vem do `Screen` (T-37), como na BonusNotice
+          paddingBottom: tokens.space[2],
         },
       ]}
     >

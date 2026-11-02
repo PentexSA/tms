@@ -8,6 +8,7 @@ import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, templateJson } from '../../test/fixtures'
 import { renderLive } from '../../test/live'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -46,6 +47,15 @@ const vtm = modelOf('vtm-v20')
 const helena = example('helena').sheet as unknown as SheetData
 const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
 const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
+const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
+
+/** No celular, as ações do narrador ficam no "Mais opções" (T-11). */
+const openNarratorMenu = async () => {
+  fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+  fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador/ }))
+  // As ações abrem depois que o menu sai da tela
+  await sheetsDismissed()
+}
 const ID = '00000000-0000-4000-8000-00000000c001'
 
 const lifecycle = (status: string, locked = false): SheetLifecycle => ({
@@ -300,8 +310,24 @@ describe('a tela da ficha com o estado', () => {
 
   it('o dono não tem o menu do narrador', async () => {
     await open(['owner'], 'active')
-    expect(screen.queryByLabelText('Ações do narrador')).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+    expect(
+      screen.queryByRole('button', { name: /^Ações do narrador/ })
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
     expect(screen.queryByTestId('policy-banner')).toBeNull()
+  })
+
+  it('em criação, a dona também não tem o menu do narrador no "Mais opções"', async () => {
+    calls.characterGet.mockResolvedValue(character(['owner'], 'creating'))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    // A ficha em criação da dona abre no Editar (T-05)
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    expect(
+      screen.queryByRole('button', { name: /^Ações do narrador/ })
+    ).toBeNull()
+    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
   })
 
   it('arquivada, o dono abre em Leitura, com o aviso e sem o seletor de modo', async () => {
@@ -326,7 +352,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'active', lockedAt: null, creationCompletedAt: 'x' })
     )
     await open(['storyteller'], 'creating', undefined, { revision: 2 })
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    await openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-complete'))
     // A folha pergunta antes; nada vai ao servidor
     expect(screen.getByText('Concluir criação?')).toBeTruthy()
@@ -362,7 +388,7 @@ describe('a tela da ficha com o estado', () => {
         'accessibilityAction',
         { nativeEvent: { actionName: 'increment' } }
       )
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    await openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-complete'))
     expect(
       screen.getByText(
@@ -393,7 +419,8 @@ describe('a tela da ficha com o estado', () => {
       />,
       session
     )
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    // O botão largo (no celular, o mesmo menu passa pelo "Mais opções")
+    fireEvent.press(screen.getByRole('button', { name: /^Narrador/ }))
     fireEvent.press(screen.getByTestId('status-complete'))
     expect(
       screen.getByText(
@@ -413,7 +440,7 @@ describe('a tela da ficha com o estado', () => {
     })
     await open(['storyteller'], 'creating', undefined, { revision: 2 })
     const before = calls.characterGet.mock.calls.length
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    await openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-complete'))
     await act(async () => {
       fireEvent.press(screen.getByTestId('status-complete-confirm'))
@@ -428,14 +455,28 @@ describe('a tela da ficha com o estado', () => {
     )
   })
 
-  it('no celular, o menu do narrador é o ⋯', async () => {
+  it('no celular, as ações do narrador ficam no "Mais opções", com o estado no item', async () => {
     await open(['storyteller'], 'creating')
-    expect(screen.getByLabelText('Ações do narrador')).toBeTruthy()
+    // Um ⋯ só no cabeçalho, sem o gatilho largo, "Experiência" ou "Histórico"
     expect(screen.queryByText('Narrador')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Histórico' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Experiência' })).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
+    expect(screen.getByRole('header', { name: 'Mais opções' })).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ações do narrador · Em criação' })
+    )
+    // O menu fecha; as ações abrem depois que ele sai da tela
+    expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+    await sheetsDismissed()
+    expect(
+      screen.getByRole('header', { name: 'Ações do narrador' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-complete')).toBeTruthy()
   })
 
   it('na tela larga, o menu do narrador diz de quem é e o estado da ficha', async () => {
-    Dimensions.set({ window: TABLET, screen: TABLET })
+    Dimensions.set({ window: DESKTOP, screen: DESKTOP })
     await open(['storyteller'], 'active', '2026-10-18T12:00:00Z')
     // O nome acessível começa pelo texto visível (WCAG 2.5.3, T-42)
     const trigger = screen.getByRole('button', { name: 'Narrador, Travada' })
@@ -451,7 +492,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'archived', lockedAt: null, creationCompletedAt: null })
     )
     await open(['storyteller'], 'active')
-    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    await openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-archive'))
     expect(calls.statusPost).not.toHaveBeenCalled()
     expect(

@@ -12,6 +12,10 @@ export interface EditorProps<V = unknown> {
   readonly onChange: (next: V) => void
   readonly error?: string | null
   readonly required?: boolean
+  // "Próximo" entre os campos de texto do formulário (T-26): com `next`, o
+  // Enter foca o campo seguinte; sem ele, é o último ("concluído") e não
+  // envia nada. Só os editores de texto de uma linha usam.
+  readonly chain?: { readonly next?: () => void }
   // Nome próprio (o nome do personagem): sem corretor nem sugestão do
   // teclado, que trocava "PO" por "PÔ" (T-38)
   readonly properName?: boolean

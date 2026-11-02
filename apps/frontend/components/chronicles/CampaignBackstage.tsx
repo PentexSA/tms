@@ -81,7 +81,10 @@ export function CampaignBackstage({
   const transfer = useTransfer(chronicle.id)
   return (
     <View style={styles.root}>
-      <SectionHeader title="Diário da crônica" />
+      {/* Os títulos com a margem da página (T-67) */}
+      <View style={styles.inset} testID="backstage-header-diary">
+        <SectionHeader title="Diário da crônica" />
+      </View>
       {narrating ? <SessionComposer chronicleId={chronicle.id} /> : null}
       {sessions.data?.items.length ? (
         sessions.data.items.map(session => (
@@ -300,7 +303,9 @@ function SettingsForm({ chronicle }: { readonly chronicle: ChronicleInfo }) {
   }
   return (
     <View style={styles.section}>
-      <SectionHeader title="Apresentação" />
+      <View style={styles.inset} testID="backstage-header-presentation">
+        <SectionHeader title="Apresentação" />
+      </View>
       <View style={styles.form}>
         <TextField
           label="Nome"
@@ -426,7 +431,9 @@ function TransferPanel({
   const cancelKey = useRef<string | null>(null)
   return (
     <View style={styles.section}>
-      <SectionHeader title="Transferir narração" />
+      <View style={styles.inset} testID="backstage-header-transfer">
+        <SectionHeader title="Transferir narração" />
+      </View>
       {/* Vencido não espera ninguém: a próxima proposta o fecha no servidor */}
       {transfer?.status === 'pending' && transfer.available ? (
         <View style={styles.form}>
@@ -532,7 +539,9 @@ function History({ chronicleId }: { readonly chronicleId: string }) {
   const items = history.data?.pages.flatMap(page => page.items) ?? []
   return (
     <View style={styles.section}>
-      <SectionHeader title="Auditoria" />
+      <View style={styles.inset} testID="backstage-header-audit">
+        <SectionHeader title="Auditoria" />
+      </View>
       <View style={styles.form}>
         <View style={styles.row}>
           <Chip

@@ -2,6 +2,7 @@ import {
   AppBar,
   Button,
   EmptyState,
+  KeyboardArea,
   Screen,
   Skeleton,
   Text,
@@ -11,8 +12,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -169,18 +168,13 @@ export default function NewCharacterScreen() {
         allowLeave={created}
         message={`O que você preencheu ${npc ? 'no NPC novo' : 'na ficha nova'} ainda não foi criado e será descartado.`}
       />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {body}
-      </KeyboardAvoidingView>
+      {/* Encolhe acima do teclado também no Android (T-26) */}
+      <KeyboardArea>{body}</KeyboardArea>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     gap: tokens.space[4],
     padding: tokens.layout.gutter,

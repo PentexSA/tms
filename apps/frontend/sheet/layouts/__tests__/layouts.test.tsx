@@ -12,6 +12,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { RatingDots } from '@tms/ui'
+import { ScrollView, StyleSheet } from 'react-native'
 import {
   example,
   modelOf,
@@ -41,6 +42,23 @@ const dims = (width: number, fontScale = 1) =>
   })
 
 beforeEach(() => dims(800))
+
+// No celular, as sub-abas e o contador ficam na faixa fixa da ficha (T-27)
+const nav = () => within(screen.getByTestId('sheet-nav'))
+const layout = (testID: string, y: number, height = 400) =>
+  fireEvent(screen.getByTestId(testID), 'layout', {
+    nativeEvent: { layout: { x: 0, y, width: 390, height } },
+  })
+/** Rola até as Habilidades: a faixa passa a mostrar as abas delas. */
+const scrollToAbilities = () => {
+  layout('sheet-panel', 600)
+  layout('sheet-nav', 500, 120)
+  layout('section-attributes', 0)
+  layout('section-abilities', 900)
+  fireEvent.scroll(screen.UNSAFE_getByType(ScrollView), {
+    nativeEvent: { contentOffset: { x: 0, y: 1450 } },
+  })
+}
 
 const renderSheet = (
   model: SheetModel,
@@ -115,18 +133,20 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(
       section.queryAllByTestId('pip-on', { includeHiddenElements: true })
     ).toHaveLength(0)
-    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar
+    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar;
+    // as abas ficam na faixa fixa (T-27)
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('tab')).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
     expect(
       section.getAllByTestId('pip-on', { includeHiddenElements: true }).length
     ).toBeGreaterThan(0)
     expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
     // A busca procura em todas as abas
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -135,7 +155,7 @@ describe('groups: filtro e busca (Habilidades)', () => {
     // Religar o filtro tira as abas: chips de todos os grupos
     fireEvent.changeText(section.getByLabelText('Buscar em Habilidades'), '')
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.queryByRole('tab')).toBeNull()
+    expect(screen.queryByTestId('group-tabs-abilities')).toBeNull()
   })
 
   it('no Editar do celular, abas por grupo; a busca procura em todos', async () => {
@@ -145,12 +165,16 @@ describe('groups: filtro e busca (Habilidades)', () => {
       fakeServer(model, sheet).post
     )
     const section = within(screen.getByTestId('groups-abilities'))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    // No topo, a faixa mostra os Atributos; rolando, as Habilidades
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    scrollToAbilities()
+    expect(nav().queryByRole('tab', { name: 'Físicos' })).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('adjustable', { name: 'Ocultismo' })).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
 
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -158,6 +182,50 @@ describe('groups: filtro e busca (Habilidades)', () => {
     // Achou fora da aba aberta, com o título do grupo
     expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
     expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
+  })
+
+  it('T-28: a 1280, no Editar, os três grupos lado a lado; a 750 e a 390, empilhados', async () => {
+    const bodyStyle = () =>
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )
+    dims(1280)
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    expect(bodyStyle()).toEqual({ flexDirection: 'row', flexWrap: 'wrap' })
+    const groupsOf = screen.getByTestId('groups-abilities-body').children
+    expect(groupsOf).toHaveLength(3)
+    for (const g of groupsOf)
+      expect(
+        StyleSheet.flatten(
+          (g as unknown as { props: { style: never } }).props.style
+        )
+      ).toMatchObject({ flexBasis: 240, flexGrow: 1, minWidth: 0 })
+    // A busca fica acima, na largura toda
+    expect(screen.getByLabelText('Buscar em Habilidades')).toBeTruthy()
+    screen.unmount()
+
+    for (const width of [750, 390]) {
+      dims(width)
+      await renderLive(
+        { model, sheet, mode: 'evolve' },
+        fakeServer(model, sheet).post
+      )
+      expect(bodyStyle()?.flexDirection).toBeUndefined()
+      screen.unmount()
+    }
+  })
+
+  it('T-28: fonte grande no desktop: empilhados', () => {
+    dims(1280, 1.4)
+    renderSheet(model, sheet)
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )?.flexDirection
+    ).toBeUndefined()
   })
 
   it('seção sem filtro nem busca (Vantagens) não tem barra', () => {
@@ -250,7 +318,7 @@ describe('grid: Atributos', () => {
       fakeServer(model, sheet).post
     )
     let grid = within(screen.getByTestId('grid-attributes'))
-    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
     screen.unmount()
 
@@ -263,6 +331,34 @@ describe('grid: Atributos', () => {
     expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
     expect(grid.queryByRole('tab', { name: 'Físicos' })).toBeNull()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
+  })
+
+  it('T-68: até 400 de grade (360 a 432 de tela), a célula fica densa e o número cabe', () => {
+    const cellOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes')).getByLabelText(label)
+          .props.style
+      )
+    const valueRowOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes'))
+          .getByLabelText(label)
+          .findAll(
+            el =>
+              (el.type as unknown) === 'View' &&
+              StyleSheet.flatten(el.props.style)?.flexDirection === 'row'
+          )[0]!.props.style
+      )
+    dims(360)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(4)
+    expect(valueRowOf(/^Força/).gap).toBe(4)
+    screen.unmount()
+
+    dims(1280)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(8)
+    expect(valueRowOf(/^Força/).gap).toBe(8)
   })
 
   it('grade sem grupos (características do CoC) quebra em colunas', () => {

@@ -17,6 +17,7 @@ import {
   Text,
   TextField,
   tokens,
+  useLayout,
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
@@ -30,7 +31,6 @@ import {
   useSetNpcVisibility,
 } from '../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../lib/queries/focus'
-import { SheetProvider } from './context'
 import { CreationContext } from './creation/CreationContext'
 import {
   completionFreebies,
@@ -45,12 +45,17 @@ import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
 import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
+import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
 import {
   createSheetStore,
   type SheetState as SheetStoreState,
 } from './store/sheetStore'
-import { StatusMenuButton } from './storyteller/StatusMenu'
+import {
+  StatusMenuButton,
+  type StatusMenuDraft,
+  type StatusMenuTarget,
+} from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
@@ -73,6 +78,9 @@ export function SheetScreen({
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
+  // T-11: abaixo de 900, as ações do cabeçalho não cabem lado a lado e
+  // ficam no "Mais opções"; a partir de 900, como antes
+  const wide = useLayout().breakpoint === 'expanded'
   // O rascunho aberto, para o cabeçalho, que fica fora do store: as
   // alterações não salvas (T-17: o cabeçalho não diz "Salvo"; T-32: o menu
   // do narrador não conclui por cima delas)
@@ -82,6 +90,23 @@ export function SheetScreen({
   const completionNotes = useMemo(
     () => freebiesNotes(draftState.freebiesLeft),
     [draftState.freebiesLeft]
+  )
+  // O que concluir pelo menu do narrador precisa (T-32, T-18): a revisão, a
+  // versão e o rascunho aberto, no botão largo e no "Mais opções"
+  const info = state.status === 'ready' ? state.character.creation : undefined
+  const sheetVersion =
+    state.status === 'ready' ? state.character.sheetVersion : undefined
+  const creation = useMemo(() => creationInfoOf(info), [info])
+  const draft = useMemo<StatusMenuDraft>(
+    () => ({
+      revision: creation?.revision,
+      sheetVersion,
+      approval: creation?.approval,
+      unsaved,
+      queued: draftState.queued,
+      notes: completionNotes,
+    }),
+    [creation, sheetVersion, unsaved, draftState.queued, completionNotes]
   )
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
@@ -190,38 +215,41 @@ export function SheetScreen({
             {state.status === 'ready' ? (
               <SyncIndicator unsaved={unsaved} />
             ) : null}
-            {state.status === 'ready' && state.roles.includes('storyteller') ? (
-              <StatusMenuButton
-                characterId={id}
-                chronicleId={state.character.chronicle.id}
-                model={state.model}
-                status={state.character.status}
-                locked={state.character.lockedAt !== null}
-                revision={creationInfoOf(state.character.creation)?.revision}
-                sheetVersion={state.character.sheetVersion}
-                approval={creationInfoOf(state.character.creation)?.approval}
-                unsaved={unsaved}
-                queued={draftState.queued}
-                notes={completionNotes}
+            {state.status !== 'ready' ? null : wide ? (
+              <>
+                {state.roles.includes('storyteller') ? (
+                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
+                ) : null}
+                {xpLedgerFields(state.model).length ? (
+                  <Button
+                    title="Experiência"
+                    variant="ghost"
+                    testID="xp-open"
+                    accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
+                    onPress={() => setXp(true)}
+                  />
+                ) : null}
+                <Button
+                  title="Histórico"
+                  variant="ghost"
+                  accessibilityHint="Abre o histórico de alterações da ficha"
+                  onPress={() => setHistory(true)}
+                />
+              </>
+            ) : (
+              <SheetMenu
+                narrator={
+                  state.roles.includes('storyteller')
+                    ? narratorOf(id, state)
+                    : null
+                }
+                draft={draft}
+                onExperience={
+                  xpLedgerFields(state.model).length ? () => setXp(true) : null
+                }
+                onHistory={() => setHistory(true)}
               />
-            ) : null}
-            {state.status === 'ready' && xpLedgerFields(state.model).length ? (
-              <Button
-                title="Experiência"
-                variant="ghost"
-                testID="xp-open"
-                accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
-                onPress={() => setXp(true)}
-              />
-            ) : null}
-            {state.status === 'ready' ? (
-              <Button
-                title="Histórico"
-                variant="ghost"
-                accessibilityHint="Abre o histórico de alterações da ficha"
-                onPress={() => setHistory(true)}
-              />
-            ) : null}
+            )}
           </View>
         }
       />
@@ -264,6 +292,20 @@ export function SheetScreen({
       ) : null}
     </Screen>
   )
+}
+
+/** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
+function narratorOf(
+  id: string,
+  state: Extract<SheetState, { status: 'ready' }>
+): StatusMenuTarget {
+  return {
+    characterId: id,
+    chronicleId: state.character.chronicle.id,
+    model: state.model,
+    status: state.character.status,
+    locked: state.character.lockedAt !== null,
+  }
 }
 
 /**
@@ -496,13 +538,20 @@ function LiveSheet({
   )
   return (
     <>
-      <NpcVisibilityBar state={state} />
       <LifecycleContext.Provider value={lifecycle}>
         <CreationContext.Provider value={creationValue}>
-          <SheetProvider store={store}>
-            <StorytellerBar ownerName={state.character.owner.username} />
-          </SheetProvider>
-          <SheetView store={store} editable />
+          {/* O painel do NPC e a barra do narrador: fixos acima da ficha
+              fora do celular; no celular, rolam com ela (T-27) */}
+          <SheetView
+            store={store}
+            editable
+            header={
+              <>
+                <NpcVisibilityBar state={state} />
+                <StorytellerBar ownerName={state.character.owner.username} />
+              </>
+            }
+          />
           <LeaveGuard store={store} />
           <DraftRecovery
             persistence={persistence}

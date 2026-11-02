@@ -103,6 +103,22 @@ export function CharacterForm({
     if (serverIssues.length)
       reach.current(new Set(serverIssues.map(i => fieldOfPath(i.path))))
   }, [serverIssues])
+  // "Próximo" (T-26): os campos de texto de uma linha, na ordem do
+  // formulário, pelos mesmos campos do T-21. Os de escolha (o Clã) ficam
+  // fora da cadeia.
+  const chain = rows
+    .flat()
+    .filter(id => model.fields.get(id)?.def.type === 'text')
+  const chainOf = (id: string) => {
+    const at = chain.indexOf(id)
+    if (at < 0) return undefined
+    const following = chain[at + 1]
+    return {
+      next: following
+        ? () => inputs.current.get(following)?.focus()
+        : undefined,
+    }
+  }
 
   const submit = () => {
     const clean: Record<string, unknown> = {}
@@ -153,6 +169,7 @@ export function CharacterForm({
                     else inputs.current.delete(id)
                   }}
                   error={errors[id] ?? fromServer[id]}
+                  chain={chainOf(id)}
                   onChange={next => {
                     setValues(v => ({ ...v, [id]: next }))
                     setErrors(({ [id]: _, ...rest }) => rest)

@@ -588,3 +588,84 @@ Ordem de merge preliminar: **P04-C → P05-C → P07-C → P08**. O código conf
 - **T-26:** o `KeyboardAvoidingView` está em cinco telas, todas só no iOS, não "só em `join` e `chronicles/new`".
 - **T-11:** o "···" do narrador a 390 é o ⋯ do `compact`, de propósito. O estado sob o nome é a D-02 (P04-D); o P08 só reserva o lugar.
 - **T-27:** "os elementos sob a barra seguem tocáveis na árvore" é o ScrollView expondo filhos cortados (seção 3.0), não defeito de código.
+
+---
+
+## 10. Desvios
+
+Registrados na implementação (branch `pacote/p08-layout`, 2026-11-02). Nenhum remove campo, muda regra do jogo ou afrouxa limite.
+
+**Do desenho:**
+
+- **`ref` do `TextField` (T-26, §4.3 da onda):** o tipo é `Ref<TextInputInstance>`, não `Ref<TextInput>`. No RN 0.88, `TextInput` é o componente, e `Ref<TextInput>` não compila. O P05-C usa o mesmo tipo, e o comentário e o import ficam iguais aos dele (`b5aeda8`) para o merge não conflitar. O `EditorProps` ganha também `chain?: { next?: () => void }`, que leva o "Próximo" ao `TextEditor`. Os ajudantes `submitField` e `nextField` ficam em `apps/frontend/lib/keyboard.ts`.
+- **`KeyboardArea` (T-10, T-26):** não é um `KeyboardAvoidingView`. O `KeyboardAvoidingView` compara o próprio layout, relativo ao pai, com o teclado, que vem em coordenadas da janela. Sob o cabeçalho e a safe area, ele encolhia de menos.
+  - Agora a área escuta o teclado (`keyboardWillShow` no iOS, com a animação dele; `keyboardDidShow` no Android) e mede a própria posição na janela a cada abertura.
+  - A `BottomSheet` continua com o `KeyboardAvoidingView` e o `keyboardBehavior()`, porque o Modal ocupa a janela inteira.
+- **`BottomSheet.onClosed` (pergunta 2, adiantada pela revisão):** o "Mais opções" abre a folha seguinte no `onClosed` do menu, não no mesmo render. O `onClosed` vem do `onDismiss` no iOS e no web, depois da devolução do foco, e no Android assim que a folha fica invisível. Motivos:
+  - no iOS, apresentar um Modal enquanto outro sai falha;
+  - no web, a folha seguinte guardava como gatilho um item que sumia.
+
+  A prop é aditiva; nenhuma prop sai.
+- **T-11:**
+  - O `SheetMenu` repassa ao `StatusMenu` o objeto inteiro de props do `StatusMenuButton` (`{...narrator}`, tipo `StatusMenuButtonProps` exportado). O que o P04-C e o P05-C acrescentarem passa sem mudar o menu.
+  - O `SyncIndicator` no `compact` tem até 112 de largura, mas **sem limite de linhas**. Com 2 linhas, o erro com rascunho perdia a contagem de alterações (revisão).
+- **T-27:**
+  - O `ModeBar` (componente) saiu: o `SheetView` usa o `useModeBar()` e monta as partes. A barra roda sempre na ficha viva (`editable`), e quem não escreve só fica sem as partes. Assim a ficha não remonta quando a política tira o Editar.
+  - O `header` (painel do NPC e barra do narrador) fica com o tema do app (a skin de fora e o accent neutro) também dentro da rolagem.
+  - O estado das sub-abas e a seção atual moram num store fora do React (`createGroupTabsStore`, com `useSyncExternalStore`). Rolar re-renderiza só a faixa.
+  - O `useGroupTabs` devolve também `tabbed` e `inStrip`.
+  - O espaço acima da faixa é um filho próprio (`nav-gap`), porque uma margem ficaria dentro da faixa presa.
+  - O painel da zona fica num invólucro com `testID="sheet-panel"`.
+- **T-65:** as colunas usam largura em % com `padding` de meia coluna, em vez de `width` em dp: o contêiner pode ser mais estreito que a janela. A conta da largura útil (`contentWidthOf`) é a mesma da célula densa (T-68).
+- **T-68:** o contexto `DenseCells` fica em `sheet/views/dense.ts`.
+- **T-67:** os invólucros ganharam `testID`, e o teste do "Participantes" fica em `app/__tests__/app.layout.test.tsx`, que já tem a tela da crônica. A API do `SectionHeader` não mudou (§3.6). A revisão sugeriu uma prop `inset`, mas ela não entrou: é escolha de desenho do plano.
+
+**Dos testes:**
+
+- O caso do Esc e do foco a 390 está no `layout.spec.ts` (T-69 a 390), não no `a11y-keyboard.spec.ts`.
+- O `create-character.spec.ts` passou a abrir "Em jogo" na Criação (T-59).
+- O contador na faixa não é conferido no E2E, porque o spec não escolhe prioridades. O Jest cobre isso.
+- O `table.spec.ts` não mudou.
+- A pergunta 1 (teclado no Modal do Android) continua aberta: não entrou dependência nativa, e a conferência é no AVD, na integração.
+
+**Revisão (`/code-review` high), 10 achados:**
+
+- **8 corrigidos:**
+  - `49c19dc`: folha seguinte do menu;
+  - `50c2689`: ficha que remontava e `ModeBar` sem uso;
+  - `245c8d0`: medida do teclado;
+  - `8aeb8b9`: sincronização cortada;
+  - `1c4e515`: tema do header;
+  - `e395e75`: largura útil repetida;
+  - `3004034`: re-render na rolagem;
+  - parte do item do `ModeBar`/`subtitle`: o `subtitle` fica, porque é o lugar acordado para o P04-D (onda-2 §4.4).
+- **2 não aplicados:**
+  - a ficha atrás da folha também encolhe com o teclado: sem efeito visível, e a posição da rolagem se mantém. Fica para a conferência no aparelho;
+  - a prop `inset` no `SectionHeader`: escolha do plano, §3.6.
+
+**Merge da onda com P04-C, P05-C e P07-C (`29c02d7`, onda em `c7c1423`):**
+
+- Conflitos resolvidos no próprio merge:
+  - `SheetView`: o `ReturnedBanner` entra na rolagem nova, e o `openBudget` fica no `SheetProvider`.
+  - `ModeBar`: a confirmação do P04-C (`completionCopy` com `notes`) vai para o `SummarySheet` do `useModeBar`, sem mudar textos.
+  - `SheetScreen`, `SheetMenu` e `StatusMenu`: as props do `StatusMenuDraft` vêm do rascunho. O `onDraftState`, a troca de modo do `LiveSheet` e o fix da criação livre ficam.
+  - `GroupsLayout`: o `GroupBlock`/`HeadedList` do P07-C dentro das colunas do T-28, com a regra `tabbed`.
+  - `TextEditor` e `CharacterForm`: `inputRef` e `chain` juntos. O "Próximo" usa os mesmos campos da rolagem até o erro do T-21.
+  - `new-character`: o `KeyboardArea` substitui o `KeyboardAvoidingView` do P05-C.
+- Testes da onda que mudaram:
+  - `policy` e `storyteller` passam pelo "Mais opções" e esperam o `sheetsDismissed`.
+  - `CreationScreen` rola até as Habilidades para usar as sub-abas da faixa e abre "Em jogo" para a Força de Vontade (T-59).
+  - Os E2E `lifecycle` e `creation-feedback` foram ajustados (`6153866`, `722e215`). O `advantages` não mudou.
+- `/code-review` (medium) do merge: 10 achados.
+  - 7 corrigidos em `8cd251f`, `722e215` e `bc9c65c`:
+    - o rascunho do narrador vai em prop própria (`StatusMenuTarget`), sem o `draftOf`;
+    - o resumo fecha quando o Editar sai;
+    - trocar de aba com a faixa presa leva ao topo do painel;
+    - só as seções do painel sobem para a faixa (`StripScope`);
+    - voltou a cobertura da dona em criação;
+    - o teste a 1280 fecha o Histórico antes de abrir a Experiência;
+    - o E2E rola a seção para logo abaixo da faixa.
+  - 3 não aplicados:
+    - o mapa de sub-abas do `creation-feedback.spec.ts`: é só do V20 e documentado; um nome fora dele é aba da zona;
+    - a ida e volta das props: resolvida junto com o `draftOf`;
+    - o narrador cruzando 900 com a confirmação aberta: caso raro, de redimensionar no meio da confirmação. Fica para a conferência no tablet.

@@ -2,6 +2,7 @@ import {
   AppBar,
   Banner,
   Button,
+  KeyboardArea,
   Screen,
   Text,
   TextField,
@@ -9,12 +10,7 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-} from 'react-native'
+import { ScrollView, StyleSheet } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { useAcceptInvite } from '../../lib/queries/chronicles'
@@ -37,10 +33,8 @@ export default function JoinScreen() {
         title="Entrar com convite"
         back={{ label: 'Crônicas', onPress: () => router.back() }}
       />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* Encolhe acima do teclado também no Android (T-26) */}
+      <KeyboardArea>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -72,13 +66,12 @@ export default function JoinScreen() {
             disabled={!code.trim()}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardArea>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     gap: tokens.space[4],
     padding: tokens.layout.gutter,

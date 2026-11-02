@@ -1,8 +1,14 @@
 import { TextArea, TextField, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { nextField } from '../../lib/keyboard'
 import { properNameInput } from './properName'
 import { SuggestionPicker } from './Suggestions'
 import type { EditorProps } from './types'
+
+// "Próximo" (T-26): o Enter foca o seguinte. O último da cadeia mostra
+// "concluído" e só fecha o teclado: criar a ficha é ação explícita.
+const chainKeys = (next?: () => void) =>
+  next ? nextField(next) : ({ returnKeyType: 'done' } as const)
 
 // text e longText. O limite vem do template (o mesmo que o servidor aplica).
 export function TextEditor({
@@ -13,6 +19,7 @@ export function TextEditor({
   error,
   required,
   properName,
+  chain,
   inputRef,
 }: EditorProps) {
   const long = def.type === 'longText'
@@ -38,6 +45,7 @@ export function TextEditor({
           : undefined
       }
       {...(properName ? properNameInput : {})}
+      {...(chain && !long ? chainKeys(chain.next) : {})}
     />
   )
   // Com sugestões no template (Natureza, Comportamento), a lista ao lado

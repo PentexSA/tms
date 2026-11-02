@@ -12,10 +12,17 @@ import {
   Text,
   textStyle,
   tokens,
+  useLayout,
   useTheme,
 } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
+import {
+  type StyleProp,
+  StyleSheet,
+  TextInput,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
@@ -67,10 +74,15 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
     all: searching,
   })
   // O título do grupo some quando a aba já diz qual é
-  const titled = !tabs.bar || searching
+  const titled = !tabs.tabbed || searching
   // T-58: o grupo único com o nome da seção à vista não repete o título nem
   // o contador (W20 "Dons", M20 "Antecedentes"): o cabeçalho é o da seção
   const echo = Boolean(sectionTitled) && echoesSection(section)
+  // T-28 (C-10): no desktop, os grupos lado a lado, cada um com pelo menos
+  // minColWidth; a busca e o "Mostrando" ficam acima, na largura toda
+  const { breakpoint, stacked } = useLayout()
+  const columns =
+    breakpoint === 'expanded' && !stacked && !tabs.tabbed && groups.length > 1
 
   return (
     <View testID={`groups-${section.id}`}>
@@ -100,10 +112,14 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
           />
         </View>
       ) : null}
-      <View {...tabs.panelProps}>
+      <View
+        {...tabs.panelProps}
+        style={columns ? styles.columns : undefined}
+        testID={`groups-${section.id}-body`}
+      >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
-          if (searching && tabs.bar && !ids.length) return null
+          if (searching && tabs.tabbed && !ids.length) return null
           const header = Boolean(g.title) && titled && !echo
           // A lista que o título à vista (do grupo ou da seção) já nomeia
           const headed = titledList(
@@ -112,7 +128,11 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             header ? g.title : echo ? section.def.title : null
           )
           return (
-            <GroupBlock key={g.id} headed={headed}>
+            <GroupBlock
+              key={g.id}
+              headed={headed}
+              style={columns ? styles.column : undefined}
+            >
               {header ? (
                 <View style={styles.title}>
                   <SectionHeader
@@ -124,7 +144,10 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
                   />
                 </View>
               ) : null}
-              {titled ? null : <CreationCounter fieldIds={g.fieldIds} line />}
+              {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
+              {titled || tabs.inStrip ? null : (
+                <CreationCounter fieldIds={g.fieldIds} line />
+              )}
               {ids.length && filtered && ids.every(id => !isList(id)) ? (
                 <ChipFlow ids={ids} />
               ) : ids.length ? (
@@ -156,14 +179,17 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
 /** O bloco do grupo; a lista que o título já nomeia não repete o cabeçalho. */
 function GroupBlock({
   headed,
+  style,
   children,
 }: {
   readonly headed: FieldId | undefined
+  // A coluna do grupo no desktop (T-28)
+  readonly style?: StyleProp<ViewStyle>
   readonly children: ReactNode
 }) {
   return (
     <HeadedList.Provider value={headed}>
-      <View>{children}</View>
+      <View style={style}>{children}</View>
     </HeadedList.Provider>
   )
 }
@@ -250,6 +276,12 @@ function FilterBar({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  columns: { flexDirection: 'row', flexWrap: 'wrap' },
+  column: {
+    flexBasis: tokens.layout.minColWidth,
+    flexGrow: 1,
+    minWidth: 0,
+  },
   title: { paddingHorizontal: tokens.layout.gutter },
   bar: {
     flexDirection: 'row',
