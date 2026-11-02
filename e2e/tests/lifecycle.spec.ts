@@ -248,7 +248,9 @@ test('T-06, T-32 e T-80: devolver, ver o motivo em qualquer modo, aprovar e o Hi
     // O Histórico da jogadora: "Criação concluída" do narrador, sem as linhas
     // do freeze ("Humanidade 0 → 7", POW-34)
     await page.goto(`/characters/${id}`)
-    await page.getByRole('button', { name: 'Histórico' }).click()
+    // A 390, o Histórico fica no "Mais opções" (T-11)
+    await page.getByRole('button', { name: 'Mais opções' }).click()
+    await page.getByRole('button', { name: 'Histórico', exact: true }).click()
     await expect(page.getByText('Criação concluída')).toBeVisible()
     await expect(
       page.getByLabel(
@@ -289,7 +291,11 @@ test('T-32: o narrador conclui pelo ⋯ só depois de confirmar', async ({
         completions++
     })
     await page.goto(`/characters/${id}`)
-    await page.getByRole('button', { name: 'Ações do narrador' }).click()
+    // A 390, as ações do narrador ficam no "Mais opções", com o estado (T-11)
+    await page.getByRole('button', { name: 'Mais opções' }).click()
+    await page
+      .getByRole('button', { name: 'Ações do narrador · Em criação' })
+      .click()
     await page
       .getByRole('button', { name: 'Concluir criação', exact: true })
       .click()

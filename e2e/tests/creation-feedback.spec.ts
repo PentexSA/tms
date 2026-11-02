@@ -118,8 +118,24 @@ async function prepared(
   })
 }
 
-const tab = (page: Page, name: string) =>
-  page.getByRole('tab', { name, exact: true }).click()
+// A 390, as sub-abas ficam na faixa fixa e são as da seção que está no
+// topo da tela (T-27): a ficha rola até a seção antes de tocar a sub-aba
+const GROUP_SECTION: Record<string, string> = {
+  Físicos: 'attributes',
+  Sociais: 'attributes',
+  Mentais: 'attributes',
+  Talentos: 'abilities',
+  Perícias: 'abilities',
+  Conhecimentos: 'abilities',
+}
+const tab = async (page: Page, name: string) => {
+  const section = GROUP_SECTION[name]
+  if (section)
+    await page
+      .getByTestId(`section-${section}`)
+      .evaluate(el => el.scrollIntoView({ block: 'start' }))
+  await page.getByRole('tab', { name, exact: true }).click()
+}
 const plus = (page: Page, trait: string) =>
   page.getByRole('button', { name: `Aumentar ${trait}`, exact: true })
 // O "+" bloqueado pela previsão é aria-disabled e continua tocável (R-20):
@@ -261,7 +277,9 @@ test('Bônus: o custo do toque e o extrato (T-57, R-17)', async ({
     'Faltaria 1 de bônus: custa 2, resta 1.'
   )
 
-  // A FdV diz o custo do próximo ponto na linha
+  // A FdV diz o custo do próximo ponto na linha; na Criação, "Em jogo"
+  // começa recolhido (T-59)
+  await page.getByRole('button', { name: 'Em jogo' }).click()
   await expect(page.getByTestId('advice-willpower')).toContainText(
     '+1 = 1 bônus'
   )
