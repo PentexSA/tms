@@ -98,7 +98,9 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
     .click()
   await expect(page.getByText('Editando · 4 alterações')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await expect(page.getByText('Salvar 4 alterações?')).toBeVisible()
   await expect(
     page.getByLabel('Forças, 1 inativo, máx. pelo Arete 2')
