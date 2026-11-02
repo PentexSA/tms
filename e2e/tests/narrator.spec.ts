@@ -103,10 +103,20 @@ test.describe('a 390', () => {
     await expect(
       page.getByText('As alterações ficam assinadas no histórico.')
     ).toBeVisible()
-    await page.getByRole('button', { name: 'Editar Notas do Narrador' }).click()
+    // R-09: o aviso no nome do botão e na descrição do campo (no DOM)
+    const editNotes = page.getByRole('button', {
+      name: 'Editar Notas do Narrador',
+    })
+    await expect(editNotes).toHaveAccessibleName(
+      'Editar Notas do Narrador. Privadas: o jogador não vê'
+    )
+    await editNotes.click()
     await expect(
       page.getByText('Privadas: o jogador não vê estas notas.')
     ).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'Notas do Narrador', exact: true })
+    ).toHaveAccessibleDescription('Privadas: o jogador não vê estas notas.')
     await expect(
       page.getByText(
         "Para pedir uma correção ao jogador, use 'Pedir ajuste' em Ações do narrador."
@@ -201,7 +211,12 @@ test.describe('a 390', () => {
     )
     await expect(page.getByTestId(`table-row-${last}`)).toBeInViewport()
 
-    // T-49 e T-75: marcar a última; a barra fica à vista, com a contagem
+    // T-49 e T-75: marcar a última; a barra fica à vista, com a contagem.
+    // No web, a seleção não chama o BackHandler (só existe no Android)
+    const errors: string[] = []
+    page.on('console', m => {
+      if (m.type() === 'error') errors.push(m.text())
+    })
     await page.getByRole('button', { name: 'Selecionar personagens' }).click()
     const box = page.getByRole('checkbox', { name: `Selecionar Ficha 8` })
     await box.scrollIntoViewIfNeeded()
@@ -222,6 +237,7 @@ test.describe('a 390', () => {
     expect(await bar.boundingBox()).toEqual(fixed)
     await bar.getByRole('button', { name: 'Limpar seleção' }).click()
     await expect(bar.getByText('Nenhum selecionado (máx. 20)')).toBeVisible()
+    expect(errors.filter(e => e.includes('BackHandler'))).toEqual([])
     await playerContext.close()
   })
 })

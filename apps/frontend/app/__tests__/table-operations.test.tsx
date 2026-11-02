@@ -9,7 +9,7 @@ import {
 import { useToast } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useFocusEffect } from 'expo-router'
-import { BackHandler } from 'react-native'
+import { BackHandler, Platform } from 'react-native'
 import { GROUP_TOAST_MS } from '../../components/chronicles/OperationSheet'
 import { operationError } from '../../components/chronicles/operationErrors'
 import {
@@ -449,6 +449,11 @@ describe('barra da seleção', () => {
         handlers.push(handler)
         return { remove }
       })
+    const original = Platform.OS
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+    })
     try {
       await render()
       await start()
@@ -468,9 +473,46 @@ describe('barra da seleção', () => {
         screen.getByRole('button', { name: 'Selecionar personagens' })
       ).toBeTruthy()
     } finally {
+      Object.defineProperty(Platform, 'OS', {
+        value: original,
+        configurable: true,
+      })
       jest.mocked(useFocusEffect).mockReset()
     }
   })
+
+  // No web o BackHandler não existe (e loga erro, que no dev cobria a
+  // barra); no iOS não há o botão
+  it.each(['web', 'ios'] as const)(
+    'no %s, ligar a seleção não chama o BackHandler',
+    async os => {
+      const focus: (() => undefined | (() => void))[] = []
+      jest.mocked(useFocusEffect).mockImplementation(cb => {
+        focus.push(cb as () => undefined | (() => void))
+      })
+      const add = jest.spyOn(BackHandler, 'addEventListener')
+      const original = Platform.OS
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+      try {
+        await render()
+        await start()
+        fireEvent.press(
+          screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+        )
+        act(() => {
+          for (const cb of focus) cb()
+        })
+        expect(add).not.toHaveBeenCalled()
+        expect(bar()).toBeTruthy()
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          value: original,
+          configurable: true,
+        })
+        jest.mocked(useFocusEffect).mockReset()
+      }
+    }
+  )
 
   it('o aviso da operação em grupo dura 10 s', async () => {
     const shown: unknown[] = []

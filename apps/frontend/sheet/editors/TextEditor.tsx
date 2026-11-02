@@ -1,5 +1,5 @@
 import { TextArea, TextField, tokens } from '@tms/ui'
-import { StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import { nextField } from '../../lib/keyboard'
 import { properNameInput } from './properName'
 import { SuggestionPicker } from './Suggestions'
@@ -21,7 +21,16 @@ export function TextEditor({
   properName,
   chain,
   inputRef,
-}: EditorProps) {
+  note,
+}: EditorProps & {
+  /**
+   * Um aviso que o leitor de tela ouve com o campo (R-09: "Privadas: o
+   * jogador não vê estas notas."): a dica no app e, no web, o
+   * `aria-describedby` apontando o texto visível com esse `id`. O nome do
+   * campo continua o rótulo.
+   */
+  readonly note?: { readonly id: string; readonly text: string }
+}) {
   const long = def.type === 'longText'
   const max =
     def.type === 'text' || def.type === 'longText'
@@ -46,6 +55,14 @@ export function TextEditor({
       }
       {...(properName ? properNameInput : {})}
       {...(chain && !long ? chainKeys(chain.next) : {})}
+      {...(note
+        ? {
+            accessibilityHint: note.text,
+            ...(Platform.OS === 'web'
+              ? ({ 'aria-describedby': note.id } as Record<string, string>)
+              : {}),
+          }
+        : {})}
     />
   )
   // Com sugestões no template (Natureza, Comportamento), a lista ao lado

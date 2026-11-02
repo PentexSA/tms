@@ -7,7 +7,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { BottomSheet, Button, Text, tokens, useTheme } from '@tms/ui'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { useSheet, useSheetSelector } from '../context'
@@ -99,8 +99,12 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
                 key={f.id}
                 title={`Editar ${f.def.label}`}
                 variant="secondary"
-                accessibilityHint={
-                  hiddenFromOwner(model, f.id) ? PRIVATE_NOTE_A11Y : undefined
+                // O aviso no nome (começa pelo texto visível, WCAG 2.5.3):
+                // a dica não chega ao DOM no web
+                accessibilityLabel={
+                  hiddenFromOwner(model, f.id)
+                    ? `Editar ${f.def.label}. ${PRIVATE_NOTE_A11Y}`
+                    : undefined
                 }
                 onPress={() => setEditing(f.id)}
               />
@@ -132,6 +136,7 @@ function TextFieldSheet({
   const { model } = useSheet()
   const commit = useCommit()
   const creating = useCreation()?.status === 'creating'
+  const noticeId = `${useId()}-privacy`
   const field = model.fields.get(id)
   const stored = useSheetSelector(s => s.values.values[id])
   const [text, setText] = useState(typeof stored === 'string' ? stored : '')
@@ -158,7 +163,9 @@ function TextFieldSheet({
     >
       {hiddenFromOwner(model, id) ? (
         <View style={styles.notice}>
-          <Text variant="caption">{PRIVATE_NOTE_SHEET}</Text>
+          <Text variant="caption" nativeID={noticeId}>
+            {PRIVATE_NOTE_SHEET}
+          </Text>
           {creating ? (
             <Text variant="caption" color="inkMuted">
               {ADJUST_HINT}
@@ -171,6 +178,11 @@ function TextFieldSheet({
         def={field.def}
         value={text}
         onChange={next => setText(String(next))}
+        note={
+          hiddenFromOwner(model, id)
+            ? { id: noticeId, text: PRIVATE_NOTE_SHEET }
+            : undefined
+        }
       />
     </BottomSheet>
   )

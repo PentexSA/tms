@@ -5,7 +5,7 @@ import {
   type RoleName,
 } from '@tms/sheet-core'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
@@ -139,7 +139,7 @@ describe('Editar como narrador', () => {
     await open(['storyteller'])
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Editar Notas do Narrador' })
+      screen.queryByRole('button', { name: /^Editar Notas do Narrador/ })
     ).toBeNull()
     // T-33: em Leitura, sem seletor de modo
     expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
@@ -172,7 +172,7 @@ describe('Editar como narrador', () => {
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
     fireEvent.press(
-      screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+      screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
     )
     const field = screen.getByLabelText('Notas do Narrador')
     expect(field.props.value).toBe(
@@ -204,7 +204,7 @@ describe('Editar como narrador', () => {
     )
     const edit = () =>
       fireEvent.press(
-        screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+        screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
       )
     edit()
     fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
@@ -269,18 +269,46 @@ describe('Notas do Narrador privadas (R-09)', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
+    // O aviso no nome do botão, começando pelo texto visível (no web, a
+    // dica não chega ao DOM)
     const edit = screen.getByRole('button', {
-      name: 'Editar Notas do Narrador',
+      name: 'Editar Notas do Narrador. Privadas: o jogador não vê',
     })
-    expect(edit.props.accessibilityHint).toBe('Privadas: o jogador não vê')
     fireEvent.press(edit)
-    expect(
-      screen.getByText('Privadas: o jogador não vê estas notas.')
-    ).toBeTruthy()
+    const notice = screen.getByText('Privadas: o jogador não vê estas notas.')
+    // O campo continua com o nome do rótulo e ouve o aviso pela dica (app)
+    const field = screen.getByLabelText('Notas do Narrador')
+    expect(field.props.accessibilityHint).toBe(
+      'Privadas: o jogador não vê estas notas.'
+    )
+    expect(notice.props.nativeID).toMatch(/-privacy$/)
     // A ficha em uso não tem o "Pedir ajuste"
     expect(screen.queryByText(/Pedir ajuste/)).toBeNull()
     // O título e o nome do campo continuam (o E2E os usa)
     expect(screen.getByLabelText('Notas do Narrador')).toBeTruthy()
+  })
+
+  it('no web, o campo aponta o aviso pelo aria-describedby', async () => {
+    const original = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      await open(['storyteller'])
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Editar como narrador' })
+      )
+      fireEvent.press(
+        screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
+      )
+      const notice = screen.getByText('Privadas: o jogador não vê estas notas.')
+      expect(screen.getByLabelText('Notas do Narrador').props).toMatchObject({
+        'aria-describedby': notice.props.nativeID,
+      })
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        value: original,
+        configurable: true,
+      })
+    }
   })
 
   it('na ficha em criação, a folha aponta o "Pedir ajuste"', async () => {
@@ -296,7 +324,7 @@ describe('Notas do Narrador privadas (R-09)', () => {
       await screen.findByRole('button', { name: 'Editar como narrador' })
     )
     fireEvent.press(
-      screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+      screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
     )
     expect(
       screen.getByText('Privadas: o jogador não vê estas notas.')
