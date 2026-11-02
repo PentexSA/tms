@@ -407,7 +407,11 @@ export function creationRoutes(
             actorId: me,
             action: 'chronicle.creation.settings',
             payload: {
-              ...(body.approval !== undefined && { approval: body.approval }),
+              ...(body.approval !== undefined && {
+                approval: body.approval,
+                // O valor de antes, para a frase "Desligada → Ligada" (T-63)
+                approvalFrom: row.character_approval,
+              }),
               defaults: body.defaults !== undefined,
             },
             at: now,

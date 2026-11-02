@@ -42,6 +42,18 @@ export const notFound = () => new ApiError(404, 'não encontrado')
 export const MAX_TARGETS = 20
 
 type Kind = 'damage' | 'heal' | 'recovery'
+
+/**
+ * Os valores do chronicle_operations_kind_check (migration 0017). A
+ * auditoria (T-63) devolve o kind do lote com este tipo, e o app tem uma
+ * frase para cada um.
+ */
+export type OperationKind =
+  | Kind
+  | 'revert'
+  | 'xp-grant'
+  | 'xp-adjust'
+  | 'xp-spend'
 type Operation =
   | Omit<GroupDamage, 'field'>
   | { readonly kind: 'recovery'; readonly recoveryId: string }

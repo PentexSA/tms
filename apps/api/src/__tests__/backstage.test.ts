@@ -8,6 +8,7 @@ import {
   createChronicle,
   createUser,
   publish,
+  setStatus,
   type TestUser,
 } from '../test/factories'
 import {
@@ -932,5 +933,228 @@ describe('auditoria consolidada', () => {
     expect(
       (await as(ctx, storyteller, 'GET', `${path}?limit=101`)).status
     ).toBe(400)
+  })
+
+  // T-63: a auditoria vira frase no app; a API manda o código tipado, a
+  // ficha alvo, o usuário alvo e o detalhe em lista branca
+  type Item = {
+    source: 'batch' | 'audit'
+    action: string
+    by: { username: string } | null
+    byRole: string | null
+    character: { id: string; name: string; deleted: boolean } | null
+    user: { username: string } | null
+    detail: Record<string, unknown>
+  }
+  const historyOf = async (id = chronicleId) => {
+    const res = await as(
+      ctx,
+      storyteller,
+      'GET',
+      `/chronicles/${id}/history?limit=100`
+    )
+    expect(res.status).toBe(200)
+    const text = await res.text()
+    return { text, items: (JSON.parse(text) as { items: Item[] }).items }
+  }
+
+  it('itens com a ficha alvo, o detalhe da lista branca e o papel do lote (T-63)', async () => {
+    const { notesField } = systemCase('vtm-v20')
+    const helena = await createCharacter(ctx, player, chronicleId, {
+      name: 'Helena Varga',
+    })
+    const caio = await createCharacter(ctx, other, chronicleId, {
+      name: 'Caio',
+    })
+    await setStatus(ctx, helena, 'active')
+    await setStatus(ctx, caio, 'active')
+    // Lote avulso do narrador
+    await as(ctx, storyteller, 'POST', `/characters/${helena}/events`, {
+      clientBatchId: crypto.randomUUID(),
+      events: [
+        { path: `values.${notesField}`, from: null, to: 'NOTA-PRIVADA' },
+      ],
+    })
+    // NPC criado e revelado
+    const npc = (await (
+      await as(
+        ctx,
+        storyteller,
+        'POST',
+        `/chronicles/${chronicleId}/characters`,
+        {
+          kind: 'npc',
+          clientCommandId: crypto.randomUUID(),
+          values: { name: 'Figura Velada', clan: 'tremere' },
+        }
+      )
+    ).json()) as { id: string }
+    await as(ctx, storyteller, 'POST', `/characters/${npc.id}/visibility`, {
+      clientCommandId: crypto.randomUUID(),
+      visibility: 'identity',
+      revision: 0,
+    })
+    // Regras da criação: aprovação Desligada → Ligada
+    expect(
+      (
+        await as(
+          ctx,
+          storyteller,
+          'PATCH',
+          `/chronicles/${chronicleId}/creation-settings`,
+          { revision: 0, approval: true }
+        )
+      ).status
+    ).toBe(200)
+    // XP para duas fichas: um registro e dois lotes
+    expect(
+      (
+        await as(ctx, storyteller, 'POST', `/chronicles/${chronicleId}/xp`, {
+          clientOperationId: crypto.randomUUID(),
+          amount: 3,
+          reason: 'MOTIVO-LIVRE',
+          targets: [{ characterId: helena }, { characterId: caio }],
+        })
+      ).status
+    ).toBe(201)
+    // O jogador sai: o usuário alvo entra na linha
+    await as(ctx, other, 'DELETE', `/chronicles/${chronicleId}/members/me`)
+
+    const { text, items } = await historyOf()
+    const find = (action: string) => items.filter(i => i.action === action)
+
+    const change = find('sheet.change')[0]
+    expect(change).toMatchObject({
+      source: 'batch',
+      byRole: 'storyteller',
+      character: { id: helena, name: 'Helena Varga', deleted: false },
+      user: null,
+      detail: {},
+    })
+    expect(find('character.create-npc')[0]?.character?.name).toBe(
+      'Figura Velada'
+    )
+    expect(find('character.visibility')[0]).toMatchObject({
+      character: { id: npc.id, name: 'Figura Velada' },
+      detail: { from: 'hidden', to: 'identity' },
+    })
+    expect(find('chronicle.creation.settings')[0]?.detail).toEqual({
+      approval: true,
+      approvalFrom: false,
+      defaults: false,
+    })
+    expect(find('xp.grant')).toHaveLength(1)
+    expect(find('xp.grant')[0]?.detail).toEqual({ amount: 3, characters: 2 })
+    expect(
+      find('xp-grant')
+        .map(i => i.character?.name)
+        .sort()
+    ).toEqual(['Caio', 'Helena Varga'])
+    expect(find('member.leave')[0]).toMatchObject({
+      user: { username: 'outra-v5' },
+      detail: { characters: 1 },
+    })
+    // Nada de payload cru, texto livre nem ids das fichas do xp.grant
+    expect(text).not.toContain('payload')
+    expect(text).not.toContain('MOTIVO-LIVRE')
+    expect(text).not.toContain('NOTA-PRIVADA')
+    const grantDetail = JSON.stringify(find('xp.grant')[0]?.detail)
+    expect(grantDetail).not.toContain(helena)
+    expect(grantDetail).not.toContain(caio)
+    for (const item of items)
+      for (const value of Object.values(item.detail))
+        expect(['string', 'number', 'boolean']).toContain(typeof value)
+
+    // A ficha excluída aparece com o nome e a marca
+    await as(ctx, storyteller, 'DELETE', `/characters/${caio}`)
+    const after = await historyOf()
+    expect(
+      after.items.find(i => i.action === 'xp-grant' && i.character?.id === caio)
+        ?.character
+    ).toEqual({ id: caio, name: 'Caio', deleted: true })
+  })
+
+  it('criar a crônica e um convite entra na auditoria, sem o código nem o hash (T-63)', async () => {
+    const created = await as(ctx, storyteller, 'POST', '/chronicles', {
+      clientCommandId: crypto.randomUUID(),
+      name: 'Crônica Nova',
+      systemCode: 'vtm-v20',
+    })
+    expect(created.status).toBe(201)
+    const { id } = (await created.json()) as { id: string }
+    // O caminho sem chave (app antigo) também registra
+    const legacy = (await (
+      await as(ctx, storyteller, 'POST', '/chronicles', {
+        name: 'Crônica Antiga',
+        systemCode: 'vtm-v20',
+      })
+    ).json()) as { id: string }
+    const invite = (await (
+      await as(ctx, storyteller, 'POST', `/chronicles/${id}/invites`, {
+        maxUses: 3,
+        expiresInDays: 5,
+      })
+    ).json()) as { id: string; code: string }
+    expect(invite.code.length).toBeGreaterThan(10)
+
+    const { text, items } = await historyOf(id)
+    expect(items.map(i => i.action).sort()).toEqual([
+      'chronicle.create',
+      'invite.create',
+    ])
+    expect(items.find(i => i.action === 'invite.create')?.detail).toEqual({
+      maxUses: 3,
+      expiresInDays: 5,
+    })
+    expect(text).not.toContain(invite.code)
+    expect((await historyOf(legacy.id)).items.map(i => i.action)).toEqual([
+      'chronicle.create',
+    ])
+    // O payload gravado também não tem o código nem o hash
+    const rows = await ctx.db
+      .selectFrom('chronicle_audit')
+      .select('payload')
+      .where('chronicle_id', '=', id)
+      .execute()
+    const hash = (
+      await ctx.db
+        .selectFrom('chronicle_invites')
+        .select('code_hash')
+        .where('id', '=', invite.id)
+        .executeTakeFirstOrThrow()
+    ).code_hash
+    const stored = JSON.stringify(rows)
+    expect(stored).not.toContain(invite.code)
+    expect(stored).not.toContain(hash)
+  })
+
+  it('alvo de outra crônica não traz nome (registro forjado) (T-63)', async () => {
+    const elsewhere = await createChronicle(
+      ctx,
+      storyteller,
+      'vtm-v20',
+      'Outra'
+    )
+    const foreign = await createCharacter(ctx, storyteller, elsewhere, {
+      name: 'Ficha de Outra Crônica',
+    })
+    await ctx.db
+      .insertInto('chronicle_audit')
+      .values({
+        chronicle_id: chronicleId,
+        actor_id: storyteller.id,
+        action: 'character.lock',
+        target_character_id: foreign,
+        payload: JSON.stringify({ segredo: 'NAO-SAI' }),
+        created_at: new Date(),
+      })
+      .execute()
+    const { text, items } = await historyOf()
+    expect(items.find(i => i.action === 'character.lock')).toMatchObject({
+      character: null,
+      detail: {},
+    })
+    expect(text).not.toContain('Ficha de Outra Crônica')
+    expect(text).not.toContain('NAO-SAI')
   })
 })

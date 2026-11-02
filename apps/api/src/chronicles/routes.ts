@@ -157,12 +157,22 @@ export function chronicleRoutes(
           })
         const key = body.clientCommandId
         if (!key) {
-          // Sem chave (app antigo): cria como antes, sem idempotência
-          const chronicle = await db
-            .insertInto('chronicles')
-            .values({ storyteller_id: me, system_id: system.id, name })
-            .returning(['id', 'name'])
-            .executeTakeFirstOrThrow()
+          // Sem chave (app antigo): cria como antes, sem idempotência. A
+          // crônica e o registro da auditoria (T-63) entram juntos
+          const chronicle = await db.transaction().execute(async trx => {
+            const row = await trx
+              .insertInto('chronicles')
+              .values({ storyteller_id: me, system_id: system.id, name })
+              .returning(['id', 'name'])
+              .executeTakeFirstOrThrow()
+            await audit(trx, {
+              chronicleId: row.id,
+              actorId: me,
+              action: 'chronicle.create',
+              at: options.now(),
+            })
+            return row
+          })
           set.status = 201
           return {
             id: chronicle.id,
@@ -210,6 +220,14 @@ export function chronicleRoutes(
             .values({ storyteller_id: me, system_id: system.id, name })
             .returning(['id', 'name'])
             .executeTakeFirstOrThrow()
+          // T-63: a criação da crônica entra na auditoria (só daqui para a
+          // frente; as que já existem não ganham registro retroativo)
+          await audit(trx, {
+            chronicleId: chronicle.id,
+            actorId: me,
+            action: 'chronicle.create',
+            at: options.now(),
+          })
           await trx
             .insertInto('user_commands')
             .values({
@@ -523,21 +541,34 @@ export function chronicleRoutes(
         const me = requireUser(userId)
         await requireStoryteller(me, params.id)
         const code = newInviteCode()
-        const expiresAt = new Date(
-          options.now().getTime() + (body?.expiresInDays ?? 7) * DAY
-        )
-        const invite = await db
-          .insertInto('chronicle_invites')
-          .values({
-            chronicle_id: params.id,
-            code_hash: hashInviteCode(code),
-            created_by: me,
-            created_at: options.now(),
-            expires_at: expiresAt,
-            max_uses: body?.maxUses ?? 10,
+        const now = options.now()
+        const expiresInDays = body?.expiresInDays ?? 7
+        const maxUses = body?.maxUses ?? 10
+        const expiresAt = new Date(now.getTime() + expiresInDays * DAY)
+        const invite = await db.transaction().execute(async trx => {
+          const row = await trx
+            .insertInto('chronicle_invites')
+            .values({
+              chronicle_id: params.id,
+              code_hash: hashInviteCode(code),
+              created_by: me,
+              created_at: now,
+              expires_at: expiresAt,
+              max_uses: maxUses,
+            })
+            .returning(['id', 'expires_at', 'max_uses'])
+            .executeTakeFirstOrThrow()
+          // T-63: o convite gerado entra na auditoria. Nunca o código nem o
+          // hash dele: só o id, os usos e a validade
+          await audit(trx, {
+            chronicleId: params.id,
+            actorId: me,
+            action: 'invite.create',
+            payload: { inviteId: row.id, maxUses, expiresInDays },
+            at: now,
           })
-          .returning(['id', 'expires_at', 'max_uses'])
-          .executeTakeFirstOrThrow()
+          return row
+        })
         set.status = 201
         // O código só aparece nesta resposta; o banco guarda o hash
         return {

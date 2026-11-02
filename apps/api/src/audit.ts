@@ -37,6 +37,10 @@ export type AuditAction =
   | 'chronicle.transfer.accept'
   | 'chronicle.transfer.reject'
   | 'chronicle.transfer.cancel'
+  // T-63 (onda 3): a criação da crônica e do convite. O convite guarda só o
+  // id, os usos e a validade, nunca o código nem o hash dele
+  | 'chronicle.create'
+  | 'invite.create'
 
 export async function audit(
   trx: Transaction<DB>,
