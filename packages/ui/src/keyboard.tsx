@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useCallback, useRef, useState } from 'react'
 import {
+  type HostInstance,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  View,
   type ViewStyle,
 } from 'react-native'
 
@@ -30,16 +32,39 @@ export interface KeyboardAreaProps {
   readonly testID?: string
 }
 
-/** Área que encolhe acima do teclado, com `flex: 1`. */
+/**
+ * Área que encolhe acima do teclado, com `flex: 1`.
+ *
+ * O `KeyboardAvoidingView` compara o próprio `onLayout` (relativo ao pai) com
+ * a posição do teclado na janela: dentro de uma tela com cabeçalho e safe
+ * area, ele encolhia de menos, pela altura de tudo o que fica acima dele, e
+ * o fim da rolagem continuava atrás do teclado. O invólucro mede a própria
+ * posição na janela e a passa como `keyboardVerticalOffset`.
+ */
 export function KeyboardArea({ children, style, testID }: KeyboardAreaProps) {
+  const ref = useRef<HostInstance>(null)
+  const [offset, setOffset] = useState(0)
+  const behavior = keyboardBehavior()
+  const measure = useCallback(() => {
+    ref.current?.measureInWindow((_x, y) => {
+      if (Number.isFinite(y)) setOffset(y)
+    })
+  }, [])
   return (
-    <KeyboardAvoidingView
+    <View
+      ref={ref}
       testID={testID}
-      behavior={keyboardBehavior()}
       style={[styles.area, style]}
+      onLayout={behavior ? measure : undefined}
     >
-      {children}
-    </KeyboardAvoidingView>
+      <KeyboardAvoidingView
+        behavior={behavior}
+        keyboardVerticalOffset={offset}
+        style={styles.area}
+      >
+        {children}
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 

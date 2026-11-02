@@ -247,6 +247,7 @@ Texto como cidadão de primeira classe.
 
 - **Classes:** `ds-field` (rótulo envolvendo), `ds-field__label` (caption 700, `ink-muted`), `ds-input` (44) e `ds-textarea` (8rem, redimensiona na vertical), `ds-field__help`, `ds-field__error` (ícone + texto em `danger`), `.has-error` (borda `danger`). O **AspectField** ainda é `p-aspect` no protótipo: tipo do campo + texto na fonte `voice`, fixado no topo pela seção com `pinTop`.
 - **Editor em sheet:** contador "20 de 80 caracteres" em `aria-live="polite"`, `maxlength` do template, Cancelar e Salvar, foco inicial no campo.
+- **Foco e "Próximo" (RN, T-26):** `ref?: Ref<TextInputInstance>` vai ao `TextInput` (no React 19, `ref` é prop). Nos formulários, os campos de uma linha encadeiam o "Próximo" do teclado (login: e-mail → senha; cadastro: e-mail → usuário → senha; Nova ficha: os textos na ordem do formulário, sem os de escolha). Só a última ação envia onde já enviava (a senha); na Nova ficha, o último campo mostra "concluído" e não cria a ficha. As telas com formulário e a rolagem da ficha ficam num `KeyboardArea`, que encolhe acima do teclado também no Android.
 - **Linha da dica e do contador (RN, T-64):** a dica (ou o erro) ocupa o resto da linha e quebra em várias; o contador fica inteiro, à direita, com `gap` de 8 entre os dois.
 - **API RN:**
 

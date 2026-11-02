@@ -9,7 +9,8 @@ import {
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { submitField } from '../../lib/keyboard'
 import { useSheet } from '../context'
 import { properNameInput } from '../editors/properName'
 import { SuggestionChips } from '../editors/Suggestions'
@@ -21,18 +22,6 @@ import { useFieldIssue, useSetDraft } from './hooks'
 // text e longText em Evoluir: a linha mostra o começo do texto e abre um
 // sheet com o campo, o contador e o limite do template (o mesmo do servidor).
 // O texto é do jogador: aparece sempre em <Text>, nunca como HTML.
-
-// T-10: no campo de uma linha, o "✓" do teclado (Enter no web) aplica, como
-// no "Digitar" do NumberEditorRow (T-25). Enter não tira o foco: com erro,
-// o campo fica aberto. No texto longo, Enter continua sendo nova linha.
-function singleLineSubmit(apply: () => void) {
-  return {
-    returnKeyType: 'done',
-    submitBehavior: 'submit',
-    ...(Platform.OS === 'web' ? { blurOnSubmit: false } : {}),
-    onSubmitEditing: apply,
-  } as const
-}
 
 export function TextEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
@@ -120,7 +109,10 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           placeholder={def.placeholder}
           autoFocus
           {...(required ? properNameInput : {})}
-          {...(long ? {} : singleLineSubmit(apply))}
+          // T-10: no campo de uma linha, o "✓" do teclado (Enter no web)
+          // aplica, como o "Digitar" (T-25); com erro, o campo fica aberto.
+          // No texto longo, Enter continua sendo nova linha.
+          {...(long ? {} : submitField('done', apply))}
         />
         {def.type === 'text' && def.suggestions?.length ? (
           <View style={styles.suggestions}>

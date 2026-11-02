@@ -6,6 +6,7 @@ import {
   Platform,
   Text as RNText,
   StyleSheet,
+  View,
   type ViewStyle,
 } from 'react-native'
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context'
@@ -157,14 +158,53 @@ describe('T-10: a folha acompanha o teclado no Android', () => {
         </KeyboardArea>
       )
     )
-    const area = screen.UNSAFE_getByType(KeyboardAvoidingView)
-    expect(area.props.behavior).toBe('padding')
-    expect(StyleSheet.flatten(area.props.style)).toEqual({
+    const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView)
+    expect(avoiding.props.behavior).toBe('padding')
+    expect(StyleSheet.flatten(avoiding.props.style)).toEqual({ flex: 1 })
+    expect(styleOf(screen.getByTestId('area'))).toEqual({
       flex: 1,
       padding: 4,
     })
-    expect(screen.getByTestId('area')).toBeTruthy()
     expect(screen.getByText('campo')).toBeTruthy()
+  })
+
+  it('KeyboardArea: o deslocamento é a posição da área na janela (cabeçalho e safe area acima)', () => {
+    const measureInWindow = jest
+      .spyOn(View.prototype as never, 'measureInWindow' as never)
+      .mockImplementation(((cb: (x: number, y: number) => void) =>
+        cb(0, 95)) as never)
+    try {
+      withOS('android', () =>
+        render(
+          <KeyboardArea testID="area">
+            <RNText>campo</RNText>
+          </KeyboardArea>
+        )
+      )
+      fireEvent(screen.getByTestId('area'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 700 } },
+      })
+      expect(
+        screen.UNSAFE_getByType(KeyboardAvoidingView).props
+          .keyboardVerticalOffset
+      ).toBe(95)
+    } finally {
+      measureInWindow.mockRestore()
+    }
+  })
+
+  it('KeyboardArea no web: sem behavior e sem medir', () => {
+    withOS('web', () =>
+      render(
+        <KeyboardArea testID="area">
+          <RNText>campo</RNText>
+        </KeyboardArea>
+      )
+    )
+    expect(
+      screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior
+    ).toBeUndefined()
+    expect(screen.getByTestId('area').props.onLayout).toBeUndefined()
   })
 
   it('o Esc no web continua fechando a folha (T-71)', () => {

@@ -1,13 +1,17 @@
-import { Banner, Button, Screen, Text, TextField, tokens } from '@tms/ui'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-} from 'react-native'
+  Banner,
+  Button,
+  KeyboardArea,
+  Screen,
+  Text,
+  TextField,
+  tokens,
+} from '@tms/ui'
+import { useRouter } from 'expo-router'
+import { useRef, useState } from 'react'
+import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { nextField } from '../../lib/keyboard'
 import { AuthError } from '../../lib/session'
 import { useSession } from '../../lib/session/SessionProvider'
 import {
@@ -28,6 +32,8 @@ export default function RegisterScreen() {
   const [fields, setFields] = useState<FieldErrors<RegisterInput>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const usernameInput = useRef<TextInputInstance>(null)
+  const passwordInput = useRef<TextInputInstance>(null)
   const set = (key: keyof RegisterInput) => (value: string) =>
     setForm(f => ({ ...f, [key]: value }))
 
@@ -51,10 +57,8 @@ export default function RegisterScreen() {
 
   return (
     <Screen>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* O formulário encolhe acima do teclado também no Android (T-26) */}
+      <KeyboardArea>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -77,9 +81,12 @@ export default function RegisterScreen() {
             textContentType="emailAddress"
             maxLength={254}
             counter={false}
+            // "Próximo": e-mail → usuário → senha (T-26)
+            {...nextField(() => usernameInput.current?.focus())}
             testID="register-email"
           />
           <TextField
+            ref={usernameInput}
             label="Nome de usuário"
             value={form.username}
             onChangeText={set('username')}
@@ -90,9 +97,11 @@ export default function RegisterScreen() {
             spellCheck={false}
             autoComplete="username-new"
             maxLength={24}
+            {...nextField(() => passwordInput.current?.focus())}
             testID="register-username"
           />
           <TextField
+            ref={passwordInput}
             label="Senha"
             value={form.password}
             onChangeText={set('password')}
@@ -103,6 +112,8 @@ export default function RegisterScreen() {
             textContentType="newPassword"
             maxLength={128}
             counter={false}
+            returnKeyType="go"
+            onSubmitEditing={submit}
             testID="register-password"
           />
           <Button title="Criar conta" onPress={submit} busy={busy} />
@@ -112,13 +123,12 @@ export default function RegisterScreen() {
             onPress={() => router.replace('/login')}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardArea>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     gap: tokens.space[4],
     padding: tokens.layout.gutter,

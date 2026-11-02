@@ -1,7 +1,7 @@
 import { canWrite, type SheetModel, validateSheet } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, type TextInputInstance, View } from 'react-native'
 import { editors } from './editors'
 
 // Criação de ficha (Etapa 14): o formulário sai do template. São os campos de
@@ -73,6 +73,23 @@ export function CharacterForm({
   const fromServer = Object.fromEntries(
     serverIssues.map(i => [fieldOfPath(i.path), i.message])
   )
+  const rows = rowsOf(model, fields, nameField)
+  // "Próximo" (T-26): os campos de texto de uma linha, na ordem do
+  // formulário. Os de escolha (o Clã) ficam fora da cadeia.
+  const inputs = useRef(new Map<string, TextInputInstance | null>())
+  const chain = rows
+    .flat()
+    .filter(id => model.fields.get(id)?.def.type === 'text')
+  const chainOf = (id: string) => {
+    const at = chain.indexOf(id)
+    if (at < 0) return undefined
+    const following = chain[at + 1]
+    return {
+      next: following
+        ? () => inputs.current.get(following)?.focus()
+        : undefined,
+    }
+  }
 
   const submit = () => {
     const clean: Record<string, unknown> = {}
@@ -96,7 +113,7 @@ export function CharacterForm({
   return (
     <View style={styles.form}>
       {error ? <Banner tone="danger" message={error} /> : null}
-      {rowsOf(model, fields, nameField).map(row => (
+      {rows.map(row => (
         <View key={row.join(':')} style={styles.row}>
           {row.map(id => {
             const def = model.fields.get(id)?.def
@@ -111,6 +128,10 @@ export function CharacterForm({
                   required={id === nameField}
                   properName={id === nameField}
                   error={errors[id] ?? fromServer[id]}
+                  chain={chainOf(id)}
+                  inputRef={el => {
+                    inputs.current.set(id, el)
+                  }}
                   onChange={next => {
                     setValues(v => ({ ...v, [id]: next }))
                     setErrors(({ [id]: _, ...rest }) => rest)

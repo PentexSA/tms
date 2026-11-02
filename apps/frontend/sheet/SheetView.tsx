@@ -9,6 +9,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import {
+  KeyboardArea,
   SectionHeader,
   TabPanel,
   Tabs,
@@ -169,54 +170,60 @@ function SheetBody({
         <FieldSheetProvider>
           <View style={styles.screen}>
             {writer ? <ModeBar /> : null}
-            <ScrollView
-              contentContainerStyle={styles.content}
-              keyboardShouldPersistTaps="handled"
-            >
-              <ConflictBanner />
-              {editable ? <PolicyBanner /> : null}
-              {editable ? <CreationStatusPanel /> : null}
-              {editable && mode === 'create' ? <CreationAlerts /> : null}
-              {mode === 'play' ? (
-                <View style={styles.toolbar}>
-                  {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
-                  <DiceButton
-                    characterId={store.getState().characterId}
-                    store={store}
-                  />
-                  <ActionsButton />
-                </View>
-              ) : null}
-              <IdentityBlock />
-              {play.length && !docked ? (
-                <View>
-                  <View style={styles.title}>
-                    <SectionHeader title="Em jogo" level="group" />
+            {/* Só a rolagem encolhe acima do teclado (T-26): o campo do
+                "Digitar", a busca e os textos ficam à vista; o dock e o
+                aviso de bônus ficam atrás do teclado enquanto ele está
+                aberto */}
+            <KeyboardArea>
+              <ScrollView
+                contentContainerStyle={styles.content}
+                keyboardShouldPersistTaps="handled"
+              >
+                <ConflictBanner />
+                {editable ? <PolicyBanner /> : null}
+                {editable ? <CreationStatusPanel /> : null}
+                {editable && mode === 'create' ? <CreationAlerts /> : null}
+                {mode === 'play' ? (
+                  <View style={styles.toolbar}>
+                    {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
+                    <DiceButton
+                      characterId={store.getState().characterId}
+                      store={store}
+                    />
+                    <ActionsButton />
                   </View>
-                  {play.map(s => (
-                    <SectionView key={s.id} section={s} hideTitle />
-                  ))}
-                </View>
-              ) : null}
-              {tabs.length ? (
-                <View style={styles.tabs}>
-                  <Tabs
-                    id="sheet-parts"
-                    accessibilityLabel="Partes da ficha"
-                    items={tabs}
-                    selected={shownTab ?? ''}
-                    onSelect={setTab}
-                  />
-                </View>
-              ) : null}
-              {paneled && shownTab !== undefined ? (
-                <TabPanel tabsId="sheet-parts" tab={shownTab}>
-                  {zoneContent}
-                </TabPanel>
-              ) : (
-                <View>{zoneContent}</View>
-              )}
-            </ScrollView>
+                ) : null}
+                <IdentityBlock />
+                {play.length && !docked ? (
+                  <View>
+                    <View style={styles.title}>
+                      <SectionHeader title="Em jogo" level="group" />
+                    </View>
+                    {play.map(s => (
+                      <SectionView key={s.id} section={s} hideTitle />
+                    ))}
+                  </View>
+                ) : null}
+                {tabs.length ? (
+                  <View style={styles.tabs}>
+                    <Tabs
+                      id="sheet-parts"
+                      accessibilityLabel="Partes da ficha"
+                      items={tabs}
+                      selected={shownTab ?? ''}
+                      onSelect={setTab}
+                    />
+                  </View>
+                ) : null}
+                {paneled && shownTab !== undefined ? (
+                  <TabPanel tabsId="sheet-parts" tab={shownTab}>
+                    {zoneContent}
+                  </TabPanel>
+                ) : (
+                  <View>{zoneContent}</View>
+                )}
+              </ScrollView>
+            </KeyboardArea>
             {docked ? <CombatDock /> : null}
             {budget ? (
               <BonusNotice onBudget={() => setTab(BUDGET_TAB)} />

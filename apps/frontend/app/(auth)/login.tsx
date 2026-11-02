@@ -1,13 +1,17 @@
-import { Banner, Button, Screen, Text, TextField, tokens } from '@tms/ui'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-} from 'react-native'
+  Banner,
+  Button,
+  KeyboardArea,
+  Screen,
+  Text,
+  TextField,
+  tokens,
+} from '@tms/ui'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useRef, useState } from 'react'
+import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { nextField } from '../../lib/keyboard'
 import { AuthError } from '../../lib/session'
 import { useSession } from '../../lib/session/SessionProvider'
 
@@ -20,6 +24,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const passwordInput = useRef<TextInputInstance>(null)
 
   const submit = async () => {
     if (!email.trim() || !password) {
@@ -40,10 +45,8 @@ export default function LoginScreen() {
 
   return (
     <Screen>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* O formulário encolhe acima do teclado também no Android (T-26) */}
+      <KeyboardArea>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -73,9 +76,12 @@ export default function LoginScreen() {
             textContentType="emailAddress"
             maxLength={254}
             counter={false}
+            // "Próximo" leva à senha (T-26); só a senha envia
+            {...nextField(() => passwordInput.current?.focus())}
             testID="login-email"
           />
           <TextField
+            ref={passwordInput}
             label="Senha"
             value={password}
             onChangeText={setPassword}
@@ -94,13 +100,12 @@ export default function LoginScreen() {
             onPress={() => router.replace('/register')}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardArea>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     gap: tokens.space[4],
     padding: tokens.layout.gutter,
