@@ -86,8 +86,8 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByLabel('Conceito').fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
   await page.getByLabel('Senhor').fill('Ana Bathory')
-  await page.getByLabel('Natureza').fill('Arquiteta')
-  await page.getByLabel('Comportamento').fill('Conformista')
+  await page.getByLabel('Natureza', { exact: true }).fill('Arquiteta')
+  await page.getByLabel('Comportamento', { exact: true }).fill('Conformista')
   await page.getByRole('button', { name: 'Criar ficha' }).click()
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   const id = /characters\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? ''

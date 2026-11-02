@@ -76,7 +76,7 @@ test('T-35 e T-71: abas com setas e Espaço; Esc devolve o foco; um Fechar', asy
   await add.focus()
   await page.keyboard.press('Enter')
   await expect(
-    page.getByRole('dialog').or(page.locator('[aria-modal]'))
+    page.getByRole('dialog').or(page.locator('[aria-modal]')).first()
   ).toBeVisible()
   // T-71: o fundo não é um segundo "Fechar"
   await expect(page.getByRole('button', { name: 'Fechar' })).toHaveCount(1)
