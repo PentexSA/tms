@@ -18,6 +18,7 @@ import {
 const KEY = 'outbox:'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_LABEL = 200
+const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -25,7 +26,7 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 /** O lote, se a forma bater com a que o servidor aceita; senão null. */
 export function parseQueuedBatch(raw: unknown): QueuedBatch | null {
   if (!isObject(raw)) return null
-  const { clientBatchId, events, label } = raw
+  const { clientBatchId, events, label, draft, draftMeta } = raw
   if (typeof clientBatchId !== 'string' || !UUID.test(clientBatchId))
     return null
   if (typeof label !== 'string' || label.length > MAX_LABEL) return null
@@ -41,7 +42,27 @@ export function parseQueuedBatch(raw: unknown): QueuedBatch | null {
       return null
     parsed.push({ path: e.path as string, from: e.from ?? null, to: e.to })
   }
-  const batch: QueuedBatch = { clientBatchId, events: parsed, label }
+  // A origem (o "Salvar" de Criação/Editar) sobrevive a reiniciar o app: o
+  // lote recusado volta ao rascunho, não some (T-03, T-31). Só `true` conta
+  const meta = isObject(draftMeta) ? draftMeta : null
+  const batch: QueuedBatch = {
+    clientBatchId,
+    events: parsed,
+    label,
+    ...(draft === true ? { draft: true } : {}),
+    ...(draft === true &&
+    meta &&
+    typeof meta.templateVersion === 'string' &&
+    VERSION.test(meta.templateVersion) &&
+    (meta.mode === 'create' || meta.mode === 'evolve')
+      ? {
+          draftMeta: {
+            templateVersion: meta.templateVersion,
+            mode: meta.mode,
+          },
+        }
+      : {}),
+  }
   return batchBytes(batch) > MAX_BATCH_BYTES ? null : batch
 }
 

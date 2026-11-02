@@ -183,6 +183,20 @@ Table chronicle_commands {
   }
 }
 
+// Comandos idempotentes por usuário (0022): a Nova crônica ainda não tem
+// linha-pai para travar. Guarda só ids, o hash do pedido e `{ id }`.
+Table user_commands {
+  user_id uuid [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  client_command_id uuid [not null]
+  kind text [not null]
+  request_hash text [not null]
+  result jsonb [not null]
+  created_at timestamptz [not null]
+  indexes {
+    (user_id, client_command_id) [pk]
+  }
+}
+
 Table chronicle_sessions {
   id uuid [pk]
   chronicle_id uuid [not null, ref: > chronicles.id, note: 'ON DELETE CASCADE']

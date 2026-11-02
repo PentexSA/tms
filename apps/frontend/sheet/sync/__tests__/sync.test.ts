@@ -2,9 +2,15 @@ import { QueryClient } from '@tanstack/react-query'
 import { sheetFor } from '../../../test/fixtures'
 import { sheetKeys } from '../../data'
 import { createSheetStore } from '../../store/sheetStore'
+import { createMemoryDraftStore } from '../draftStore'
 import { createMemoryOutbox, type Outbox, type QueuedBatch } from '../outbox'
 import type { PostOutcome } from '../sender'
-import { createSync, issuesOf, rejectionMessage } from '../sync'
+import {
+  createSync,
+  issuesOf,
+  parseConflictBody,
+  rejectionMessage,
+} from '../sync'
 
 // Etapa 16: fila + envio + store + cache, sem tela.
 
@@ -138,7 +144,7 @@ it('409: o store guarda o conflito e a ficha é rebuscada', async () => {
   await flush()
   store.getState().commit([blood(9, 8)], 'Sangue −1')
   await flush()
-  expect(store.getState().conflict?.paths).toEqual(['values.blood'])
+  expect(store.getState().conflict?.play?.paths).toEqual(['values.blood'])
   expect(invalidate).toHaveBeenCalledWith({ queryKey: sheetKeys.character(ID) })
 })
 
@@ -283,6 +289,56 @@ it('logout: para o envio e apaga a fila', async () => {
   expect(post).toHaveBeenCalledTimes(1)
 })
 
+// T-03: o rascunho guardado sai no logout, como a fila
+it('reset (logout) apaga os rascunhos guardados; start varre os vencidos', async () => {
+  const drafts = createMemoryDraftStore()
+  const sync = createSync({
+    outbox: createMemoryOutbox(),
+    drafts,
+    post: jest.fn(),
+    queryClient: new QueryClient(),
+    notify: jest.fn(),
+  })
+  expect(sync.drafts).toBe(drafts)
+  await drafts.write({
+    v: 1,
+    characterId: ID,
+    templateVersion: '1.0.0',
+    baseVersion: 3,
+    mode: 'evolve',
+    savedAt: Date.now(),
+    edits: [{ path: 'values.strength', from: 2, to: 3 }],
+  })
+  const sweep = jest.spyOn(drafts, 'sweep')
+  await sync.start()
+  expect(sweep).toHaveBeenCalledTimes(1)
+  expect(await drafts.characters()).toEqual([ID])
+  await sync.reset()
+  expect(await drafts.characters()).toEqual([])
+  expect(drafts.count.getSnapshot()).toBe(0)
+})
+
+it('enqueue diz se o lote entrou no outbox', async () => {
+  const { sync, store } = setup(() => ({ status: 200, body: null }))
+  const result = store.getState().commit([blood(9, 8)], 'Sangue −1')
+  expect(result.ok && (await result.queued)).toBe(true)
+  const broken: Outbox = {
+    ...createMemoryOutbox(),
+    enqueue: () => Promise.reject(new Error('disco cheio')),
+  }
+  const failing = setup(() => ({ status: 200, body: null }), broken)
+  const refused = failing.store.getState().commit([blood(9, 8)], 'Sangue −1')
+  expect(refused.ok && (await refused.queued)).toBe(false)
+  await expect(
+    failing.sync.enqueue(ID, {
+      clientBatchId: '00000000-0000-4000-8000-0000000000ff',
+      events: [blood(9, 8)],
+      label: 'x',
+    })
+  ).rejects.toThrow('disco cheio')
+  expect(sync).toBeTruthy()
+})
+
 it('flush: reconectou, tenta já', async () => {
   const { store, sync, post } = setup(() => ({ status: 0, body: null }))
   await flush()
@@ -334,5 +390,200 @@ describe('422 (Etapa 18)', () => {
     expect(
       issuesOf({ issues: [{ path: 'values.a', message: 'm', extra: 1 }] })
     ).toEqual([{ path: 'values.a', message: 'm' }])
+  })
+})
+
+// T-31: o corpo do 409 é input hostil
+describe('parseConflictBody', () => {
+  const batch: QueuedBatch = {
+    clientBatchId: '00000000-0000-4000-8000-000000000001',
+    events: [
+      { path: 'values.sire', from: 'A', to: 'B' },
+      { path: 'values.strength', from: 2, to: 3 },
+    ],
+    label: 'x',
+  }
+
+  it('só caminhos válidos do próprio lote, sem repetição', () => {
+    expect(
+      parseConflictBody(
+        {
+          issues: [
+            { path: 'values.sire', message: 'conflito' },
+            { path: 'values.sire', message: 'de novo' },
+            { path: 'values.storytellerNotes', message: 'fora do lote' },
+            { path: 7 },
+            null,
+          ],
+          current: { 'values.sire': 'ignorado' },
+        },
+        batch
+      )
+    ).toEqual({ paths: ['values.sire'], changedBy: { 'values.sire': null } })
+  })
+
+  it('changedBy só com os valores conhecidos; o resto vira null', () => {
+    const both: QueuedBatch['events'] = batch.events
+    const issues = both.map(e => ({ path: e.path, message: 'c' }))
+    expect(
+      parseConflictBody(
+        {
+          issues,
+          changedBy: {
+            'values.sire': 'storyteller',
+            'values.strength': 'admin@x.test',
+            'values.outro': 'owner',
+          },
+        },
+        batch
+      )
+    ).toEqual({
+      paths: ['values.sire', 'values.strength'],
+      changedBy: { 'values.sire': 'storyteller', 'values.strength': null },
+    })
+  })
+
+  it('corpo sem issues ou quebrado: nenhum caminho', () => {
+    for (const body of [null, 'x', {}, { issues: 'x' }])
+      expect(parseConflictBody(body, batch)).toEqual({
+        paths: [],
+        changedBy: {},
+      })
+  })
+
+  it('no máximo 50', () => {
+    const big: QueuedBatch = {
+      ...batch,
+      events: Array.from({ length: 60 }, (_, i) => ({
+        path: `values.f${i}`,
+        from: 0,
+        to: 1,
+      })),
+    }
+    const issues = big.events.map(e => ({ path: e.path, message: 'c' }))
+    expect(parseConflictBody({ issues }, big).paths).toHaveLength(50)
+  })
+})
+
+it('o 409 chega ao store só com os caminhos em conflito', async () => {
+  const { store } = setup(() => ({
+    status: 409,
+    body: { issues: [{ path: 'values.blood', message: 'conflito' }] },
+  }))
+  store
+    .getState()
+    .commit([blood(9, 8), { path: 'values.strength', from: 2, to: 3 }], 'Ação')
+  await flush()
+  expect(store.getState().conflict?.play?.paths).toEqual(['values.blood'])
+})
+
+// Achado do /code-review: o 409 ou 422 do "Salvar" com a ficha fechada
+// sumia (o rascunho já tinha saído do aparelho quando o lote entrou no outbox)
+describe('o "Salvar" recusado com a ficha fechada volta ao rascunho guardado', () => {
+  function savedThenClosed(status: 409 | 422) {
+    const drafts = createMemoryDraftStore()
+    let answer: (o: PostOutcome) => void = () => undefined
+    const post = jest.fn(
+      () =>
+        new Promise<PostOutcome>(resolve => {
+          answer = resolve
+        })
+    )
+    const notify = jest.fn()
+    const sync = createSync({
+      outbox: createMemoryOutbox(),
+      drafts,
+      post,
+      queryClient: new QueryClient(),
+      notify,
+      random: () => 0,
+    })
+    const store = createSheetStore({
+      characterId: ID,
+      model,
+      sheet,
+      sheetVersion: 3,
+      roles: ['owner'],
+      sync,
+    })
+    const unregister = sync.register(ID, store)
+    store.getState().setMode('evolve')
+    store.getState().startDraft()
+    store.getState().setDraftValue('values.strength', 3)
+    store.getState().saveDraft('Força')
+    return {
+      drafts,
+      notify,
+      store,
+      close: unregister,
+      answer: () =>
+        answer({
+          status,
+          body: { issues: [{ path: 'values.strength', message: 'x' }] },
+        }),
+      post,
+    }
+  }
+
+  it.each([409, 422] as const)(
+    '%i com a ficha fechada: o rascunho volta guardado',
+    async status => {
+      const t = savedThenClosed(status)
+      await flush()
+      expect(t.post).toHaveBeenCalledTimes(1)
+      t.close()
+      t.answer()
+      await flush()
+      await flush()
+      const back = await t.drafts.read(ID)
+      expect(back).toMatchObject({
+        characterId: ID,
+        templateVersion: model.version,
+        mode: 'evolve',
+        edits: [{ path: 'values.strength', from: 2, to: 3 }],
+      })
+      expect(t.notify).toHaveBeenCalled()
+    }
+  )
+
+  it('409 com a ficha aberta sem edição (travada): guarda em vez de abrir Editar', async () => {
+    const t = savedThenClosed(409)
+    await flush()
+    t.store.getState().setEditable(false)
+    t.store.getState().setMode('play')
+    const parked = jest.fn()
+    t.drafts.onParked(parked)
+    t.answer()
+    await flush()
+    await flush()
+    expect(t.store.getState().draft).toBeNull()
+    expect(parked).toHaveBeenCalledWith(ID)
+    expect((await t.drafts.read(ID))?.edits).toHaveLength(1)
+  })
+
+  it('o rascunho que já estava guardado entra junto, sem perder nada', async () => {
+    const t = savedThenClosed(409)
+    await flush()
+    t.close()
+    // Depois do "Salvar", a pessoa seguiu editando: Força 3 → 4 e Destreza
+    await t.drafts.write({
+      v: 1,
+      characterId: ID,
+      templateVersion: model.version,
+      baseVersion: 3,
+      mode: 'evolve',
+      savedAt: Date.now(),
+      edits: [
+        { path: 'values.strength', from: 3, to: 4 },
+        { path: 'values.dexterity', from: 2, to: 3 },
+      ],
+    })
+    t.answer()
+    await flush()
+    await flush()
+    expect((await t.drafts.read(ID))?.edits).toEqual([
+      { path: 'values.strength', from: 2, to: 4 },
+      { path: 'values.dexterity', from: 2, to: 3 },
+    ])
   })
 })

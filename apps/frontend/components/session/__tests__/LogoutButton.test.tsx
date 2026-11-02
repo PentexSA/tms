@@ -12,6 +12,10 @@ import {
 } from '@testing-library/react-native'
 import { SessionProvider } from '../../../lib/session/SessionProvider'
 import {
+  createMemoryDraftStore,
+  type DraftStore,
+} from '../../../sheet/sync/draftStore'
+import {
   createMemoryOutbox,
   type QueuedBatch,
 } from '../../../sheet/sync/outbox'
@@ -159,5 +163,84 @@ describe('LogoutButton', () => {
     )
     await pressSair()
     await waitFor(() => expect(session.getState().status).toBe('signedOut'))
+  })
+})
+
+// P03-C (T-03): o rascunho de Criação/Editar guardado no aparelho também se
+// perde no logout; o aviso de "Sair" passa a contá-lo
+describe('LogoutButton com rascunho guardado', () => {
+  async function draftsWith(count: number): Promise<DraftStore> {
+    const drafts = createMemoryDraftStore()
+    for (let n = 1; n <= count; n++)
+      await drafts.write({
+        v: 1,
+        characterId: `00000000-0000-4000-8000-00000000c00${n}`,
+        templateVersion: '1.0.0',
+        baseVersion: 1,
+        mode: 'evolve',
+        savedAt: Date.now(),
+        edits: [{ path: 'values.sire', from: 'Anônimo', to: 'Etrius' }],
+      })
+    return drafts
+  }
+
+  it('só com rascunho, avisa; "Sair e descartar" sai e apaga o rascunho', async () => {
+    const { session } = await signedIn()
+    const drafts = await draftsWith(1)
+    renderWithSession(<LogoutButton />, session, {
+      outbox: createMemoryOutbox(),
+      drafts,
+      post: offline,
+    })
+    await pressSair()
+    expect(await screen.findByText('Sair e descartar?')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'O rascunho não salvo de 1 ficha será descartado neste aparelho.'
+      )
+    ).toBeTruthy()
+    // Nenhum valor de campo no aviso
+    expect(screen.queryByText(/Etrius|Anônimo/)).toBeNull()
+    expect(session.getState().status).toBe('signedIn')
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Sair e descartar' }))
+    })
+    await waitFor(() => expect(session.getState().status).toBe('signedOut'))
+    expect(await drafts.characters()).toEqual([])
+  })
+
+  it('com fila pendente e rascunhos, diz as duas coisas', async () => {
+    onlineManager.setOnline(false)
+    const { session } = await signedIn()
+    renderWithSession(<LogoutButton />, session, {
+      outbox: await outboxWith(1),
+      drafts: await draftsWith(2),
+      post: offline,
+    })
+    await act(() => new Promise(r => setTimeout(r, 0)))
+    await pressSair()
+    expect(
+      await screen.findByText(
+        '1 alteração ainda não foi enviada e será descartada neste aparelho. Os rascunhos não salvos de 2 fichas serão descartados neste aparelho.'
+      )
+    ).toBeTruthy()
+  })
+
+  it('"Continuar conectado" mantém o rascunho', async () => {
+    const { session } = await signedIn()
+    const drafts = await draftsWith(1)
+    renderWithSession(<LogoutButton />, session, {
+      outbox: createMemoryOutbox(),
+      drafts,
+      post: offline,
+    })
+    await pressSair()
+    await act(async () => {
+      fireEvent.press(
+        await screen.findByRole('button', { name: 'Continuar conectado' })
+      )
+    })
+    expect(session.getState().status).toBe('signedIn')
+    expect(await drafts.characters()).toHaveLength(1)
   })
 })

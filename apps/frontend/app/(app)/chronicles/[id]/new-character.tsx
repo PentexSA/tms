@@ -8,9 +8,8 @@ import {
   tokens,
   useToast,
 } from '@tms/ui'
-import { randomUUID } from 'expo-crypto'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +17,7 @@ import {
   StyleSheet,
 } from 'react-native'
 
+import { UnsavedChangesGuard } from '../../../../components/UnsavedChangesGuard'
 import { messageOf } from '../../../../lib/errors'
 import {
   useChronicle,
@@ -43,7 +43,15 @@ export default function NewCharacterScreen() {
   const model = useCompiled(template.data)
   const create = useCreateCharacter(id)
   const toast = useToast()
-  const commandId = useRef<string | null>(null)
+  // Trava síncrona (T-02): dois toques no mesmo quadro chamam onSubmit duas
+  // vezes antes de o `busy` chegar. Só destrava no erro; no sucesso a tela
+  // navega para a ficha nova. A chave do comando (clientCommandId) fica no
+  // useCreateCharacter, que a troca quando a resposta chega
+  const submitting = useRef(false)
+  // Guarda de saída (T-56): o formulário preenchido segura voltar, o F5 e o
+  // Voltar do Android. Depois de criar, a ida para a ficha passa direto
+  const [dirty, setDirty] = useState(false)
+  const created = useRef(false)
   const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
@@ -90,30 +98,28 @@ export default function NewCharacterScreen() {
               : null
           }
           serverIssues={issuesOf(create.error)}
-          onSubmit={values =>
-            create.mutate(
-              npc
-                ? {
-                    values,
-                    kind: 'npc',
-                    clientCommandId: (commandId.current ??= randomUUID()),
-                  }
-                : values,
-              {
-                // A ficha nova abre no rascunho: na Criação, quando o sistema
-                // tem criação por pontos; senão, em Evoluir
-                onSuccess: c => {
-                  commandId.current = null
-                  // L-03: a confirmação vem antes de abrir a ficha; mesmo que
-                  // ela não abra, a pessoa sabe que a ficha existe
-                  toast.show({ message: 'Ficha criada.' })
-                  router.replace(
-                    `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
-                  )
-                },
-              }
-            )
-          }
+          onDirtyChange={setDirty}
+          onSubmit={values => {
+            if (submitting.current) return
+            submitting.current = true
+            create.mutate(npc ? { values, kind: 'npc' } : { values }, {
+              // A ficha nova abre no rascunho: na Criação, quando o sistema
+              // tem criação por pontos; senão, em Evoluir
+              onSuccess: c => {
+                // T-56: a ida para a ficha nova passa pela guarda sem perguntar
+                created.current = true
+                // L-03: a confirmação vem antes de abrir a ficha; mesmo que
+                // ela não abra, a pessoa sabe que a ficha existe
+                toast.show({ message: 'Ficha criada.' })
+                router.replace(
+                  `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
+                )
+              },
+              onError: () => {
+                submitting.current = false
+              },
+            })
+          }}
         />
       </ScrollView>
     )
@@ -121,6 +127,11 @@ export default function NewCharacterScreen() {
   return (
     <Screen>
       <AppBar title={npc ? 'Novo NPC' : 'Nova ficha'} back={back} />
+      <UnsavedChangesGuard
+        when={dirty}
+        allowLeave={created}
+        message={`O que você preencheu ${npc ? 'no NPC novo' : 'na ficha nova'} ainda não foi criado e será descartado.`}
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

@@ -1,10 +1,20 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { Issue } from '@tms/sheet-core'
+import { type Issue, MAX_EVENTS_PER_BATCH, parsePath } from '@tms/sheet-core'
 import { chronicleKeys } from '../../lib/queries/chronicles'
 import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
-import type { SheetStore, SheetSync } from '../store/sheetStore'
+import type {
+  ChangedBy,
+  ConflictDetail,
+  SheetStore,
+  SheetSync,
+} from '../store/sheetStore'
 import { ledgerMessage } from '../xp/messages'
+import {
+  createMemoryDraftStore,
+  type DraftStore,
+  returnedDraft,
+} from './draftStore'
 import type { Outbox, QueuedBatch } from './outbox'
 import { createSender, type PostOutcome, type Sender } from './sender'
 
@@ -14,6 +24,9 @@ import { createSender, type PostOutcome, type Sender } from './sender'
 
 export interface SyncDeps {
   readonly outbox: Outbox
+  // Os rascunhos de Criação/Editar guardados no aparelho (T-03); sem eles,
+  // em memória
+  readonly drafts?: DraftStore
   readonly post: (
     characterId: string,
     batch: QueuedBatch
@@ -45,10 +58,16 @@ export interface Sync extends SheetSync {
   register(characterId: string, store: SheetStore): () => void
   /** Reconectou: tenta de novo o que esperava o backoff. */
   flush(): Promise<void>
-  /** Logout: para o envio e apaga a fila (nada fica para o próximo usuário). */
+  /**
+   * Logout: para o envio e apaga a fila e os rascunhos (nada fica para o
+   * próximo usuário).
+   */
   reset(): Promise<void>
-  /** Abriu o app: conta o que ficou na fila e retoma o envio. */
+  /** Abriu o app: conta o que ficou na fila, retoma o envio e varre os rascunhos vencidos. */
   start(): Promise<void>
+  /** O lote entrou no outbox (resolve) ou não pôde ser guardado (rejeita). */
+  enqueue(characterId: string, batch: QueuedBatch): Promise<void>
+  readonly drafts: DraftStore
   readonly status: SyncStatusStore
   readonly sender: Sender
 }
@@ -75,6 +94,50 @@ export function issuesOf(body: unknown): Issue[] {
     )
     .slice(0, 50)
     .map(i => ({ path: i.path, message: i.message }))
+}
+
+const CHANGED_BY: ReadonlySet<unknown> = new Set([
+  'self',
+  'owner',
+  'storyteller',
+])
+
+/**
+ * O corpo de um 409 (`issues` com os caminhos em conflito, `changedBy` com
+ * quem mudou cada um). A resposta é input hostil: só caminhos válidos que
+ * estão no próprio lote, até 50, e `changedBy` só com os valores conhecidos
+ * (o resto vira null). O `current` do corpo é ignorado: o valor atual vem da
+ * ficha rebuscada.
+ */
+export function parseConflictBody(
+  body: unknown,
+  batch: QueuedBatch
+): ConflictDetail {
+  const inBatch = new Set(batch.events.map(e => e.path))
+  const raw = (body as { issues?: unknown } | null)?.issues
+  const paths: string[] = []
+  if (Array.isArray(raw))
+    for (const issue of raw) {
+      const path = (issue as { path?: unknown } | null)?.path
+      if (
+        typeof path === 'string' &&
+        inBatch.has(path) &&
+        parsePath(path) &&
+        !paths.includes(path)
+      )
+        paths.push(path)
+      if (paths.length >= MAX_EVENTS_PER_BATCH) break
+    }
+  const by = (body as { changedBy?: unknown } | null)?.changedBy
+  const changedBy = new Map<string, ChangedBy>()
+  for (const path of paths) {
+    const value =
+      by && typeof by === 'object' && Object.hasOwn(by, path)
+        ? (by as Record<string, unknown>)[path]
+        : null
+    changedBy.set(path, CHANGED_BY.has(value) ? (value as ChangedBy) : null)
+  }
+  return { paths, changedBy: Object.fromEntries(changedBy) }
 }
 
 /**
@@ -108,6 +171,45 @@ export function rejectionMessage(
 
 export function createSync(deps: SyncDeps): Sync {
   const { outbox, queryClient, notify } = deps
+  const drafts = deps.drafts ?? createMemoryDraftStore()
+
+  /** O lote do "Salvar" recusado volta como rascunho guardado da ficha. */
+  const park = async (
+    characterId: string,
+    batch: QueuedBatch
+  ): Promise<boolean> => {
+    try {
+      const cached = queryClient.getQueryData(
+        sheetKeys.character(characterId)
+      ) as { templateVersion?: unknown; sheetVersion?: unknown } | undefined
+      const existing = await drafts.read(characterId)
+      const templateVersion =
+        batch.draftMeta?.templateVersion ??
+        (typeof cached?.templateVersion === 'string'
+          ? cached.templateVersion
+          : existing?.templateVersion) ??
+        // Versão desconhecida: a oferta mostra só "Descartar", com o motivo
+        '0.0.0'
+      return await drafts.park(
+        returnedDraft(
+          existing,
+          batch.events,
+          {
+            characterId,
+            templateVersion,
+            mode: batch.draftMeta?.mode ?? existing?.mode ?? 'evolve',
+            baseVersion:
+              typeof cached?.sheetVersion === 'number'
+                ? cached.sheetVersion
+                : (existing?.baseVersion ?? 0),
+          },
+          Date.now()
+        )
+      )
+    } catch {
+      return false
+    }
+  }
   const stores = new Map<string, SheetStore>()
   const refetch = (characterId: string) =>
     queryClient.invalidateQueries({
@@ -173,20 +275,38 @@ export function createSync(deps: SyncDeps): Sync {
           void queryClient.invalidateQueries({ queryKey: chronicleKeys.all })
         }
       },
-      conflicted(characterId, batch) {
+      conflicted(characterId, batch, body) {
         answered()
-        stores.get(characterId)?.getState().conflicted(batch.clientBatchId)
+        const taken =
+          stores
+            .get(characterId)
+            ?.getState()
+            .conflicted(batch.clientBatchId, parseConflictBody(body, batch)) ??
+          false
+        // O "Salvar" com a ficha fechada (ou sem edição): o rascunho já saiu
+        // do aparelho quando o lote entrou no outbox. Ele volta guardado, e
+        // a próxima abertura oferece "Recuperar", com o conflito marcado
+        if (batch.draft && !taken)
+          void park(characterId, batch).then(kept =>
+            notify(
+              kept
+                ? `“${batch.label}” não foi salvo: a ficha mudou em outro lugar. As alterações voltaram para o rascunho; abra a ficha para revisar.`
+                : `“${batch.label}” não foi salvo: a ficha mudou em outro lugar, e as alterações não couberam no rascunho do aparelho.`
+            )
+          )
         void refetch(characterId)
       },
       rejected(characterId, batch, status, body) {
         answered()
-        stores
-          .get(characterId)
-          ?.getState()
-          .rejected(
-            batch.clientBatchId,
-            status === 422 ? issuesOf(body) : undefined
-          )
+        const store = stores.get(characterId)?.getState()
+        store?.rejected(
+          batch.clientBatchId,
+          status === 422 ? issuesOf(body) : undefined
+        )
+        // O 422 do "Salvar" volta ao rascunho na ficha aberta e editável;
+        // fora dela, fica guardado no aparelho
+        if (status === 422 && batch.draft && (!store || !store.editable))
+          void park(characterId, batch)
         notify(
           rejectionMessage(
             batch.label,
@@ -212,15 +332,19 @@ export function createSync(deps: SyncDeps): Sync {
         return () => listeners.delete(listener)
       },
     },
+    drafts,
     enqueue(characterId, batch) {
-      outbox.enqueue(characterId, batch).then(
+      // A Promise diz se o lote está no outbox: o rascunho persistido só some
+      // depois disso (T-03)
+      return outbox.enqueue(characterId, batch).then(
         () => {
           void recount()
-          return sender.kick(characterId)
+          void sender.kick(characterId)
         },
-        () => {
+        error => {
           stores.get(characterId)?.getState().rejected(batch.clientBatchId)
           notify(`Não foi possível guardar “${batch.label}” no aparelho.`)
+          throw error
         }
       )
     },
@@ -238,6 +362,7 @@ export function createSync(deps: SyncDeps): Sync {
     },
     flush: () => sender.flush(),
     async start() {
+      await drafts.sweep(Date.now()).catch(() => undefined)
       await recount()
       await sender.flush()
     },
@@ -246,7 +371,10 @@ export function createSync(deps: SyncDeps): Sync {
       stores.clear()
       counting++
       setStatus({ pending: 0, failure: null })
-      await outbox.clear().catch(() => undefined)
+      await Promise.all([
+        outbox.clear().catch(() => undefined),
+        drafts.clear().catch(() => undefined),
+      ])
     },
   }
 }

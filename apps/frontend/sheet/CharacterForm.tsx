@@ -1,6 +1,6 @@
 import { canWrite, type SheetModel, validateSheet } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { editors } from './editors'
 
@@ -22,6 +22,8 @@ export interface CharacterFormProps {
   // Erros do servidor (422), no formato "/values/<campo>"
   readonly serverIssues?: readonly ServerIssue[]
   readonly onSubmit: (values: Record<string, unknown>) => void
+  // Algum campo preenchido (depois do trim): a tela segura a saída (T-56)
+  readonly onDirtyChange?: (dirty: boolean) => void
 }
 
 // Linhas do formulário: o nome sozinho, textos curtos de dois em dois e os
@@ -49,9 +51,18 @@ export function CharacterForm({
   error,
   serverIssues = [],
   onSubmit,
+  onDirtyChange,
 }: CharacterFormProps) {
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const dirty = Object.values(values).some(v =>
+    typeof v === 'string' ? v.trim() !== '' : v !== undefined && v !== null
+  )
+  const notify = useRef(onDirtyChange)
+  notify.current = onDirtyChange
+  useEffect(() => {
+    notify.current?.(dirty)
+  }, [dirty])
   const nameField = model.template.identity.name
   const fields = model.identityFields.filter(id => {
     const def = model.fields.get(id)?.def

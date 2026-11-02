@@ -10,6 +10,12 @@ export interface QueuedBatch extends EventBatch {
   // Veio do "Salvar" de Evoluir: recusado (422), volta como rascunho. Fica
   // no aparelho; a API recebe só clientBatchId e events.
   readonly draft?: boolean
+  // De onde veio o "Salvar": recusado com a ficha fechada, o lote volta ao
+  // rascunho guardado com a versão do template e o modo (T-03)
+  readonly draftMeta?: {
+    readonly templateVersion: string
+    readonly mode: 'create' | 'evolve'
+  }
 }
 
 export interface Outbox {

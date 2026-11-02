@@ -41,6 +41,7 @@ describe('migrations', () => {
         'game_systems',
         'refresh_tokens',
         'trait_templates',
+        'user_commands',
         'users',
         'xp_entries',
         'xp_requests',
@@ -748,8 +749,11 @@ describe('migrations', () => {
         select name from characters order by updated_at desc`.execute(db)
       expect(order.map(r => r.name)).toEqual(['editada', 'nova'])
 
-      // O down volta os tipos e a hora de parede do fuso do banco
-      expect((await migrator.migrateDown()).error).toBeUndefined()
+      // O down volta os tipos e a hora de parede do fuso do banco. Desce até
+      // antes da 0021: as migrations depois dela (0022) descem junto
+      expect(
+        (await migrator.migrateTo('0020_product_templates')).error
+      ).toBeUndefined()
       const { rows: types } = await sql<{ column: string }>`
         select table_name || '.' || column_name as column
         from information_schema.columns
@@ -797,6 +801,49 @@ describe('migrations', () => {
     } finally {
       if (previous === undefined) delete process.env.TMS_LEGACY_APP_TZ
       else process.env.TMS_LEGACY_APP_TZ = previous
+      await destroy()
+    }
+  })
+
+  it('0022: a chave do comando é por usuário e cai com a conta', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const user = (name: string) =>
+        db
+          .insertInto('users')
+          .values({
+            username: name,
+            email: `${name}@x.test`,
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      const a = await user('a')
+      const b = await user('b')
+      const key = crypto.randomUUID()
+      const command = (userId: string) =>
+        db
+          .insertInto('user_commands')
+          .values({
+            user_id: userId,
+            client_command_id: key,
+            kind: 'chronicle.create',
+            request_hash: 'h',
+            result: JSON.stringify({ id: crypto.randomUUID() }),
+          })
+          .execute()
+      await command(a.id)
+      // A mesma chave do mesmo usuário não grava duas vezes
+      await expect(command(a.id)).rejects.toThrow()
+      // Em outra conta, é outra intenção
+      await command(b.id)
+      await db.deleteFrom('users').where('id', '=', a.id).execute()
+      const left = await db
+        .selectFrom('user_commands')
+        .select('user_id')
+        .execute()
+      expect(left).toEqual([{ user_id: b.id }])
+    } finally {
       await destroy()
     }
   })

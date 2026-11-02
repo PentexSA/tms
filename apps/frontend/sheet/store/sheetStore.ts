@@ -7,9 +7,11 @@ import {
   checkCreation,
   checkCreationBatch,
   type FieldId,
+  fieldOrder,
   type Issue,
   invert,
   jsonEqual,
+  MAX_EVENTS_PER_BATCH,
   parsePath,
   parseSheet,
   type ResolvedField,
@@ -24,7 +26,14 @@ import {
 import { randomUUID } from 'expo-crypto'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { type CreationPhase, draftRefusal } from '../creation/creation'
-import { checkLimits, OutboxLimitError, type QueuedBatch } from '../sync/outbox'
+import {
+  batchBytes,
+  checkLimits,
+  MAX_BATCH_BYTES,
+  OutboxLimitError,
+  type QueuedBatch,
+} from '../sync/outbox'
+import type { RestorePlan } from './draftRestore'
 
 // Um store por ficha aberta (doc/arquitetura §6.5):
 //
@@ -53,17 +62,75 @@ export interface DraftEdit {
 
 export type Draft = ReadonlyMap<string, DraftEdit>
 
-export interface SheetConflict {
-  readonly batches: readonly QueuedBatch[]
+/**
+ * De onde vêm os campos em conflito do rascunho: `draft`, o "Salvar" de
+ * Criação/Editar recusado com 409 (T-31), que volta inteiro ao rascunho;
+ * `recovery`, o rascunho recuperado do aparelho com campos que mudaram desde
+ * então (T-03). As entradas em conflito ficam no rascunho com o `from`
+ * antigo, e o "Salvar" é recusado até a pessoa escolher campo a campo.
+ */
+export type DraftConflictOrigin = 'draft' | 'recovery'
+
+/**
+ * Quem mudou o campo, relativo a quem pediu (o 409 da API): `self`, a mesma
+ * conta noutro aparelho; `owner`, o jogador; `storyteller`, o narrador; null
+ * quando não se sabe (ou quando dizer revelaria uma rolagem oculta).
+ */
+export type ChangedBy = 'self' | 'owner' | 'storyteller' | null
+
+/** O que o 409 disse, já validado (sync.ts, parseConflictBody). */
+export interface ConflictDetail {
+  // Só os caminhos em conflito, todos do próprio lote
   readonly paths: readonly string[]
+  readonly changedBy?: Readonly<Record<string, ChangedBy>>
 }
+
+/**
+ * O conflito tem duas partes, que não se misturam: os lotes do Jogo (voltam
+ * inteiros, "Reaplicar tudo", ou não voltam: uma ação mexe em campos
+ * ligados) e os campos do rascunho (resolvidos um a um). Um 409 de um lado
+ * nunca apaga o que o outro guarda.
+ */
+export interface SheetConflict {
+  readonly play: {
+    readonly batches: readonly QueuedBatch[]
+    readonly paths: readonly string[]
+  } | null
+  readonly draft: {
+    readonly paths: readonly string[]
+    readonly origin: DraftConflictOrigin
+  } | null
+  // Por caminho; ausente: em outro lugar
+  readonly changedBy?: Readonly<Record<string, ChangedBy>>
+}
+
+/** Junta as partes; sem nenhuma, não há conflito. */
+const conflictOf = (
+  play: SheetConflict['play'],
+  draft: SheetConflict['draft'],
+  changedBy: SheetConflict['changedBy']
+): SheetConflict | null =>
+  play || draft ? { play, draft, ...(changedBy ? { changedBy } : {}) } : null
+
+/**
+ * Como o último rascunho saiu: salvo (a Promise diz se o lote entrou no
+ * outbox) ou descartado. O rascunho persistido só some depois disso (T-03).
+ */
+export type DraftExit =
+  | { readonly kind: 'saved'; readonly queued: Promise<boolean> }
+  | { readonly kind: 'discarded' }
 
 // `creation`: a avaliação parcial da criação por pontos recusou o lote
 // (doc/plano-v4.md §3.1); ele nem entra na fila
 export type CommitFailure = ApplyFailure | 'limit' | 'readonly' | 'creation'
 
 export type CommitResult =
-  | { readonly ok: true; readonly batch: QueuedBatch }
+  | {
+      readonly ok: true
+      readonly batch: QueuedBatch
+      // O lote entrou no outbox do aparelho (false: não pôde ser guardado)
+      readonly queued?: Promise<boolean>
+    }
   | {
       readonly ok: false
       readonly kind: CommitFailure
@@ -72,7 +139,7 @@ export type CommitResult =
 
 /** Para onde vão os lotes confirmados no aparelho (o SyncProvider). */
 export interface SheetSync {
-  enqueue(characterId: string, batch: QueuedBatch): void
+  enqueue(characterId: string, batch: QueuedBatch): void | Promise<void>
 }
 
 export interface SheetStoreInit {
@@ -88,6 +155,8 @@ export interface SheetStoreInit {
   // A conta da criação por pontos, quando ela vale (creating/pending, modo
   // por pontos): os contadores e a avaliação parcial antes de enfileirar
   readonly creation?: CreationInput | null
+  // A política deixa editar; sem ela, o padrão é sim (prévia, testes)
+  readonly editable?: boolean
 }
 
 export interface SheetState {
@@ -102,6 +171,7 @@ export interface SheetState {
   readonly entries: ReadonlyMap<FieldId, FieldEntry>
   readonly mode: SheetMode
   readonly draft: Draft | null
+  readonly draftExit: DraftExit | null
   readonly undoStack: readonly QueuedBatch[]
   readonly conflict: SheetConflict | null
   // O que o servidor recusou (422), por campo: o editor mostra a mensagem.
@@ -113,6 +183,9 @@ export interface SheetState {
   readonly creationRefusal: CreationRefusal | null
   // Na criação, o que a distribuição gasta agora: básicos ou bônus
   readonly creationPhase: CreationPhase
+  // A política deixa editar (não travada, arquivada nem de quem saiu). Sem
+  // ela, nada entra em Criação/Editar: o rascunho fica guardado no aparelho
+  readonly editable: boolean
 }
 
 export interface SheetActions {
@@ -134,15 +207,26 @@ export interface SheetActions {
     clientBatchId: string,
     issues?: readonly Issue[]
   ): QueuedBatch | undefined
-  /** 409: sai da fila e fica guardado para "Reaplicar". */
-  conflicted(clientBatchId: string): void
+  /**
+   * 409: sai da fila. O lote do "Salvar" volta ao rascunho, com só os campos
+   * do 409 marcados; o do Jogo fica guardado para "Reaplicar tudo". Devolve
+   * false quando o lote do "Salvar" não pôde voltar (a política não deixa
+   * editar): quem chamou guarda o rascunho no aparelho.
+   */
+  conflicted(clientBatchId: string, detail?: ConflictDetail): boolean
   /** A ficha rebuscada do servidor (foco, reconexão, depois de um 409). */
   received(sheet: unknown, sheetVersion: number): boolean
   /** Lotes que já estavam no outbox (a ficha reaberta antes de sincronizar). */
   hydrate(pending: readonly QueuedBatch[]): void
-  /** Reaplica o que deu conflito sobre os valores atuais, num lote novo. */
+  /** Reaplica os lotes do Jogo em conflito sobre os valores atuais. */
   reapply(): CommitResult | null
+  /** Mantém a ficha como está: os lotes do Jogo em conflito saem. */
   dismissConflict(): void
+  /**
+   * Um campo em conflito do rascunho: `mine` fica com o seu valor sobre o de
+   * agora; `theirs` tira a entrada do rascunho.
+   */
+  resolveConflict(path: string, choice: 'mine' | 'theirs'): void
   setMode(mode: SheetMode): void
   startDraft(): void
   /** Altera o rascunho de Evoluir (validado como um lote). */
@@ -153,6 +237,16 @@ export interface SheetActions {
   draftEvents(): SheetEvent[]
   saveDraft(label: string): CommitResult | null
   discardDraft(): void
+  /**
+   * O rascunho recuperado do aparelho (T-03), já revalidado por
+   * planDraftRestore. Entra no modo pedido (o do registro), se ele ainda
+   * vale, senão em Criação ou Editar; os campos que mudaram desde então
+   * ficam marcados como conflito. Sem permissão de edição, não entra: devolve
+   * false e o registro fica.
+   */
+  restoreDraft(plan: RestorePlan, mode?: 'create' | 'evolve'): boolean
+  /** A política mudou (travou, arquivou, liberou). */
+  setEditable(editable: boolean): void
   /** A conta da criação mudou (escolhas, orçamento, estado). */
   setCreation(creation: CreationInput | null): void
   /** Básicos (o grupo cheio trava) ou Bônus (passar do grupo usa o saldo). */
@@ -223,7 +317,23 @@ function issuesByField(
 
 const NO_ISSUES: ReadonlyMap<FieldId, string> = new Map()
 
-const valueAt = (sheet: SheetData, path: string): unknown => {
+const NO_BATCH = '00000000-0000-4000-8000-000000000000'
+
+/** Por que o rascunho não cabe num lote (50 eventos, 64 KiB), ou null. */
+export function draftLimit(draft: Draft): string | null {
+  if (draft.size > MAX_EVENTS_PER_BATCH)
+    return `Até ${MAX_EVENTS_PER_BATCH} alterações por vez: salve antes de continuar.`
+  const events = [...draft].map(([path, e]) => ({
+    path,
+    from: e.from,
+    to: e.to,
+  }))
+  if (batchBytes({ clientBatchId: NO_BATCH, events }) > MAX_BATCH_BYTES)
+    return 'As alterações ficaram grandes demais para um envio: salve antes de continuar.'
+  return null
+}
+
+export const valueAt = (sheet: SheetData, path: string): unknown => {
   const p = parsePath(path)
   if (!p) return null
   const bucket: Readonly<Record<string, unknown>> =
@@ -243,12 +353,13 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       return r.ok ? r.sheet : sheet
     }, snapshot)
 
-  // Ordem do template (valores, depois especializações): o resumo de
-  // "Concluir" e o lote saem na mesma ordem do diffToBatch.
+  // Ordem da ficha (seções e grupos do template; valores, depois
+  // especializações): o resumo de "Salvar"/"Concluir" e o lote saem nela, não
+  // na ordem das chaves do jsonb (T-54). O servidor não depende da ordem: os
+  // caminhos são distintos e cada `from` é conferido no seu caminho.
   const order = new Map<string, number>()
   for (const scope of ['values', 'specialties'])
-    for (const id of model.fields.keys())
-      order.set(`${scope}.${id}`, order.size)
+    for (const id of fieldOrder(model)) order.set(`${scope}.${id}`, order.size)
   const draftToEvents = (draft: Draft): SheetEvent[] =>
     [...draft]
       .sort(([a], [b]) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
@@ -298,6 +409,17 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       return { batch, pending, undoStack }
     }
 
+    // O modo do rascunho que volta: o pedido (o do registro ou o do lote),
+    // se ainda vale; a Criação só enquanto a conta por pontos vale
+    const allowedMode = (wanted?: 'create' | 'evolve'): 'create' | 'evolve' => {
+      const creating = Boolean(get().creation)
+      if (wanted === 'create') return creating ? 'create' : 'evolve'
+      if (wanted === 'evolve') return 'evolve'
+      return creating ? 'create' : 'evolve'
+    }
+    const returnMode = (batch: QueuedBatch | undefined) =>
+      allowedMode(batch?.draftMeta?.mode)
+
     const commit: SheetActions['commit'] = (events, label, options) => {
       const s = get()
       if (!sync) return failure('readonly', 'ficha só de leitura')
@@ -325,7 +447,17 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         clientBatchId: uuid(),
         events: events.map(e => ({ path: e.path, from: e.from, to: e.to })),
         label,
-        ...(options?.draft ? { draft: true } : {}),
+        // O "Salvar" de Criação/Editar leva de onde veio: recusado com a
+        // ficha fechada, ele volta ao rascunho do aparelho (T-03)
+        ...(options?.draft
+          ? {
+              draft: true,
+              draftMeta: {
+                templateVersion: model.version,
+                mode: s.mode === 'create' ? 'create' : 'evolve',
+              },
+            }
+          : {}),
       }
       try {
         checkLimits(batch, s.pending.length)
@@ -344,8 +476,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         creationRefusal: null,
         ...derive({ ...s, pending }, r.sheet),
       })
-      sync.enqueue(characterId, batch)
-      return { ok: true, batch }
+      const queued = Promise.resolve(sync.enqueue(characterId, batch)).then(
+        () => true,
+        () => false
+      )
+      return { ok: true, batch, queued }
     }
 
     const editDraft: SheetActions['editDraft'] = events => {
@@ -362,6 +497,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         if (jsonEqual(from, e.to)) draft.delete(e.path)
         else draft.set(e.path, { from, to: e.to })
       }
+      // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
+      // o que não cabe num "Salvar" também não caberia no aparelho
+      const tooBig = draftLimit(draft)
+      if (tooBig) return failure('limit', tooBig, events[0]?.path ?? '')
       // Mexeu no campo: a recusa anterior do servidor deixa de valer
       let fieldIssues = s.fieldIssues
       for (const e of events) {
@@ -432,9 +571,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       creationPhase: 'basics',
       mode: init.mode ?? 'read',
       draft: null,
+      draftExit: null,
       undoStack: [],
       conflict: null,
       fieldIssues: NO_ISSUES,
+      editable: init.editable ?? true,
 
       commit,
       received,
@@ -494,8 +635,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         const marked = issues?.length ? issuesByField(model, issues) : null
         // O "Salvar" de Evoluir recusado (422): as alterações voltam ao
         // rascunho, com os campos marcados, em vez de sumirem. Recusa de um
-        // lote do Jogo só desfaz o otimista.
-        const back = Boolean(marked?.size && batch?.draft && !s.draft)
+        // lote do Jogo só desfaz o otimista. Sem permissão de edição, a tela
+        // não entra em edição: o sync guarda o rascunho no aparelho
+        const back = Boolean(
+          marked?.size && batch?.draft && !s.draft && s.editable
+        )
         const draft = back
           ? new Map(
               (batch?.events ?? []).map(e => [
@@ -508,47 +652,133 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           pending,
           undoStack,
           draft,
-          mode: back ? (s.creation ? 'create' : 'evolve') : s.mode,
+          mode: back ? returnMode(batch) : s.mode,
           fieldIssues: marked?.size ? marked : s.fieldIssues,
           ...derive({ ...s, pending, draft }),
         })
         return batch
       },
 
-      conflicted(clientBatchId) {
+      conflicted(clientBatchId, detail) {
         const { batch, pending, undoStack } = without(clientBatchId)
         const s = get()
+        const inBatch = new Set(batch?.events.map(e => e.path) ?? [])
+        const marked = (detail?.paths ?? []).filter(p => inBatch.has(p))
+        const changedBy =
+          s.conflict?.changedBy || detail?.changedBy
+            ? { ...(s.conflict?.changedBy ?? {}), ...(detail?.changedBy ?? {}) }
+            : undefined
+        // O "Salvar" de Criação/Editar (T-31): as alterações voltam todas ao
+        // rascunho, como no 422. As que não conflitam ficam prontas; as do
+        // 409 ficam com o `from` antigo e seguram o Salvar até a escolha. Os
+        // lotes do Jogo em conflito, se houver, continuam guardados
+        if (batch?.draft && !s.draft?.size) {
+          if (!s.editable) {
+            set({ pending, undoStack, ...derive({ ...s, pending }) })
+            return false
+          }
+          const draft = new Map(
+            batch.events.map(e => [e.path, { from: e.from, to: e.to }])
+          )
+          set({
+            pending,
+            undoStack,
+            draft,
+            mode: returnMode(batch),
+            conflict: conflictOf(
+              s.conflict?.play ?? null,
+              {
+                paths: marked.length ? marked : [...inBatch],
+                origin: 'draft',
+              },
+              changedBy
+            ),
+            ...derive({ ...s, pending, draft }),
+          })
+          return true
+        }
+        // Lote do Jogo (ou um "Salvar" com outro rascunho já aberto): volta
+        // inteiro ou não volta. Os campos do rascunho em conflito ficam
         const batches = [
-          ...(s.conflict?.batches ?? []),
+          ...(s.conflict?.play?.batches ?? []),
           ...(batch ? [batch] : []),
         ]
-        const paths = [
-          ...new Set(batches.flatMap(b => b.events.map(e => e.path))),
-        ]
+        // Só os campos do 409; sem o corpo, o lote inteiro (como antes)
+        const paths = marked.length ? marked : [...inBatch]
         set({
           pending,
           undoStack,
-          conflict: batches.length ? { batches, paths } : s.conflict,
+          conflict: batches.length
+            ? conflictOf(
+                {
+                  batches,
+                  paths: [
+                    ...new Set([...(s.conflict?.play?.paths ?? []), ...paths]),
+                  ],
+                },
+                s.conflict?.draft ?? null,
+                changedBy
+              )
+            : s.conflict,
           ...derive({ ...s, pending }),
         })
+        return true
       },
 
       reapply() {
         const s = get()
-        if (!s.conflict) return null
+        const play = s.conflict?.play
+        if (!play) return null
         // O último `to` de cada caminho, com o `from` de agora
         const last = new Map<string, unknown>()
-        for (const b of s.conflict.batches)
+        for (const b of play.batches)
           for (const e of b.events) last.set(e.path, e.to)
         const events = [...last]
           .map(([path, to]) => ({ path, from: valueAt(s.values, path), to }))
           .filter(e => !jsonEqual(e.from, e.to))
-        set({ conflict: null })
+        set({
+          conflict: conflictOf(
+            null,
+            s.conflict?.draft ?? null,
+            s.conflict?.changedBy
+          ),
+        })
         return events.length ? commit(events, 'Reaplicado') : null
       },
 
       dismissConflict() {
-        set({ conflict: null })
+        const s = get()
+        set({
+          conflict: conflictOf(
+            null,
+            s.conflict?.draft ?? null,
+            s.conflict?.changedBy
+          ),
+        })
+      },
+
+      resolveConflict(path, choice) {
+        const s = get()
+        const part = s.conflict?.draft
+        if (!part || !s.draft || !part.paths.includes(path)) return
+        const draft = new Map(s.draft)
+        const edit = draft.get(path)
+        if (edit) {
+          const from = valueAt(s.values, path)
+          if (choice === 'theirs' || jsonEqual(from, edit.to))
+            draft.delete(path)
+          else draft.set(path, { from, to: edit.to })
+        }
+        const paths = part.paths.filter(p => p !== path)
+        set({
+          draft,
+          conflict: conflictOf(
+            s.conflict?.play ?? null,
+            paths.length ? { ...part, paths } : null,
+            s.conflict?.changedBy
+          ),
+          ...derive({ ...s, draft }, s.values),
+        })
       },
 
       setMode(mode) {
@@ -571,7 +801,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         if (!s.draft) return null
         const events = draftToEvents(s.draft)
         if (!events.length) {
-          set({ draft: null })
+          set({ draft: null, draftExit: { kind: 'discarded' } })
           return null
         }
         // Salvar é um lote só; com conflito, o rascunho fica para decidir
@@ -580,6 +810,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
           const after = get()
           set({
             draft: null,
+            draftExit: {
+              kind: 'saved',
+              queued: result.queued ?? Promise.resolve(true),
+            },
             fieldIssues: NO_ISSUES,
             ...derive({ ...after, draft: null }, after.values),
           })
@@ -591,10 +825,46 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         const s = get()
         set({
           draft: null,
+          draftExit: { kind: 'discarded' },
+          // O conflito do rascunho sai com ele; o do Jogo fica
+          conflict: conflictOf(
+            s.conflict?.play ?? null,
+            null,
+            s.conflict?.changedBy
+          ),
           fieldIssues: NO_ISSUES,
           creationRefusal: null,
           ...derive({ ...s, draft: null }, s.values),
         })
+      },
+
+      restoreDraft(plan, mode) {
+        const s = get()
+        // Sem permissão de edição, a tela não entra em edição; o registro
+        // continua guardado no aparelho
+        if (!s.editable) return false
+        const draft = new Map(
+          plan.events.map(e => [e.path, { from: e.from, to: e.to }])
+        )
+        set({
+          draft,
+          mode: allowedMode(mode),
+          conflict: conflictOf(
+            s.conflict?.play ?? null,
+            plan.conflicts.length
+              ? { paths: plan.conflicts, origin: 'recovery' }
+              : null,
+            s.conflict?.changedBy
+          ),
+          fieldIssues: NO_ISSUES,
+          creationRefusal: null,
+          ...derive({ ...s, draft }, s.values),
+        })
+        return true
+      },
+
+      setEditable(editable) {
+        if (get().editable !== editable) set({ editable })
       },
 
       setCreation(creation) {

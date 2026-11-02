@@ -22,6 +22,7 @@ import { messageOf } from '../../lib/errors'
 import { useChronicleCreationSettings } from '../../lib/queries/creation'
 import { useCompiled, useLatestTemplate } from '../../sheet/data'
 import { ReloadButton, unsupportedShort } from '../../sheet/UnsupportedTemplate'
+import { UnsavedChangesGuard } from '../UnsavedChangesGuard'
 
 const RANKS = ['Primária', 'Secundária', 'Terciária', 'Quarta', 'Quinta']
 
@@ -75,6 +76,11 @@ export function CreationSettings({
   // continua sendo quem valida
   const loadFailed = latest.isError && latest.data === undefined
   const rulesKnown = Boolean(model)
+  // T-56: "Descartar e sair" volta ao que está salvo
+  const reset = () => {
+    setApproval(creation.approval)
+    setDefaults(layerOf(creation.defaults))
+  }
 
   const setBudget = (id: string, value: number | readonly number[]) =>
     setDefaults(current => ({
@@ -94,6 +100,11 @@ export function CreationSettings({
 
   return (
     <View style={styles.panel} testID="creation-settings">
+      <UnsavedChangesGuard
+        when={changed}
+        message="As regras da criação mudaram e não foram salvas."
+        onDiscard={reset}
+      />
       <SectionHeader
         title="Criação de fichas"
         subtitle="Valem para as fichas criadas a partir de agora. Para mudar uma ficha que já existe, use as Regras da casa dentro dela."

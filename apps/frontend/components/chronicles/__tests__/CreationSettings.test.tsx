@@ -1,4 +1,5 @@
 import { act, fireEvent, screen } from '@testing-library/react-native'
+import { usePreventRemove } from 'expo-router'
 import { Dimensions } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
@@ -110,6 +111,48 @@ describe('Regras da criação', () => {
         defaults: { budgets: { attributes: [8, 5, 3] } },
       }
     )
+  })
+})
+
+// T-56 (QAW-10, NW-03): mudar as regras e sair descartava sem perguntar
+describe('sair com as regras mudadas', () => {
+  const last = () => {
+    const calls = jest.mocked(usePreventRemove).mock.calls
+    return calls[calls.length - 1]
+  }
+  const raisePrimary = () =>
+    fireEvent(
+      screen.getByLabelText('Atributos, Primária'),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+
+  it('sem mudança, não segura a saída', async () => {
+    await render()
+    expect(last()?.[0]).toBe(false)
+  })
+
+  it('mudou: "Sair sem salvar?"; "Descartar e sair" volta ao salvo e sai', async () => {
+    await render()
+    raisePrimary()
+    expect(last()?.[0]).toBe(true)
+    const repeat = jest.fn()
+    act(() => {
+      last()?.[1]?.({ data: { action: { type: 'GO_BACK' } }, repeat } as never)
+    })
+    expect(screen.getByText('Sair sem salvar?')).toBeTruthy()
+    expect(
+      screen.getByText('As regras da criação mudaram e não foram salvas.')
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Continuar editando' }))
+    expect(repeat).not.toHaveBeenCalled()
+    act(() => {
+      last()?.[1]?.({ data: { action: { type: 'GO_BACK' } }, repeat } as never)
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    expect(repeat).toHaveBeenCalledTimes(1)
+    // De volta ao salvo: nada a perder
+    expect(last()?.[0]).toBe(false)
   })
 })
 

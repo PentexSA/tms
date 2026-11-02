@@ -6,6 +6,13 @@ import { tokens } from './tokens'
 
 export type BannerTone = 'info' | 'success' | 'warning' | 'danger'
 
+/**
+ * Largura mínima do texto ao lado das ações. Sem ela, o texto encolhia até
+ * ~25 px quando os botões ocupavam a linha (T-12); com menos espaço que isso,
+ * as ações descem para a linha de baixo.
+ */
+const MIN_TEXT_WIDTH = 200
+
 export interface BannerProps {
   readonly tone?: BannerTone
   readonly title?: string
@@ -54,19 +61,30 @@ export function Banner({
           {message}
         </Text>
       </View>
-      {action}
+      {action ? <View style={styles.action}>{action}</View> : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  // Com largura, texto e ações numa linha; sem ela, as ações quebram para
+  // baixo, alinhadas ao início, e o texto fica com a linha inteira
   banner: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: tokens.space[3],
+    rowGap: tokens.space[2],
+    columnGap: tokens.space[3],
     borderLeftWidth: 4,
     padding: tokens.space[3],
     borderRadius: tokens.radius.sm,
   },
-  text: { flex: 1, gap: tokens.space['0.5'] },
+  text: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: MIN_TEXT_WIDTH,
+    minWidth: 0,
+    gap: tokens.space['0.5'],
+  },
+  action: { flexShrink: 0, maxWidth: '100%' },
 })

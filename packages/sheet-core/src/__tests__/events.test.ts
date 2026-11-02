@@ -12,7 +12,7 @@ import {
   parsePath,
   type SheetEvent,
 } from '../events'
-import { describeBatch, describeEvent } from '../labels'
+import { describeBatch, describeEvent, describeValue } from '../labels'
 import { character, clone, type Json, templates } from './fixtures'
 
 const model = compileTemplate(templates['vtm-v20'])
@@ -540,5 +540,46 @@ describe('jsonEqual', () => {
     [{ a: 1 }, null, false],
   ])('%p = %p → %p', (a, b, expected) => {
     expect(jsonEqual(a, b)).toBe(expected)
+  })
+})
+
+// T-31: a folha de conflito mostra os dois valores para a pessoa escolher
+describe('describeValue (só a tela de conflito)', () => {
+  const show = (path: string, value: unknown) =>
+    describeValue(model, path, value)
+
+  it('números, recursos, escolhas e listas', () => {
+    expect(show('values.strength', 3)).toBe('3')
+    expect(show('values.strength', null)).toBe('—')
+    expect(show('values.willpower', { current: 5, permanent: 7 })).toBe(
+      'permanente 7, atual 5'
+    )
+    expect(show('values.clan', 'tremere')).toBe('Tremere')
+    expect(show('values.clan', null)).toBe('—')
+    expect(show('values.disciplines', [{ id: 'a', name: 'x', value: 1 }])).toBe(
+      '1 item'
+    )
+    expect(show('values.health', { lethal: 2, bashing: 1 })).toMatch(/2 letal/)
+  })
+
+  it('texto livre aparece (a escolha exige vê-lo), cortado em 80', () => {
+    expect(show('values.sire', '  Etrius ')).toBe('Etrius')
+    const long = show('values.sire', 'x'.repeat(200))
+    expect(long).toHaveLength(80)
+    expect(long.endsWith('…')).toBe(true)
+    expect(show('values.sire', '')).toBe('—')
+    expect(show('specialties.strength', 'Pegada firme')).toBe('Pegada firme')
+  })
+
+  it('caminho desconhecido não quebra', () => {
+    expect(show('values.inexistente', 1)).toBe('—')
+    expect(show('lixo', 1)).toBe('—')
+  })
+
+  it('o resto do motor continua sem conteúdo: describeEvent não muda', () => {
+    expect(
+      describeEvent(model, { path: 'values.sire', from: 'A', to: 'Etrius' })
+        .change
+    ).toBe('atualizado')
   })
 })

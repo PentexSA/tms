@@ -5,6 +5,7 @@ import type { ReactElement } from 'react'
 import { SessionProvider } from '../lib/session/SessionProvider'
 import { Session, type SessionDeps } from '../lib/session/session'
 import type { TokenStore } from '../lib/session/tokenStore'
+import type { DraftStore } from '../sheet/sync/draftStore'
 import type { Outbox, QueuedBatch } from '../sheet/sync/outbox'
 import { SyncProvider } from '../sheet/sync/SyncProvider'
 import type { PostOutcome } from '../sheet/sync/sender'
@@ -73,6 +74,8 @@ export function testSession(
 
 export interface SyncOptions {
   readonly outbox?: Outbox
+  // Os rascunhos guardados: o mesmo entre dois renders simula reabrir o app
+  readonly drafts?: DraftStore
   readonly post?: (id: string, batch: QueuedBatch) => Promise<PostOutcome>
 }
 
@@ -94,7 +97,11 @@ export function renderWithSession(
       <QueryClientProvider client={queryClient}>
         <SessionProvider session={session}>
           <ToastProvider>
-            <SyncProvider outbox={sync.outbox} post={sync.post}>
+            <SyncProvider
+              outbox={sync.outbox}
+              drafts={sync.drafts}
+              post={sync.post}
+            >
               {ui}
             </SyncProvider>
           </ToastProvider>

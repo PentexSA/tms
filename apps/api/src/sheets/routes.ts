@@ -207,6 +207,10 @@ export function sheetRoutes(
           values: body.values,
           portraitUrl,
         }
+        // A chave é opcional na ficha do jogador (o app antigo não a manda)
+        // e obrigatória no NPC; com ela, as duas são idempotentes
+        const commandKind =
+          kind === 'npc' ? 'character.create-npc' : 'character.create'
         const row = await db.transaction().execute(async trx => {
           // Toda criação começa pela crônica. Isso serializa limite,
           // transferência e replay do comando sem adquirir outra trava antes.
@@ -222,7 +226,10 @@ export function sheetRoutes(
               code: 'STORYTELLER_REQUIRED',
             })
 
-          if (kind === 'npc' && body.clientCommandId) {
+          // A repetição é conferida antes do limite: repetir não cria nem
+          // conta. O resultado só volta para o mesmo autor com o mesmo
+          // pedido; fora disso, 409 sem o id (T-02)
+          if (body.clientCommandId) {
             const done = await trx
               .selectFrom('chronicle_commands')
               .select(['kind', 'request_hash', 'result', 'created_by'])
@@ -231,10 +238,9 @@ export function sheetRoutes(
               .executeTakeFirst()
             if (done) {
               if (
-                done.kind !== 'character.create-npc' ||
+                done.kind !== commandKind ||
                 done.created_by !== me ||
-                done.request_hash !==
-                  commandHash('character.create-npc', request)
+                done.request_hash !== commandHash(commandKind, request)
               )
                 throw idempotencyConflict()
               return { ...(done.result as { id: string }), duplicate: true }
@@ -276,18 +282,19 @@ export function sheetRoutes(
             })
             .returning('id')
             .executeTakeFirstOrThrow()
-          if (kind === 'npc' && body.clientCommandId) {
+          if (body.clientCommandId)
             await trx
               .insertInto('chronicle_commands')
               .values({
                 chronicle_id: params.id,
                 client_command_id: body.clientCommandId,
-                kind: 'character.create-npc',
-                request_hash: commandHash('character.create-npc', request),
+                kind: commandKind,
+                request_hash: commandHash(commandKind, request),
                 result: JSON.stringify({ id: inserted.id }),
                 created_by: me,
               })
               .execute()
+          if (kind === 'npc')
             await audit(trx, {
               chronicleId: params.id,
               actorId: me,
@@ -297,7 +304,6 @@ export function sheetRoutes(
               payload: { visibility: 'hidden' },
               at: new Date(),
             })
-          }
           return { id: inserted.id, duplicate: false }
         })
         set.status = row.duplicate ? 200 : 201

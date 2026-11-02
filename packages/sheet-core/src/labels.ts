@@ -209,3 +209,84 @@ export function inactiveChanges(
   }
   return out
 }
+
+const MAX_SHOWN_TEXT = 80
+
+const clip = (text: string) =>
+  text.length > MAX_SHOWN_TEXT ? `${text.slice(0, MAX_SHOWN_TEXT - 1)}…` : text
+
+const shownText = (value: unknown) =>
+  typeof value === 'string' && value.trim() ? clip(value.trim()) : DASH
+
+/**
+ * O valor de um caminho, para a pessoa escolher entre o seu e o de agora num
+ * conflito (T-31). SÓ para a tela de conflito: ali a escolha exige ver o que
+ * cada lado escreveu, então texto livre e especialização aparecem (até 80
+ * caracteres). Aviso, resumo, histórico e log continuam sem conteúdo
+ * (README dos templates §10 e §11): neles, use `describeEvent`.
+ */
+export function describeValue(
+  model: SheetModel,
+  path: string,
+  value: unknown
+): string {
+  const p = parsePath(path)
+  const def = p ? model.fields.get(p.fieldId)?.def : undefined
+  if (!p || !def) return DASH
+  if (p.scope === 'specialties') return shownText(value)
+  const unset = value === null || value === undefined
+  switch (def.type) {
+    case 'text':
+    case 'longText':
+      return shownText(value)
+    case 'rating':
+    case 'number':
+    case 'percent':
+      return n(value)
+    case 'resource': {
+      const r = rec(value) ?? {}
+      const parts = [
+        typeof r.permanent === 'number' ? `permanente ${r.permanent}` : null,
+        typeof r.current === 'number' ? `atual ${r.current}` : null,
+        typeof r.temp === 'number' && r.temp ? `temporários ${r.temp}` : null,
+        typeof r.max === 'number' ? `máximo ${r.max}` : null,
+      ].filter(Boolean)
+      return parts.join(', ') || DASH
+    }
+    case 'track': {
+      if (def.rule === 'boxes') {
+        const marked = Object.values(rec(value) ?? {})
+          .flatMap(x => asArray(x))
+          .filter(x => x === true).length
+        return plural(marked, 'marcada', 'marcadas')
+      }
+      const parts = (def.types ?? []).flatMap(t => {
+        const count = get(value, t.id)
+        return typeof count === 'number' && count
+          ? [`${count} ${t.label.toLowerCase()}`]
+          : []
+      })
+      return parts.join(', ') || 'sem dano'
+    }
+    case 'choice':
+    case 'state':
+      return unset ? DASH : optionLabel(def.options, value)
+    case 'mark':
+      return unset
+        ? DASH
+        : optionLabel(model.template.markStates?.[def.states], value)
+    case 'tags':
+      return plural(asArray(value).length, 'marcada', 'marcadas')
+    case 'list':
+      return plural(asArray(value).length, 'item', 'itens')
+    case 'clock':
+      return def.fills
+        .map(f => {
+          const x = get(value, f.id)
+          return `${f.label} ${typeof x === 'number' ? x : 0}`
+        })
+        .join(', ')
+    default:
+      return unset ? DASH : 'definido'
+  }
+}
