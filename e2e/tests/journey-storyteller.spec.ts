@@ -42,7 +42,9 @@ async function createSheet(page: Page, chronicleId: string, name: string) {
       })
       .click()
   }
-  await page.getByRole('button', { name: 'Concluir', exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   const saved = response(page, `/characters/${id}/events`, 200)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await saved

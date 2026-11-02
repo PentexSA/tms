@@ -31,6 +31,19 @@ cobertos por teste que falha sem a correção:
 | A auditoria ordenava só por data; lotes de uma operação em grupo têm o mesmo instante e podiam repetir ou sumir entre páginas | Desempate por `id` no SQL e comparação binária no merge | `backstage.test.ts`: 10+ itens no mesmo instante, páginas de 3 sem lacuna nem repetição |
 | O narrador via "Aguardando aceitar" e "Cancelar" para um pedido vencido | A tela só mostra o pendente disponível; senão volta a oferecer os membros | `CampaignBackstage.test.tsx` |
 
+**Onda 3 (P11, 2026-11-02).** A correção da data da sessão acima era só do
+servidor. No app, o cliente Eden trocava por `Date` todo texto com forma de
+data: "2026-11-01" virava meia-noite UTC, e a tela mostrava "Sat Oct 31 2026
+21:00:00 GMT-0300" no Brasil; a edição reenviava esse texto, e a API a
+recusava (400). O cliente passa a usar `parseDate: false`, e a tela formata a
+data civil com `civilDate`, sem `Date` nem fuso (T-16; `lib/__tests__/api.test.ts`
+com o Eden real, `format.test.ts`, `CampaignBackstage.test.tsx` e
+`npc-backstage.spec.ts` com o fuso de São Paulo). A auditoria consolidada
+passa a mandar o código tipado, a ficha alvo, o usuário alvo e um `detail`
+em lista branca, e o app mostra frases em vez dos códigos (T-63;
+`auditView.ts`, `auditPhrase.ts`). A criação da crônica e do convite entram
+na auditoria daqui para a frente, sem o código do convite.
+
 Também foram reduzidos o tempo e a memória da suíte da API, que esgotava a
 memória local: a matriz de AuthZ divide um PGLite entre os cenários (235 s →
 31 s; 1,9 GB → 1,0 GB), e o `destroy()` do PGLite de teste solta o módulo

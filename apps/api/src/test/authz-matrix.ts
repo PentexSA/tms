@@ -164,6 +164,14 @@ export const MATRIX: readonly MatrixRow[] = [
     expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
+    // O NPC oculto: nem a identidade nem a crônica dele (T-81) saem para
+    // quem não narra. O nome dele não aparece em resposta nenhuma (check)
+    method: 'GET',
+    route: '/characters/:id',
+    target: 'npc',
+    expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
     method: 'DELETE',
     route: '/characters/:id',
     mutates: true,
@@ -209,6 +217,21 @@ export const MATRIX: readonly MatrixRow[] = [
     sheet: { status: 'pending' },
     mutates: true,
     expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  // Estado da criação (P04-D, D-04 e D-03). A ficha da matriz está em
+  // criação livre: o narrador pede ajuste; só a dona avisa que terminou
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/adjust',
+    body: () => ({ reason: 'Refaça os Antecedentes' }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    method: 'POST',
+    route: '/characters/:id/creation/ready',
+    mutates: true,
+    expect: { storyteller: 403, owner: 200, player: 404, ...denied },
   },
   {
     method: 'PATCH',

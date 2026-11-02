@@ -12,6 +12,7 @@ import { requireUser } from '../auth/guard'
 import { chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
+import { creationStateOf } from '../sheets/creation-state'
 import { modelFor } from '../sheets/models'
 
 // Mesa do narrador (doc/plano-v0.md, Etapa 19): todas as fichas da crônica
@@ -106,6 +107,8 @@ export function tableRoutes(
           'ch.locked_at',
           'ch.kind',
           'ch.visibility',
+          'ch.creation',
+          'ch.activated_at',
           'u.username',
           'g.code as systemCode',
           'lb.created_at as lastChangeAt',
@@ -129,6 +132,10 @@ export function tableRoutes(
           templateVersion: r.template_version,
           sheetVersion: r.sheet_version,
           status: r.status,
+          // O estado da criação (P04-D, R-12), como na lista: o modo e os
+          // marcadores, sem o motivo
+          ...creationStateOf(model, r.status, r.creation),
+          activatedAt: r.activated_at,
           lockedAt: r.locked_at,
           updatedAt: r.updated_at,
           lastChange:

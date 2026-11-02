@@ -47,7 +47,10 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
-import { ReturnedBanner } from './creation/ReturnedBanner'
+import {
+  CompletedWhileEditingBanner,
+  ReturnedBanner,
+} from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
@@ -296,6 +299,7 @@ function SheetBody({
       editable ? <CreationStatusPanel key="status" /> : null,
       // A devolução aparece em qualquer modo (T-06)
       editable ? <ReturnedBanner key="returned" /> : null,
+      editable ? <CompletedWhileEditingBanner key="completed" /> : null,
       editable && mode === 'create' ? <CreationAlerts key="alerts" /> : null,
       mode === 'play' ? (
         <View key="toolbar" style={styles.toolbar}>

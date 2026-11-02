@@ -13,19 +13,19 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
+import { civilDate, whenLabel } from '../../lib/format'
 import {
-  useAcceptTransfer,
   useCancelTransfer,
   useChronicleHistory,
   useCreateSession,
   useProposeTransfer,
-  useRejectTransfer,
   useSessions,
   useTransfer,
   useUpdateChronicle,
   useUpdateSession,
 } from '../../lib/queries/backstage'
 import { useChronicleCharacters } from '../../lib/queries/chronicles'
+import { auditPhrase } from './auditPhrase'
 
 interface ChronicleInfo {
   readonly id: string
@@ -78,7 +78,9 @@ export function CampaignBackstage({
   readonly narrating: boolean
 }) {
   const sessions = useSessions(chronicle.id)
-  const transfer = useTransfer(chronicle.id)
+  // Só o painel do narrador lê a transferência aqui; a proposta do jogador
+  // fica no topo da crônica (TransferOffer, U-03)
+  const transfer = useTransfer(chronicle.id, narrating)
   return (
     <View style={styles.root}>
       {/* Os títulos com a margem da página (T-67) */}
@@ -110,12 +112,9 @@ export function CampaignBackstage({
           />
           <History chronicleId={chronicle.id} />
         </>
-      ) : transfer.data?.available ? (
-        <AcceptTransfer
-          chronicleId={chronicle.id}
-          transferId={transfer.data.id}
-        />
       ) : null}
+      {/* A proposta de narrar do jogador fica no topo da crônica e na lista
+          de crônicas (TransferOffer, U-03), não aqui */}
     </View>
   )
 }
@@ -147,7 +146,7 @@ function SessionEntry({
       <ListItem
         title={session.title}
         subtitle={session.summary || 'Sem resumo público.'}
-        meta={String(session.date)}
+        meta={civilDate(session.date) ?? undefined}
         trailing={
           narrating ? (
             <Button
@@ -195,7 +194,8 @@ function SessionEntry({
               {
                 clientCommandId: (key.current ??= randomUUID()),
                 revision: session.revision,
-                date: String(session.date),
+                // A data civil volta como chegou (AAAA-MM-DD), sem Date
+                date: session.date,
                 title,
                 summary,
                 privateNotes: notes,
@@ -486,39 +486,6 @@ function TransferPanel({
   )
 }
 
-function AcceptTransfer({
-  chronicleId,
-  transferId,
-}: {
-  chronicleId: string
-  transferId: string
-}) {
-  const accept = useAcceptTransfer(chronicleId, transferId)
-  const reject = useRejectTransfer(chronicleId, transferId)
-  const key = useRef<string | null>(null)
-  const rejectKey = useRef<string | null>(null)
-  return (
-    <View style={styles.form}>
-      <Text variant="fieldLabel">Convite para narrar</Text>
-      <Text>
-        Ao aceitar, você assume NPCs, notas privadas e o histórico
-        administrativo desta crônica.
-      </Text>
-      <Button
-        title="Aceitar narração"
-        busy={accept.isPending}
-        onPress={() => accept.mutate((key.current ??= randomUUID()))}
-      />
-      <Button
-        title="Recusar"
-        variant="secondary"
-        busy={reject.isPending}
-        onPress={() => reject.mutate((rejectKey.current ??= randomUUID()))}
-      />
-    </View>
-  )
-}
-
 function History({ chronicleId }: { readonly chronicleId: string }) {
   const characters = useChronicleCharacters(chronicleId)
   const [characterId, setCharacterId] = useState<string | null>(null)
@@ -579,12 +546,13 @@ function History({ chronicleId }: { readonly chronicleId: string }) {
           </View>
         </View>
       </View>
+      {/* T-63: a frase com a ficha e o que mudou; o autor e a hora no fuso
+          de quem lê, em pt-BR. Nenhum código interno na tela */}
       {items.map(item => (
         <ListItem
           key={`${item.source}:${item.id}`}
-          title={item.action}
-          subtitle={item.by?.username ?? 'Conta excluída'}
-          meta={new Date(item.at).toLocaleString()}
+          title={auditPhrase(item)}
+          subtitle={`${item.by?.username ?? 'Conta excluída'} · ${whenLabel(item.at)}`}
         />
       ))}
       {history.hasNextPage ? (

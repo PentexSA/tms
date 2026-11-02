@@ -40,6 +40,8 @@ const info = {
   config: {},
   effective: effectiveCreationConfig(model),
   returned: null,
+  adjust: null,
+  ready: null,
   approval: true,
 }
 

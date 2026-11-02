@@ -302,6 +302,9 @@ describe('Visibilidade do NPC: rádio marcado, não botão desabilitado (T-42)',
     )
     await openNpc()
     fireEvent.press(screen.getByRole('radio', { name: /^Identidade/ }))
+    // Revelar pede confirmação (T-46): o rádio sozinho não envia
+    expect(calls.visibilityPost).not.toHaveBeenCalled()
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar identidade' }))
     // Com o pedido pendente, as opções ficam desabilitadas
     await waitFor(() =>
       expect(screen.getByRole('radio', { name: /^Ficha/ })).toBeDisabled()

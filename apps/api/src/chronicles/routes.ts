@@ -1,7 +1,7 @@
 import type { DB } from '@tms/db'
 import { effectiveChronicleOptions, isSafeText } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
-import type { Kysely } from 'kysely'
+import { type Kysely, sql } from 'kysely'
 import { audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
@@ -157,12 +157,22 @@ export function chronicleRoutes(
           })
         const key = body.clientCommandId
         if (!key) {
-          // Sem chave (app antigo): cria como antes, sem idempotência
-          const chronicle = await db
-            .insertInto('chronicles')
-            .values({ storyteller_id: me, system_id: system.id, name })
-            .returning(['id', 'name'])
-            .executeTakeFirstOrThrow()
+          // Sem chave (app antigo): cria como antes, sem idempotência. A
+          // crônica e o registro da auditoria (T-63) entram juntos
+          const chronicle = await db.transaction().execute(async trx => {
+            const row = await trx
+              .insertInto('chronicles')
+              .values({ storyteller_id: me, system_id: system.id, name })
+              .returning(['id', 'name'])
+              .executeTakeFirstOrThrow()
+            await audit(trx, {
+              chronicleId: row.id,
+              actorId: me,
+              action: 'chronicle.create',
+              at: options.now(),
+            })
+            return row
+          })
           set.status = 201
           return {
             id: chronicle.id,
@@ -210,6 +220,14 @@ export function chronicleRoutes(
             .values({ storyteller_id: me, system_id: system.id, name })
             .returning(['id', 'name'])
             .executeTakeFirstOrThrow()
+          // T-63: a criação da crônica entra na auditoria (só daqui para a
+          // frente; as que já existem não ganham registro retroativo)
+          await audit(trx, {
+            chronicleId: chronicle.id,
+            actorId: me,
+            action: 'chronicle.create',
+            at: options.now(),
+          })
           await trx
             .insertInto('user_commands')
             .values({
@@ -270,12 +288,31 @@ export function chronicleRoutes(
     )
     .get('/chronicles', async ({ userId }) => {
       const me = requireUser(userId)
+      const now = options.now()
       const rows = await db
         .selectFrom('chronicles as c')
         .innerJoin('game_systems as g', 'g.id', 'c.system_id')
         .innerJoin('users as st', 'st.id', 'c.storyteller_id')
         .leftJoin('chronicle_members as m', join =>
           join.onRef('m.chronicle_id', '=', 'c.id').on('m.user_id', '=', me)
+        )
+        // A proposta de narrar pendente e válida para quem pergunta (U-03),
+        // numa consulta só por crônica: o filtro do destinatário fica no
+        // servidor, como no GET /transfer
+        .leftJoinLateral(
+          eb =>
+            eb
+              .selectFrom('chronicle_transfers as tr')
+              .select(['tr.id as offerId', 'tr.expires_at as offerExpiresAt'])
+              .whereRef('tr.chronicle_id', '=', 'c.id')
+              .where('tr.recipient_id', '=', me)
+              .where('tr.status', '=', 'pending')
+              .where('tr.expires_at', '>', now)
+              .orderBy('tr.requested_at', 'desc')
+              .orderBy('tr.id', 'desc')
+              .limit(1)
+              .as('offer'),
+          join => join.onTrue()
         )
         // O ex-membro continua vendo a crônica em que tem ficha ("Você saiu")
         .where(eb =>
@@ -319,32 +356,69 @@ export function chronicleRoutes(
               ])
             )
             .as('characterCount'),
-          // Fichas que aguardam a revisão do narrador: só ele recebe a conta
+          // Fichas que aguardam a revisão do narrador: as enviadas para
+          // aprovação e as da criação livre cujo dono avisou que terminou
+          // (P04-D, R-13). Só ele recebe a conta
           eb
             .selectFrom('characters as ch')
             .select(eb.fn.countAll<string>().as('n'))
             .whereRef('ch.chronicle_id', '=', 'c.id')
             .where('ch.deleted_at', 'is', null)
-            .where('ch.status', '=', 'pending')
+            .where(eb =>
+              eb.or([
+                eb('ch.status', '=', 'pending'),
+                eb.and([
+                  eb('ch.status', '=', 'creating'),
+                  // O banner da aba Fichas: PC de outra pessoa (depois de uma
+                  // transferência, a ficha do próprio narrador não conta)
+                  eb('ch.kind', '=', 'pc'),
+                  eb('ch.user_id', '<>', me),
+                  // A mesma forma que o parse aceita: a data em texto
+                  sql<boolean>`jsonb_typeof(ch.creation -> 'ready' -> 'at') = 'string'`,
+                ]),
+              ])
+            )
             .where('c.storyteller_id', '=', me)
             .as('pendingReview'),
+          // A data civil da última sessão (U-04), no formato do sessionDate.
+          // O índice chronicle_sessions_recent_idx atende
+          eb
+            .selectFrom('chronicle_sessions as s')
+            .select(
+              sql<string>`to_char(max(s.session_date), 'YYYY-MM-DD')`.as('d')
+            )
+            .whereRef('s.chronicle_id', '=', 'c.id')
+            .as('lastSession'),
+          'offer.offerId',
+          'offer.offerExpiresAt',
         ])
         .orderBy('c.created_at', 'desc')
         .execute()
-      return rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        system: { code: r.systemCode, name: r.systemName },
-        role:
+      return rows.map(r => {
+        const role =
           r.storyteller_id === me
             ? ('storyteller' as const)
             : r.member
               ? ('player' as const)
-              : ('former' as const),
-        storyteller: { username: r.storyteller },
-        characterCount: Number(r.characterCount ?? 0),
-        pendingReview: Number(r.pendingReview ?? 0),
-      }))
+              : ('former' as const)
+        return {
+          id: r.id,
+          name: r.name,
+          system: { code: r.systemCode, name: r.systemName },
+          role,
+          storyteller: { username: r.storyteller },
+          characterCount: Number(r.characterCount ?? 0),
+          pendingReview: Number(r.pendingReview ?? 0),
+          // Só narrador e membro: o ex-membro não acompanha a crônica
+          // (plano v5 §3.5)
+          lastSession: role === 'former' ? null : (r.lastSession ?? null),
+          // Só o destinatário que ainda é membro: a decisão revalida tudo
+          transferOffer:
+            role === 'player' && r.offerId && r.offerExpiresAt
+              ? { id: r.offerId, expiresAt: r.offerExpiresAt }
+              : null,
+        }
+      })
     })
     .get(
       '/chronicles/:id',
@@ -486,21 +560,34 @@ export function chronicleRoutes(
         const me = requireUser(userId)
         await requireStoryteller(me, params.id)
         const code = newInviteCode()
-        const expiresAt = new Date(
-          options.now().getTime() + (body?.expiresInDays ?? 7) * DAY
-        )
-        const invite = await db
-          .insertInto('chronicle_invites')
-          .values({
-            chronicle_id: params.id,
-            code_hash: hashInviteCode(code),
-            created_by: me,
-            created_at: options.now(),
-            expires_at: expiresAt,
-            max_uses: body?.maxUses ?? 10,
+        const now = options.now()
+        const expiresInDays = body?.expiresInDays ?? 7
+        const maxUses = body?.maxUses ?? 10
+        const expiresAt = new Date(now.getTime() + expiresInDays * DAY)
+        const invite = await db.transaction().execute(async trx => {
+          const row = await trx
+            .insertInto('chronicle_invites')
+            .values({
+              chronicle_id: params.id,
+              code_hash: hashInviteCode(code),
+              created_by: me,
+              created_at: now,
+              expires_at: expiresAt,
+              max_uses: maxUses,
+            })
+            .returning(['id', 'expires_at', 'max_uses'])
+            .executeTakeFirstOrThrow()
+          // T-63: o convite gerado entra na auditoria. Nunca o código nem o
+          // hash dele: só o id, os usos e a validade
+          await audit(trx, {
+            chronicleId: params.id,
+            actorId: me,
+            action: 'invite.create',
+            payload: { inviteId: row.id, maxUses, expiresInDays },
+            at: now,
           })
-          .returning(['id', 'expires_at', 'max_uses'])
-          .executeTakeFirstOrThrow()
+          return row
+        })
         set.status = 201
         // O código só aparece nesta resposta; o banco guarda o hash
         return {

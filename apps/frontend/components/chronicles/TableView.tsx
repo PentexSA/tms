@@ -3,6 +3,7 @@ import type { SheetModel } from '@tms/sheet-core'
 import {
   Button,
   Chip,
+  SectionHeader,
   Skeleton,
   TabPanel,
   Tabs,
@@ -38,6 +39,7 @@ import { useTableSelection } from './TableSelection'
 import {
   arrange,
   buildItem,
+  bySection,
   type TableItem,
   type TableRowData,
   type TableSort,
@@ -79,15 +81,17 @@ function TableGrid({
   items,
   columns,
   renderItem,
+  testID = 'table-grid',
 }: {
   readonly items: readonly TableItem[]
   readonly columns: number
   readonly renderItem: (item: TableItem, framed: boolean) => ReactNode
+  readonly testID?: string
 }) {
   if (columns <= 1) return <>{items.map(i => renderItem(i, false))}</>
   const width = `${100 / columns}%` as const
   return (
-    <View style={styles.grid} testID="table-grid">
+    <View style={styles.grid} testID={testID}>
       {items.map(item => (
         <View
           key={item.row.id}
@@ -214,16 +218,30 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
   )
+  // PCs e, depois, NPCs numa seção própria (T-52)
+  const sections = useMemo(() => bySection(shown), [shown])
   // A ordem da tela, lida ao abrir: o callback não muda com o filtro, e as
   // linhas não redesenham por causa dele
   const order = useRef<readonly string[]>([])
-  order.current = shown.map(i => i.row.id)
+  order.current = [...sections.pcs, ...sections.npcs].map(i => i.row.id)
   const open = useCallback(
     (id: string) => {
       remember(chronicleId, order.current)
       router.push(`/characters/${id}`)
     },
     [chronicleId, remember, router]
+  )
+  // A mesma linha nas duas seções (PCs e NPCs), na mesma grade (T-48)
+  const row = (item: TableItem, framed: boolean) => (
+    <TableRow
+      key={item.row.id}
+      item={item}
+      onOpen={open}
+      selecting={selecting}
+      selected={selected.has(item.row.id)}
+      onSelect={select}
+      framed={framed}
+    />
   )
 
   return (
@@ -302,21 +320,26 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 : 'Nenhuma ficha na crônica ainda.'}
           </Text>
         ) : (
-          <TableGrid
-            items={shown}
-            columns={columns}
-            renderItem={(item, framed) => (
-              <TableRow
-                key={item.row.id}
-                item={item}
-                onOpen={open}
-                selecting={selecting}
-                selected={selected.has(item.row.id)}
-                onSelect={select}
-                framed={framed}
-              />
-            )}
-          />
+          <>
+            <TableGrid
+              items={sections.pcs}
+              columns={columns}
+              renderItem={row}
+            />
+            {sections.npcs.length ? (
+              <>
+                <View style={styles.section} testID="table-npcs">
+                  <SectionHeader title="NPCs" level="group" />
+                </View>
+                <TableGrid
+                  items={sections.npcs}
+                  columns={columns}
+                  renderItem={row}
+                  testID="table-grid-npcs"
+                />
+              </>
+            ) : null}
+          </>
         )}
       </TabPanel>
       {requests ? (
@@ -337,6 +360,10 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
+  section: {
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[3],
+  },
   hint: {
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[2],

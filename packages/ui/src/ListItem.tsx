@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Pressable } from './Pressable'
+import { StateBadge, type StateBadgeProps } from './StateBadge'
 import { Text } from './Text'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
@@ -9,6 +10,9 @@ export interface ListItemProps {
   readonly title: string
   readonly subtitle?: string
   readonly meta?: string
+  // Selos de estado sob o meta (ficha em criação, NPC oculto). O rótulo de
+  // cada um entra no nome acessível, depois do meta
+  readonly badges?: readonly StateBadgeProps[]
   readonly leading?: ReactNode
   readonly trailing?: ReactNode
   readonly onPress?: () => void
@@ -29,6 +33,7 @@ export function ListItem({
   title,
   subtitle,
   meta,
+  badges,
   leading,
   trailing,
   onPress,
@@ -37,7 +42,10 @@ export function ListItem({
 }: ListItemProps) {
   const { colors } = useTheme()
   const label =
-    accessibilityLabel ?? [title, subtitle, meta].filter(Boolean).join(', ')
+    accessibilityLabel ??
+    [title, subtitle, meta, ...(badges ?? []).map(b => b.label)]
+      .filter(Boolean)
+      .join(', ')
   const text = (
     <View style={styles.text}>
       <Text variant="fieldLabel" numberOfLines={2}>
@@ -52,6 +60,14 @@ export function ListItem({
         <Text variant="caption" color="inkMuted">
           {meta}
         </Text>
+      ) : null}
+      {badges?.length ? (
+        // A linha continua um alvo só: os selos são texto dentro dela
+        <View style={styles.badges}>
+          {badges.map(b => (
+            <StateBadge key={b.testID ?? b.label} {...b} />
+          ))}
+        </View>
       ) : null}
     </View>
   )
@@ -105,4 +121,10 @@ const styles = StyleSheet.create({
     gap: tokens.space[3],
   },
   text: { flex: 1, gap: tokens.space['0.5'] },
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.space[1],
+    paddingTop: tokens.space['0.5'],
+  },
 })

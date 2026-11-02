@@ -191,7 +191,17 @@ describe('sair', () => {
     expect((await leave(player)).status).toBe(204)
     expect((await characterRow()).status).toBe('archived')
     expect((await memberRows()).map(r => r.user_id)).toEqual([other.id])
-    expect(await auditRows()).toEqual([
+    // O convite gerado também entra na auditoria (T-63), sem o código
+    const rows = (await auditRows()).sort((a, b) =>
+      a.action < b.action ? -1 : 1
+    )
+    expect(rows).toEqual([
+      {
+        action: 'invite.create',
+        actor_id: storyteller.id,
+        target_user_id: null,
+        payload: { inviteId: kept.id, maxUses: 10, expiresInDays: 7 },
+      },
       {
         action: 'member.leave',
         actor_id: player.id,

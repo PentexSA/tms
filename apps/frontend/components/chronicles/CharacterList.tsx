@@ -24,8 +24,9 @@ import {
   summaryLine,
 } from '../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate, useTemplate } from '../../sheet/data'
+import { deadLabel } from '../../sheet/policy'
 import type { ChronicleCreationInfo } from './CreationSettings'
-import { characterStateText } from './characterState'
+import { characterState, npcVisibilityText } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -47,8 +48,13 @@ interface FullRow {
   readonly identity?: PublicIdentity
   // creating, pending (aguarda o narrador), active...
   readonly status?: string
-  // Devolvida pelo narrador (T-06), sem o motivo
+  // O estado da criação (T-06, P04-D): o modo e os marcadores, sem o motivo
+  readonly creationMode?: 'free' | 'points' | null
   readonly returned?: boolean
+  readonly adjust?: boolean
+  readonly ready?: boolean
+  readonly activatedAt?: string | Date | null
+  readonly lockedAt?: string | Date | null
 }
 
 interface IdentityRow {
@@ -85,14 +91,48 @@ function CharacterRow({
       (model
         ? identityOf(resolve(model, { values: row.values } as SheetData))
         : null))
+  // T-52: o NPC do narrador diz "NPC" (o dono dele é o narrador, e "Sua
+  // ficha" confundia) e a visibilidade. O jogador continua com "NPC
+  // revelado", sem a visibilidade
+  const npc = !partial && row.kind === 'npc' && narrating
   const owner = partial
     ? 'NPC revelado'
-    : row.mine
-      ? 'Sua ficha'
-      : `de ${row.owner.username}`
+    : npc
+      ? 'NPC'
+      : row.mine
+        ? 'Sua ficha'
+        : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
-  const state = partial ? null : characterStateText(row, narrating)
-  const who = state ? `${owner} · ${state}` : owner
+  // O selo de visibilidade do NPC (T-52), só para o narrador; não passa
+  // pelo characterState, que devolve null para o NPC em criação ou em jogo
+  const visibility = npc ? npcVisibilityText(row.visibility) : null
+  // O estado vai no selo, sob o meta, e entra no nome acessível (D-02)
+  const state = partial
+    ? null
+    : characterState(
+        { ...row, locked: Boolean(row.lockedAt) },
+        { narrating, deadLabel: model ? deadLabel(model) : undefined }
+      )
+  const badges = [
+    ...(visibility
+      ? [
+          {
+            label: visibility,
+            tone: 'neutral' as const,
+            testID: `npc-visibility-${row.id}`,
+          },
+        ]
+      : []),
+    ...(state
+      ? [
+          {
+            label: state.label,
+            tone: state.tone,
+            testID: `character-state-${row.id}`,
+          },
+        ]
+      : []),
+  ]
   return (
     <ThemeProvider
       accent={
@@ -108,7 +148,8 @@ function CharacterRow({
               : (identity.subtitle ?? undefined)
             : undefined
         }
-        meta={identity?.chip ? `${identity.chip} · ${who}` : who}
+        meta={identity?.chip ? `${identity.chip} · ${owner}` : owner}
+        badges={badges.length ? badges : undefined}
         leading={
           <Avatar
             name={name}
@@ -183,6 +224,11 @@ export function CharacterList({
   const shown = narrating ? pcs : pcs.filter(r => r.mine)
   // A ficha enviada para aprovação espera o narrador: o aviso fica no topo
   const review = narrating ? shown.filter(r => r.status === 'pending') : []
+  // Na criação livre, o jogador avisou que terminou (D-03): o narrador
+  // conclui ou pede ajuste
+  const told = narrating
+    ? shown.filter(r => r.status === 'creating' && r.ready === true && !r.mine)
+    : []
   const create = (
     <Button
       title="Nova ficha"
@@ -222,6 +268,19 @@ export function CharacterList({
                 : `${review.length} fichas aguardam sua revisão`
             }
             message={`${review.map(r => r.name).join(', ')}: abra a ficha para aprovar ou devolver para correção.`}
+          />
+        </View>
+      ) : null}
+      {told.length ? (
+        <View style={styles.header} testID="ready-review">
+          <Banner
+            tone="warning"
+            title={
+              told.length === 1
+                ? '1 jogador avisou que terminou'
+                : `${told.length} jogadores avisaram que terminaram`
+            }
+            message={`${told.map(r => r.name).join(', ')}: abra a ficha para concluir a criação ou pedir ajuste.`}
           />
         </View>
       ) : null}

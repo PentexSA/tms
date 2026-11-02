@@ -12,6 +12,7 @@ import { Dimensions, ScrollView, StyleSheet } from 'react-native'
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
 import { clearChronicleScroll, scrollOf } from '../../lib/chronicleScroll'
+import { useTableOrder } from '../../lib/tableOrder'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import {
@@ -213,6 +214,51 @@ describe('Mesa do narrador', () => {
     ).toBe('dona · alterada às 14:05')
   })
 
+  it('os NPCs ficam numa seção própria, depois dos PCs, com a visibilidade (T-52)', async () => {
+    const NPC = '00000000-0000-4000-8000-00000000c009'
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        // A API manda em qualquer ordem: o NPC antes de um PC
+        row(NPC, 'helena', 'vtm-v20', {
+          name: 'Figura Velada',
+          kind: 'npc',
+          visibility: 'hidden',
+        }),
+        row(HELENA, 'helena', 'vtm-v20', { kind: 'pc', visibility: 'hidden' }),
+        row(LIA, 'lia', 'dnd5e-2014', { kind: 'pc', visibility: 'hidden' }),
+      ])
+    )
+    await openTable()
+    const header = await screen.findByRole('header', { name: 'NPCs' })
+    expect(header).toBeTruthy()
+    const lines = screen
+      .getAllByRole('button')
+      .map(b => String(b.props.accessibilityLabel ?? ''))
+      .filter(l => /^(Figura Velada|Helena Varga|Lia)/.test(l))
+    // PCs antes, NPC depois do cabeçalho
+    expect(lines.at(-1)).toMatch(/^Figura Velada, Tremere\. Oculto\./)
+    expect(lines.slice(0, -1).every(l => !l.includes('Oculto'))).toBe(true)
+    expect(screen.getByTestId(`visibility-${NPC}`)).toHaveTextContent('Oculto')
+    expect(screen.queryByTestId(`visibility-${HELENA}`)).toBeNull()
+
+    // A navegação da Mesa lembra a ordem da tela: PCs e depois o NPC
+    fireEvent.press(
+      screen.getByRole('button', { name: /^Figura Velada, Tremere\./ })
+    )
+    const ids = useTableOrder.getState().ids
+    expect(ids.at(-1)).toBe(NPC)
+    expect(ids.slice(0, 2).sort()).toEqual([HELENA, LIA].sort())
+  })
+
+  it('sem NPC, a seção não aparece', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([row(HELENA, 'helena', 'vtm-v20', { kind: 'pc' })])
+    )
+    await openTable()
+    await screen.findByRole('button', { name: /^Helena Varga, Tremere\./ })
+    expect(screen.queryByRole('header', { name: 'NPCs' })).toBeNull()
+  })
+
   it('tocar na linha abre a ficha (em Leitura)', async () => {
     calls.chronicle.tableGet.mockResolvedValue(
       ok([row(HELENA, 'helena', 'vtm-v20')])
@@ -222,6 +268,52 @@ describe('Mesa do narrador', () => {
       await screen.findByRole('button', { name: /^Helena Varga, Tremere\./ })
     )
     expect(router.push).toHaveBeenCalledWith(`/characters/${HELENA}`)
+  })
+
+  // P04-D (R-12, R-13): o selo do estado no cartão, da mesma regra da lista
+  it('o selo diz o estado: aguardando aprovação, avisou, em criação e concluída', async () => {
+    const OTHER = '00000000-0000-4000-8000-00000000c003'
+    const DONE = '00000000-0000-4000-8000-00000000c004'
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(HELENA, 'helena', 'vtm-v20', {
+          status: 'pending',
+          creationMode: 'points',
+        }),
+        row(LIA, 'lia', 'dnd5e-2014', {
+          status: 'creating',
+          creationMode: 'free',
+          ready: true,
+        }),
+        row(OTHER, 'helena', 'vtm-v20', {
+          name: 'Caio',
+          status: 'creating',
+          creationMode: 'free',
+        }),
+        row(DONE, 'helena', 'vtm-v20', {
+          name: 'Dora',
+          status: 'active',
+          activatedAt: '2026-11-01T12:00:00Z',
+        }),
+      ])
+    )
+    await openTable()
+    expect(
+      await screen.findByTestId(`table-state-${HELENA}`)
+    ).toHaveTextContent('Aguardando aprovação')
+    expect(screen.getByTestId(`table-state-${LIA}`)).toHaveTextContent(
+      'Avisou que terminou'
+    )
+    expect(screen.getByTestId(`table-state-${OTHER}`)).toHaveTextContent(
+      'Em criação · livre'
+    )
+    expect(screen.getByTestId(`table-state-${DONE}`)).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    // O estado entra no nome da linha, que é um alvo só
+    expect(
+      screen.getByTestId(`table-row-${HELENA}`).props.accessibilityLabel
+    ).toContain('Aguardando aprovação')
   })
 
   it('alteração de outro dia mostra a data', async () => {

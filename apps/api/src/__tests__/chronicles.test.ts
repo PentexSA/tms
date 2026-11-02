@@ -10,6 +10,7 @@ import { defaultLimits } from '../options'
 import {
   addMember,
   as,
+  createCharacter,
   createChronicle,
   createUser,
   publish,
@@ -173,6 +174,63 @@ describe('POST /chronicles e GET /chronicles', () => {
     expect(
       await (await as(ctx, stranger, 'GET', '/chronicles')).json()
     ).toEqual([])
+  })
+
+  // U-04: a data civil da última sessão, sem hora, só para narrador e membro
+  it('a lista traz a última sessão como data civil; o ex-membro recebe null (U-04)', async () => {
+    const lastOf = async (user: TestUser) => {
+      const list = (await (
+        await as(ctx, user, 'GET', '/chronicles')
+      ).json()) as {
+        id: string
+        lastSession: string | null
+      }[]
+      return list.find(c => c.id === chronicleId)?.lastSession
+    }
+    expect(await lastOf(storyteller)).toBeNull()
+    expect(await lastOf(player)).toBeNull()
+
+    const register = (date: string) =>
+      as(ctx, storyteller, 'POST', `/chronicles/${chronicleId}/sessions`, {
+        clientCommandId: crypto.randomUUID(),
+        date,
+        title: `Sessão de ${date}`,
+        summary: '',
+        privateNotes: '',
+      })
+    for (const date of ['2026-10-20', '2026-11-01', '2026-10-25'])
+      expect((await register(date)).status).toBe(201)
+    // A maior data vence, como texto AAAA-MM-DD (sem hora nem fuso)
+    expect(await lastOf(storyteller)).toBe('2026-11-01')
+    expect(await lastOf(player)).toBe('2026-11-01')
+    // A outra crônica não tem sessão
+    const other = (await (
+      await as(ctx, otherStoryteller, 'GET', '/chronicles')
+    ).json()) as { lastSession: string | null }[]
+    expect(other.map(c => c.lastSession)).toEqual([null])
+
+    // O ex-membro (tem ficha e saiu) continua vendo a crônica, sem a sessão
+    await createCharacter(ctx, player, chronicleId)
+    expect(
+      (await as(ctx, player, 'DELETE', `/chronicles/${chronicleId}/members/me`))
+        .status
+    ).toBe(204)
+    const former = (await (
+      await as(ctx, player, 'GET', '/chronicles')
+    ).json()) as {
+      id: string
+      role: string
+      lastSession: string | null
+      transferOffer: unknown
+    }[]
+    expect(former).toEqual([
+      expect.objectContaining({
+        id: chronicleId,
+        role: 'former',
+        lastSession: null,
+        transferOffer: null,
+      }),
+    ])
   })
 })
 

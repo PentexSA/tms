@@ -3,6 +3,7 @@ import {
   Avatar,
   Pressable,
   Skeleton,
+  StateBadge,
   Text,
   ThemeProvider,
   tokens,
@@ -45,7 +46,7 @@ export const TableRow = memo(function TableRow({
   // separador entre as linhas
   readonly framed?: boolean
 }) {
-  const { row, model, store, alerts, state } = item
+  const { row, model, store, alerts, state, visibility } = item
   const { colors } = useTheme()
   const resolved = store?.getState()
   const identity = resolved ? identityOf(resolved.resolved) : null
@@ -69,7 +70,8 @@ export const TableRow = memo(function TableRow({
     : []
   const label = [
     [row.name, identity?.chip].filter(Boolean).join(', '),
-    state,
+    visibility,
+    state?.label,
     ...alerts.map(a => a.label),
     ...described,
     problem,
@@ -130,12 +132,23 @@ export const TableRow = memo(function TableRow({
             ) : null}
           </View>
         </View>
-        {state || alerts.length ? (
+        {/* A linha de selos: a visibilidade do NPC (T-52, P11), o estado
+            (D-02, P04-D) e os alertas do template, sempre com texto */}
+        {visibility || state || alerts.length ? (
           <View style={styles.badges} testID={`table-badges-${row.id}`}>
+            {visibility ? (
+              <StateBadge
+                label={visibility}
+                tone="neutral"
+                testID={`visibility-${row.id}`}
+              />
+            ) : null}
             {state ? (
-              <Text variant="caption" color="inkMuted">
-                {state}
-              </Text>
+              <StateBadge
+                label={state.label}
+                tone={state.tone}
+                testID={`table-state-${row.id}`}
+              />
             ) : null}
             {alerts.map(a => (
               <Text

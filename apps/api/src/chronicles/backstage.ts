@@ -7,7 +7,7 @@ import {
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import { type Kysely, sql, type Transaction } from 'kysely'
-import { audit } from '../audit'
+import { type AuditAction, audit } from '../audit'
 import type { authGuard } from '../auth/guard'
 import { requireUser } from '../auth/guard'
 import { chronicleAccess } from '../authz'
@@ -15,6 +15,8 @@ import { ApiError } from '../http/errors'
 import { idParams, uuid } from '../http/params'
 import type { AppOptions } from '../options'
 import { latestTemplate, modelFor } from '../sheets/models'
+import { type AuditDetail, auditDetail, auditShowsUser } from './auditView'
+import type { OperationKind } from './operations'
 
 const DAY = 24 * 60 * 60 * 1000
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -151,6 +153,18 @@ const publicSession = (row: {
   summary: row.public_summary,
   revision: row.revision,
 })
+
+// A ficha alvo de uma linha da auditoria (T-63): o nome atual; a excluída
+// sai com o nome e a marca
+export interface AuditCharacter {
+  readonly id: string
+  readonly name: string
+  readonly deleted: boolean
+}
+
+// Quem escreveu o lote: só os dois papéis que gravam lote
+const roleOf = (value: string | null) =>
+  value === 'owner' || value === 'storyteller' ? value : null
 
 const cursorOf = (date: Date | string, source: string, id: string) =>
   Buffer.from(
@@ -826,11 +840,22 @@ export function backstageRoutes(
             'b.by_role',
             'u.username',
             'o.kind as operation_kind',
+            // A ficha alvo, com o nome atual (T-63)
+            'ch.name as character_name',
+            'ch.deleted_at as character_deleted_at',
           ])
           .where('ch.chronicle_id', '=', params.id)
         let audits = db
           .selectFrom('chronicle_audit as a')
           .leftJoin('users as u', 'u.id', 'a.actor_id')
+          // A ficha alvo só se for desta crônica: um alvo de outra crônica
+          // não traz nome (T-63)
+          .leftJoin('characters as tc', join =>
+            join
+              .onRef('tc.id', '=', 'a.target_character_id')
+              .onRef('tc.chronicle_id', '=', 'a.chronicle_id')
+          )
+          .leftJoin('users as tu', 'tu.id', 'a.target_user_id')
           .select([
             'a.id',
             'a.created_at',
@@ -838,6 +863,10 @@ export function backstageRoutes(
             'a.target_character_id',
             'a.payload',
             'u.username',
+            'tc.id as target_id',
+            'tc.name as target_name',
+            'tc.deleted_at as target_deleted_at',
+            'tu.username as target_username',
           ])
           .where('a.chronicle_id', '=', params.id)
         if (query.characterId) {
@@ -916,8 +945,20 @@ export function backstageRoutes(
             characterId: row.character_id,
             operationId: row.operation_id,
             sessionId: row.session_id,
-            action: row.operation_kind ?? 'sheet.change',
+            // O kind da operação ou a alteração avulsa (T-63: tipado, para o
+            // app ter uma frase para cada valor)
+            action:
+              (row.operation_kind as OperationKind | null) ??
+              ('sheet.change' as const),
             by: row.username === null ? null : { username: row.username },
+            byRole: roleOf(row.by_role),
+            character: {
+              id: row.character_id,
+              name: row.character_name,
+              deleted: row.character_deleted_at !== null,
+            } as AuditCharacter | null,
+            user: null as { username: string } | null,
+            detail: {} as AuditDetail,
           })),
           ...auditRows.map(row => ({
             source: 'audit' as const,
@@ -933,8 +974,23 @@ export function backstageRoutes(
                 'string'
                 ? ((row.payload as { sessionId: string }).sessionId ?? null)
                 : null,
-            action: row.action,
+            action: row.action as AuditAction,
             by: row.username === null ? null : { username: row.username },
+            byRole: null,
+            character:
+              row.target_id !== null && row.target_name !== null
+                ? ({
+                    id: row.target_id,
+                    name: row.target_name,
+                    deleted: row.target_deleted_at !== null,
+                  } as AuditCharacter | null)
+                : null,
+            user:
+              auditShowsUser(row.action) && row.target_username !== null
+                ? { username: row.target_username }
+                : null,
+            // Lista branca por ação; o payload cru não sai
+            detail: auditDetail(row.action, row.payload),
           })),
         ].sort((a, b) => {
           const date = new Date(b.at).getTime() - new Date(a.at).getTime()

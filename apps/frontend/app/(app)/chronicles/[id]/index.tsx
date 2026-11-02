@@ -40,9 +40,11 @@ import {
   TableSelectionProvider,
 } from '../../../../components/chronicles/TableSelection'
 import { TableView } from '../../../../components/chronicles/TableView'
+import { TransferOffer } from '../../../../components/chronicles/TransferOffer'
 import { rememberScroll, scrollOf } from '../../../../lib/chronicleScroll'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
+import { useTransfer } from '../../../../lib/queries/backstage'
 import {
   chronicleKeys,
   useChronicle,
@@ -89,6 +91,9 @@ export default function ChronicleScreen() {
       { cancelRefetch: false }
     )
   )
+  // U-03: a proposta de narrar, para o jogador, no topo da crônica. A mesma
+  // consulta do Diário (mesma chave, nenhuma requisição a mais)
+  const transfer = useTransfer(id, chronicle.data?.role === 'player')
   const [inviting, setInviting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -219,6 +224,12 @@ export default function ChronicleScreen() {
                 : `Narrador: ${c.storyteller.username}`}
             </Text>
           </View>
+
+          {c.role === 'player' && transfer.data?.available ? (
+            <View style={styles.info}>
+              <TransferOffer chronicleId={c.id} transferId={transfer.data.id} />
+            </View>
+          ) : null}
 
           {narrating && c.creation ? (
             <CreationSettings

@@ -38,6 +38,7 @@ import {
   Screen,
   SectionHeader,
   Skeleton,
+  StateBadge,
   Stepper,
   Tabs,
   Text,
@@ -982,6 +983,62 @@ describe('listas e navegação', () => {
     })
     fireEvent.press(item)
     expect(onPress).toHaveBeenCalled()
+  })
+
+  it('item com selos: os rótulos entram no nome acessível, depois do meta (P04-D)', () => {
+    render(
+      <ListItem
+        title="Helena Varga"
+        subtitle="Tremere"
+        meta="Sua ficha"
+        badges={[
+          { label: 'Aguardando ajuste', tone: 'attention', testID: 'b1' },
+          { label: 'Oculto', testID: 'b2' },
+        ]}
+        onPress={jest.fn()}
+      />
+    )
+    expect(
+      screen.getByRole('button', {
+        name: 'Helena Varga, Tremere, Sua ficha, Aguardando ajuste, Oculto',
+      })
+    ).toBeTruthy()
+    // Os selos aparecem na ordem dada, sob o meta
+    expect(screen.getByTestId('b1')).toHaveTextContent('Aguardando ajuste')
+    expect(screen.getByTestId('b2')).toHaveTextContent('Oculto')
+  })
+
+  it('selo de estado: texto, tom do tema e região viva só quando pedida', () => {
+    render(
+      <ThemeProvider preference="noite">
+        <StateBadge label="Em criação · livre" testID="neutral" />
+        <StateBadge label="Devolvida" tone="attention" testID="attention" />
+        <StateBadge label="Concluída em 01/11" tone="done" live testID="done" />
+      </ThemeProvider>
+    )
+    const colors = tokens.color.noite
+    const neutral = screen.getByTestId('neutral')
+    expect(neutral).toHaveTextContent('Em criação · livre')
+    // Não é um elemento à parte: o texto é lido como texto
+    expect(neutral.props.accessible).toBeUndefined()
+    expect(neutral.props.accessibilityLiveRegion).toBeUndefined()
+    expect(neutral.props['aria-live']).toBeUndefined()
+    expect(styleOf(neutral).borderColor).toBe(colors.borderControl)
+    expect(screen.getByText('Em criação · livre')).toHaveStyle({
+      color: colors.inkMuted,
+    })
+    expect(styleOf(screen.getByTestId('attention')).borderColor).toBe(
+      colors.action
+    )
+    expect(screen.getByText('Devolvida')).toHaveStyle({ color: colors.action })
+    const done = screen.getByTestId('done')
+    expect(styleOf(done).borderColor).toBe(colors.success)
+    expect(done.props.accessibilityLiveRegion).toBe('polite')
+    expect(done.props['aria-live']).toBe('polite')
+    // O texto quebra em vez de ser cortado
+    expect(screen.getByText('Concluída em 01/11').props.numberOfLines).toBe(
+      undefined
+    )
   })
 
   it('item sem ação é um elemento só, sem papel de botão', () => {

@@ -957,6 +957,27 @@ describe('ListItem sem ação não engole o trailing (T-41)', () => {
     expect(row.props.accessible).toBe(true)
     expect(row.props.accessibilityLabel).toBe('Helena, Tremere')
   })
+
+  it('com selos, continua um elemento só e o selo entra no nome (P04-D)', () => {
+    render(
+      <ListItem
+        title="Helena"
+        meta="de dona"
+        badges={[{ label: 'Aguardando aprovação', testID: 'badge' }]}
+        trailing={
+          <Button title="Revogar" variant="ghost" onPress={jest.fn()} />
+        }
+      />
+    )
+    expect(
+      screen.getByLabelText('Helena, de dona, Aguardando aprovação')
+    ).toBeTruthy()
+    // O selo fica dentro do elemento da linha, e o botão, fora
+    expect(insideAccessible(screen.getByTestId('badge'))).toBe(true)
+    expect(
+      insideAccessible(screen.getByRole('button', { name: 'Revogar' }))
+    ).toBe(false)
+  })
 })
 
 describe('Chip: alternância e interruptor anunciados (T-42)', () => {

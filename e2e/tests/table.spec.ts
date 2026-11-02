@@ -77,7 +77,7 @@ test('o narrador edita pela Mesa e a jogadora vê ao voltar para a ficha', async
   await page
     .getByRole('textbox', { name: 'Notas do Narrador', exact: true })
     .fill('O Regente vai cobrar.')
-  await page.getByRole('button', { name: 'Salvar' }).click()
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Desfazer' })).toBeVisible()
   // Geração foi o primeiro lote; as notas do narrador são o segundo.
   // O lote sai em segundo plano: espera o servidor confirmar.

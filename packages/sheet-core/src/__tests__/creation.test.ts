@@ -970,6 +970,36 @@ describe('metadados de criação da ficha', () => {
     ).toEqual({})
   })
 
+  it('parseCharacterCreation lê o pedido de ajuste e o aviso de "terminei" (R-13, R-14)', () => {
+    const marks = {
+      adjust: { reason: 'Refaça os Antecedentes', at: '2026-11-02T10:00:00Z' },
+      ready: { at: '2026-11-02T11:00:00Z' },
+    }
+    expect(parseCharacterCreation(model, marks)).toEqual(marks)
+    // Forma errada fica de fora, como no `returned`.
+    expect(
+      parseCharacterCreation(model, {
+        adjust: { reason: 1, at: '2026-11-02T10:00:00Z' },
+        ready: {},
+      })
+    ).toEqual({})
+    expect(
+      parseCharacterCreation(model, {
+        adjust: { reason: 'x' },
+        ready: { at: 5 },
+      })
+    ).toEqual({})
+    expect(parseCharacterCreation(model, { adjust: 'x', ready: true })).toEqual(
+      {}
+    )
+    // Os campos extras do marcador não passam.
+    expect(
+      parseCharacterCreation(model, {
+        ready: { at: '2026-11-02T11:00:00Z', by: 'x' },
+      })
+    ).toEqual({ ready: { at: '2026-11-02T11:00:00Z' } })
+  })
+
   it('creationInputOf aplica a camada da ficha', () => {
     expect(
       creationInputOf(model, { config: { freebies: 3 }, choices: PRIORITIES })
