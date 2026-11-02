@@ -576,6 +576,42 @@ describe('describeValue (só a tela de conflito)', () => {
     expect(show('lixo', 1)).toBe('—')
   })
 
+  // Os outros tipos de campo, nos templates que os têm (genérico: não é só
+  // o WoD que chega à folha de conflito)
+  it('caixas, marcas, etiquetas, relógio e o tipo sem descrição própria', () => {
+    const fate = compileTemplate(templates['fate-core'])
+    const mage = compileTemplate(templates['mta-m20'])
+    expect(
+      describeValue(fate, 'values.stress', { physical: [true, false, true] })
+    ).toBe('2 marcadas')
+    expect(describeValue(fate, 'values.stress', null)).toMatch(/marcada/)
+
+    const states = dndModel.template.markStates?.proficiency2 ?? []
+    const first = states[0]
+    if (!first) throw new Error('template sem estados de proficiência')
+    expect(describeValue(dndModel, 'values.saveStr', first.id)).toBe(
+      first.label
+    )
+    expect(describeValue(dndModel, 'values.saveStr', null)).toBe('—')
+    expect(
+      describeValue(dndModel, 'values.conditions', ['poisoned', 'prone'])
+    ).toBe('2 marcadas')
+
+    const wheel = mage.fields.get('wheel')?.def
+    if (wheel?.type !== 'clock') throw new Error('roda do Mago sem clock')
+    const [a, b] = wheel.fills
+    if (!a || !b) throw new Error('roda do Mago sem os dois preenchimentos')
+    expect(describeValue(mage, 'values.wheel', { [a.id]: 3 })).toBe(
+      `${a.label} 3, ${b.label} 0`
+    )
+
+    // spellSlots (slots) não tem descrição própria: só diz que mudou
+    expect(describeValue(dndModel, 'values.spellSlots', { 1: 2 })).toBe(
+      'definido'
+    )
+    expect(describeValue(dndModel, 'values.spellSlots', null)).toBe('—')
+  })
+
   it('o resto do motor continua sem conteúdo: describeEvent não muda', () => {
     expect(
       describeEvent(model, { path: 'values.sire', from: 'A', to: 'Etrius' })
