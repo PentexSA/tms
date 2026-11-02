@@ -17,7 +17,13 @@ import {
   useRef,
   useState,
 } from 'react'
-import { BackHandler, ScrollView, StyleSheet, View } from 'react-native'
+import {
+  BackHandler,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
 
 import { useOnline } from '../../lib/network'
 import { OperationSheet } from './OperationSheet'
@@ -181,13 +187,14 @@ export function TableActionBar({
   const [height, setHeight] = useState(0)
   useToastOffset(selecting ? height : 0)
   // O voltar do Android desliga a seleção antes de sair da crônica, como a
-  // barra de ação contextual. Só com a barra à vista (a aba Mesa) e com a
-  // tela em foco: em outra aba, ou com uma ficha aberta por cima, o voltar
-  // é o de sempre
+  // barra de ação contextual. Só no Android (no web o BackHandler não
+  // existe e loga erro; o iOS não tem o botão), só com a barra à vista (a
+  // aba Mesa) e com a tela em foco: em outra aba, ou com uma ficha aberta
+  // por cima, o voltar é o de sempre
   const stop = selection.stop
   useFocusEffect(
     useCallback(() => {
-      if (!selecting) return
+      if (!selecting || Platform.OS !== 'android') return
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
         stop()
         return true
