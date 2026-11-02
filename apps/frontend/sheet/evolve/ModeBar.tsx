@@ -161,7 +161,7 @@ export function useModeBar({
       finishing.start()
       return
     }
-    const result = saveDraftNow(model, store)
+    const result = saveDraftNow(store)
     if (!result.ok) {
       setError(result.message)
       return

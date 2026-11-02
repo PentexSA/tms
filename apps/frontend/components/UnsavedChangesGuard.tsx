@@ -1,6 +1,6 @@
 import { BottomSheet, Button, Text, tokens, useLayout } from '@tms/ui'
 import { usePreventRemove } from 'expo-router'
-import { type RefObject, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 // Sair com alterações não salvas pede confirmação (T-56): a ficha em
@@ -12,6 +12,12 @@ import { StyleSheet, View } from 'react-native'
 // A saída ("Descartar e sair", "Salvar e sair") acontece depois que a folha
 // sai da tela (onClosed): no iOS, mexer na navegação enquanto um Modal
 // ainda sai falha (a lição do P08 para a folha seguinte vale para sair).
+// Enquanto ela sai, a tela continua segura: um segundo "voltar" não navega
+// de novo (a saída combinada já vai navegar). Se o aviso de saída não vier,
+// a saída acontece assim mesmo, depois de EXIT_FALLBACK_MS.
+
+/** Teto para esperar a folha sair (a animação leva ~300 ms). */
+export const EXIT_FALLBACK_MS = 2000
 
 export type SaveBeforeLeave =
   | { readonly ok: true }
@@ -45,12 +51,16 @@ export function UnsavedChangesGuard({
   const [error, setError] = useState<string | null>(null)
   // A saída combinada, feita quando a folha termina de sair
   const exit = useRef<(() => void) | null>(null)
+  // Saindo: a folha fecha e a saída espera por ela
+  const [leaving, setLeaving] = useState(false)
   // Dois toques no mesmo quadro gravam uma vez só
   const saving = useRef(false)
   const { breakpoint, stacked } = useLayout()
   const column = breakpoint === 'compact' || stacked
 
-  usePreventRemove(when, ({ repeat }) => {
+  usePreventRemove(when || leaving, ({ repeat }) => {
+    // Outro "voltar" enquanto a folha sai: a saída combinada já navega
+    if (exit.current) return
     if (allowLeave?.current) {
       repeat()
       return
@@ -68,6 +78,7 @@ export function UnsavedChangesGuard({
   // Fecha a folha; a navegação segurada volta no onClosed
   const leaveAfterClose = (repeat: () => void) => {
     exit.current = repeat
+    setLeaving(true)
     setHeld(null)
   }
   const discard = () => {
@@ -78,7 +89,13 @@ export function UnsavedChangesGuard({
   const save = () => {
     if (!held || !onSave || saving.current) return
     saving.current = true
-    const result = onSave()
+    let result: SaveBeforeLeave
+    try {
+      result = onSave()
+    } catch {
+      // Fail secure: fica na tela, com o rascunho, e o botão volta a valer
+      result = { ok: false, message: 'Não foi possível salvar.' }
+    }
     if (!result.ok) {
       saving.current = false
       setError(result.message)
@@ -86,12 +103,28 @@ export function UnsavedChangesGuard({
     }
     leaveAfterClose(held)
   }
-  const closed = () => {
+  const closed = useCallback(() => {
     const go = exit.current
     exit.current = null
     saving.current = false
-    go?.()
-  }
+    if (!go) return
+    // A prevenção desliga junto com a saída (o repeat também a desliga)
+    setLeaving(false)
+    go()
+  }, [])
+  // Sem o aviso de que a folha saiu, sai assim mesmo
+  useEffect(() => {
+    if (!leaving) return
+    const timer = setTimeout(closed, EXIT_FALLBACK_MS)
+    return () => clearTimeout(timer)
+  }, [leaving, closed])
+  // A tela saiu por outro caminho: nada a repetir
+  useEffect(
+    () => () => {
+      exit.current = null
+    },
+    []
+  )
 
   const discardButton = (
     <Button title="Descartar e sair" variant="danger" onPress={discard} />

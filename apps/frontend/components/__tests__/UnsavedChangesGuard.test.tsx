@@ -10,6 +10,7 @@ import { usePreventRemove } from 'expo-router'
 import { Dimensions, StyleSheet } from 'react-native'
 import { sheetsDismissed } from '../../test/queries'
 import {
+  EXIT_FALLBACK_MS,
   UnsavedChangesGuard,
   type UnsavedChangesGuardProps,
 } from '../UnsavedChangesGuard'
@@ -34,15 +35,18 @@ function setup(props: Partial<UnsavedChangesGuardProps> = {}) {
     </ThemeProvider>
   )
   const last = () => hook.mock.calls[hook.mock.calls.length - 1]
+  const leaveWith = (again: () => void) =>
+    act(() =>
+      last()?.[1]?.({
+        data: { action: { type: 'GO_BACK' } },
+        repeat: again,
+      } as never)
+    )
   return {
     repeat,
-    leave: () =>
-      act(() =>
-        last()?.[1]?.({
-          data: { action: { type: 'GO_BACK' } },
-          repeat,
-        } as never)
-      ),
+    prevents: () => last()?.[0],
+    leave: () => leaveWith(repeat),
+    leaveWith,
   }
 }
 
@@ -160,6 +164,59 @@ describe('UnsavedChangesGuard', () => {
     })
     leave()
     expect(screen.getByRole('button', { name: 'Guardar e sair' })).toBeTruthy()
+  })
+
+  it('enquanto a folha sai, um segundo "voltar" não navega de novo', async () => {
+    const { leave, leaveWith, repeat, prevents } = setup({
+      when: false,
+      onDiscard: jest.fn(),
+    })
+    // A prevenção do rascunho: o pai liga `when`; aqui, o callback direto
+    leave()
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    // O rascunho foi descartado (`when` falso), mas a tela segue segura
+    expect(prevents()).toBe(true)
+    const again = jest.fn()
+    leaveWith(again)
+    expect(screen.queryByText('Sair sem salvar?')).toBeNull()
+    await sheetsDismissed()
+    expect(again).not.toHaveBeenCalled()
+    expect(repeat).toHaveBeenCalledTimes(1)
+    expect(prevents()).toBe(false)
+  })
+
+  it('sem o aviso de que a folha saiu, sai depois do teto de espera', () => {
+    jest.useFakeTimers()
+    try {
+      const { leave, repeat } = setup({ onSave: () => ({ ok: true }) })
+      leave()
+      fireEvent.press(screen.getByRole('button', { name: 'Salvar e sair' }))
+      act(() => jest.advanceTimersByTime(EXIT_FALLBACK_MS - 1))
+      expect(repeat).not.toHaveBeenCalled()
+      act(() => jest.advanceTimersByTime(1))
+      expect(repeat).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('um erro ao gravar fica na folha, e o botão volta a valer', () => {
+    const onSave = jest
+      .fn<ReturnType<NonNullable<UnsavedChangesGuardProps['onSave']>>, []>()
+      .mockImplementationOnce(() => {
+        throw new Error('fila cheia')
+      })
+      .mockImplementationOnce(() => ({ ok: true }))
+    const { leave, repeat } = setup({ onSave })
+    leave()
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar e sair' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Não foi possível salvar.'
+    )
+    expect(repeat).not.toHaveBeenCalled()
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar e sair' }))
+    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText('Sair sem salvar?')).toBeNull()
   })
 
   it('com allowLeave, passa direto, sem folha', () => {

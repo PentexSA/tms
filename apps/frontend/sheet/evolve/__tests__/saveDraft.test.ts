@@ -31,7 +31,7 @@ describe('saveDraftNow', () => {
     const from = Number(store.getState().values.values.strength)
     store.getState().startDraft()
     store.getState().setDraftValue('values.strength', from + 1)
-    const out = saveDraftNow(model, store)
+    const out = saveDraftNow(store)
     expect(out).toEqual({
       ok: true,
       label: `Força ${from} → ${from + 1}`,
@@ -46,7 +46,7 @@ describe('saveDraftNow', () => {
   it('rascunho vazio: ok, sem lote', () => {
     const { store, enqueue } = setup()
     store.getState().startDraft()
-    expect(saveDraftNow(model, store)).toMatchObject({
+    expect(saveDraftNow(store)).toMatchObject({
       ok: true,
       batchId: null,
     })
@@ -70,7 +70,7 @@ describe('saveDraftNow', () => {
       })
     )
     expect(s().conflict?.draft?.paths).toEqual(['values.occult'])
-    expect(saveDraftNow(model, store)).toEqual({
+    expect(saveDraftNow(store)).toEqual({
       ok: false,
       message: CONFLICT_TEXT,
     })
@@ -93,7 +93,7 @@ describe('saveDraftNow', () => {
     })
     store.getState().startDraft()
     store.getState().setDraftValue('values.str', 5)
-    expect(saveDraftNow(acct, store)).toEqual({
+    expect(saveDraftNow(store)).toEqual({
       ok: false,
       message: REFUSAL_TEXT.CREATION_PRIORITIES_REQUIRED,
     })
@@ -113,11 +113,11 @@ describe('saveDraftNow', () => {
         issues: [{ path: 'values.strength', message: 'Fora do limite' }],
       })
       .mockReturnValueOnce({ ok: false, kind: 'invalid', issues: [] })
-    expect(saveDraftNow(model, store)).toEqual({
+    expect(saveDraftNow(store)).toEqual({
       ok: false,
       message: 'Fora do limite',
     })
-    expect(saveDraftNow(model, store)).toEqual({
+    expect(saveDraftNow(store)).toEqual({
       ok: false,
       message: 'Não foi possível salvar.',
     })

@@ -1,4 +1,3 @@
-import type { SheetModel } from '@tms/sheet-core'
 import { useToast } from '@tms/ui'
 import { useStore } from 'zustand'
 import { UnsavedChangesGuard } from '../../components/UnsavedChangesGuard'
@@ -10,13 +9,7 @@ import { saveDraftNow } from './saveDraft'
 // a genérica (UnsavedChangesGuard, T-56), com a contagem do rascunho e o
 // "Salvar e sair" (D-01): o mesmo lote do "Salvar" da barra.
 
-export function LeaveGuard({
-  store,
-  model,
-}: {
-  readonly store: SheetStore
-  readonly model: SheetModel
-}) {
+export function LeaveGuard({ store }: { readonly store: SheetStore }) {
   const count = useStore(store, s => s.draft?.size ?? 0)
   const toast = useToast()
   return (
@@ -29,7 +22,7 @@ export function LeaveGuard({
       }
       onDiscard={() => store.getState().discardDraft()}
       onSave={() => {
-        const result = saveDraftNow(model, store)
+        const result = saveDraftNow(store)
         // Sem "Desfazer": o store da ficha sai com a tela; ele fica no
         // Histórico. O lote já está no outbox do aparelho
         if (result.ok && result.batchId !== null)

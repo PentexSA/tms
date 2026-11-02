@@ -1,9 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import {
-  compileTemplate,
-  effectiveCreationConfig,
-  type SheetModel,
-} from '@tms/sheet-core'
+import { compileTemplate, effectiveCreationConfig } from '@tms/sheet-core'
 import { ThemeProvider, ToastProvider } from '@tms/ui'
 import { usePreventRemove } from 'expo-router'
 import { Platform } from 'react-native'
@@ -50,14 +46,11 @@ function prevention() {
   }
 }
 
-const renderGuard = (
-  store: ReturnType<typeof storeWithDraft>,
-  sheetModel: SheetModel = model
-) =>
+const renderGuard = (store: ReturnType<typeof storeWithDraft>) =>
   render(
     <ThemeProvider>
       <ToastProvider>
-        <LeaveGuard store={store} model={sheetModel} />
+        <LeaveGuard store={store} />
       </ToastProvider>
     </ThemeProvider>
   )
@@ -100,11 +93,13 @@ describe('LeaveGuard', () => {
     leave()
     fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
     expect(store.getState().draft).toBeNull()
-    expect(prevents()).toBe(false)
-    // Sai depois que a folha sai da tela (onClosed)
+    // Sai depois que a folha sai da tela (onClosed); até lá, a tela segue
+    // segura contra um segundo "voltar"
     expect(repeat).not.toHaveBeenCalled()
+    expect(prevents()).toBe(true)
     await sheetsDismissed()
     expect(repeat).toHaveBeenCalledTimes(1)
+    expect(prevents()).toBe(false)
   })
 
   it('uma alteração: a frase no singular', () => {
@@ -202,7 +197,7 @@ describe('LeaveGuard: "Salvar e sair"', () => {
     store.getState().setDraftValue('values.str', 5)
     expect(store.getState().draft?.size).toBe(1)
     const { leave, repeat } = prevention()
-    renderGuard(store, acct)
+    renderGuard(store)
     leave()
     fireEvent.press(screen.getByRole('button', { name: 'Salvar e sair' }))
     expect(screen.getByRole('alert')).toHaveTextContent(
