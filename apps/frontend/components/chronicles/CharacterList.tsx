@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { identityOf, resolve, type SheetData } from '@tms/sheet-core'
 import {
   Avatar,
@@ -12,10 +13,14 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { StyleSheet, View } from 'react-native'
-
 import { messageOf } from '../../lib/errors'
-import { useChronicleCharacters } from '../../lib/queries/chronicles'
+import {
+  chronicleKeys,
+  useChronicleCharacters,
+} from '../../lib/queries/chronicles'
+import { useRefetchOnFocus } from '../../lib/queries/focus'
 import { useCompiled, useTemplate } from '../../sheet/data'
+import { characterStateText } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -37,6 +42,8 @@ interface FullRow {
   readonly identity?: PublicIdentity
   // creating, pending (aguarda o narrador), active...
   readonly status?: string
+  // Devolvida pelo narrador (T-06), sem o motivo
+  readonly returned?: boolean
 }
 
 interface IdentityRow {
@@ -79,10 +86,8 @@ function CharacterRow({
       ? 'Sua ficha'
       : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
-  const pending = !partial && row.status === 'pending'
-  const who = pending
-    ? `${owner} · ${narrating ? 'Aguarda sua revisão' : 'Aguarda aprovação'}`
-    : owner
+  const state = partial ? null : characterStateText(row, narrating)
+  const who = state ? `${owner} · ${state}` : owner
   return (
     <ThemeProvider
       accent={
@@ -130,7 +135,16 @@ export function CharacterList({
   readonly canCreate?: boolean
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const characters = useChronicleCharacters(chronicleId)
+  // Voltar à crônica rebusca: a ficha devolvida ou aprovada noutro aparelho
+  // aparece sem esperar o cache vencer (T-06)
+  useRefetchOnFocus(() =>
+    queryClient.invalidateQueries(
+      { queryKey: chronicleKeys.characters(chronicleId) },
+      { cancelRefetch: false }
+    )
+  )
   const rows = (characters.data ?? []) as Row[]
   const pcs = rows.filter(
     (row): row is FullRow =>

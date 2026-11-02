@@ -11,6 +11,7 @@ import {
   testSession,
   tokens,
 } from '../../test/session'
+import { awaitsStoryteller, PENDING_REFETCH_MS } from '../data'
 import { openingMode, SheetScreen } from '../SheetScreen'
 
 jest.mock('../../lib/api', () => {
@@ -271,41 +272,42 @@ describe('SheetScreen', () => {
   )
 })
 
+// Ficha em criação por pontos (V20), da dona por padrão
+const vtm = modelOf('vtm-v20')
+const creation = (mode: 'points' | 'free', extra = {}) => ({
+  revision: 1,
+  mode,
+  accounting: true,
+  choices: {},
+  config: mode === 'free' ? { mode: 'free' } : {},
+  effective: { ...effectiveCreationConfig(vtm), mode },
+  returned: null,
+  approval: false,
+  ...extra,
+})
+const creating = (over: Record<string, unknown> = {}) =>
+  ok({
+    id: ID,
+    name: 'Nova',
+    chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+    owner: { id: 'u1', username: 'dona' },
+    systemCode: 'vtm-v20',
+    templateVersion: '1.0.0',
+    sheetVersion: 1,
+    roles: ['owner'],
+    status: 'creating',
+    lockedAt: null,
+    member: true,
+    updatedAt: '2026-10-18T12:00:00Z',
+    sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+    creation: creation('points'),
+    ...over,
+  })
+const radio = (name: string) => screen.findByRole('radio', { name }, WAIT)
+
 // T-05: a ficha em criação da dona abre na montagem por qualquer entrada
 // (lista, link, recarga), não só logo depois de "Criar ficha"
 describe('modo de abertura (T-05)', () => {
-  const vtm = modelOf('vtm-v20')
-  const creation = (mode: 'points' | 'free', extra = {}) => ({
-    revision: 1,
-    mode,
-    accounting: true,
-    choices: {},
-    config: mode === 'free' ? { mode: 'free' } : {},
-    effective: { ...effectiveCreationConfig(vtm), mode },
-    returned: null,
-    approval: false,
-    ...extra,
-  })
-  const creating = (over: Record<string, unknown> = {}) =>
-    ok({
-      id: ID,
-      name: 'Nova',
-      chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
-      owner: { id: 'u1', username: 'dona' },
-      systemCode: 'vtm-v20',
-      templateVersion: '1.0.0',
-      sheetVersion: 1,
-      roles: ['owner'],
-      status: 'creating',
-      lockedAt: null,
-      member: true,
-      updatedAt: '2026-10-18T12:00:00Z',
-      sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
-      creation: creation('points'),
-      ...over,
-    })
-  const radio = (name: string) => screen.findByRole('radio', { name }, WAIT)
-
   it.each([
     [['owner'], 'creating', true, true, 'create'],
     [['owner'], 'creating', false, true, 'evolve'],
@@ -411,5 +413,102 @@ describe('modo de abertura (T-05)', () => {
     )
     expect(await radio('Editar')).toBeChecked()
     expect(screen.getByText('Editando · 2 alterações')).toBeTruthy()
+  })
+})
+
+// T-06: a devolução aparece em qualquer modo, e a ficha aberta em `pending`
+// se atualiza sozinha enquanto a dona espera o narrador
+describe('devolução na ficha aberta (T-06)', () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+  const returned = (over: Record<string, unknown> = {}) =>
+    creating({
+      creation: creation('points', {
+        returned: {
+          reason: 'Troque 1 ponto de Ofícios por Esquiva',
+          at: '2026-11-02T12:00:00Z',
+        },
+      }),
+      ...over,
+    })
+
+  it.each([
+    [{ status: 'pending', roles: ['owner'] }, true],
+    [{ status: 'pending', roles: ['storyteller'] }, false],
+    [{ status: 'pending', roles: ['owner', 'storyteller'] }, false],
+    [{ status: 'active', roles: ['owner'] }, false],
+    [{ status: 'pending' }, false],
+    [null, false],
+  ])('awaitsStoryteller(%j) = %s', (data, expected) => {
+    expect(awaitsStoryteller(data)).toBe(expected)
+  })
+
+  it('a dona com a ficha em pending rebusca em 30 s e vê a devolução', async () => {
+    jest.useFakeTimers()
+    calls.characterGet.mockResolvedValue(creating({ status: 'pending' }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    const before = calls.characterGet.mock.calls.length
+    calls.characterGet.mockResolvedValue(returned())
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(PENDING_REFETCH_MS)
+    })
+    expect(calls.characterGet.mock.calls.length).toBeGreaterThan(before)
+    expect(
+      await screen.findByTestId('creation-returned', {}, WAIT)
+    ).toHaveTextContent(
+      'O narrador devolveu a fichaTroque 1 ponto de Ofícios por Esquiva'
+    )
+    expect(await screen.findByRole('radio', { name: 'Criação' })).toBeChecked()
+  })
+
+  it('o narrador com a ficha em pending não rebusca no intervalo', async () => {
+    jest.useFakeTimers()
+    calls.characterGet.mockResolvedValue(
+      creating({ status: 'pending', roles: ['storyteller'] })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByTestId('creation-return-open', {}, WAIT)
+    const before = calls.characterGet.mock.calls.length
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(2 * PENDING_REFETCH_MS)
+    })
+    expect(calls.characterGet.mock.calls.length).toBe(before)
+  })
+
+  it('o banner fica em Criação e em Jogo, com o texto da dona', async () => {
+    calls.characterGet.mockResolvedValue(returned())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await screen.findByRole('radio', { name: 'Criação' })).toBeChecked()
+    expect(screen.getByTestId('creation-returned')).toHaveTextContent(
+      /^O narrador devolveu a ficha/
+    )
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(await screen.findByRole('radio', { name: 'Jogo' })).toBeChecked()
+    expect(screen.getByTestId('creation-returned')).toHaveTextContent(
+      /Troque 1 ponto de Ofícios por Esquiva$/
+    )
+  })
+
+  it('em Leitura: o ex-membro vê o motivo; o narrador lê "Você devolveu"', async () => {
+    calls.characterGet.mockResolvedValue(returned({ member: false }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { unmount } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(
+      await screen.findByTestId('creation-returned', {}, WAIT)
+    ).toHaveTextContent(/^O narrador devolveu a ficha/)
+    unmount()
+    calls.characterGet.mockResolvedValue(returned({ roles: ['storyteller'] }))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(
+      await screen.findByTestId('creation-returned', {}, WAIT)
+    ).toHaveTextContent(/^Você devolveu esta ficha/)
   })
 })

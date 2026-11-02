@@ -21,6 +21,10 @@ const useRefresh = (characterId: string, chronicleId?: string) => {
             queryClient.invalidateQueries({
               queryKey: chronicleKeys.table(chronicleId),
             }),
+            // A lista da crônica mostra "Devolvida" e "Aguarda" (T-06)
+            queryClient.invalidateQueries({
+              queryKey: chronicleKeys.characters(chronicleId),
+            }),
           ]
         : []),
     ])

@@ -131,31 +131,23 @@ export function useFinishCreation() {
   }
 }
 
-/** Os avisos que ficam na ficha: a devolução do narrador e a última recusa. */
+/**
+ * O aviso que fica na ficha em Criação: a última recusa da conta. A devolução
+ * do narrador é o `ReturnedBanner`, que vale em qualquer modo (T-06).
+ */
 export function CreationAlerts() {
   const creation = useCreation()
   const refusal = useSheetSelector(s => s.creationRefusal)
   if (!creation?.active || creation.status !== 'creating' || !creation.info)
     return null
-  const { returned } = creation.info
-  if (!returned && !refusal) return null
+  if (!refusal) return null
   return (
     <View style={styles.panel}>
-      {returned ? (
-        <Banner
-          tone="warning"
-          title="O narrador devolveu a ficha"
-          message={returned.reason}
-          testID="creation-returned"
-        />
-      ) : null}
-      {refusal ? (
-        <Banner
-          tone="warning"
-          message={`${REFUSAL_TEXT[refusal.code]} A alteração foi desfeita.`}
-          testID="creation-refused"
-        />
-      ) : null}
+      <Banner
+        tone="warning"
+        message={`${REFUSAL_TEXT[refusal.code]} A alteração foi desfeita.`}
+        testID="creation-refused"
+      />
     </View>
   )
 }
