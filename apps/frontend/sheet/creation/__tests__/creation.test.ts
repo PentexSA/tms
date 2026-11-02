@@ -696,3 +696,95 @@ describe('priorityNote: quem mudou de lugar junto', () => {
     )
   })
 })
+
+// Achados do /code-review do P05-C
+describe('previsão e motivo: casos de borda', () => {
+  const withTemplate = (patch: (t: typeof template) => typeof template) =>
+    compileTemplate(patch(JSON.parse(JSON.stringify(template))))
+
+  it('point-buy abaixo da base: o ponto só devolve o que faltava', () => {
+    const dnd = modelOf('dnd5e-2014')
+    const sheet = {
+      values: { name: 'Lia', str: 6, dex: 8, con: 8, int: 8, wis: 8, cha: 8 },
+    } as SheetData
+    const check = checkCreation(dnd, sheet, {
+      config: effectiveCreationConfig(dnd),
+    })
+    expect(stepAdvice(dnd, check, 'basics', 'values.str')).toEqual({
+      blocked: null,
+      text: null,
+      cost: 0,
+      inline: false,
+    })
+  })
+
+  it('Bônus: traço no teto num grupo sem preço diz o teto, não "os básicos acabaram"', () => {
+    const noAbility = withTemplate(t => ({
+      ...t,
+      costs: {
+        ...t.costs,
+        freebie: t.costs.freebie.filter(
+          (e: { id: string }) => e.id !== 'ability'
+        ),
+      },
+    }))
+    const sheet = { values: { ...COMPLETE, brawl: 1 } } as SheetData
+    const check = checkCreation(noAbility, sheet, {
+      config: effectiveCreationConfig(noAbility),
+      choices: PRIORITIES,
+    })
+    expect(stepAdvice(noAbility, check, 'freebies', 'values.alert')).toEqual({
+      blocked: 'not-purchasable',
+      text: 'Com pontos básicos, vai até 3; acima disso, não se compra com bônus.',
+      cost: null,
+      inline: true,
+    })
+  })
+
+  it('a escolha que trava segue o critério da conta, inclusive `equalsTarget`', () => {
+    // A Esfera da afinidade começa travada em 0 (condição pelo próprio alvo)
+    const affinity = withTemplate(t => ({
+      ...t,
+      creation: {
+        ...t.creation,
+        baselines: [
+          ...t.creation.baselines,
+          {
+            targets: ['sphereA', 'sphereB'],
+            value: 0,
+            locked: true,
+            when: { field: 'affinity', equalsTarget: true },
+          },
+        ],
+      },
+    }))
+    const input = {
+      config: effectiveCreationConfig(affinity),
+      choices: PRIORITIES,
+    }
+    const before = {
+      values: { ...COMPLETE, affinity: 'sphereA', arete: 2 },
+    } as SheetData
+    const touch = (field: string) => {
+      const after = {
+        values: { ...before.values, [field]: 1 },
+      } as SheetData
+      return draftRefusal(
+        affinity,
+        { before, after },
+        {
+          before: checkCreation(affinity, before, input),
+          after: checkCreation(affinity, after, input),
+        },
+        input,
+        'freebies'
+      )
+    }
+    expect(touch('sphereA')).toEqual({
+      cause: 'locked',
+      text: 'Esfera A: fica em 0 na criação (Afinidade: Esfera A).',
+    })
+    // A outra Esfera não é a da afinidade: compra normal
+    expect(touch('sphereB')).toBeNull()
+  })
+})

@@ -8,11 +8,14 @@ import {
   type CreationProblem,
   type CreationRefusalCode,
   checkCreationBatch,
+  conditionHolds,
   type FieldId,
+  type FreebieLine,
   type PointBuyBudget,
   type PriorityBudget,
   type ResolvedSheet,
   type RoleName,
+  resolve,
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
@@ -306,36 +309,75 @@ export interface CreationNotice {
   readonly action?: 'budget'
 }
 
+/** Onde um caminho está na conta: o componente e o grupo ou a linha dele. */
+type Placed =
+  | {
+      readonly component: CreationComponent
+      readonly budget: string
+      readonly group: CreationGroup
+      readonly line?: undefined
+    }
+  | {
+      readonly component: CreationComponent
+      readonly line: FreebieLine
+      readonly budget?: undefined
+      readonly group?: undefined
+    }
+
+// Um índice por conta: cada linha da ficha acha o próprio componente sem
+// varrer a conta inteira a cada mudança do store (a conta é imutável; uma
+// conta nova é outro índice)
+const placed = new WeakMap<CreationCheck, ReadonlyMap<string, Placed>>()
+function placeOf(check: CreationCheck, path: string): Placed | undefined {
+  let index = placed.get(check)
+  if (!index) {
+    const map = new Map<string, Placed>()
+    for (const b of check.budgets)
+      for (const group of b.groups)
+        for (const component of group.components)
+          if (!map.has(component.path))
+            map.set(component.path, { component, budget: b.id, group })
+    for (const line of check.lines)
+      for (const component of line.components ?? [])
+        if (!map.has(component.path))
+          map.set(component.path, { component, line })
+    index = map
+    placed.set(check, index)
+  }
+  return index.get(path)
+}
+
+/** "resta 1", "restam 10". */
+export const restam = (n: number): string =>
+  n === 1 ? 'resta 1' : `restam ${n}`
+
 /** O componente da conta num caminho ("values.alert", "values.x#item"). */
 export function componentAt(
   check: CreationCheck | null,
   path: string
 ): CreationComponent | null {
-  if (!check) return null
-  for (const b of check.budgets)
-    for (const g of b.groups)
-      for (const c of g.components) if (c.path === path) return c
-  for (const l of check.lines)
-    for (const c of l.components ?? []) if (c.path === path) return c
-  return null
+  return check ? (placeOf(check, path)?.component ?? null) : null
 }
 
-/** "(Clã: Nosferatu)": a escolha da ficha que trava o valor inicial. */
+/**
+ * "(Clã: Nosferatu)": a escolha da ficha que trava o valor inicial. O mesmo
+ * critério da conta (checkCreation): o primeiro baseline do campo cuja
+ * condição vale.
+ */
 function lockReason(
   model: SheetModel,
-  choiceOf: (field: FieldId) => unknown,
+  resolved: ResolvedSheet | undefined,
   c: CreationComponent
 ): string {
+  if (!resolved) return ''
   for (const bl of model.template.creation?.baselines ?? []) {
-    if (!bl.locked || !bl.targets.includes(c.field) || bl.value !== c.initial)
-      continue
-    if (!bl.when) return ''
-    const chosen = choiceOf(bl.when.field)
-    const def = model.fields.get(bl.when.field)?.def
-    if (typeof chosen !== 'string' || def?.type !== 'choice') continue
-    if (bl.when.in && !bl.when.in.includes(chosen)) continue
-    const option = def.options.find(o => o.id === chosen)?.label
-    return option ? ` (${def.label}: ${option})` : ''
+    if (!bl.targets.includes(c.field)) continue
+    if (bl.when && !conditionHolds(resolved, bl.when, c.field)) continue
+    if (!bl.locked || !bl.when) return ''
+    const r = resolved.get(bl.when.field)
+    return r?.type === 'choice' && r.option
+      ? ` (${r.field.def.label}: ${r.option.label})`
+      : ''
   }
   return ''
 }
@@ -358,7 +400,7 @@ function refusalNotice(
   if (locked && lockedAt && lockedC)
     return {
       cause: 'locked',
-      text: `${fieldLabel(model, lockedAt)}: fica em ${lockedC.initial} na criação${lockReason(model, f => sheets.after.values[f], lockedC)}.`,
+      text: `${fieldLabel(model, lockedAt)}: fica em ${lockedC.initial} na criação${lockReason(model, resolve(model, sheets.after), lockedC)}.`,
     }
   const hard = find('CREATION_HARD_CAP')
   const hardAt = hard?.paths[0]
@@ -400,7 +442,7 @@ function refusalNotice(
       text:
         left < 0
           ? `Bônus: o saldo já está ${-left} acima; este ponto custa ${cost}.`
-          : `${-after.remaining === 1 ? 'Faltaria 1' : `Faltariam ${-after.remaining}`} de bônus: custa ${cost}, ${left === 1 ? 'resta 1' : `restam ${left}`}.`,
+          : `${-after.remaining === 1 ? 'Faltaria 1' : `Faltariam ${-after.remaining}`} de bônus: custa ${cost}, ${restam(left)}.`,
     }
   }
   const first = problems[0]
@@ -495,8 +537,6 @@ const advice = (
 
 const bonus = (n: number) => `+1 = ${n} bônus`
 
-const restam = (n: number) => (n === 1 ? 'resta 1' : `restam ${n}`)
-
 /**
  * A previsão do "+", pela conta que o store já tem e pelo preço de tabela,
  * sem reavaliar a ficha. É uma previsão, não a decisão: os descontos
@@ -512,88 +552,95 @@ export function stepAdvice(
   path: string,
   resolved?: ResolvedSheet
 ): StepAdvice | null {
-  const choiceOf = (f: FieldId) => {
-    const r = resolved?.get(f)
-    return r?.type === 'choice' ? r.value : null
-  }
   const freebies = check.freebies
   const limits = (c: CreationComponent): StepAdvice | null => {
     if (c.locked && c.value >= c.initial)
       return advice(
         'locked',
-        `Fica em ${c.initial} na criação${lockReason(model, choiceOf, c)}.`
+        `Fica em ${c.initial} na criação${lockReason(model, resolved, c)}.`
       )
     if (c.ceiling !== undefined && c.value >= c.ceiling)
       return advice('ceiling', `Na criação, vai até ${c.ceiling}.`)
     return null
   }
-  for (const b of check.budgets)
-    for (const g of b.groups) {
-      const c = g.components.find(x => x.path === path)
-      if (!c) continue
-      if (g.budget === null)
-        return advice(
-          'priorities',
-          `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+  const at = placeOf(check, path)
+  if (!at) return null
+  const c = at.component
+  const g = at.group
+  if (g?.budget === null)
+    return advice(
+      'priorities',
+      `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+    )
+  const limit = limits(c)
+  if (limit) return limit
+  // Abaixo do inicial (no point-buy, abaixo da base), o ponto só devolve o
+  // que faltava
+  if (c.value < c.initial) return advice(null, null, 0)
+  if (g) {
+    if (g.measure === 'cost') return pointBuyAdvice(model, at.budget, g, c)
+    return groupAdvice(g, c, phase, freebies)
+  }
+  const { price } = at.line
+  if (price === undefined || !freebies) return null
+  // Linha de bônus fora dos orçamentos (FdV, Humanidade): o cabeçalho não
+  // diz o preço, a linha diz
+  return price > freebies.remaining
+    ? advice(
+        'freebies',
+        `${bonus(price)}; ${restam(Math.max(0, freebies.remaining))}.`,
+        price,
+        true
+      )
+    : advice(null, bonus(price), price, true)
+}
+
+/** O próximo ponto num grupo de orçamento: básico, teto, preço ou saldo. */
+function groupAdvice(
+  g: CreationGroup,
+  c: CreationComponent,
+  phase: CreationPhase,
+  freebies: CreationCheck['freebies']
+): StepAdvice {
+  const atCap = c.cap !== undefined && c.value >= c.cap
+  const price = freebies !== null ? g.price : null
+  // O cabeçalho diz "3/13": o teto do traço, com o grupo incompleto, só a
+  // linha explica
+  const inline = g.missing > 0
+  if (phase === 'basics') {
+    if (atCap)
+      return advice(
+        'cap',
+        `Com pontos básicos, vai até ${c.cap}.${price !== null ? ` Acima disso, ${bonus(price)}.` : ''}`,
+        null,
+        inline
+      )
+    if (g.missing === 0)
+      return advice('budget', basicsSpentText(g, freebies !== null))
+    return advice(null, null, 0)
+  }
+  if (!atCap && g.missing > 0) return advice(null, null, 0)
+  // Daqui em diante, o ponto sai do bônus
+  if (price === null || freebies === null)
+    return atCap
+      ? advice(
+          'not-purchasable',
+          `Com pontos básicos, vai até ${c.cap}; acima disso, não se compra com bônus.`,
+          null,
+          inline
         )
-      const limit = limits(c)
-      if (limit) return limit
-      if (g.measure === 'cost') return pointBuyAdvice(model, b.id, g, c)
-      // Abaixo do inicial, o ponto só devolve o que faltava
-      if (c.value < c.initial) return advice(null, null, 0)
-      const atCap = c.cap !== undefined && c.value >= c.cap
-      const priced = freebies !== null && g.price !== null
-      if (phase === 'basics') {
-        if (atCap)
-          return advice(
-            'cap',
-            `Com pontos básicos, vai até ${c.cap}.${priced ? ` Acima disso, ${bonus(g.price as number)}.` : ''}`,
-            null,
-            // O cabeçalho diz "3/13": o teto do traço só a linha explica
-            g.missing > 0
-          )
-        if (g.missing === 0)
-          return advice('budget', basicsSpentText(g, freebies !== null))
-        return advice(null, null, 0)
-      }
-      if (!atCap && g.missing > 0) return advice(null, null, 0)
-      // Daqui em diante, o ponto sai do bônus
-      if (!priced)
-        return advice(
+      : advice(
           'not-purchasable',
           `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
         )
-      const price = g.price as number
-      const inline = g.missing > 0
-      const left = (freebies as NonNullable<typeof freebies>).remaining
-      return price > left
-        ? advice(
-            'freebies',
-            `${bonus(price)}; ${restam(Math.max(0, left))}.`,
-            price,
-            inline
-          )
-        : advice(null, bonus(price), price, inline)
-    }
-  for (const l of check.lines) {
-    const c = l.components?.find(x => x.path === path)
-    if (!c) continue
-    const limit = limits(c)
-    if (limit) return limit
-    if (c.value < c.initial) return advice(null, null, 0)
-    if (l.price === undefined || !freebies) return null
-    // Linha de bônus fora dos orçamentos (FdV, Humanidade): o cabeçalho não
-    // diz o preço, a linha diz
-    return l.price > freebies.remaining
-      ? advice(
-          'freebies',
-          `${bonus(l.price)}; ${restam(Math.max(0, freebies.remaining))}.`,
-          l.price,
-          true
-        )
-      : advice(null, bonus(l.price), l.price, true)
-  }
-  return null
+  return price > freebies.remaining
+    ? advice(
+        'freebies',
+        `${bonus(price)}; ${restam(Math.max(0, freebies.remaining))}.`,
+        price,
+        inline
+      )
+    : advice(null, bonus(price), price, inline)
 }
 
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */
