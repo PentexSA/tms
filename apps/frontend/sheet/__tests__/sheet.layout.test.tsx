@@ -23,6 +23,7 @@ import {
 import { CharacterForm } from '../CharacterForm'
 import { identityColumnsPerRow } from '../IdentityBlock'
 import { SheetScreen } from '../SheetScreen'
+import { SheetView } from '../SheetView'
 
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(),
@@ -332,6 +333,23 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
   })
 
+  it('T-27: a barra do narrador rola com a ficha no celular e fica fixa no desktop', async () => {
+    const inScroll = () =>
+      within(
+        screen.UNSAFE_getByType(KeyboardArea).findAllByType(ScrollView)[0]!
+      ).queryByRole('button', { name: 'Editar como narrador' })
+    resize(PHONE)
+    await openSheet(['storyteller'], 'active')
+    expect(inScroll()).toBeTruthy()
+    screen.unmount()
+    resize(DESKTOP)
+    await openSheet(['storyteller'], 'active')
+    expect(
+      screen.getByRole('button', { name: 'Editar como narrador' })
+    ).toBeTruthy()
+    expect(inScroll()).toBeNull()
+  })
+
   it('no celular, o "N alterações não salvas" quebra em 2 linhas numa largura fixa', async () => {
     resize(PHONE)
     await openSheet(['owner'], 'creating')
@@ -365,4 +383,34 @@ describe('T-59: "Em jogo" recolhido na Criação', () => {
       expect(screen.getAllByLabelText(/^Vitalidade/).length).toBeGreaterThan(0)
     }
   )
+})
+
+describe('T-27 (parte 1): no celular, os controles de modo rolam com a ficha', () => {
+  const scroll = () =>
+    screen.UNSAFE_getByType(KeyboardArea).findAllByType(ScrollView)[0]!
+
+  it('a 390, Editar: o seletor de modo na rolagem; a barra de ação fixa', async () => {
+    resize(PHONE)
+    await renderSheet({ mode: 'evolve' })
+    expect(within(scroll()).getByLabelText('Modo da ficha')).toBeTruthy()
+    expect(within(scroll()).queryByText('Editando · 0 alterações')).toBeNull()
+    expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
+  })
+
+  it('a 750: o seletor e a barra fixos acima, como antes', async () => {
+    resize(TABLET)
+    await renderSheet({ mode: 'evolve' })
+    expect(within(scroll()).queryByLabelText('Modo da ficha')).toBeNull()
+    expect(screen.getByLabelText('Modo da ficha')).toBeTruthy()
+    expect(screen.queryByTestId('sheet-scroll-header')).toBeNull()
+  })
+
+  it('a ficha só de leitura (sem quem escreva) não ganha o seletor', async () => {
+    resize(PHONE)
+    render(
+      <SheetView model={vtm} sheet={helena()} roles={['owner']} mode="read" />
+    )
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+    expect(screen.queryByTestId('sheet-scroll-header')).toBeNull()
+  })
 })

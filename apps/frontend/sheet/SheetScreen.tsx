@@ -31,7 +31,6 @@ import {
   useSetNpcVisibility,
 } from '../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../lib/queries/focus'
-import { SheetProvider } from './context'
 import { CreationContext } from './creation/CreationContext'
 import {
   creationActive,
@@ -422,13 +421,20 @@ function LiveSheet({
   )
   return (
     <>
-      <NpcVisibilityBar state={state} />
       <LifecycleContext.Provider value={lifecycle}>
         <CreationContext.Provider value={creationValue}>
-          <SheetProvider store={store}>
-            <StorytellerBar ownerName={state.character.owner.username} />
-          </SheetProvider>
-          <SheetView store={store} editable />
+          {/* O painel do NPC e a barra do narrador: fixos acima da ficha
+              fora do celular; no celular, rolam com ela (T-27) */}
+          <SheetView
+            store={store}
+            editable
+            header={
+              <>
+                <NpcVisibilityBar state={state} />
+                <StorytellerBar ownerName={state.character.owner.username} />
+              </>
+            }
+          />
           <LeaveGuard store={store} />
           <DraftRecovery
             persistence={persistence}

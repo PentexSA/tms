@@ -22,7 +22,7 @@ import {
   useTheme,
   useToast,
 } from '@tms/ui'
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
 import { useCreation } from '../creation/CreationContext'
@@ -54,11 +54,26 @@ const OTHER_CREATE: readonly SheetMode[] = ['read', 'play', 'create']
 export const changesLabel = (n: number): string =>
   n === 1 ? '1 alteração' : `${n} alterações`
 
-export function ModeBar({
+/** As três partes da barra de modos, com um estado só (T-27). */
+export interface ModeBarParts {
+  /** O seletor de modo (Leitura · Jogo · Editar). */
+  readonly switcher: ReactNode
+  /** A barra de ação do rascunho ("Criação · N alterações" e o botão). */
+  readonly actionBar: ReactNode
+  /** O resumo antes de salvar (folha). */
+  readonly summary: ReactNode
+}
+
+/**
+ * A lógica da barra de modos (ir, revisar, salvar, descartar e o resumo),
+ * com as partes separadas: no celular, o seletor rola com a ficha e a barra
+ * de ação fica fixa (T-27). Fora dele, o ModeBar monta as três juntas.
+ */
+export function useModeBar({
   modes: only,
 }: {
   readonly modes?: readonly SheetMode[]
-}) {
+} = {}): ModeBarParts {
   const { model, mode, roles } = useSheet()
   const creating = useCreation()?.active === true
   const owner = roles.has('owner')
@@ -177,51 +192,63 @@ export function ModeBar({
     switchTo(next)
   }
 
+  const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
+  const actionBar =
+    mode === 'evolve' ? (
+      <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
+    ) : mode === 'create' ? (
+      // Um botão só: com a conta fechada, conclui (salvando antes)
+      <EvolveBar
+        count={count}
+        label="Criação"
+        detail={freebies}
+        finish={
+          finishing.waitingSync
+            ? 'Sincronizando…'
+            : finishing.ready
+              ? finishing.label
+              : 'Salvar alterações'
+        }
+        primary={finishing.ready}
+        busy={finishing.busy}
+        disabled={!finishing.ready && count === 0}
+        testID="creation-action"
+        onFinish={() =>
+          finishing.ready
+            ? review('create', true)
+            : count
+              ? review('create')
+              : undefined
+        }
+      />
+    ) : null
+  const summarySheet = (
+    <SummarySheet
+      visible={summary !== null}
+      finish={
+        summary?.finish
+          ? { label: finishing.label, approval: finishing.approval }
+          : null
+      }
+      events={summary?.events ?? []}
+      inactive={summary?.inactive ?? []}
+      error={error}
+      onSave={save}
+      onDiscard={discard}
+      onClose={() => setSummary(null)}
+    />
+  )
+  return { switcher, actionBar, summary: summarySheet }
+}
+
+/** A barra de modos inteira, fixa acima da ficha (fora do celular). */
+export function ModeBar(props: { readonly modes?: readonly SheetMode[] }) {
+  const { switcher, actionBar, summary } = useModeBar(props)
   return (
     <View>
-      <ModeSwitch modes={modes} mode={mode} onChange={go} />
-      {mode === 'evolve' ? (
-        <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
-      ) : mode === 'create' ? (
-        // Um botão só: com a conta fechada, conclui (salvando antes)
-        <EvolveBar
-          count={count}
-          label="Criação"
-          detail={freebies}
-          finish={
-            finishing.waitingSync
-              ? 'Sincronizando…'
-              : finishing.ready
-                ? finishing.label
-                : 'Salvar alterações'
-          }
-          primary={finishing.ready}
-          busy={finishing.busy}
-          disabled={!finishing.ready && count === 0}
-          testID="creation-action"
-          onFinish={() =>
-            finishing.ready
-              ? review('create', true)
-              : count
-                ? review('create')
-                : undefined
-          }
-        />
-      ) : null}
-      <SummarySheet
-        visible={summary !== null}
-        finish={
-          summary?.finish
-            ? { label: finishing.label, approval: finishing.approval }
-            : null
-        }
-        events={summary?.events ?? []}
-        inactive={summary?.inactive ?? []}
-        error={error}
-        onSave={save}
-        onDiscard={discard}
-        onClose={() => setSummary(null)}
-      />
+      {switcher}
+      {actionBar}
+      {summary}
     </View>
   )
 }

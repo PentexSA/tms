@@ -19,7 +19,7 @@ import {
   tokens,
   useLayout,
 } from '@tms/ui'
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -34,7 +34,7 @@ import {
 } from './creation/CreationPanel'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
-import { ModeBar } from './evolve/ModeBar'
+import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
 import { PolicyBanner } from './PolicyBanner'
 import { ActionsButton } from './play/ActionsMenu'
@@ -60,7 +60,16 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // (Leitura · Jogo · Evoluir) para quem escreve algum campo.
 
 export type SheetViewProps =
-  | { readonly store: SheetStore; readonly editable?: boolean }
+  | {
+      readonly store: SheetStore
+      readonly editable?: boolean
+      /**
+       * O que vem acima da ficha (o painel do NPC e a barra do narrador).
+       * Fora do celular, fica fixo, como antes; no celular, rola com a ficha
+       * (T-27).
+       */
+      readonly header?: ReactNode
+    }
   | {
       readonly model: SheetModel
       readonly sheet: SheetData
@@ -105,15 +114,32 @@ export function SheetView(props: SheetViewProps) {
     ]
   )
   const editable = 'store' in props && props.editable === true
-  return <SheetBody store={store} editable={editable} />
+  return (
+    <SheetBody
+      store={store}
+      editable={editable}
+      header={'store' in props ? props.header : undefined}
+    />
+  )
+}
+
+/** As partes da barra de modos, para quem escreve (T-27). */
+function ModeBarSlots({
+  children,
+}: {
+  readonly children: (bar: ModeBarParts) => ReactNode
+}) {
+  return children(useModeBar())
 }
 
 function SheetBody({
   store,
   editable,
+  header,
 }: {
   readonly store: SheetStore
   readonly editable: boolean
+  readonly header?: ReactNode
 }) {
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
@@ -169,83 +195,103 @@ function SheetBody({
   // primeira dobra) e abre com um toque; nos outros modos, aberto como antes
   const collapsible = mode === 'create'
   const [playOpen, setPlayOpen] = useState(false)
+  // T-27: no celular, o painel do NPC, a barra do narrador e o seletor de
+  // modo rolam com a ficha; a barra de ação (onde se salva e conclui) fica
+  // fixa. Fora do celular, tudo fixo acima, como antes.
+  const phone = breakpoint === 'compact'
+
+  const screen = (bar: ModeBarParts | null) => (
+    <View style={styles.screen}>
+      {phone ? null : header}
+      {bar && !phone ? (
+        <View>
+          {bar.switcher}
+          {bar.actionBar}
+        </View>
+      ) : null}
+      {bar && phone ? bar.actionBar : null}
+      {bar?.summary}
+      {/* Só a rolagem encolhe acima do teclado (T-26): o campo do
+                "Digitar", a busca e os textos ficam à vista; o dock e o
+                aviso de bônus ficam atrás do teclado enquanto ele está
+                aberto */}
+      <KeyboardArea>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {phone && (header || bar) ? (
+            <View testID="sheet-scroll-header">
+              {header}
+              {bar?.switcher}
+            </View>
+          ) : null}
+          <ConflictBanner />
+          {editable ? <PolicyBanner /> : null}
+          {editable ? <CreationStatusPanel /> : null}
+          {editable && mode === 'create' ? <CreationAlerts /> : null}
+          {mode === 'play' ? (
+            <View style={styles.toolbar}>
+              {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
+              <DiceButton
+                characterId={store.getState().characterId}
+                store={store}
+              />
+              <ActionsButton />
+            </View>
+          ) : null}
+          <IdentityBlock />
+          {play.length && !docked ? (
+            <View>
+              {collapsible ? (
+                <PlayToggle
+                  open={playOpen}
+                  onToggle={() => setPlayOpen(v => !v)}
+                />
+              ) : (
+                <View style={styles.title}>
+                  <SectionHeader title="Em jogo" level="group" />
+                </View>
+              )}
+              {!collapsible || playOpen ? (
+                <View nativeID={PLAY_ID}>
+                  {play.map(s => (
+                    <SectionView key={s.id} section={s} hideTitle />
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          {tabs.length ? (
+            <View style={styles.tabs}>
+              <Tabs
+                id="sheet-parts"
+                accessibilityLabel="Partes da ficha"
+                items={tabs}
+                selected={shownTab ?? ''}
+                onSelect={setTab}
+              />
+            </View>
+          ) : null}
+          {paneled && shownTab !== undefined ? (
+            <TabPanel tabsId="sheet-parts" tab={shownTab}>
+              {zoneContent}
+            </TabPanel>
+          ) : (
+            <View>{zoneContent}</View>
+          )}
+        </ScrollView>
+      </KeyboardArea>
+      {docked ? <CombatDock /> : null}
+      {budget ? <BonusNotice onBudget={() => setTab(BUDGET_TAB)} /> : null}
+    </View>
+  )
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
       <SheetProvider store={store}>
         <FieldSheetProvider>
-          <View style={styles.screen}>
-            {writer ? <ModeBar /> : null}
-            {/* Só a rolagem encolhe acima do teclado (T-26): o campo do
-                "Digitar", a busca e os textos ficam à vista; o dock e o
-                aviso de bônus ficam atrás do teclado enquanto ele está
-                aberto */}
-            <KeyboardArea>
-              <ScrollView
-                contentContainerStyle={styles.content}
-                keyboardShouldPersistTaps="handled"
-              >
-                <ConflictBanner />
-                {editable ? <PolicyBanner /> : null}
-                {editable ? <CreationStatusPanel /> : null}
-                {editable && mode === 'create' ? <CreationAlerts /> : null}
-                {mode === 'play' ? (
-                  <View style={styles.toolbar}>
-                    {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
-                    <DiceButton
-                      characterId={store.getState().characterId}
-                      store={store}
-                    />
-                    <ActionsButton />
-                  </View>
-                ) : null}
-                <IdentityBlock />
-                {play.length && !docked ? (
-                  <View>
-                    {collapsible ? (
-                      <PlayToggle
-                        open={playOpen}
-                        onToggle={() => setPlayOpen(v => !v)}
-                      />
-                    ) : (
-                      <View style={styles.title}>
-                        <SectionHeader title="Em jogo" level="group" />
-                      </View>
-                    )}
-                    {!collapsible || playOpen ? (
-                      <View nativeID={PLAY_ID}>
-                        {play.map(s => (
-                          <SectionView key={s.id} section={s} hideTitle />
-                        ))}
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
-                {tabs.length ? (
-                  <View style={styles.tabs}>
-                    <Tabs
-                      id="sheet-parts"
-                      accessibilityLabel="Partes da ficha"
-                      items={tabs}
-                      selected={shownTab ?? ''}
-                      onSelect={setTab}
-                    />
-                  </View>
-                ) : null}
-                {paneled && shownTab !== undefined ? (
-                  <TabPanel tabsId="sheet-parts" tab={shownTab}>
-                    {zoneContent}
-                  </TabPanel>
-                ) : (
-                  <View>{zoneContent}</View>
-                )}
-              </ScrollView>
-            </KeyboardArea>
-            {docked ? <CombatDock /> : null}
-            {budget ? (
-              <BonusNotice onBudget={() => setTab(BUDGET_TAB)} />
-            ) : null}
-          </View>
+          {writer ? <ModeBarSlots>{screen}</ModeBarSlots> : screen(null)}
         </FieldSheetProvider>
       </SheetProvider>
     </ThemeProvider>
