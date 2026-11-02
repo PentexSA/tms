@@ -1,5 +1,5 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
-import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
+import type { SheetModel } from '@tms/sheet-core'
 import {
   Button,
   Chip,
@@ -23,7 +23,6 @@ import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { hhmm } from '../../lib/format'
-import { useOnline } from '../../lib/network'
 import {
   type TableScope,
   useChronicleTable,
@@ -33,9 +32,9 @@ import { rollKeys } from '../../lib/queries/rolls'
 import { useChronicleXpRequests } from '../../lib/queries/xp'
 import { useTableOrder } from '../../lib/tableOrder'
 import { compileSafe, templateQuery } from '../../sheet/data'
-import { OperationSheet } from './OperationSheet'
 import { RollFeed } from './RollFeed'
 import { TableRow } from './TableRow'
+import { useTableSelection } from './TableSelection'
 import {
   arrange,
   buildItem,
@@ -43,7 +42,7 @@ import {
   type TableRowData,
   type TableSort,
 } from './tableItems'
-import { GrantXpSheet, grantable, XpRequestsSheet } from './XpSheets'
+import { XpRequestsSheet } from './XpSheets'
 
 // A Mesa do narrador (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9;
 // design/telas/mesa.html): uma linha por personagem com o dock e os alertas
@@ -110,6 +109,10 @@ function TableGrid({
     </View>
   )
 }
+
+// Sem resposta ainda: o mesmo array vazio a cada render, para os itens (e a
+// seleção, que os recebe) não mudarem à toa
+const NO_ROWS: readonly TableRowData[] = []
 
 // Fora do componente: com a mesma função, o TanStack não refaz o array
 const dataOf = (results: readonly { readonly data: unknown }[]) =>
@@ -194,39 +197,22 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [scope, setScope] = useState<TableScope>('playing')
   const [sort, setSort] = useState<TableSort>('name')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
-  const online = useOnline()
   const { width, stacked } = useLayout()
   const columns = tableColumns(width, stacked)
-  const [selecting, setSelecting] = useState(false)
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const [operation, setOperation] = useState<{
-    kind: 'damage' | 'heal' | 'recovery'
-    recovery?: TemplateRecovery
-    items: readonly TableItem[]
-  } | null>(null)
-  const [xpSheet, setXpSheet] = useState<'grant' | 'requests' | null>(null)
+  // A seleção vive na crônica (T-49): a barra fica fora da rolagem
+  const selection = useTableSelection()
+  const { selecting, selected, toggle: select, sync } = selection
+  const [requests, setRequests] = useState(false)
   const xpRequests = useChronicleXpRequests(chronicleId)
-  const select = useCallback(
-    (id: string) =>
-      setSelected(old => {
-        const next = new Set(old)
-        if (next.has(id)) next.delete(id)
-        else if (next.size < 20) next.add(id)
-        return next
-      }),
-    []
-  )
   const table = useChronicleTable(chronicleId, true, scope)
   useRefetchOnFocus(() => {
     void queryClient.invalidateQueries({ queryKey: rollKeys.feed(chronicleId) })
     return table.refetch({ cancelRefetch: false })
   })
-  const rows = (table.data ?? []) as TableRowData[]
+  const rows = (table.data ?? NO_ROWS) as TableRowData[]
   const items = useItems(rows)
-  const chosen = useMemo(
-    () => items.filter(i => selected.has(i.row.id)),
-    [items, selected]
-  )
+  // A barra sabe o que está marcado pelos itens da Mesa
+  useEffect(() => sync(items), [items, sync])
   const shown = useMemo(
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
@@ -257,7 +243,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           selected={scope}
           onSelect={id => {
             setScope(id as TableScope)
-            setSelected(new Set())
+            selection.clear()
           }}
         />
         <View style={styles.chips}>
@@ -285,69 +271,17 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             title={`Pedidos de XP (${xpRequests.data.length})`}
             variant="secondary"
             testID="table-xp-requests"
-            onPress={() => setXpSheet('requests')}
+            onPress={() => setRequests(true)}
           />
         ) : null}
-        <Button
-          title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
-          variant="secondary"
-          onPress={() => {
-            setSelecting(v => !v)
-            setSelected(new Set())
-          }}
-        />
-        {selecting ? (
-          <View style={styles.hint}>
-            <Text>{chosen.length} de 20 selecionados</Text>
-            <View style={styles.chips}>
-              <Button
-                title="Aplicar dano"
-                disabled={!online || !chosen.length}
-                onPress={() => setOperation({ kind: 'damage', items: chosen })}
-              />
-              <Button
-                title="Curar"
-                variant="secondary"
-                disabled={!online || !chosen.length}
-                onPress={() => setOperation({ kind: 'heal', items: chosen })}
-              />
-              <Button
-                title="Conceder XP"
-                variant="secondary"
-                testID="table-xp-grant"
-                disabled={!online || !grantable(chosen)}
-                onPress={() => setXpSheet('grant')}
-              />
-              {(chosen[0]?.model?.template.recoveries ?? [])
-                .filter(r =>
-                  chosen.every(i =>
-                    i.model?.template.recoveries?.some(
-                      other => other.id === r.id
-                    )
-                  )
-                )
-                .map(recovery => (
-                  <Button
-                    key={recovery.id}
-                    title={recovery.label}
-                    variant="secondary"
-                    disabled={!online}
-                    onPress={() =>
-                      setOperation({
-                        kind: 'recovery',
-                        recovery,
-                        items: chosen,
-                      })
-                    }
-                  />
-                ))}
-            </View>
-            {!online ? (
-              <Text color="inkMuted">
-                Conecte-se para aplicar uma operação em grupo.
-              </Text>
-            ) : null}
-          </View>
+        {/* Mesa vazia: nada a selecionar (NW-17). A contagem e as ações
+            ficam na barra fixa embaixo (T-49) */}
+        {rows.length || selecting ? (
+          <Button
+            title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
+            variant="secondary"
+            onPress={selecting ? selection.stop : selection.start}
+          />
         ) : null}
       </View>
       <TabPanel tabsId="table-scope" tab={scope}>
@@ -388,26 +322,10 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           />
         )}
       </TabPanel>
-      {xpSheet === 'grant' ? (
-        <GrantXpSheet
-          chronicleId={chronicleId}
-          items={chosen}
-          onClose={() => setXpSheet(null)}
-        />
-      ) : null}
-      {xpSheet === 'requests' ? (
+      {requests ? (
         <XpRequestsSheet
           chronicleId={chronicleId}
-          onClose={() => setXpSheet(null)}
-        />
-      ) : null}
-      {operation ? (
-        <OperationSheet
-          chronicleId={chronicleId}
-          items={operation.items}
-          kind={operation.kind}
-          recovery={operation.recovery}
-          onClose={() => setOperation(null)}
+          onClose={() => setRequests(false)}
         />
       ) : null}
       <RollFeed chronicleId={chronicleId} />

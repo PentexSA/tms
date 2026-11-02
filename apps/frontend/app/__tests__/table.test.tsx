@@ -325,6 +325,37 @@ describe('Mesa do narrador', () => {
     }
   })
 
+  // T-49 (P09-C): a barra da seleção é irmã da rolagem da crônica
+  it('a barra da seleção fica fora da rolagem e só na aba Mesa', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([row(HELENA, 'helena', 'vtm-v20')])
+    )
+    await openTable()
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Selecionar personagens' })
+    )
+    const bar = screen.getByTestId('table-action-bar')
+    expect(bar.props.role).toBe('toolbar')
+    expect(
+      within(screen.getByTestId('chronicle-scroll')).queryByTestId(
+        'table-action-bar'
+      )
+    ).toBeNull()
+    fireEvent.press(
+      screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+    )
+    expect(within(bar).getByText('1 selecionado (máx. 20)')).toBeTruthy()
+    // Na aba Fichas, a barra sai; de volta à Mesa, a seleção continua
+    fireEvent.press(screen.getByRole('tab', { name: 'Fichas' }))
+    expect(screen.queryByTestId('table-action-bar')).toBeNull()
+    fireEvent.press(screen.getByRole('tab', { name: 'Mesa' }))
+    expect(
+      within(await screen.findByTestId('table-action-bar')).getByText(
+        '1 selecionado (máx. 20)'
+      )
+    ).toBeTruthy()
+  })
+
   it('a aba Fichas continua com as fichas e o convite', async () => {
     calls.chronicle.tableGet.mockResolvedValue(ok([]))
     await openTable()

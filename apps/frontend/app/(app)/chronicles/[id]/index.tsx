@@ -28,6 +28,10 @@ import {
   LeaveChronicleSheet,
   RemoveMemberSheet,
 } from '../../../../components/chronicles/MemberSheets'
+import {
+  TableActionBar,
+  TableSelectionProvider,
+} from '../../../../components/chronicles/TableSelection'
 import { TableView } from '../../../../components/chronicles/TableView'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
@@ -87,100 +91,109 @@ export default function ChronicleScreen() {
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
-      <ScrollView contentContainerStyle={styles.content}>
-        {former ? (
-          <Banner
-            title="Você saiu"
-            message="Suas fichas desta crônica são só leitura. Para voltar, peça um convite ao narrador."
-            testID="former-banner"
-          />
-        ) : null}
-        <View style={styles.info}>
-          <Text variant="caption" color="inkMuted">
-            {c.system.name}
-          </Text>
-          <Text>
-            {narrating
-              ? 'Você narra esta crônica.'
-              : `Narrador: ${c.storyteller.username}`}
-          </Text>
-        </View>
+      {/* A seleção da Mesa vive aqui (T-49): a barra fica fora da rolagem */}
+      <TableSelectionProvider>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          testID="chronicle-scroll"
+        >
+          {former ? (
+            <Banner
+              title="Você saiu"
+              message="Suas fichas desta crônica são só leitura. Para voltar, peça um convite ao narrador."
+              testID="former-banner"
+            />
+          ) : null}
+          <View style={styles.info}>
+            <Text variant="caption" color="inkMuted">
+              {c.system.name}
+            </Text>
+            <Text>
+              {narrating
+                ? 'Você narra esta crônica.'
+                : `Narrador: ${c.storyteller.username}`}
+            </Text>
+          </View>
 
-        {narrating && c.creation ? (
-          <CreationSettings
-            chronicleId={c.id}
-            systemCode={c.system.code}
-            creation={c.creation}
-          />
-        ) : null}
+          {narrating && c.creation ? (
+            <CreationSettings
+              chronicleId={c.id}
+              systemCode={c.system.code}
+              creation={c.creation}
+            />
+          ) : null}
 
-        {!former ? (
-          <Tabs
-            id="chronicle-view"
-            accessibilityLabel="Visão da crônica"
-            items={
-              narrating
-                ? [
-                    { id: 'sheets', label: 'Fichas' },
-                    { id: 'table', label: 'Mesa' },
-                    { id: 'backstage', label: 'Bastidores' },
-                  ]
-                : [
-                    { id: 'sheets', label: 'Fichas' },
-                    { id: 'backstage', label: 'Diário' },
-                  ]
-            }
-            selected={showing}
-            onSelect={id => setView(id as typeof view)}
-          />
-        ) : null}
+          {!former ? (
+            <Tabs
+              id="chronicle-view"
+              accessibilityLabel="Visão da crônica"
+              items={
+                narrating
+                  ? [
+                      { id: 'sheets', label: 'Fichas' },
+                      { id: 'table', label: 'Mesa' },
+                      { id: 'backstage', label: 'Bastidores' },
+                    ]
+                  : [
+                      { id: 'sheets', label: 'Fichas' },
+                      { id: 'backstage', label: 'Diário' },
+                    ]
+              }
+              selected={showing}
+              onSelect={id => setView(id as typeof view)}
+            />
+          ) : null}
 
-        {/* O ex-membro não tem as abas: sem tablist, nada de tabpanel (o
+          {/* O ex-membro não tem as abas: sem tablist, nada de tabpanel (o
             aria-labelledby ficaria apontando para uma aba que não existe) */}
-        {former ? (
-          <SheetsPanel
-            chronicle={c}
-            narrating={narrating}
-            former={former}
-            onInvite={() => setInviting(true)}
-          />
-        ) : (
-          <TabPanel tabsId="chronicle-view" tab={showing}>
-            {showing === 'table' ? (
-              <TableView chronicleId={c.id} />
-            ) : showing === 'backstage' ? (
-              <CampaignBackstage chronicle={c} narrating={narrating} />
-            ) : (
-              <SheetsPanel
-                chronicle={c}
-                narrating={narrating}
-                former={former}
-                onInvite={() => setInviting(true)}
+          {former ? (
+            <SheetsPanel
+              chronicle={c}
+              narrating={narrating}
+              former={former}
+              onInvite={() => setInviting(true)}
+            />
+          ) : (
+            <TabPanel tabsId="chronicle-view" tab={showing}>
+              {showing === 'table' ? (
+                <TableView chronicleId={c.id} />
+              ) : showing === 'backstage' ? (
+                <CampaignBackstage chronicle={c} narrating={narrating} />
+              ) : (
+                <SheetsPanel
+                  chronicle={c}
+                  narrating={narrating}
+                  former={former}
+                  onInvite={() => setInviting(true)}
+                />
+              )}
+            </TabPanel>
+          )}
+          {c.role === 'player' ? (
+            <View style={styles.danger}>
+              <Button
+                title="Sair da crônica"
+                variant="danger"
+                accessibilityHint="Suas fichas ficam arquivadas, só leitura"
+                onPress={() => setLeaving(true)}
               />
-            )}
-          </TabPanel>
-        )}
-        {c.role === 'player' ? (
-          <View style={styles.danger}>
-            <Button
-              title="Sair da crônica"
-              variant="danger"
-              accessibilityHint="Suas fichas ficam arquivadas, só leitura"
-              onPress={() => setLeaving(true)}
-            />
-          </View>
+            </View>
+          ) : null}
+          {narrating ? (
+            <View style={styles.danger}>
+              <Button
+                title="Excluir crônica"
+                variant="danger"
+                accessibilityHint="Pede o nome da crônica para confirmar"
+                onPress={() => setDeleting(true)}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
+        {narrating && showing === 'table' ? (
+          <TableActionBar chronicleId={c.id} />
         ) : null}
-        {narrating ? (
-          <View style={styles.danger}>
-            <Button
-              title="Excluir crônica"
-              variant="danger"
-              accessibilityHint="Pede o nome da crônica para confirmar"
-              onPress={() => setDeleting(true)}
-            />
-          </View>
-        ) : null}
-      </ScrollView>
+      </TableSelectionProvider>
       {narrating ? (
         <>
           <InviteSheet
