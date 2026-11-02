@@ -64,7 +64,6 @@ describe('describeSync', () => {
       3,
       '3 alterações não salvas · offline',
     ],
-    [{ pending: 1, failure: 'server' }, true, 2, '2 alterações não salvas'],
   ] as const)(
     'com rascunho, %j online=%s, %i: %s',
     (status, online, n, text) => {
@@ -74,6 +73,14 @@ describe('describeSync', () => {
       })
     }
   )
+
+  // Achado do /code-review: o erro do servidor ficava escondido
+  it('erro ao salvar com rascunho: o erro primeiro, com as alterações junto', () => {
+    expect(describeSync({ pending: 1, failure: 'server' }, true, 2)).toEqual({
+      state: 'error',
+      text: 'Erro ao salvar · tentando de novo · 2 alterações não salvas',
+    })
+  })
 })
 
 function signedInSession() {

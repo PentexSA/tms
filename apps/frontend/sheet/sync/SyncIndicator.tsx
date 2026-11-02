@@ -22,6 +22,13 @@ export function describeSync(
   online: boolean,
   unsaved = 0
 ): { readonly state: SyncState; readonly text: string } {
+  // O erro do servidor vem primeiro, com o rascunho junto: um não esconde o
+  // outro
+  if (status.failure === 'server' && status.pending)
+    return {
+      state: 'error',
+      text: `Erro ao salvar · tentando de novo${unsaved > 0 ? ` · ${unsavedLabel(unsaved)}` : ''}`,
+    }
   if (unsaved > 0)
     return {
       state: 'unsaved',
