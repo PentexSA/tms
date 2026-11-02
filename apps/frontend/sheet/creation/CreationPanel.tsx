@@ -20,7 +20,9 @@ import {
   useSaveCreation,
 } from '../../lib/queries/creation'
 import { useSheet, useSheetSelector } from '../context'
+import { CompletionMessage } from './CompletionMessage'
 import { useCreation } from './CreationContext'
+import { completionBy, completionCopy } from './completion'
 import {
   basicsDone,
   type CreationPhase,
@@ -46,6 +48,8 @@ const PHASES: readonly {
   { id: 'basics', label: 'Pontos básicos' },
   { id: 'freebies', label: 'Pontos de bônus' },
 ]
+
+const NO_NOTES: readonly string[] = []
 
 /** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
 export function useCreating(): boolean {
@@ -101,12 +105,14 @@ export function useFinishCreation() {
     complete.mutate(
       { revision: info.revision, sheetVersion: s.sheetVersion },
       {
+        // O aviso de quem concluiu (T-32): o narrador lê "passa por você"
         onSuccess: result =>
           toast.show({
-            message:
-              result.status === 'pending'
-                ? 'Ficha enviada. Ela aguarda a aprovação do narrador.'
-                : 'Criação concluída. Subir um traço agora passa pelo narrador.',
+            message: completionCopy({
+              by: completionBy(roles),
+              approval: result.status === 'pending',
+              action: 'complete',
+            }).done,
           }),
         onError: error => {
           const code = creationRefusalOf(errorBodyOf(error))
@@ -118,44 +124,38 @@ export function useFinishCreation() {
         },
       }
     )
-  }, [waiting, dirty, queued, info, store, complete, toast])
+  }, [waiting, dirty, queued, info, store, complete, toast, roles])
 
   return {
     ready: creating && ready,
     label: info ? completeLabel(info, roles) : '',
     // A ficha vai para o narrador aprovar
     approval: info?.approval === true && !roles.has('storyteller'),
+    // Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
+    notes: NO_NOTES,
     busy: waiting || complete.isPending,
     waitingSync: waiting && queued,
     start: () => setWaiting(true),
   }
 }
 
-/** Os avisos que ficam na ficha: a devolução do narrador e a última recusa. */
+/**
+ * O aviso que fica na ficha em Criação: a última recusa da conta. A devolução
+ * do narrador é o `ReturnedBanner`, que vale em qualquer modo (T-06).
+ */
 export function CreationAlerts() {
   const creation = useCreation()
   const refusal = useSheetSelector(s => s.creationRefusal)
   if (!creation?.active || creation.status !== 'creating' || !creation.info)
     return null
-  const { returned } = creation.info
-  if (!returned && !refusal) return null
+  if (!refusal) return null
   return (
     <View style={styles.panel}>
-      {returned ? (
-        <Banner
-          tone="warning"
-          title="O narrador devolveu a ficha"
-          message={returned.reason}
-          testID="creation-returned"
-        />
-      ) : null}
-      {refusal ? (
-        <Banner
-          tone="warning"
-          message={`${REFUSAL_TEXT[refusal.code]} A alteração foi desfeita.`}
-          testID="creation-refused"
-        />
-      ) : null}
+      <Banner
+        tone="warning"
+        message={`${REFUSAL_TEXT[refusal.code]} A alteração foi desfeita.`}
+        testID="creation-refused"
+      />
     </View>
   )
 }
@@ -306,6 +306,8 @@ export function CreationStatusPanel() {
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // "Aprovar ficha" confirma antes, como concluir (T-32)
+  const [approving, setApproving] = useState(false)
   // O painel continua montado fora de `pending`: sem zerar, o formulário de
   // devolução reaparecia preenchido na próxima revisão (nota do QA app)
   const pending = creation?.status === 'pending'
@@ -314,6 +316,7 @@ export function CreationStatusPanel() {
     setReturning(false)
     setReason('')
     setError(null)
+    setApproving(false)
   }, [pending])
   if (!pending) return null
   const storyteller = roles.has('storyteller')
@@ -351,12 +354,7 @@ export function CreationStatusPanel() {
               disabled={sendBack.isPending}
               onPress={() => {
                 setError(null)
-                approve.mutate(undefined, {
-                  onSuccess: () =>
-                    toast.show({ message: 'Ficha aprovada e liberada.' }),
-                  onError: failure =>
-                    failed(failure, 'Não foi possível aprovar a ficha.'),
-                })
+                setApproving(true)
               }}
             />
             <Button
@@ -409,9 +407,52 @@ export function CreationStatusPanel() {
           ) : null}
         </View>
       ) : null}
+      {storyteller ? (
+        <BottomSheet
+          visible={approving}
+          title={approveCopy.title}
+          onClose={() => setApproving(false)}
+          footer={
+            <>
+              <Button
+                title="Voltar"
+                variant="ghost"
+                onPress={() => setApproving(false)}
+              />
+              <Button
+                title={approveCopy.confirm}
+                testID="creation-approve-confirm"
+                busy={approve.isPending}
+                onPress={() =>
+                  approve.mutate(undefined, {
+                    onSuccess: () => {
+                      setApproving(false)
+                      toast.show({ message: approveCopy.done })
+                    },
+                    onError: failure => {
+                      setApproving(false)
+                      failed(failure, 'Não foi possível aprovar a ficha.')
+                    },
+                  })
+                }
+              />
+            </>
+          }
+        >
+          <CompletionMessage body={approveCopy.body} notes={approveNotes} />
+        </BottomSheet>
+      ) : null}
     </View>
   )
 }
+
+const approveCopy = completionCopy({
+  by: 'storyteller',
+  approval: true,
+  action: 'approve',
+})
+// Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
+const approveNotes: readonly string[] = []
 
 /** O narrador ajusta o saldo de bônus da ficha ou libera a criação livre. */
 function BudgetControls() {

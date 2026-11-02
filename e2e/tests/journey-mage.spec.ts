@@ -135,6 +135,8 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
     ],
   })
   await page.reload()
+  // A ficha ainda em criação (livre) reabre em Editar (T-05): volta ao Jogo
+  await page.getByRole('radio', { name: 'Jogo' }).click()
   await expect(wheel(page)).toHaveAccessibleName(
     /Quintessência 5, Paradoxo 15, de 20 casas/
   )

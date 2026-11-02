@@ -1,7 +1,12 @@
-import { act, fireEvent, screen } from '@testing-library/react-native'
-import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  usePreventRemove,
+  useRouter,
+} from 'expo-router'
 import { Platform } from 'react-native'
-
+import { characterStateText } from '../../components/chronicles/characterState'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { templateJson } from '../../test/fixtures'
@@ -186,6 +191,76 @@ describe('Nova ficha', () => {
 
 // L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
 // não abrir, a pessoa sabe que ela existe e não cria outra igual
+// T-29: a Nova ficha diz o modo em que a ficha vai abrir e o orçamento
+describe('Nova ficha: modo e orçamento da crônica', () => {
+  const chronicleWith = (
+    creation?: { approval: boolean; defaults: unknown },
+    role = 'player'
+  ) =>
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role,
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+        ...(creation && { creation: { ...creation, revision: 1 } }),
+      })
+    )
+  const intro = async () =>
+    (await screen.findByTestId('new-character-intro')).props.children
+
+  it('por pontos: o orçamento, o modo Criação e a aprovação', async () => {
+    chronicleWith({ approval: true, defaults: { freebies: 21 } })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toBe(
+      'Esta crônica usa criação por pontos: Atributos 7/5/3 · Habilidades 13/9/5 · Disciplinas 3 · Antecedentes 5 · Virtudes 7 · 21 de bônus. Comece pela identidade; os pontos você distribui depois, na ficha, no modo Criação. O narrador aprova a ficha antes de ela entrar em jogo.'
+    )
+  })
+
+  it('livre: o modo Editar e quem conclui', async () => {
+    chronicleWith({ approval: false, defaults: { mode: 'free' } })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const text = await intro()
+    expect(text).toMatch(/criação livre/)
+    expect(text).toMatch(/no modo Editar/)
+    expect(text).toMatch(/O narrador conclui a criação\.$/)
+  })
+
+  it('sem as regras da crônica, o texto de antes (nunca "criação livre")', async () => {
+    chronicleWith(undefined)
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toBe(
+      'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'
+    )
+  })
+
+  it('o NPC não muda', async () => {
+    chronicleWith({ approval: true, defaults: {} }, 'storyteller')
+    jest
+      .mocked(useLocalSearchParams)
+      .mockReturnValue({ id: CHRONICLE, kind: 'npc' })
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    expect(await intro()).toMatch(/^O NPC nasce oculto e em criação livre/)
+  })
+
+  it('na crônica, o jogador vê a linha sob "Suas fichas"; o narrador, não', async () => {
+    chronicleWith({ approval: false, defaults: {} })
+    calls.chronicle.charactersGet.mockResolvedValue(ok([]))
+    const session = await signedIn()
+    const first = renderWithSession(<ChronicleScreen />, session)
+    expect((await screen.findByTestId('creation-summary')).props.children).toBe(
+      'Criação por pontos · Atributos 7/5/3 · Habilidades 13/9/5 · Disciplinas 3 · Antecedentes 5 · Virtudes 7 · 15 de bônus · aprovação desligada'
+    )
+    first.unmount()
+    chronicleWith({ approval: false, defaults: {} }, 'storyteller')
+    renderWithSession(<ChronicleScreen />, session)
+    await screen.findByRole('header', { name: 'Fichas' })
+    expect(screen.queryByTestId('creation-summary')).toBeNull()
+  })
+})
+
 describe('Nova ficha: confirmação ao criar', () => {
   it('mostra "Ficha criada." e abre a ficha', async () => {
     calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
@@ -403,6 +478,99 @@ describe('Fichas na crônica', () => {
     ).toBeTruthy()
     expect(
       screen.getByRole('button', { name: /^Caio, .*de beto$/ })
+    ).toBeTruthy()
+  })
+
+  // T-06: a ficha devolvida volta à lista com o estado, sem o motivo
+  const row = (over: Record<string, unknown>) => ({
+    id: 'ch1',
+    name: 'Helena Varga',
+    mine: true,
+    owner: { id: 'u2', username: 'dona' },
+    templateVersion: '1.0.0',
+    updatedAt: '',
+    values: { name: 'Helena Varga' },
+    ...over,
+  })
+
+  it.each([
+    [{ status: 'pending' }, false, 'Aguarda aprovação'],
+    [{ status: 'pending' }, true, 'Aguarda sua revisão'],
+    [{ status: 'creating', returned: true }, false, 'Devolvida'],
+    [{ status: 'creating', returned: true }, true, 'Devolvida'],
+    [{ status: 'creating', returned: false }, false, null],
+    [{ status: 'active', returned: true }, false, null],
+    [{}, false, null],
+  ])('characterStateText(%j, narra: %s) = %s', (r, narrating, expected) => {
+    expect(characterStateText(r, narrating)).toBe(expected)
+  })
+
+  it('a dona vê "Sua ficha · Devolvida"; "Aguarda aprovação" continua', async () => {
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([
+        row({ status: 'creating', returned: true }),
+        row({ id: 'ch2', name: 'Caio', status: 'pending' }),
+      ])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: /^Helena Varga, .*Sua ficha · Devolvida$/,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: /^Caio, .*Sua ficha · Aguarda aprovação$/,
+      })
+    ).toBeTruthy()
+  })
+
+  it('o narrador vê "de <jogador> · Devolvida"', async () => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'storyteller',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([row({ mine: false, status: 'creating', returned: true })])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: /^Helena Varga, .*de dona · Devolvida$/,
+      })
+    ).toBeTruthy()
+  })
+
+  it('voltar à crônica rebusca a lista', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(effect => {
+      focus.push(effect as () => void)
+    })
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([row({ status: 'pending' })])
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    await screen.findByRole('button', { name: /Aguarda aprovação$/ })
+    const before = calls.chronicle.charactersGet.mock.calls.length
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([row({ status: 'creating', returned: true })])
+    )
+    await act(async () => {
+      for (const f of focus) f()
+    })
+    await waitFor(() =>
+      expect(calls.chronicle.charactersGet.mock.calls.length).toBeGreaterThan(
+        before
+      )
+    )
+    expect(
+      await screen.findByRole('button', { name: /Sua ficha · Devolvida$/ })
     ).toBeTruthy()
   })
 

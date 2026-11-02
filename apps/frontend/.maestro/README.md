@@ -8,7 +8,7 @@ SQLCipher, dock com toque longo e modo avião.
 | Fluxo | O que prova |
 |---|---|
 | `01-login` | o app abre e entra (sessão no SecureStore) |
-| `02-open-sheet` | a ficha abre em Jogo com o dock e "Salvo" |
+| `02-open-sheet` | a ficha concluída abre em Jogo com o dock e "Salvo" (a ficha em criação da dona abre em Criação ou Editar, T-05) |
 | `03-spend-blood` | toque longo no Sangue, aviso com Desfazer, fila confirma |
 | `04-airplane-mode` | gastar offline, reiniciar sem rede (dados do banco cifrado) e sincronizar ao voltar (só Android) |
 | `05-mage-wheel` | a roda do Mago no dock: Paradoxo +1 pela regra e Desfazer (v1) |
@@ -20,7 +20,9 @@ SQLCipher, dock com toque longo e modo avião.
 ## Preparar
 
 1. Uma conta de teste **num servidor de homologação**, nunca com dados de
-   produção, com uma crônica de Vampiro e uma ficha da própria conta. O Sangue
+   produção, com uma crônica de Vampiro e uma ficha da própria conta, já
+   concluída (`active`): a ficha em criação abre na montagem, não em Jogo
+   (T-05), e o `02` espera o dock. O `CHARACTER_ID` é o dela. O Sangue
    precisa estar acima de 0. Cada rodada do `04` gasta 1. Para o `05`, uma
    crônica de Mago com uma ficha da conta e menos de 20 de Paradoxo na roda
    (o Desfazer devolve o que a rodada tirou).
@@ -45,7 +47,7 @@ As credenciais vão por `-e` e nunca ficam no repositório:
 maestro test apps/frontend/.maestro \
   -e EMAIL=<conta de teste> -e PASSWORD=<senha> \
   -e CHRONICLE="<nome da crônica>" -e CHARACTER="<nome da ficha>" \
-  -e CHARACTER_ID=<uuid da ficha> \
+  -e CHARACTER_ID=<uuid da ficha concluída (active)> \
   -e MAGE_CHRONICLE="<crônica de Mago>" -e MAGE_CHARACTER="<ficha de Mago>" \
   -e WEREWOLF_CHRONICLE="<crônica de Lobisomem>" \
   -e WEREWOLF_CHARACTER="<ficha de Lobisomem fora de Crinos>" \
@@ -62,7 +64,8 @@ No iOS, exclua o fluxo de modo avião: `--exclude-tags android`.
 O Maestro não liga o modo avião no simulador do iOS, e só um aparelho de
 verdade mostra o banco cifrado. Antes do release:
 
-1. Instale o build de release e entre. Abra a ficha (o dono abre em Jogo).
+1. Instale o build de release e entre. Abra a ficha concluída (o dono abre
+   em Jogo; a ficha em criação abre em Criação ou Editar).
 2. Ligue o modo avião. Aparece "Sem conexão" e o indicador mostra "Offline".
 3. Gaste Sangue pelo dock (toque longo) e leve 1 de dano letal pelo sheet da
    Vitalidade. O indicador mostra "Offline · 2 pendentes".

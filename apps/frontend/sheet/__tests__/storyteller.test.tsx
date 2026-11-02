@@ -219,6 +219,34 @@ describe('Histórico de alterações', () => {
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).toBeNull()
   })
 
+  // T-80: a conclusão aparece com quem concluiu, sem "Desfazer"
+  it('"Criação concluída" com quem concluiu e sem "Desfazer"', async () => {
+    calls.historyGet.mockResolvedValue(
+      ok({
+        items: [
+          {
+            ...item('a1', 'storyteller', []),
+            event: 'creation.completed',
+            reversible: false,
+            sheetVersion: null,
+            operationId: null,
+          },
+          item('b1', 'owner', [{ label: 'Força', change: '2 → 3' }]),
+        ],
+        next: null,
+      })
+    )
+    await open(['storyteller'])
+    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    expect(
+      await screen.findByLabelText(
+        /^Criação concluída\. às \d\d:\d\d · ana \(narrador\)$/
+      )
+    ).toBeTruthy()
+    expect(screen.getByText('Criação concluída')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
+  })
+
   it('quem excluiu a conta aparece como "Conta excluída"', async () => {
     calls.historyGet.mockResolvedValue(
       ok({

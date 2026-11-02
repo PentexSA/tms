@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
+import {
+  apiAs,
+  completeCreation,
+  eighthGeneration,
+  freeCreation,
+  signUp,
+} from '../support/users'
 
 // Etapa 13: uma ficha criada pela API abre no navegador em Leitura, com a
 // identidade, "Em jogo" e as 3 abas do Vampiro.
@@ -47,6 +53,9 @@ test('a ficha abre em Leitura com as 3 abas; só o narrador vê as notas dele', 
     }
   )
   await eighthGeneration(playerContext, player, character.id)
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador
+  await completeCreation(context, storyteller, character.id)
 
   // A jogadora abre a própria ficha
   const sheet = await playerContext.newPage()

@@ -112,6 +112,7 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   // 4 e 9. Jogo, offline: o dock com Vitalidade, Fúria e Forma. Crinos com a
   // mudança instantânea, num lote só, com aviso e Desfazer
   await page.reload()
+  // A ficha ainda em criação (livre) reabre em Editar (T-05)
   await page.getByRole('radio', { name: 'Jogo' }).click()
   await expect(form(page)).toHaveAccessibleName(/^Forma: Hominídeo/)
   await page.context().setOffline(true)
@@ -183,6 +184,8 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
     ],
   })
   await page.reload()
+  // A ficha ainda em criação (livre) reabre em Editar (T-05): volta ao Jogo
+  await page.getByRole('radio', { name: 'Jogo' }).click()
   await page.getByRole('button', { name: 'Ações da ficha' }).click()
   await page.getByRole('button', { name: 'Regenerar 1 nível' }).click()
   const regenerated = batchSaved(page, id)
