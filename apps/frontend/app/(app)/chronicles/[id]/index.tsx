@@ -18,7 +18,10 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
-import { CreationSettings } from '../../../../components/chronicles/CreationSettings'
+import {
+  type ChronicleCreationInfo,
+  CreationSettings,
+} from '../../../../components/chronicles/CreationSettings'
 import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
 import {
@@ -209,6 +212,8 @@ interface ChronicleData {
   readonly id: string
   readonly system: { readonly code: string }
   readonly storyteller: { readonly username: string }
+  // As regras da criação (o ex-membro não recebe)
+  readonly creation?: ChronicleCreationInfo
   readonly members: readonly {
     readonly id: string
     readonly username: string
@@ -250,6 +255,7 @@ function SheetsPanel({
         chronicleId={c.id}
         systemCode={c.system.code}
         narrating={narrating}
+        creation={c.creation}
       />
 
       {/* O título e o "Convidar" com a margem da página (T-67) */}

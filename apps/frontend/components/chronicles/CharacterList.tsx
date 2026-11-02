@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { identityOf, resolve, type SheetData } from '@tms/sheet-core'
 import {
   Avatar,
@@ -12,10 +13,19 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { StyleSheet, View } from 'react-native'
-
 import { messageOf } from '../../lib/errors'
-import { useChronicleCharacters } from '../../lib/queries/chronicles'
-import { useCompiled, useTemplate } from '../../sheet/data'
+import {
+  chronicleKeys,
+  useChronicleCharacters,
+} from '../../lib/queries/chronicles'
+import { useRefetchOnFocus } from '../../lib/queries/focus'
+import {
+  chronicleCreationSummary,
+  summaryLine,
+} from '../../sheet/creation/summary'
+import { useCompiled, useLatestTemplate, useTemplate } from '../../sheet/data'
+import type { ChronicleCreationInfo } from './CreationSettings'
+import { characterStateText } from './characterState'
 
 interface PublicIdentity {
   readonly name: string
@@ -37,6 +47,8 @@ interface FullRow {
   readonly identity?: PublicIdentity
   // creating, pending (aguarda o narrador), active...
   readonly status?: string
+  // Devolvida pelo narrador (T-06), sem o motivo
+  readonly returned?: boolean
 }
 
 interface IdentityRow {
@@ -79,10 +91,8 @@ function CharacterRow({
       ? 'Sua ficha'
       : `de ${row.owner.username}`
   const name = partial ? row.identity.name : row.name
-  const pending = !partial && row.status === 'pending'
-  const who = pending
-    ? `${owner} · ${narrating ? 'Aguarda sua revisão' : 'Aguarda aprovação'}`
-    : owner
+  const state = partial ? null : characterStateText(row, narrating)
+  const who = state ? `${owner} · ${state}` : owner
   return (
     <ThemeProvider
       accent={
@@ -115,6 +125,25 @@ function CharacterRow({
   )
 }
 
+/** "Criação por pontos · Atributos 7/5/3 · … · 15 de bônus · …". */
+function CreationLine({
+  systemCode,
+  creation,
+}: {
+  readonly systemCode: string
+  readonly creation: ChronicleCreationInfo
+}) {
+  const latest = useLatestTemplate(systemCode)
+  const model = useCompiled(latest.data)
+  // L-01: sem as regras do sistema, nada de "criação livre"
+  if (!model) return null
+  return (
+    <Text variant="caption" color="inkMuted" testID="creation-summary">
+      {summaryLine(chronicleCreationSummary(model, creation))}
+    </Text>
+  )
+}
+
 // O narrador vê todas as fichas; o jogador, só as dele (a API já filtra: a
 // ficha de outro jogador nunca chega ao aparelho).
 export function CharacterList({
@@ -122,15 +151,27 @@ export function CharacterList({
   systemCode,
   narrating,
   canCreate = true,
+  creation,
 }: {
   readonly chronicleId: string
   readonly systemCode: string
   readonly narrating: boolean
   // O ex-membro não cria ficha (a API dá 403)
   readonly canCreate?: boolean
+  // As regras da criação da crônica: o jogador vê o modo e o orçamento (T-29)
+  readonly creation?: ChronicleCreationInfo
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const characters = useChronicleCharacters(chronicleId)
+  // Voltar à crônica rebusca: a ficha devolvida ou aprovada noutro aparelho
+  // aparece sem esperar o cache vencer (T-06)
+  useRefetchOnFocus(() =>
+    queryClient.invalidateQueries(
+      { queryKey: chronicleKeys.characters(chronicleId) },
+      { cancelRefetch: false }
+    )
+  )
   const rows = (characters.data ?? []) as Row[]
   const pcs = rows.filter(
     (row): row is FullRow =>
@@ -166,6 +207,10 @@ export function CharacterList({
           title={narrating ? 'Fichas' : 'Suas fichas'}
           right={canCreate ? create : undefined}
         />
+        {/* O narrador vê o painel inteiro; o jogador, a linha (T-29) */}
+        {!narrating && canCreate && creation ? (
+          <CreationLine systemCode={systemCode} creation={creation} />
+        ) : null}
       </View>
       {review.length ? (
         <View style={styles.header} testID="review-pending">

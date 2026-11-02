@@ -6,6 +6,7 @@ import { stateLabel } from '../components/chronicles/tableItems'
 import {
   StatusMenu,
   type StatusMenuButtonProps,
+  type StatusMenuDraft,
   statusActions,
 } from './storyteller/StatusMenu'
 
@@ -35,7 +36,12 @@ export function SheetMenu({
   const [narrating, setNarrating] = useState(false)
   // As mesmas condições do botão da tela larga: só com ação no estado
   const actions = narrator
-    ? statusActions(narrator.model, narrator.status, narrator.locked)
+    ? statusActions(
+        narrator.model,
+        narrator.status,
+        narrator.locked,
+        narrator.approval
+      )
     : []
   const state = narrator
     ? stateLabel(narrator.model, narrator.status, narrator.locked)
@@ -96,13 +102,27 @@ export function SheetMenu({
         // As mesmas props do StatusMenuButton: o que ele ganhar, o menu
         // repassa (onda-2 §4.4)
         <StatusMenu
-          {...narrator}
+          characterId={narrator.characterId}
+          chronicleId={narrator.chronicleId}
           actions={actions}
+          draft={draftOf(narrator)}
           onClose={() => setNarrating(false)}
         />
       ) : null}
     </>
   )
+}
+
+/** O rascunho e a criação que o menu leva ao concluir (T-32, T-18). */
+function draftOf({
+  characterId: _id,
+  chronicleId: _chronicle,
+  model: _model,
+  status: _status,
+  locked: _locked,
+  ...draft
+}: StatusMenuButtonProps): StatusMenuDraft {
+  return draft
 }
 
 const styles = StyleSheet.create({

@@ -96,7 +96,7 @@ describe('trava da criação a cada toque', () => {
         {
           path: 'values.str',
           message:
-            'Escolha as prioridades deste grupo antes de distribuir os pontos.',
+            'Físicos: escolha a prioridade antes de distribuir os pontos.',
         },
       ],
     })
@@ -117,7 +117,7 @@ describe('trava da criação a cada toque', () => {
         {
           path: 'values.dex',
           message:
-            'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus.',
+            'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
         },
       ],
     })
@@ -138,7 +138,12 @@ describe('trava da criação a cada toque', () => {
     expect(store.getState().check?.freebies?.remaining).toBe(0)
     expect(set(store, 'str', 4)).toMatchObject({
       ok: false,
-      issues: [{ path: 'values.str', message: 'Bônus: 5 acima do saldo.' }],
+      issues: [
+        {
+          path: 'values.str',
+          message: 'Faltariam 5 de bônus: custa 5, restam 0.',
+        },
+      ],
     })
   })
 
@@ -150,5 +155,165 @@ describe('trava da criação a cada toque', () => {
     set(store, 'dex', 3)
     set(store, 'sta', 2)
     expect(set(store, 'dex', 4)).toMatchObject({ ok: true })
+  })
+})
+
+// T-20, T-55: o aviso do toque recusado mora no store, um por ficha, e some
+// quando a causa some, sem esperar o próximo toque da mesma linha.
+describe('aviso da recusa no store', () => {
+  const PRIORITIES = {
+    priorities: {
+      attributes: ['phys', 'soc', 'men'],
+      abilities: ['talents', 'knowledges'],
+    },
+  }
+  const creating = (
+    choices: Record<string, unknown> = PRIORITIES,
+    values: Record<string, unknown> = {}
+  ) => {
+    const store = createSheetStore({
+      characterId: ID,
+      model,
+      sheet: { values, specialties: {} } as SheetData,
+      sheetVersion: 0,
+      roles: ['owner'],
+      mode: 'create',
+      sync: { enqueue: jest.fn() },
+      creation: { config: effectiveCreationConfig(model), choices },
+    })
+    store.getState().startDraft()
+    return store
+  }
+  const set = (store: ReturnType<typeof creating>, id: string, n: unknown) =>
+    store.getState().setDraftValue(`values.${id}`, n)
+
+  it('a recusa vira o aviso, e o próximo aviso substitui o anterior', () => {
+    const store = creating({})
+    set(store, 'str', 2)
+    const first = store.getState().notice
+    expect(first).toMatchObject({
+      paths: ['values.str'],
+      cause: 'priorities',
+      text: 'Físicos: escolha a prioridade antes de distribuir os pontos.',
+    })
+    set(store, 'per', 2)
+    const second = store.getState().notice
+    expect(second).toMatchObject({
+      paths: ['values.per'],
+      text: 'Mentais: escolha a prioridade antes de distribuir os pontos.',
+    })
+    expect(second?.id).toBeGreaterThan(first?.id ?? 0)
+  })
+
+  it('a prioridade escolhida apaga o aviso de "escolha a prioridade"', () => {
+    const store = creating({})
+    set(store, 'str', 2)
+    expect(store.getState().notice?.cause).toBe('priorities')
+    store.getState().setCreation({
+      config: effectiveCreationConfig(model),
+      choices: PRIORITIES,
+    })
+    expect(store.getState().notice).toBeNull()
+    // O ponto não entra sozinho: só o aviso sai
+    expect(store.getState().draft?.size).toBe(0)
+  })
+
+  it('trocar para Bônus apaga o aviso dos Básicos', () => {
+    const store = creating()
+    set(store, 'str', 3)
+    set(store, 'dex', 3)
+    set(store, 'sta', 2)
+    set(store, 'dex', 4)
+    expect(store.getState().notice?.cause).toBe('budget')
+    store.getState().setCreationPhase('freebies')
+    expect(store.getState().notice).toBeNull()
+  })
+
+  it('o limite que sobe pelo servidor apaga o aviso do teto', () => {
+    const store = creating()
+    set(store, 'sphereA', 1)
+    set(store, 'sphereA', 2)
+    expect(store.getState().notice).toMatchObject({
+      cause: 'ceiling',
+      text: 'Esfera A: na criação, vai até 1.',
+    })
+    // Outra pessoa sobe o Arete: a Esfera 2 passaria agora
+    store.getState().received({ values: { arete: 2 }, specialties: {} }, 1)
+    expect(store.getState().notice).toBeNull()
+  })
+
+  it('com a causa mudando para outro motivo, o texto acompanha', () => {
+    const store = creating(PRIORITIES, { str: 3, dex: 3, sta: 2 })
+    set(store, 'str', 4)
+    const before = store.getState().notice
+    expect(before?.cause).toBe('budget')
+    // Físicos passa a secundária (3): já gasta 10 de bônus, e o ponto a
+    // mais custaria 5 que não há
+    store.getState().setCreation({
+      config: effectiveCreationConfig(model),
+      choices: {
+        priorities: {
+          attributes: ['soc', 'phys', 'men'],
+          abilities: ['talents', 'knowledges'],
+        },
+      },
+    })
+    const after = store.getState().notice
+    expect(after).toMatchObject({
+      paths: ['values.str'],
+      cause: 'freebies',
+      text: 'Faltariam 5 de bônus: custa 5, restam 0.',
+    })
+    expect(after?.id).toBeGreaterThan(before?.id ?? 0)
+  })
+
+  it('qualquer toque aceito apaga o aviso e a faixa do "Salvar" recusado', () => {
+    const store = creating({})
+    set(store, 'name', 'Isadora')
+    set(store, 'str', 2)
+    expect(store.getState().notice).not.toBeNull()
+    store.getState().saveDraft('Força')
+    expect(store.getState().creationRefusal).toBeNull()
+    set(store, 'name', 'Isadora Vex')
+    expect(store.getState().notice).toBeNull()
+
+    const refused = creating({})
+    refused.getState().setMode('evolve')
+    refused.getState().startDraft()
+    set(refused, 'str', 2)
+    refused.getState().setMode('create')
+    refused.getState().saveDraft('Força')
+    expect(refused.getState().creationRefusal?.code).toBe(
+      'CREATION_PRIORITIES_REQUIRED'
+    )
+    refused.getState().startDraft()
+    set(refused, 'name', 'Outra')
+    expect(refused.getState().creationRefusal).toBeNull()
+  })
+
+  it('sair do modo, descartar ou limpar some com o aviso', () => {
+    const store = creating({})
+    set(store, 'str', 2)
+    store.getState().clearNotice()
+    expect(store.getState().notice).toBeNull()
+    store.getState().clearNotice()
+    set(store, 'str', 2)
+    store.getState().discardDraft()
+    expect(store.getState().notice).toBeNull()
+    store.getState().startDraft()
+    set(store, 'str', 2)
+    store.getState().setMode('play')
+    expect(store.getState().notice).toBeNull()
+    store.getState().setMode('create')
+    store.getState().startDraft()
+    set(store, 'str', 2)
+    store.getState().setCreation(null)
+    expect(store.getState().notice).toBeNull()
+  })
+
+  it('valor recusado pelo core e rascunho grande demais também viram aviso', () => {
+    const store = creating()
+    expect(set(store, 'str', 9)).toMatchObject({ ok: false })
+    expect(store.getState().notice?.cause).toBe('invalid')
   })
 })

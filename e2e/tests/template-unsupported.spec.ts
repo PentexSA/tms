@@ -71,7 +71,8 @@ test('Criação de fichas com template mais novo: aviso, sem "criação livre", 
     panel.getByText(/^As regras deste sistema são mais novas/)
   ).toBeVisible()
   await expect(panel.getByText(/criação livre/)).toHaveCount(0)
-  await panel.getByRole('radio', { name: 'Ligada', exact: true }).click()
+  // O nome acessível tem o efeito da opção depois do rótulo (T-29)
+  await panel.getByRole('radio', { name: /^Ligada, / }).click()
   await expect(
     panel.getByRole('button', { name: 'Salvar regras da criação' })
   ).toBeDisabled()

@@ -383,7 +383,7 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
 
   it('no celular, o texto da sincronização quebra numa largura fixa, sem cortar', async () => {
     resize(PHONE)
-    await openSheet(['owner'], 'creating')
+    await openSheet(['owner'], 'active')
     const sync = screen.getByTestId(/^sync-/)
     expect(StyleSheet.flatten(sync.props.style).maxWidth).toBe(112)
     expect(

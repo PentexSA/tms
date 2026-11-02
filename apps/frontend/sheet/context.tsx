@@ -9,6 +9,7 @@ import type {
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { OpenBudgetContext } from './creation/CreationContext'
 import type {
   FieldEntry,
   SheetActions,
@@ -30,16 +31,25 @@ const SheetContext = createContext<SheetContextValue | null>(null)
 
 export function SheetProvider({
   store,
+  openBudget = null,
   children,
 }: {
   readonly store: SheetStore
+  // "Ver orçamento" dos avisos da recusa (T-07), quando a aba existe
+  readonly openBudget?: (() => void) | null
   readonly children: ReactNode
 }) {
   const value = useMemo(() => {
     const { model, roles } = store.getState()
     return { store, model, roles: new Set(roles) }
   }, [store])
-  return <SheetContext.Provider value={value}>{children}</SheetContext.Provider>
+  return (
+    <SheetContext.Provider value={value}>
+      <OpenBudgetContext.Provider value={openBudget}>
+        {children}
+      </OpenBudgetContext.Provider>
+    </SheetContext.Provider>
+  )
 }
 
 function useSheetContext(): SheetContextValue {

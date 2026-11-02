@@ -32,6 +32,7 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
+import { ReturnedBanner } from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
@@ -169,6 +170,11 @@ function SheetBody({
   // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
   // conteúdo fica num contêiner comum, sem papel de painel
   const shownTab = onBudget ? BUDGET_TAB : active?.id
+  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  const openBudget = useMemo(
+    () => (budget ? () => setTab(BUDGET_TAB) : null),
+    [budget]
+  )
   const paneled = shownTab !== undefined && tabs.some(t => t.id === shownTab)
   const zoneContent = (
     <>
@@ -226,6 +232,8 @@ function SheetBody({
       <ConflictBanner key="conflict" />,
       editable ? <PolicyBanner key="policy" /> : null,
       editable ? <CreationStatusPanel key="status" /> : null,
+      // A devolução aparece em qualquer modo (T-06)
+      editable ? <ReturnedBanner key="returned" /> : null,
       editable && mode === 'create' ? <CreationAlerts key="alerts" /> : null,
       mode === 'play' ? (
         <View key="toolbar" style={styles.toolbar}>
@@ -325,7 +333,7 @@ function SheetBody({
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider store={store}>
+      <SheetProvider store={store} openBudget={openBudget}>
         <FieldSheetProvider>
           <GroupTabsContext.Provider value={groupTabs}>
             {/* A barra de modos é da ficha viva (editable não muda numa ficha

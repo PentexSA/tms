@@ -11,7 +11,7 @@ import {
 import { useCallback } from 'react'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
 import { blockedBy, blockedNote, useLifecycle } from '../policy'
-import type { CommitResult } from '../store/sheetStore'
+import type { CommitResult, DraftNotice } from '../store/sheetStore'
 
 // O que os editores de Evoluir leem e escrevem. O modo é UX: quem decide se
 // a escrita vale é o applyBatch (aqui, no rascunho) e o servidor.
@@ -88,6 +88,23 @@ export function useSetDraft() {
     [store]
   )
 }
+
+/** O caminho toca o prefixo ("values.wits", "values.disciplines#d1"). */
+export const touches = (path: string, prefix: string): boolean =>
+  path === prefix ||
+  path.startsWith(`${prefix}#`) ||
+  path.startsWith(`${prefix}.`)
+
+/**
+ * O aviso do último toque recusado, se ele toca este caminho (R-20, T-20).
+ * Mesma referência enquanto o aviso não muda: a linha só re-renderiza quando
+ * o aviso dela nasce, muda ou some (arquitetura §6.5).
+ */
+export const useDraftNotice = (path: string): DraftNotice | null =>
+  useSheetSelector(s => {
+    const n = s.notice
+    return n?.paths.some(p => touches(p, path)) ? n : null
+  })
 
 /** O modo atual e se este campo está editável nele. */
 export function useEditable(id: FieldId): boolean {

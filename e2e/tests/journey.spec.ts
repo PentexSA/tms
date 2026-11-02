@@ -91,7 +91,7 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Criar ficha' }).click()
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   const id = /characters\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? ''
-  // O ?mode=evolve vale só na chegada: recarregar abre no modo do papel
+  // O ?mode=evolve vale só na chegada: recarregar abre no modo de abertura
   await expect(page).toHaveURL(new RegExp(`/characters/${id}$`))
 
   // 5. Evoluir: atributos, habilidades, especialização, FdV, disciplinas e
@@ -230,6 +230,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   )
   await page.reload()
   expect(await (await fetched).text()).not.toContain('Regente')
+  // A ficha ainda em criação (livre) reabre em Editar (T-05): volta ao Jogo
+  await expect(page.getByRole('radio', { name: 'Editar' })).toBeChecked()
+  await page.getByRole('radio', { name: 'Jogo' }).click()
   await expect(
     page.getByRole('button', { name: /^Vitalidade: .*1 contusivo/ })
   ).toBeVisible()

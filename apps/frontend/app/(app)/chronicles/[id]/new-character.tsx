@@ -10,8 +10,13 @@ import {
   useToast,
 } from '@tms/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useRef, useState } from 'react'
-import { ScrollView, StyleSheet } from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import {
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native'
 
 import { UnsavedChangesGuard } from '../../../../components/UnsavedChangesGuard'
 import { messageOf } from '../../../../lib/errors'
@@ -23,6 +28,10 @@ import {
   CharacterForm,
   type ServerIssue,
 } from '../../../../sheet/CharacterForm'
+import {
+  chronicleCreationSummary,
+  newCharacterIntro,
+} from '../../../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate } from '../../../../sheet/data'
 import { UnsupportedTemplate } from '../../../../sheet/UnsupportedTemplate'
 
@@ -49,6 +58,20 @@ export default function NewCharacterScreen() {
   const [dirty, setDirty] = useState(false)
   const created = useRef(false)
   const npc = kind === 'npc' && chronicle.data?.role === 'storyteller'
+  // T-21: "Criar ficha" com erro rola até o primeiro campo inválido; o `y`
+  // da linha vem do formulário, e o do formulário, daqui
+  const scroll = useRef<ScrollViewInstance>(null)
+  const formY = useRef(0)
+  // Uma lista por resposta do servidor: a mesma recusa repetida também leva
+  // ao campo (o formulário reage a cada resposta)
+  const serverIssues = useMemo(() => issuesOf(create.error), [create.error])
+  // As regras de criação da crônica (T-29): o texto de topo diz em que modo
+  // a ficha vai abrir e o orçamento combinado
+  // (o ex-membro não recebe as regras, e não cria ficha)
+  const creation =
+    chronicle.data && 'creation' in chronicle.data
+      ? chronicle.data.creation
+      : undefined
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
     onPress: () => router.back(),
@@ -77,46 +100,63 @@ export default function NewCharacterScreen() {
   else
     body = (
       <ScrollView
+        ref={scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text color="inkMuted">
+        <Text color="inkMuted" testID="new-character-intro">
           {npc
             ? 'O NPC nasce oculto e em criação livre. Só você o vê até escolher o que revelar.'
-            : 'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'}
+            : creation
+              ? newCharacterIntro(chronicleCreationSummary(model, creation))
+              : // L-01: sem as regras da crônica, nada de "criação livre"
+                'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'}
         </Text>
-        <CharacterForm
-          model={model}
-          busy={create.isPending}
-          error={
-            create.isError && !issuesOf(create.error).length
-              ? messageOf(create.error, 'Não foi possível criar a ficha')
-              : null
-          }
-          serverIssues={issuesOf(create.error)}
-          onDirtyChange={setDirty}
-          onSubmit={values => {
-            if (submitting.current) return
-            submitting.current = true
-            create.mutate(npc ? { values, kind: 'npc' } : { values }, {
-              // A ficha nova abre no rascunho: na Criação, quando o sistema
-              // tem criação por pontos; senão, em Evoluir
-              onSuccess: c => {
-                // T-56: a ida para a ficha nova passa pela guarda sem perguntar
-                created.current = true
-                // L-03: a confirmação vem antes de abrir a ficha; mesmo que
-                // ela não abra, a pessoa sabe que a ficha existe
-                toast.show({ message: 'Ficha criada.' })
-                router.replace(
-                  `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
-                )
-              },
-              onError: () => {
-                submitting.current = false
-              },
-            })
+        <View
+          testID="new-character-form"
+          onLayout={e => {
+            formY.current = e.nativeEvent.layout.y
           }}
-        />
+        >
+          <CharacterForm
+            model={model}
+            onInvalid={y =>
+              scroll.current?.scrollTo({
+                y: Math.max(0, formY.current + y - tokens.space[4]),
+                animated: true,
+              })
+            }
+            busy={create.isPending}
+            error={
+              create.isError && !serverIssues.length
+                ? messageOf(create.error, 'Não foi possível criar a ficha')
+                : null
+            }
+            serverIssues={serverIssues}
+            onDirtyChange={setDirty}
+            onSubmit={values => {
+              if (submitting.current) return
+              submitting.current = true
+              create.mutate(npc ? { values, kind: 'npc' } : { values }, {
+                // A ficha nova abre no rascunho: na Criação, quando o sistema
+                // tem criação por pontos; senão, em Evoluir
+                onSuccess: c => {
+                  // T-56: a ida para a ficha nova passa pela guarda sem perguntar
+                  created.current = true
+                  // L-03: a confirmação vem antes de abrir a ficha; mesmo que
+                  // ela não abra, a pessoa sabe que a ficha existe
+                  toast.show({ message: 'Ficha criada.' })
+                  router.replace(
+                    `/characters/${c.id}?mode=${model.template.creation ? 'create' : 'evolve'}`
+                  )
+                },
+                onError: () => {
+                  submitting.current = false
+                },
+              })
+            }}
+          />
+        </View>
       </ScrollView>
     )
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { apiAs, freeCreation, signUp } from '../support/users'
+import { apiAs, completeCreation, freeCreation, signUp } from '../support/users'
 
 // Etapa 21: montar Destreza + Esportes no sheet "Dados" e rolar. Quem rola é
 // o servidor; a tela mostra o resultado e a parada que saiu da ficha.
@@ -30,6 +30,9 @@ test('montar Destreza + Esportes e rolar', async ({ page }) => {
       { path: 'values.athletics', from: null, to: 2 },
     ],
   })
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador (aqui, a mesma pessoa)
+  await completeCreation(context, user, character.id)
 
   await page.goto(`/characters/${character.id}`)
   await page.getByRole('button', { name: 'Dados', exact: true }).click()

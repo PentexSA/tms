@@ -15,7 +15,7 @@ export default function CharacterRoute() {
   const { id, mode } = useLocalSearchParams<{ id: string; mode?: string }>()
   // O parâmetro vem da URL: só "evolve" e "create" são aceitos (a ficha nova
   // abre no rascunho). Vale só na chegada: recarregar ou voltar abre no modo
-  // padrão do papel
+  // de abertura da ficha (a montagem, se ainda em criação; T-05)
   const [initialMode] = useState<SheetMode | undefined>(
     mode === 'evolve' || mode === 'create' ? mode : undefined
   )

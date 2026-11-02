@@ -132,6 +132,9 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
     await page
       .getByRole('button', { name: 'Concluir criação', exact: true })
       .click()
+    // T-32: o menu confirma antes de concluir, com o texto do narrador
+    await expect(page.getByText('Concluir criação?')).toBeVisible()
+    await page.getByTestId('status-complete-confirm').click()
     await expect(
       page.getByText('Criação concluída. Subir um traço agora passa por você.')
     ).toBeVisible()

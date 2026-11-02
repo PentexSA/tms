@@ -29,6 +29,9 @@ export interface HistoryItem {
   readonly by: { readonly username: string } | null
   readonly byRole: string
   readonly operationId?: string | null
+  // Um evento da ficha que não é mudança de campo (T-80): a conclusão da
+  // criação, vinda do registro da crônica, sem "Desfazer"
+  readonly event?: 'creation.completed'
   readonly reversible?: boolean
   readonly changes: readonly {
     readonly label: string
@@ -37,6 +40,12 @@ export interface HistoryItem {
 }
 
 export const DELETED_ACCOUNT = 'Conta excluída'
+
+const EVENT_LABELS: Readonly<
+  Record<NonNullable<HistoryItem['event']>, string>
+> = {
+  'creation.completed': 'Criação concluída',
+}
 
 export const whoLabel = (item: Pick<HistoryItem, 'by' | 'byRole'>) =>
   `${item.by?.username ?? DELETED_ACCOUNT}${
@@ -53,7 +62,11 @@ function HistoryRow({
   readonly disabled: boolean
 }) {
   const { colors } = useTheme()
-  const lines = item.changes.map(c => `${c.label}: ${c.change}`)
+  const lines = item.changes.length
+    ? item.changes.map(c => `${c.label}: ${c.change}`)
+    : item.event
+      ? [EVENT_LABELS[item.event]]
+      : []
   const meta = `${whenLabel(item.at)} · ${whoLabel(item)}`
   return (
     <View style={[styles.row, { borderBottomColor: colors.borderSubtle }]}>
@@ -133,7 +146,7 @@ export function HistorySheet({
             item={item}
             disabled={!online || pending}
             undo={
-              storyteller && item.reversible
+              storyteller && item.reversible && !item.event
                 ? () => {
                     void revert({ revertsBatchId: item.id })
                   }
