@@ -12,6 +12,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { RatingDots } from '@tms/ui'
+import { StyleSheet } from 'react-native'
 import {
   example,
   modelOf,
@@ -263,6 +264,34 @@ describe('grid: Atributos', () => {
     expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
     expect(grid.queryByRole('tab', { name: 'Físicos' })).toBeNull()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
+  })
+
+  it('T-68: até 400 de grade (360 a 432 de tela), a célula fica densa e o número cabe', () => {
+    const cellOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes')).getByLabelText(label)
+          .props.style
+      )
+    const valueRowOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes'))
+          .getByLabelText(label)
+          .findAll(
+            el =>
+              (el.type as unknown) === 'View' &&
+              StyleSheet.flatten(el.props.style)?.flexDirection === 'row'
+          )[0]!.props.style
+      )
+    dims(360)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(4)
+    expect(valueRowOf(/^Força/).gap).toBe(4)
+    screen.unmount()
+
+    dims(1280)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(8)
+    expect(valueRowOf(/^Força/).gap).toBe(8)
   })
 
   it('grade sem grupos (características do CoC) quebra em colunas', () => {

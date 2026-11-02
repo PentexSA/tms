@@ -405,6 +405,7 @@ Grade primária (atributos) sem abas e pirâmide por degrau.
 - **Por tipo:** `rating` põe o rótulo sozinho na 1ª linha e pips + número embaixo; `number score+mod` mostra o modificador grande, o valor em `__sub` e o selo ◆; `percent` mostra o valor grande e "½ · ⅕". Com `groups`, cada grupo vira uma coluna, lida linha a linha.
 - **API RN:** `GridProps = { columns: number; headers?: string[]; children: ReactNode }`; `CellProps = { label: string; value: ReactNode; sub?: string; badge?: string; accessibilityLabel: string; onPress(): void }`; `PyramidProps = { tiers: { rung: string; items: { id: string; label: string; accessibilityLabel: string }[] }[] }`.
 - **Estados:** pressionado; container ≤ 400 (padding menor, rótulo 15, pip 12); `.is-stacked` (uma coluna, sem cabeçalhos).
+- **Célula densa no app (RN, T-68):** com a grade até 400 de largura útil (360 a 432 de tela), o `GridLayout` liga o `DenseCells`, e a `RatingCell` usa padding 4 e espaço 4 entre os pips e o número: a 360, 94 dp úteis para 76 de pips, 4 de espaço e o número. Abaixo de 360, a grade já vira lista.
 - **A11y:** cada célula é um botão com a gramática do tipo e o selo em texto; cabeçalhos de grupo ocultos.
 - **Multi-sistema:** 9 atributos de WoD em 3×3 sem abas; 6 atributos de D&D com modificador; 8 características do CoC em % (2 colunas); perícias do Fate na pirâmide (`layout: pyramid`).
 - **Resolve:** C-07, C-09, C-10, DS-06.

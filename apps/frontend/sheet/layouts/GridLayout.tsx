@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native'
 import { useSheet } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
+import { DENSE_GRID_MAX, DenseCells, gridWidthOf } from '../views/dense'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -15,7 +16,9 @@ import type { LayoutProps } from './types'
 
 export function GridLayout({ section }: LayoutProps) {
   const { mode } = useSheet()
-  const { stacked, breakpoint } = useLayout()
+  const { stacked, breakpoint, width } = useLayout()
+  // Grade estreita: célula com padding e espaço menores (T-68)
+  const dense = gridWidthOf(width) <= DENSE_GRID_MAX
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]
@@ -55,40 +58,44 @@ export function GridLayout({ section }: LayoutProps) {
   if (!section.groups) {
     const count = section.def.columns ?? 3
     return (
-      <View testID={`grid-${section.id}`} style={styles.wrap}>
-        {section.fieldIds.map(id => (
-          <View key={id} style={{ width: `${100 / count}%` }}>
-            <FieldSlot id={id} variant="cell" />
-          </View>
-        ))}
-      </View>
+      <DenseCells value={dense}>
+        <View testID={`grid-${section.id}`} style={styles.wrap}>
+          {section.fieldIds.map(id => (
+            <View key={id} style={{ width: `${100 / count}%` }}>
+              <FieldSlot id={id} variant="cell" />
+            </View>
+          ))}
+        </View>
+      </DenseCells>
     )
   }
 
   return (
-    <View testID={`grid-${section.id}`} style={styles.columns}>
-      {groups.map(g => (
-        <View key={g.id} style={styles.column}>
-          {/* O título do grupo é visual: cada célula já diz o próprio nome */}
-          <Text
-            variant="overline"
-            color="inkMuted"
-            aria-hidden
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={styles.head}
-          >
-            {g.title}
-          </Text>
-          <View style={styles.counter}>
-            <CreationCounter fieldIds={g.fieldIds} />
+    <DenseCells value={dense}>
+      <View testID={`grid-${section.id}`} style={styles.columns}>
+        {groups.map(g => (
+          <View key={g.id} style={styles.column}>
+            {/* O título do grupo é visual: cada célula já diz o próprio nome */}
+            <Text
+              variant="overline"
+              color="inkMuted"
+              aria-hidden
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={styles.head}
+            >
+              {g.title}
+            </Text>
+            <View style={styles.counter}>
+              <CreationCounter fieldIds={g.fieldIds} />
+            </View>
+            {g.fieldIds.map(id => (
+              <FieldSlot key={id} id={id} variant="cell" />
+            ))}
           </View>
-          {g.fieldIds.map(id => (
-            <FieldSlot key={id} id={id} variant="cell" />
-          ))}
-        </View>
-      ))}
-    </View>
+        ))}
+      </View>
+    </DenseCells>
   )
 }
 
