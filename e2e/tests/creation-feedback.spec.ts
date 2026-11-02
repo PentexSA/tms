@@ -119,7 +119,9 @@ async function prepared(
 }
 
 // A 390, as sub-abas ficam na faixa fixa e são as da seção que está no
-// topo da tela (T-27): a ficha rola até a seção antes de tocar a sub-aba
+// topo da tela (T-27): a ficha rola até a seção começar logo abaixo da
+// faixa (não embaixo dela, que cobriria a primeira linha) antes de tocar a
+// sub-aba. Um nome fora do mapa é uma aba da zona ("Orçamento")
 const GROUP_SECTION: Record<string, string> = {
   Físicos: 'attributes',
   Sociais: 'attributes',
@@ -131,9 +133,18 @@ const GROUP_SECTION: Record<string, string> = {
 const tab = async (page: Page, name: string) => {
   const section = GROUP_SECTION[name]
   if (section)
-    await page
-      .getByTestId(`section-${section}`)
-      .evaluate(el => el.scrollIntoView({ block: 'start' }))
+    await page.getByTestId(`section-${section}`).evaluate(el => {
+      let scroller = el.parentElement
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight)
+        scroller = scroller.parentElement
+      if (!scroller) return
+      const nav = document.querySelector('[data-testid="sheet-nav"]')
+      const below = nav?.getBoundingClientRect().height ?? 0
+      scroller.scrollTop +=
+        el.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        below
+    })
   await page.getByRole('tab', { name, exact: true }).click()
 }
 const plus = (page: Page, trait: string) =>
