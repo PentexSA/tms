@@ -622,9 +622,9 @@ No total, de 1,5 a 2 dias de uma pessoa, fora o build nativo do CI.
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| SAIDA-sair-voltar | iOS SE (obrigatório: I-A, IA-01, IA-03, IA-04, IA-09; `iniciante-app.md`, Tarefa 4); web 390 (I-W, IW-01, IW-02) | J1 | "Vampiro v4" → ficha nova → prioridades e todos os pontos básicos menos 1 → "Salvar" → mais 2 alterações → fechar o app (`simctl terminate`; no web, F5) → abrir → crônica → ficha → fechar o último ponto → "‹" com 1 alteração → "Salvar e sair" → abrir de novo | A lista diz "Em criação · por pontos"; a ficha abre em Criação com o selo sob o nome; "Recuperar" devolve as 2 alterações; com a conta fechada, "Salvar" e "Concluir criação" lado a lado; "Salvar e sair" grava e sai; reaberta, nada se perdeu | `onda3-ios-se-SAIDA-sair-voltar-01..08.png`, `onda3-web390-SAIDA-sair-voltar-01..08.png` | |
-| SAIDA-entregar | iOS SE (obrigatório: PO-A, POA-10); web 390 (POW-08) | J1, depois N | "Vampiro v3/v5" → ficha nova em Editar → ler a linha do próximo passo → mudar um traço → "Avisar que terminei" → confirmar. N: lista de crônicas → crônica → Mesa | J1: "Quando terminar, avise: o narrador conclui."; o resumo diz que salva antes; o toast "Pronto: o narrador foi avisado."; o selo "Você avisou que terminou". N: "1 ficha aguarda revisão" na lista de crônicas, o banner "1 jogador avisou que terminou" na aba Fichas e o selo "Avisou que terminou" no cartão da Mesa | `onda3-ios-se-SAIDA-entregar-01..06.png`, `onda3-web390-SAIDA-entregar-01..06.png` | |
-| SAIDA-devolver | iOS SE (obrigatório: N-A, NA-17, NA-18); web 390 e 1280 (N-W, NW-24, NW-25) | N, depois J1 | N abre a ficha de J1 (Leitura, com a aba Orçamento) → "Editar Notas do Narrador" (ler o rótulo) → "Mais opções" → "Ações do narrador · Avisou que terminou" → "Pedir ajuste" → "Refaça os Antecedentes" → enviar. J1 volta ao app | N: as Notas dizem "privadas: o jogador não vê"; a folha do motivo abre depois do menu (troca de folha no iOS); o selo passa a "Aguardando ajuste". J1: o banner "O narrador pediu um ajuste" com o motivo, em Editar e em Jogo; a lista diz "Aguardando ajuste" | `onda3-ios-se-SAIDA-devolver-01..07.png`, `onda3-web1280-SAIDA-devolver-01..07.png` | |
+| SAIDA-sair-voltar | iOS SE (obrigatório: I-A, IA-01, IA-03, IA-04, IA-09; `iniciante-app.md`, Tarefa 4); web 390 (I-W, IW-01, IW-02) | J1 | "Vampiro v4" → ficha nova → prioridades e todos os pontos básicos menos 1 → "Salvar" → mais 2 alterações → fechar o app (`simctl terminate`; no web, F5) → abrir → crônica → ficha → fechar o último ponto → "‹" com 1 alteração → "Salvar e sair" → abrir de novo | A lista diz "Em criação · por pontos"; a ficha abre em Criação com o selo sob o nome; "Recuperar" devolve as 2 alterações; com a conta fechada, "Salvar" e "Concluir criação" lado a lado; "Salvar e sair" grava e sai; reaberta, nada se perdeu | `onda3-ios-se-SAIDA-sair-voltar-01..08.png`, `onda3-web390-SAIDA-sair-voltar-01..08.png` | **ok** no iOS SE (18.1) e no web 390. O gesto de voltar do T-04 ficou não conferido no iOS (seção 11) |
+| SAIDA-entregar | iOS SE (obrigatório: PO-A, POA-10); web 390 (POW-08) | J1, depois N | "Vampiro v3/v5" → ficha nova em Editar → ler a linha do próximo passo → mudar um traço → "Avisar que terminei" → confirmar. N: lista de crônicas → crônica → Mesa | J1: "Quando terminar, avise: o narrador conclui."; o resumo diz que salva antes; o toast "Pronto: o narrador foi avisado."; o selo "Você avisou que terminou". N: "1 ficha aguarda revisão" na lista de crônicas, o banner "1 jogador avisou que terminou" na aba Fichas e o selo "Avisou que terminou" no cartão da Mesa | `onda3-ios-se-SAIDA-entregar-01..06.png`, `onda3-web390-SAIDA-entregar-01..06.png` | **ok** no iOS SE, no web 390 e no Android a 393 |
+| SAIDA-devolver | iOS SE (obrigatório: N-A, NA-17, NA-18); web 390 e 1280 (N-W, NW-24, NW-25) | N, depois J1 | N abre a ficha de J1 (Leitura, com a aba Orçamento) → "Editar Notas do Narrador" (ler o rótulo) → "Mais opções" → "Ações do narrador · Avisou que terminou" → "Pedir ajuste" → "Refaça os Antecedentes" → enviar. J1 volta ao app | N: as Notas dizem "privadas: o jogador não vê"; a folha do motivo abre depois do menu (troca de folha no iOS); o selo passa a "Aguardando ajuste". J1: o banner "O narrador pediu um ajuste" com o motivo, em Editar e em Jogo; a lista diz "Aguardando ajuste" | `onda3-ios-se-SAIDA-devolver-01..07.png`, `onda3-web1280-SAIDA-devolver-01..07.png` | **ok** no iOS SE, no web 390 e 1280 e no Android a 393. O "privadas" chega ao leitor de tela pela descrição do campo (seção 11) |
 
 Cada linha só fica "ok" com a tarefa concluída de ponta a ponta, sem ajuda, na plataforma em que a persona não a concluiu.
 
@@ -632,12 +632,12 @@ Cada linha só fica "ok" com a tarefa concluída de ponta a ponta, sem ajuda, na
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| X-selo | Web 390 e 1280; Android 360 e 393; iOS SE | N | "Lobisomem v3/v5", com a ficha de J1 avisada e o NPC "Figura Velada" oculto → aba Fichas → Mesa | Lista: "de roteiro_jogador1" com o selo "Avisou que terminou"; o NPC com "NPC" e o selo "Oculto", sem estado de ficha. Mesa: cartão compacto (recursos numa linha) com o selo de estado; seção "NPCs" com o selo "Oculto"; a 1280, grade de 3 colunas em cada seção; nome acessível da linha com o texto do selo | `onda3-<plat>-X-selo-01..04.png` | |
-| X-ajuste-reenvio | Web 390 (J1) e 1280 (N); iOS SE (J1) | N e J1 | Depois do SAIDA-devolver: J1 ajusta, toca "Salvar" (com o nome acessível "Salvar alterações"), toca "Avisar que terminei" de novo → N vê o selo na Mesa → N conclui pelo menu → os dois abrem o Histórico → N abre Bastidores › Auditoria | O banner do ajuste some no aviso; "Avisou que terminou" de novo na Mesa; depois, "Concluída em dd/mm" (a data de hoje, no fuso local); Histórico com "Ajuste pedido", "Avisou que terminou" e "Criação concluída", **sem o motivo**; auditoria com "O narrador pediu um ajuste na ficha …" e "… avisou que terminou a ficha …", sem o motivo e sem código | `onda3-<plat>-X-ajuste-reenvio-01..07.png` | |
-| X-barra | Android 360 e 411; iOS SE e 17; web 390 | J1 | Ficha livre em Editar com 1 alteração; ficha por pontos em Criação com a conta fechada | "Salvar" e "Avisar que terminei" (ou "Concluir criação") sem transbordo; a linha do próximo passo inteira; a altura da barra medida no `dump`/`describe-all` (perguntas 1 e 2 da seção 8) | `onda3-<plat>-X-barra-01..02.png` | |
-| X-toast | Android 393; iOS SE; web 390 | J1 e N | J1: "Salvar" na Criação → segurar o dedo no aviso por 6 s → "Desfazer". N: dano em grupo na "Vampiro limite 20" → esperar 7 s → "Desfazer" | O aviso não some enquanto há toque (P09-C); o "Desfazer" desfaz nos dois; o aviso do grupo fica acima da barra de seleção | `onda3-<plat>-X-toast-01..04.png` | |
-| X-datas | Web 390 (fuso de São Paulo); iOS SE (obrigatório: T-16 na edição) | N | Registrar a sessão de "2026-11-01" → Diário → Editar → Salvar sessão → lista de crônicas; concluir uma ficha → lista | "01/11/2026" no Diário e "Última sessão: 01/11" na lista; a edição salva (sem 400); "Concluída em dd/mm" com o dia local | `onda3-<plat>-X-datas-01..05.png` | |
-| X-volta | iOS SE (obrigatório: T-39, T-81); Android 393 (voltar do Android); web 390 | N, depois J1 | N: Mesa → rolar → abrir uma ficha → "‹". J1: crônica → NPC revelado (identidade) → "‹" | N volta à Mesa, no mesmo ponto, com a seleção; J1 volta à crônica de origem, com "Voltar para {crônica}" | `onda3-<plat>-X-volta-01..04.png` | |
+| X-selo | Web 390 e 1280; Android 360 e 393; iOS SE | N | "Lobisomem v3/v5", com a ficha de J1 avisada e o NPC "Figura Velada" oculto → aba Fichas → Mesa | Lista: "de roteiro_jogador1" com o selo "Avisou que terminou"; o NPC com "NPC" e o selo "Oculto", sem estado de ficha. Mesa: cartão compacto (recursos numa linha) com o selo de estado; seção "NPCs" com o selo "Oculto"; a 1280, grade de 3 colunas em cada seção; nome acessível da linha com o texto do selo | `onda3-<plat>-X-selo-01..04.png` | **ok** em todas as plataformas. O cartão tem 157 a 158 px no web a 390, 157 a 158 dp no Android a 360 e 393 e 159 pt no iOS SE. A 1280, 3 colunas |
+| X-ajuste-reenvio | Web 390 (J1) e 1280 (N); iOS SE (J1) | N e J1 | Depois do SAIDA-devolver: J1 ajusta, toca "Salvar" (com o nome acessível "Salvar alterações"), toca "Avisar que terminei" de novo → N vê o selo na Mesa → N conclui pelo menu → os dois abrem o Histórico → N abre Bastidores › Auditoria | O banner do ajuste some no aviso; "Avisou que terminou" de novo na Mesa; depois, "Concluída em dd/mm" (a data de hoje, no fuso local); Histórico com "Ajuste pedido", "Avisou que terminou" e "Criação concluída", **sem o motivo**; auditoria com "O narrador pediu um ajuste na ficha …" e "… avisou que terminou a ficha …", sem o motivo e sem código | `onda3-<plat>-X-ajuste-reenvio-01..07.png` | **ok** no web (J1 a 390, N a 1280) e no iOS SE. A auditoria diz "Ajuste pedido em {ficha}" e "O dono de {ficha} avisou que terminou". Há um toque a mais: depois do "Salvar", a ficha vai para Jogo, e é preciso voltar ao Editar para avisar (seção 6, ponto 3) |
+| X-barra | Android 360 e 411; iOS SE e 17; web 390 | J1 | Ficha livre em Editar com 1 alteração; ficha por pontos em Criação com a conta fechada | "Salvar" e "Avisar que terminei" (ou "Concluir criação") sem transbordo; a linha do próximo passo inteira; a altura da barra medida no `dump`/`describe-all` (perguntas 1 e 2 da seção 8) | `onda3-<plat>-X-barra-01..02.png` | **ok**, numa linha só em todos. A barra mede 110 dp no Android (360, 393 e 411), ~89 pt no iOS SE, uma linha no iPhone 17 e ~88 px no web 390 (Chromium e WebKit) |
+| X-toast | Android 393; iOS SE; web 390 | J1 e N | J1: "Salvar" na Criação → segurar o dedo no aviso por 6 s → "Desfazer". N: dano em grupo na "Vampiro limite 20" → esperar 7 s → "Desfazer" | O aviso não some enquanto há toque (P09-C); o "Desfazer" desfaz nos dois; o aviso do grupo fica acima da barra de seleção | `onda3-<plat>-X-toast-01..04.png` | **ok** no web 390 e no iOS SE (J1 e N). No Android a 393, o J1 deu ok. O N ficou não conferido: a folha do dano em grupo ficou "busy" ~2 min no emulador (seção 11, achado 1) |
+| X-datas | Web 390 (fuso de São Paulo); iOS SE (obrigatório: T-16 na edição) | N | Registrar a sessão de "2026-11-01" → Diário → Editar → Salvar sessão → lista de crônicas; concluir uma ficha → lista | "01/11/2026" no Diário e "Última sessão: 01/11" na lista; a edição salva (sem 400); "Concluída em dd/mm" com o dia local | `onda3-<plat>-X-datas-01..05.png` | **ok** no web 390 e no iOS SE. "Salvar sessão" deu `PATCH` 200; a conclusão mostra "Concluída em 02/11" |
+| X-volta | iOS SE (obrigatório: T-39, T-81); Android 393 (voltar do Android); web 390 | N, depois J1 | N: Mesa → rolar → abrir uma ficha → "‹". J1: crônica → NPC revelado (identidade) → "‹" | N volta à Mesa, no mesmo ponto, com a seleção; J1 volta à crônica de origem, com "Voltar para {crônica}" | `onda3-<plat>-X-volta-01..04.png` | **ok** no iOS SE (cartão no mesmo y; T-81), no Android a 393 (pelo voltar do Android) e no web 390 (Chromium e WebKit). A volta "com a seleção" não foi conferida: com a seleção ligada, tocar o cartão marca a ficha, não abre |
 
 ### 10.8 Pendências do iOS da onda 2 ([onda-2.md](onda-2.md) §10)
 
@@ -645,11 +645,11 @@ Na onda 2, o iOS só abriu o app e desenhou o login. Estes passos vêm da §7 de
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| O2-folha | iOS SE e 17 | N | "Mais opções" → "Histórico"; "Mais opções" → "Ações do narrador" → "Concluir criação?" (P08, perg. 2; P04-C) | A segunda folha abre depois da primeira sair (`onClosed`), sem tela presa | `onda3-ios-O2-folha-01..04.png` | |
-| O2-P04-C | iOS SE | J1 e N | T-05 (IA-04: reabrir em Criação, "Recuperar"); T-06 (banner da devolução em até 30 s); T-32 (mesma confirmação pelo menu e pela barra); T-80 (Histórico só com "Criação concluída") | Como na tabela do P04-C §7 | `onda3-ios-O2-P04C-01..06.png` | |
-| O2-P05-C | iOS SE | J1 | T-20 (o aviso na altura do toque); T-55 (some ao subir o Arete); T-18 (sobra de bônus na confirmação); R-17 (custo e extrato); R-28 (toast das prioridades); T-21 (rola e foca o Nome) | Como na tabela do P05-C §7 | `onda3-ios-O2-P05C-01..06.png` | |
-| O2-P07-C | iOS SE | J1 | Teclado de software: "Adicionar Qualidade" → "Ambidestro" → Return (T-62); a recusa dentro da folha (T-19); "Custo 1" (T-23) | Entra "Ambidestro" inteiro; a frase dentro da folha | `onda3-ios-O2-P07C-01..03.png` | |
-| O2-P08 | iOS SE e 17 | J1 e N | T-37 (abaixo da ilha); T-11 ("Mais opções"); T-27 (abas fixas, "Orçamento" sem voltar ao topo); T-10 (a folha sobe uma vez só com o teclado); T-26 ("Próximo") | Como na tabela do P08 §7 | `onda3-ios-O2-P08-01..05.png` | |
+| O2-folha | iOS SE e 17 | N | "Mais opções" → "Histórico"; "Mais opções" → "Ações do narrador" → "Concluir criação?" (P08, perg. 2; P04-C) | A segunda folha abre depois da primeira sair (`onClosed`), sem tela presa | `onda3-ios-O2-folha-01..04.png` | **ok** no SE e no 17 |
+| O2-P04-C | iOS SE | J1 e N | T-05 (IA-04: reabrir em Criação, "Recuperar"); T-06 (banner da devolução em até 30 s); T-32 (mesma confirmação pelo menu e pela barra); T-80 (Histórico só com "Criação concluída") | Como na tabela do P04-C §7 | `onda3-ios-O2-P04C-01..06.png` | **Em parte.** T-05 ok (no SAIDA-sair-voltar). T-06 ok: o banner apareceu em 5,2 s. T-32: só a barra; o menu do dono não tem a ação. T-80 não foi conferido |
+| O2-P05-C | iOS SE | J1 | T-20 (o aviso na altura do toque); T-55 (some ao subir o Arete); T-18 (sobra de bônus na confirmação); R-17 (custo e extrato); R-28 (toast das prioridades); T-21 (rola e foca o Nome) | Como na tabela do P05-C §7 | `onda3-ios-O2-P05C-01..06.png` | **Em parte.** T-18 ok ("Sobram 15 pontos de bônus. Eles não viram XP."). T-20, T-55, R-17, R-28 e T-21 não foram conferidos: faltaram rodadas do agente |
+| O2-P07-C | iOS SE | J1 | Teclado de software: "Adicionar Qualidade" → "Ambidestro" → Return (T-62); a recusa dentro da folha (T-19); "Custo 1" (T-23) | Entra "Ambidestro" inteiro; a frase dentro da folha | `onda3-ios-O2-P07C-01..03.png` | **Em parte.** T-62 ok: "Ambidestro" entra inteiro com o Return. T-23 ok ("Custo 1"). T-19 não foi conferido: o caso de recusa não apareceu |
+| O2-P08 | iOS SE e 17 | J1 e N | T-37 (abaixo da ilha); T-11 ("Mais opções"); T-27 (abas fixas, "Orçamento" sem voltar ao topo); T-10 (a folha sobe uma vez só com o teclado); T-26 ("Próximo") | Como na tabela do P08 §7 | `onda3-ios-O2-P08-01..05.png` | **Em parte.** No SE, T-10, T-11 e T-27 ok. No 17, T-37 ok: o cabeçalho fica abaixo da ilha. T-26 não foi conferido |
 
 ### 10.9 Itens obrigatórios no iOS, por pacote
 
@@ -705,3 +705,154 @@ Nunca "ok" sem a evidência.
 - os achados da integração;
 - o resultado das suítes;
 - a conferência manual por plataforma.
+
+## 11. Integração (02/11/2026)
+
+Cada pacote foi implementado em paralelo, por um agente no seu próprio worktree, e integrado em série na `onda/3-estado-narrador`, na ordem da seção 2. O P04-D, o P11 e o P09-C receberam a onda na própria branch antes do merge e resolveram os conflitos ali:
+
+- o P04-D reaplicou o `next` e o `note` sobre o `EvolveBar` do P03-D;
+- o P11 somou o selo de visibilidade ao `StateBadge` do P04-D;
+- o P09-C refez o cartão da Mesa com os selos do P04-D e do P11.
+
+As correções da integração foram feitas na branch do pacote e entraram na onda por um merge `--no-ff` novo.
+
+| Ordem | Pacote | Merge na onda | Revisão |
+|---|---|---|---|
+| 1 | P03-D | `12921dd` | `/code-review`: 4 achados, corrigidos no pacote |
+| 2 | P04-D | `93718c0`, `d14118b` | `/code-review` (high): 8 achados, corrigidos. `/security-review`: nenhuma vulnerabilidade |
+| 3 | P11 | `6f54a20` | `/code-review`: 3 achados, corrigidos. `/security-review`: nenhuma vulnerabilidade |
+| 4 | P09-C | `2422837`, `2849774`, `40f2b1b` | `/code-review`: 9 achados, corrigidos. `/security-review`: nenhuma vulnerabilidade |
+
+**`/security-review` da onda inteira (independente dos pacotes):** nenhuma vulnerabilidade com confiança alta. Foram conferidos:
+
+- a AuthZ de `creation/adjust` e `creation/ready`;
+- o motivo do ajuste, que não sai no Histórico, na auditoria nem na Mesa;
+- o `invite.create`, sem o código e sem o hash;
+- a lista branca do `auditDetail`;
+- a projeção de identidade do NPC;
+- a parametrização do SQL;
+- o `?view=` e a volta no app.
+
+Abaixo do limiar: o `adjust` confere o papel de narrador fora da trava. É o mesmo padrão de `return` e `approve`, e o estado é conferido de novo sob a trava.
+
+**Perguntas técnicas (seção 8): o que foi aplicado.** Sem resposta do time, cada pacote seguiu a proposta do próprio plano. Os desvios estão na seção 10 de cada plano.
+
+1. **Barra de ação no `compact`.** Ela cabe numa linha, com os dois botões, sem transbordar:
+
+   | Onde | Altura |
+   |---|---|
+   | AVD a 360, 393 e 411 dp | 110 dp |
+   | Web a 390 | ~88 px |
+   | iOS SE | ~89 pt |
+   | iPhone 17 | uma linha |
+
+   O plano B do P04-D não foi preciso.
+2. **`parseDate: false`** vale para o cliente inteiro (P11). Os quatro pacotes leem as datas como texto (seção 4.5).
+3. **Troca de folha no iOS** (`onClosed`). A `BottomSheet` não precisou mudar. No SE (18.1) e no 17 (26.5):
+   - a folha do motivo abre pelo `onClosed` do "Mais opções";
+   - "Concluir criação?" e "Histórico" abrem depois do menu;
+   - "Salvar e sair" com o "‹" sai depois que a folha fecha.
+
+   O gesto de voltar ficou não conferido: o idb não dispara o gesto de borda do iOS.
+4. **"Concluir criação"** fica escondido até a conta fechar. Até lá, a linha do próximo passo diz "Você conclui quando a conta fechar." (P03-D e P04-D).
+5. **"Editar como narrador"** leva a Criação na criação por pontos, a Editar na criação livre e a Jogo na ficha em uso. O narrador abre a ficha em Leitura (P09-C, pergunta 1).
+6. **`setParams` no web.**
+   - A volta com o "‹" e com o voltar do navegador leva a `?view=table`, com a aba e a rolagem.
+   - A seleção não volta: com a seleção ligada, tocar o cartão marca a ficha em vez de abrir.
+   - No AVD, foram precisos três "voltar" para sair da crônica depois de usar a seleção. O caso não foi repetido, e a pergunta segue aberta (achado 6).
+7. **Barra de seleção abaixo de 600.** Numa linha só, com rolagem lateral (P09-C §3.6).
+8. **"Avisar que terminei"** sobe a revisão da criação (`creation_revision + 1`). O aviso manda só a `revision` (P04-D, desvio 3).
+9. **Selo no `subtitle` da `AppBar`:** não entrou. O selo fica sob o nome, no `IdentityBlock`.
+10. **Contagem da lista.** O `pendingReview` soma o aviso de "terminei" à contagem. Só conta o PC de outra pessoa (P04-D, desvio 8 e revisão).
+11. **App antigo e passos novos do Histórico.** Um passo que o app não conhece aparece só com a data e o autor (P04-D, desvio 10).
+12. **T-81.** Entraram os dois caminhos: a crônica vai na projeção de identidade (link direto), e o "‹" volta pela pilha com o `useSheetBack` do P09-C.
+13. **Filtro "Desde/Até" da auditoria:** continua em UTC. Fica registrado para depois (P11, pergunta 7).
+14. **"Desfazer" em grupo:** 10 s, com pausa enquanto há toque (`GROUP_TOAST_MS`). Os outros avisos ficam nos 5 s do DS.
+15. **fb-idb.**
+    - A versão `1.7.7` roda no Python 3.15.2. Ela saiu junto com o `idb_companion` instalado; a `1.1.7` que o plano previa é anterior.
+    - Fica num venv fora do repositório (`~/.venvs/idb-tms`), com o `pip-audit` sem vulnerabilidade conhecida.
+    - Nunca entrou no `package.json` nem no lockfile.
+    - Nada escuta em porta TCP: o companion usa um socket de domínio.
+    - **O build do roteiro manual precisa de assinatura local.** O build sem assinatura (`CODE_SIGNING_ALLOWED=NO`, como no job `native-ios`) instala e abre, mas não loga: o keychain do simulador recusa o `expo-secure-store` com `-34018`. Foi por isso que o iOS da onda 2 parou no login. Com "Sign to Run Locally" (`CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-`, incremental de 45 s), o login funciona no SE e no 17. O CI pode continuar sem assinatura, porque só compila. A seção 10.4 vale com essa troca na próxima onda.
+
+**Achados da integração (commits na onda):**
+
+- **`d9fa56f` (P04-D, achado pelo E2E).** No `creation-state.spec`, o diálogo de "Pedir ajuste" era medido na camada da folha (1280) em vez do painel de 560. A medida passou a ser no painel (`bottom-sheet-root > [aria-modal="true"]`), depois da entrada, conferindo 560 e o centro. O erro estava no teste, não no app.
+- **`1bbb073` e `9439cfa` (P09-C, achado pelo E2E).**
+  - **Cartão da Mesa alto demais.** Com o selo de estado do P04-D e o de visibilidade do P11, o cartão tinha 183 px a 390, e o limite é 170. Os selos passaram para a linha do clã, que quebra quando não cabe: o cartão ficou com 157 px a 390 e a 360.
+  - **Seletor ambíguo.** O aviso do aceite da narração passou a ser conferido com `exact`.
+- **`a46f8a9`, `bf41219` e `903971c` (P09-C, achado no roteiro web).**
+  - **`BackHandler` no web.** A seleção da Mesa registrava o `BackHandler` também no web. No Metro, o toast de erro do Expo cobria a barra de seleção. Agora ele só é registrado no Android.
+  - **Notas do Narrador no leitor de tela.** O botão passou a ter o nome "Editar Notas do Narrador. Privadas: o jogador não vê". O campo continua com o nome "Notas do Narrador" e recebe o aviso "Privadas: o jogador não vê estas notas." como descrição (`aria-describedby`).
+  - **Desvio da seção 10.10.** A 10.10 pedia o "privadas" no nome do campo. O aviso foi para a descrição para manter o nome curto: o leitor de tela anuncia o nome e depois a descrição.
+    - **iOS:** o `describe-all` mostra o campo com o `AXLabel` "Notas do Narrador" e a dica "Privadas: o jogador não vê estas notas.".
+    - **Android:** foi conferido antes da correção. O nome não tinha "privadas", e o aviso vinha do botão e do texto da folha. Não foi repetido depois.
+
+**Resultado na onda com os quatro pacotes (`40f2b1b`):**
+
+| Verificação | Resultado |
+|---|---|
+| build, typecheck e lint | verdes |
+| sheet-core | 981 testes |
+| config | 36 testes |
+| db | 33 testes |
+| api | 1766 testes (65 `*.pg.test` pulados no PGLite) |
+| ui | 197 testes |
+| frontend | 1290 testes; `test:coverage` dentro das metas |
+| `*.pg.test` | 45 testes, num banco `_test` descartável |
+| E2E Chromium e WebKit | 144 testes, com os quatro specs novos (`save-finish`, `creation-state`, `npc-backstage` e `narrator`) |
+| Build nativo local (debug) | Android: `assembleDebug` (arm64) em ~2 min. iOS: `xcodebuild` Debug para o simulador, incremental. A onda não muda nada nativo, nem o `package.json` ou o lockfile |
+
+**Conferência manual** (API local com o seed do roteiro; contas `@roteiro.test`, só dados fictícios). O resultado de cada item está nas seções 10.6 a 10.10.
+
+| Onde | Seed | Resumo |
+|---|---|---|
+| Web 390 e 1280 (Chromium; WebKit nos itens de Safari) | 13:50 | Todos os SAIDA e X ok. Aprovação, T-83 e transferência ok. O XP do jogador (T-40, item 1) ficou não conferido na tela: coberto pelo `narrator.spec.ts:234`. Os achados da a11y e do `BackHandler` foram corrigidos (`40f2b1b`) |
+| Android, AVD Pixel 3a a 393 dp; layout também a 360 e 411 | 14:21 | SAIDA-entregar e SAIDA-devolver ok. X-selo, X-barra, X-toast do jogador e X-volta ok. Os quatro "voltar" ok. T-49 e T-40 ok. O T-46 ficou preso no emulador (achado 1). O X-toast do narrador ficou não conferido |
+| iOS, simulador iPhone SE (18.1) e iPhone 17 (26.5), pelo idb | 15:45 | No SE, os três SAIDA e os obrigatórios da 10.9 ok: T-04 com o "‹", R-12f, R-14f, T-39, T-49, T-15, T-16 na edição, T-46 e T-81. Todos os X da 10.7 e a 10.10 ok. No 17, X-barra, O2-folha e T-37 ok. Da 10.8, ficaram em parte o O2-P04-C, o O2-P05-C, o O2-P07-C e o O2-P08 |
+
+**Achados do roteiro manual que ficaram sem correção nesta onda:**
+
+1. **A folha fica "busy" depois do envio** (Android, a confirmar). Acontece em "Revelar identidade" e "Revelar ficha" (P11, T-46) e em "Confirmar operação" do dano em grupo (P09-C).
+   - **No AVD:** a folha ficou "busy" de 60 a 120 s.
+   - **Na API:** respondeu em menos de 1 s, e as rebuscas do log terminaram em até 10 s. Nenhum pedido novo chegou à API no intervalo.
+   - **Na folha:** enquanto espera, nem o "×" nem o voltar a fecham.
+   - **Por que espera:** o `onSuccess` das duas mutações espera as invalidações. No caso do NPC, todo o prefixo `['chronicles']`.
+   - **Ambiente:** a máquina estava com carga ~6 e pouca memória livre. Os pedidos podem ter travado no `adb reverse` (timeout de 10 s mais 2 novas tentativas).
+   - **No iOS (SE), com a mesma API e o mesmo Metro, a espera não aconteceu:**
+
+     | Ação | Folha fechou em | Aviso apareceu em | Pedidos |
+     |---|---|---|---|
+     | Revelar identidade | ≤ 0,6 s | 1,7 s | POST em 22 ms e 6 rebuscas de 5 a 19 ms |
+     | Revelar ficha | ≤ 0,5 s | 1,7 s | POST em 22 ms e 6 rebuscas de 11 a 22 ms |
+     | Dano em grupo | ≤ 0,6 s | 2,0 s | POST em 25 ms e 4 rebuscas |
+
+     O web também não mostrou o problema. A causa provável é o emulador sob carga ou o `adb reverse`, não o app.
+   - **Proposta para a próxima onda:** fechar a folha no sucesso do POST e invalidar sem `await`. Num celular com rede ruim, uma rebusca lenta prenderia a folha depois de a escrita já ter valido, porque o "×" fica desabilitado enquanto espera.
+2. **"Salvar" no Editar leva a ficha para Jogo.** É o ponto 3 da seção 6, ainda sem decisão. Na criação livre, quem ajusta e salva vai para Jogo. Lá não há "Avisar que terminei" nem a linha do próximo passo, então quem quer avisar precisa voltar ao Editar. O roteiro viu isso no web, no Android e no iOS: é o toque a mais do X-ajuste-reenvio.
+3. **A linha do próximo passo não muda quando a conta fecha** (observação). Na criação por pontos, ela continua "Você conclui quando a conta fechar." mesmo quando "Concluir criação" já aparece. A linha depende do modo da crônica, como a seção 3.3 do P04-D define. O botão é que muda.
+4. **A barra de seleção rola na horizontal a 390** (desenho). "Nova noite" e "Fim da história" começam fora da tela, como pede o P09-C §3.6.
+5. **Dev build.** O LogBox fica sobre a barra de abas e sobre o pé das folhas no Android. Tocar nele abre o React Native DevTools.
+6. **Três "voltar" para sair da crônica** depois da seleção da Mesa (AVD, não repetido). Ver a pergunta 6.
+7. **Observações anteriores à onda,** vistas no iOS:
+   - a lista vazia diz "Nenhum Qualidade", sem concordância (já registrado na onda 2);
+   - "Ambidestro" repetido foi aceito: dois itens, e o bônus caiu de 15 para 13. Fica para conferir se o template devia recusar (T-19).
+
+**O que ficou não conferido, e por quê:**
+
+- **T-04 com o gesto de voltar (iOS):** o `idb ui swipe` não dispara o gesto de borda. Foram 6 variações; na crônica, o arrasto virou toque.
+- **X-toast do narrador (Android):** a folha ficou "busy" no emulador (achado 1). Passou no web e no iOS.
+- **X-volta "com a seleção":** com a seleção ligada, tocar o cartão marca a ficha em vez de abrir.
+- **XP do jogador (T-40, item 1) na tela do web:** coberto pelo `narrator.spec.ts:234`.
+- **Pendências do iOS da onda 2 (seção 10.8):**
+  - T-20, T-55, R-17, R-28 e T-21 (O2-P05-C): faltaram rodadas do agente;
+  - T-19: o caso de recusa não apareceu;
+  - T-32 pelo menu: o menu do dono não tem a ação;
+  - T-80 e T-26.
+- **Limites do idb:** ele digita como teclado físico, então o teclado de software some depois do primeiro texto, e não digita fora do ASCII ("ç").
+
+**Fica para depois da integração local:**
+
+- os jobs nativos do CI no PR da onda;
+- o anúncio pelo VoiceOver e pelo TalkBack (a troca de selo com `live` e o banner do ajuste), para ouvir no aparelho;
+- os pontos para o PO da seção 6 e das ondas 1 e 2 (`onda-1.md` §6 e `onda-2.md` §6), que continuam sem decisão.
