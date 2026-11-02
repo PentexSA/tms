@@ -22,7 +22,13 @@ jest.mock('../../lib/api', () => {
 const calls = (
   apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
 ).fake.calls
-const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+const router = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  setParams: jest.fn(),
+  canGoBack: jest.fn(),
+}
 const ID = '00000000-0000-4000-8000-00000000c001'
 
 beforeEach(() => {
@@ -180,6 +186,22 @@ describe('SheetScreen', () => {
       screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
     )
     expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
+  })
+
+  // T-39 (P09-C): com a crônica embaixo na pilha, o "‹" volta a ela (com a
+  // aba e a rolagem), em vez de montar outra crônica
+  it('o "‹" volta pela pilha quando há tela de baixo', async () => {
+    router.canGoBack.mockReturnValue(true)
+    calls.characterGet.mockResolvedValue(character())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', {
+        name: 'Voltar para Crônica da Liberdade',
+      })
+    )
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('sem acesso (404)', async () => {

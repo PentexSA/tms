@@ -13,9 +13,14 @@ import {
   Text,
   tokens,
 } from '@tms/ui'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
 import {
@@ -33,6 +38,7 @@ import {
   TableSelectionProvider,
 } from '../../../../components/chronicles/TableSelection'
 import { TableView } from '../../../../components/chronicles/TableView'
+import { rememberScroll, scrollOf } from '../../../../lib/chronicleScroll'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
 import {
@@ -40,14 +46,52 @@ import {
   useChronicleCharacters,
 } from '../../../../lib/queries/chronicles'
 
+export type ChronicleView = 'sheets' | 'table' | 'backstage'
+
+/**
+ * A aba da crônica que a URL pede (T-39): `?view=table|backstage`; "Fichas" é
+ * o padrão, sem parâmetro. Valor desconhecido vira "Fichas", e o jogador com
+ * `?view=table` também (fail secure: a aba nem existe para ele, e a API dá
+ * 404 na Mesa).
+ */
+export function viewOf(param: unknown, narrating: boolean): ChronicleView {
+  if (param === 'table') return narrating ? 'table' : 'sheets'
+  if (param === 'backstage') return 'backstage'
+  return 'sheets'
+}
+
 export default function ChronicleScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const params = useLocalSearchParams<{ id: string; view?: string }>()
+  const { id } = params
   const router = useRouter()
   const chronicle = useChronicle(id)
   const [inviting, setInviting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [view, setView] = useState<'sheets' | 'table' | 'backstage'>('sheets')
+  // A aba vem da URL (link direto, F5 no web, voltar do navegador) e muda na
+  // hora pelo toque; a URL acompanha pelo setParams
+  const [view, setView] = useState<string | undefined>(params.view)
+  useEffect(() => {
+    setView(params.view)
+  }, [params.view])
+  const selectView = (next: ChronicleView) => {
+    setView(next)
+    router.setParams({ view: next === 'sheets' ? undefined : next })
+  }
+  // A rolagem de cada aba, em memória: volta ao mesmo ponto ao voltar de
+  // uma ficha (no web, mesmo se a tela foi desmontada)
+  const scrollRef = useRef<ScrollViewInstance>(null)
+  const scrollKey = useRef<ChronicleView>('sheets')
+  scrollKey.current = viewOf(view, true)
+  const restoring = useRef<number | null>(null)
+  useFocusEffect(
+    useCallback(() => {
+      const y = scrollOf(id, scrollKey.current)
+      if (!y) return
+      restoring.current = y
+      scrollRef.current?.scrollTo({ y, animated: false })
+    }, [id])
+  )
   const back = { label: 'Crônicas', onPress: () => router.replace('/') }
 
   if (chronicle.isPending)
@@ -87,15 +131,31 @@ export default function ChronicleScreen() {
   // Mesa, convites nem membros
   const former = c.role === 'former'
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
-  const showing = former ? 'sheets' : view
+  const showing: ChronicleView = former ? 'sheets' : viewOf(view, narrating)
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
       {/* A seleção da Mesa vive aqui (T-49): a barra fica fora da rolagem */}
       <TableSelectionProvider>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.content}
           testID="chronicle-scroll"
+          scrollEventThrottle={64}
+          onScroll={e =>
+            rememberScroll(id, showing, e.nativeEvent.contentOffset.y)
+          }
+          // Quem rola antes de o conteúdo chegar decide: nada de pular depois
+          onScrollBeginDrag={() => {
+            restoring.current = null
+          }}
+          // O conteúdo cresceu até a rolagem guardada: volta a ela uma vez
+          onContentSizeChange={(_, height) => {
+            const y = restoring.current
+            if (y === null || height < y) return
+            restoring.current = null
+            scrollRef.current?.scrollTo({ y, animated: false })
+          }}
         >
           {former ? (
             <Banner
@@ -140,7 +200,7 @@ export default function ChronicleScreen() {
                     ]
               }
               selected={showing}
-              onSelect={id => setView(id as typeof view)}
+              onSelect={next => selectView(next as ChronicleView)}
             />
           ) : null}
 

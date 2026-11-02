@@ -21,7 +21,6 @@ import {
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
-import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -44,6 +43,7 @@ import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
+import { useSheetBack } from './navigation'
 import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
 import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
@@ -72,7 +72,6 @@ export function SheetScreen({
   // conta por pontos vale (v4)
   readonly initialMode?: SheetMode
 }) {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const sync = useSync()
   const state = useSheetData(id)
@@ -126,12 +125,8 @@ export function SheetScreen({
     state.status === 'ready' || state.status === 'viewer'
       ? state.character.chronicle
       : null
-  const back = chronicle
-    ? {
-        label: chronicle.name,
-        onPress: () => router.replace(`/chronicles/${chronicle.id}`),
-      }
-    : { label: 'Crônicas', onPress: () => router.replace('/') }
+  // T-39: o "‹" volta à crônica de baixo, com a aba e a rolagem dela
+  const back = useSheetBack(chronicle)
   const title =
     state.status === 'ready'
       ? state.character.name

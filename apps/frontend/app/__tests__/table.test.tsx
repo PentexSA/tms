@@ -7,10 +7,11 @@ import {
 } from '@testing-library/react-native'
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { Dimensions } from 'react-native'
+import { Dimensions, ScrollView } from 'react-native'
 
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
+import { clearChronicleScroll, scrollOf } from '../../lib/chronicleScroll'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import {
@@ -20,7 +21,7 @@ import {
   testSession,
   tokens,
 } from '../../test/session'
-import ChronicleScreen from '../(app)/chronicles/[id]/index'
+import ChronicleScreen, { viewOf } from '../(app)/chronicles/[id]/index'
 
 // Etapa 19: a Mesa do narrador. Uma linha por personagem com o dock do
 // template, desenhado pelo registry: o mesmo código para Vampiro e D&D.
@@ -34,7 +35,13 @@ jest.mock('../../lib/api', () => {
 const calls = (
   apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
 ).fake.calls
-const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+const router = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  setParams: jest.fn(),
+  canGoBack: jest.fn(),
+}
 const CHRONICLE_ID = '00000000-0000-4000-8000-0000000000c1'
 const HELENA = '00000000-0000-4000-8000-00000000c001'
 const LIA = '00000000-0000-4000-8000-00000000c002'
@@ -363,6 +370,91 @@ describe('Mesa do narrador', () => {
     expect(await screen.findByText('Nenhuma ficha ainda.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Convidar' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Participantes' })).toBeTruthy()
+  })
+})
+
+// T-39 (P09-C): a aba na URL e a rolagem guardada
+describe('a crônica volta na mesma aba e no mesmo ponto', () => {
+  it('?view=table abre a Mesa; trocar de aba põe a aba na URL', async () => {
+    jest
+      .mocked(useLocalSearchParams)
+      .mockReturnValue({ id: CHRONICLE_ID, view: 'table' })
+    calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+    calls.chronicle.tableGet.mockResolvedValue(ok([]))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByText('Nenhuma ficha na crônica ainda.')
+    ).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Mesa' })).toBeSelected()
+    fireEvent.press(screen.getByRole('tab', { name: 'Bastidores' }))
+    expect(router.setParams).toHaveBeenLastCalledWith({ view: 'backstage' })
+    expect(screen.getByRole('tab', { name: 'Bastidores' })).toBeSelected()
+    // "Fichas" é o padrão: sai da URL
+    fireEvent.press(screen.getByRole('tab', { name: 'Fichas' }))
+    expect(router.setParams).toHaveBeenLastCalledWith({ view: undefined })
+  })
+
+  it('valor desconhecido, ou o jogador com ?view=table, ficam em Fichas', async () => {
+    expect(viewOf('table', true)).toBe('table')
+    expect(viewOf('table', false)).toBe('sheets')
+    expect(viewOf('backstage', false)).toBe('backstage')
+    expect(viewOf('qualquer', true)).toBe('sheets')
+    expect(viewOf(undefined, true)).toBe('sheets')
+    jest
+      .mocked(useLocalSearchParams)
+      .mockReturnValue({ id: CHRONICLE_ID, view: 'table' })
+    calls.chronicle.get.mockResolvedValue(detail('player'))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(await screen.findByText('Narrador: ana')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Fichas' })).toBeSelected()
+    expect(calls.chronicle.tableGet).not.toHaveBeenCalled()
+  })
+
+  it('ao voltar à tela, a rolagem guardada da aba volta', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => void)
+    })
+    try {
+      jest
+        .mocked(useLocalSearchParams)
+        .mockReturnValue({ id: CHRONICLE_ID, view: 'table' })
+      calls.chronicle.get.mockResolvedValue(detail('storyteller'))
+      calls.chronicle.tableGet.mockResolvedValue(
+        ok([row(HELENA, 'helena', 'vtm-v20')])
+      )
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      await screen.findByRole('button', { name: /^Helena Varga, Tremere\./ })
+      const scroll = screen.getByTestId('chronicle-scroll')
+      fireEvent.scroll(scroll, {
+        nativeEvent: { contentOffset: { y: 640 } },
+      })
+      expect(scrollOf(CHRONICLE_ID, 'table')).toBe(640)
+      expect(scrollOf(CHRONICLE_ID, 'sheets')).toBe(0)
+      // A volta de uma ficha: o foco pede a rolagem; quando o conteúdo
+      // cresce até ela, a tela rola uma vez
+      // O mock do ScrollView do RN tem o scrollTo no protótipo
+      const scrollTo = jest.mocked(
+        (ScrollView as unknown as { prototype: { scrollTo: jest.Mock } })
+          .prototype.scrollTo
+      )
+      scrollTo.mockClear()
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      // O conteúdo ainda curto não rola; quando cresce até a altura, rola
+      // uma vez, sem animação
+      scrollTo.mockClear()
+      fireEvent(scroll, 'contentSizeChange', 390, 300)
+      expect(scrollTo).not.toHaveBeenCalled()
+      fireEvent(scroll, 'contentSizeChange', 390, 2000)
+      expect(scrollTo).toHaveBeenCalledWith({ y: 640, animated: false })
+      fireEvent(scroll, 'contentSizeChange', 390, 2400)
+      expect(scrollTo).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.mocked(useFocusEffect).mockReset()
+      clearChronicleScroll()
+    }
   })
 })
 
