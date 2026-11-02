@@ -6,6 +6,7 @@ import {
   renderHook,
   screen,
 } from '@testing-library/react-native'
+import { useLayoutEffect } from 'react'
 import { Modal, Platform, Text as RNText } from 'react-native'
 import {
   BottomSheet,
@@ -583,6 +584,36 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
       fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
       jest.runAllTimers()
       expect(trigger.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('com um campo em autoFocus na folha (QAW-28): volta ao gatilho, não ao campo', () => {
+      // O autoFocus do React foca o campo na fase de layout da mesma
+      // montagem. O ModalFocusTrap do react-native-web lê o foco depois
+      // (efeito passivo) e guardaria o campo, que some ao fechar. Um layout
+      // effect da folha também leria tarde: os do filho rodam antes.
+      const field = { focus: jest.fn(), isConnected: true }
+      function AutoFocused() {
+        useLayoutEffect(() => {
+          fake.activeElement = field
+        }, [])
+        return null
+      }
+      const sheetWith = (visible: boolean) => (
+        <BottomSheet visible={visible} title="Antecedente" onClose={jest.fn()}>
+          {visible ? <AutoFocused /> : null}
+        </BottomSheet>
+      )
+      const { rerender } = render(sheetWith(false))
+      rerender(sheetWith(true))
+      expect(fake.activeElement).toBe(field)
+      // Fechou: o campo saiu da tela e o foco ficou no body
+      field.isConnected = false
+      fake.activeElement = fake.body
+      rerender(sheetWith(false))
+      fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+      jest.runAllTimers()
+      expect(trigger.focus).toHaveBeenCalledTimes(1)
+      expect(field.focus).not.toHaveBeenCalled()
     })
 
     it('ao desmontar aberta (quem chama some com a folha)', () => {

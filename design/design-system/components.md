@@ -620,7 +620,7 @@ Folha que hospeda detalhe, editores, dano, parada e menu.
 - **Estados:** abrindo (`ds-slide` ou `ds-fade`), aberto, empilhado. Arrastar para fechar: proposta (nativo no `formSheet` do Expo Router).
 - **A11y:** `role="dialog"`, `aria-modal`, `aria-labelledby`; foco preso; Esc fecha o do topo; foco inicial no título; foco volta a quem abriu. RN `Modal` + `onRequestClose` (voltar do Android) + `accessibilityViewIsModal`.
   - **Um "Fechar" só:** o fundo fecha no toque, mas fica fora da árvore (`aria-hidden`, `accessible={false}`) e do Tab (`tabIndex` −1); no web o react-native-web não esconde os irmãos do modal. Como o fundo sai do alcance do VoiceOver, a folha fecha com o gesto de escape (`onAccessibilityEscape`, o "Z" do iOS).
-  - **Foco de volta (web, `@tms/ui`):** a folha guarda o elemento focado ao abrir (num layout effect, antes de o trap do modal levar o foco para dentro) e o devolve depois que o modal sai (`onDismiss`) ou quando a folha desmonta aberta, se ele ainda estiver na tela e nenhum outro elemento tiver pego o foco.
+  - **Foco de volta (web, `@tms/ui`):** a folha guarda o elemento focado ao abrir (num insertion effect, antes do autoFocus de qualquer campo da folha; o ModalFocusTrap do react-native-web lê o foco depois e, com autoFocus, guarda o campo de dentro, que some ao fechar) e o devolve depois que o modal sai (`onDismiss`) ou quando a folha desmonta aberta, se ele ainda estiver na tela e nenhum outro elemento tiver pego o foco.
 - **Multi-sistema:** o mesmo sheet edita Vitalidade (WoD), PV com temporários (D&D), SAN (CoC) e estresse (Fate), e hospeda a parada de qualquer modelo.
 - **Resolve:** C-01, C-02, C-04, C-18, DS-05, DS-07.
 

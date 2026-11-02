@@ -2,7 +2,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useLayoutEffect,
+  useInsertionEffect,
   useRef,
 } from 'react'
 import {
@@ -30,6 +30,14 @@ import { tokens } from './tokens'
 // (no web o react-native-web não esconde os irmãos do modal). No iOS, o
 // gesto de escape do VoiceOver ("Z") fecha. No web, o foco volta a quem
 // abriu a folha, se ele ainda estiver na tela.
+//
+// Por que não basta o ModalFocusTrap do react-native-web: ele guarda o
+// elemento focado num efeito passivo, depois da montagem. Quando a folha
+// tem um campo com autoFocus ("Adicionar Antecedente", os editores de
+// texto), o React já focou o campo na fase de layout, e o trap guarda o
+// campo de dentro da folha, que some ao fechar: o foco cai no body
+// (QAW-28). Aqui o gatilho é lido num insertion effect, que roda antes da
+// fase de layout e, portanto, antes de qualquer autoFocus.
 
 type Focusable = { focus?: () => void; isConnected?: boolean }
 type WebDocument = { activeElement?: unknown; body?: unknown }
@@ -58,15 +66,18 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
-  // Quem tinha o foco antes de abrir (web). Lido num layout effect, antes de
-  // o trap do modal levar o foco para dentro.
+  // Quem tinha o foco antes de abrir (web), lido antes do autoFocus de
+  // qualquer campo da folha e antes do trap do modal
   const trigger = useRef<Focusable | null>(null)
-  useLayoutEffect(() => {
+  useInsertionEffect(() => {
     const doc = webDocument()
     if (visible && doc)
       trigger.current = (doc.activeElement as Focusable) ?? null
   }, [visible])
-  // Devolve o foco depois que o modal sai da tela (o trap já soltou o foco).
+  // Um caminho só para devolver o foco, uma vez por abertura (o gatilho é
+  // zerado na primeira chamada). Roda depois que o modal sai da tela, quando
+  // o trap já soltou o foco: no onDismiss (a folha fecha e continua montada)
+  // ou ao desmontar aberta (quem chama some com ela; aí não há onDismiss).
   // Se outro elemento pegou o foco de propósito, não o rouba.
   const restoreFocus = useCallback(() => {
     const el = trigger.current
@@ -81,7 +92,6 @@ export function BottomSheet({
       el.focus?.()
     }, 0)
   }, [])
-  // Desmontar com a folha aberta (quem chama some com ela) também devolve
   useEffect(() => () => restoreFocus(), [restoreFocus])
   return (
     <Modal
