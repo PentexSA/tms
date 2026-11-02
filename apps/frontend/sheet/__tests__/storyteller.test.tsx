@@ -262,6 +262,47 @@ describe('Histórico de alterações', () => {
     expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
   })
 
+  // P04-D (R-12): os outros passos do ciclo, sem "Desfazer" e sem o motivo
+  it('enviar, devolver, pedir ajuste e avisar aparecem como passos', async () => {
+    const stepOf = (
+      id: string,
+      byRole: 'owner' | 'storyteller',
+      event: string
+    ) => ({
+      ...item(id, byRole, []),
+      event,
+      reversible: false,
+      sheetVersion: null,
+      operationId: null,
+    })
+    calls.historyGet.mockResolvedValue(
+      ok({
+        items: [
+          stepOf('a4', 'owner', 'creation.ready'),
+          stepOf('a3', 'storyteller', 'creation.adjust'),
+          stepOf('a2', 'storyteller', 'creation.returned'),
+          stepOf('a1', 'owner', 'creation.submitted'),
+          // Um passo que esta versão não conhece: só a data e o autor
+          stepOf('a0', 'owner', 'creation.reopened'),
+        ],
+        next: null,
+      })
+    )
+    await open(['owner'])
+    await openHistory()
+    expect(
+      await screen.findByLabelText(
+        /^Avisou que terminou\. às \d\d:\d\d · dona$/
+      )
+    ).toBeTruthy()
+    expect(
+      screen.getByLabelText(/^Ajuste pedido\. às \d\d:\d\d · ana \(narrador\)$/)
+    ).toBeTruthy()
+    expect(screen.getByText('Devolvida para correção')).toBeTruthy()
+    expect(screen.getByText('Enviada para aprovação')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
+  })
+
   it('quem excluiu a conta aparece como "Conta excluída"', async () => {
     calls.historyGet.mockResolvedValue(
       ok({
