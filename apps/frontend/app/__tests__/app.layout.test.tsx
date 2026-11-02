@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from '@testing-library/react-native'
-import { KeyboardArea } from '@tms/ui'
+import { KeyboardArea, tokens as uiTokens } from '@tms/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { TextInput } from 'react-native'
+import { StyleSheet, TextInput } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
@@ -13,6 +13,7 @@ import {
   testSession,
   tokens,
 } from '../../test/session'
+import ChronicleScreen from '../(app)/chronicles/[id]/index'
 import NewCharacterScreen from '../(app)/chronicles/[id]/new-character'
 import NewChronicleScreen from '../(app)/chronicles/new'
 import JoinScreen from '../(app)/join'
@@ -150,5 +151,31 @@ describe('T-26: "Próximo" entre os campos', () => {
     })
     expect(fetch).not.toHaveBeenCalled()
     expect(screen.getByText('Informe um e-mail válido')).toBeTruthy()
+  })
+})
+
+describe('T-67: "Participantes" e o "Convidar" com a margem da página', () => {
+  it('o título fica num invólucro com o recuo da página', async () => {
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'storyteller',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(ok([]))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    expect(
+      await screen.findByRole('header', { name: 'Participantes' })
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Convidar' })).toBeTruthy()
+    expect(
+      StyleSheet.flatten(screen.getByTestId('members-header').props.style)
+        .paddingHorizontal
+    ).toBe(uiTokens.layout.gutter)
   })
 })

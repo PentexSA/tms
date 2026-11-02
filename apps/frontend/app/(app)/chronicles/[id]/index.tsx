@@ -252,14 +252,17 @@ function SheetsPanel({
         narrating={narrating}
       />
 
-      <SectionHeader
-        title="Participantes"
-        right={
-          narrating ? (
-            <Button title="Convidar" variant="secondary" onPress={onInvite} />
-          ) : undefined
-        }
-      />
+      {/* O título e o "Convidar" com a margem da página (T-67) */}
+      <View style={styles.header} testID="members-header">
+        <SectionHeader
+          title="Participantes"
+          right={
+            narrating ? (
+              <Button title="Convidar" variant="secondary" onPress={onInvite} />
+            ) : undefined
+          }
+        />
+      </View>
       <ListItem
         title={c.storyteller.username}
         subtitle="Narrador"
@@ -315,6 +318,7 @@ const styles = StyleSheet.create({
   content: { gap: tokens.space[2], paddingBottom: tokens.space[12] },
   info: { gap: tokens.space[1], padding: tokens.layout.gutter },
   empty: { paddingHorizontal: tokens.layout.gutter },
+  header: { paddingHorizontal: tokens.layout.gutter },
   danger: {
     paddingHorizontal: tokens.layout.gutter,
     paddingTop: tokens.space[8],
