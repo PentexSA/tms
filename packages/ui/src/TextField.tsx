@@ -1,4 +1,5 @@
-import { type Ref, useId } from 'react'
+import type { Ref } from 'react'
+import { useId } from 'react'
 import {
   StyleSheet,
   TextInput,
@@ -20,7 +21,8 @@ export interface TextFieldProps
   readonly hint?: string
   // Mostra o contador "12/80" quando há maxLength.
   readonly counter?: boolean
-  // O campo de texto, para focar (React 19: ref é prop; vai no ...rest)
+  // Com o React 19 o ref é prop: quem chama foca o campo (T-21). O `...rest`
+  // o leva ao TextInput
   readonly ref?: Ref<TextInputInstance>
 }
 

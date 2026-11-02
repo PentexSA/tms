@@ -19,7 +19,8 @@ export interface EditorProps<V = unknown> {
   // Nome próprio (o nome do personagem): sem corretor nem sugestão do
   // teclado, que trocava "PO" por "PÔ" (T-38)
   readonly properName?: boolean
-  // O campo de texto do editor, para focar
+  // O campo de texto do editor, para quem precisa focá-lo (T-21: o primeiro
+  // campo com erro); editores sem texto ignoram
   readonly inputRef?: Ref<TextInputInstance>
 }
 
