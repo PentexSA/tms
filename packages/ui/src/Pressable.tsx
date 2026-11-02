@@ -9,7 +9,7 @@ import {
   StyleSheet,
   type ViewStyle,
 } from 'react-native'
-import { keyOf } from './roving'
+import { fromSelf, keyOf } from './roving'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
 
@@ -41,11 +41,13 @@ export function Pressable({
     ? (e: KeyDownEvent) => {
         onKeyDown?.(e)
         const { key, repeat } = keyOf(e)
-        if ((key === ' ' || key === 'Spacebar') && !repeat && !disabled) {
-          // A página não rola, e a ação sai uma vez só (sem auto-repetição).
-          e.preventDefault()
+        // Só o Espaço do próprio elemento: num descendente focável (um campo
+        // dentro dele), o Espaço é do descendente
+        if ((key !== ' ' && key !== 'Spacebar') || !fromSelf(e)) return
+        // A página não rola, nem com a tecla presa; a ação sai uma vez só
+        e.preventDefault()
+        if (!repeat && !disabled)
           rest.onPress?.(e as unknown as GestureResponderEvent)
-        }
       }
     : onKeyDown
   return (

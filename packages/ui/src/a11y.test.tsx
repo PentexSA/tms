@@ -27,12 +27,26 @@ const setOS = (os: string) =>
   Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
 afterEach(() => setOS(realOS))
 
-const key = (k: string, extra: { repeat?: boolean } = {}) => {
+const key = (
+  k: string,
+  extra: {
+    repeat?: boolean
+    altKey?: boolean
+    ctrlKey?: boolean
+    metaKey?: boolean
+    shiftKey?: boolean
+    // Tecla que sobe de um descendente: alvo diferente do elemento
+    fromChild?: boolean
+  } = {}
+) => {
   const preventDefault = jest.fn()
+  const { fromChild, ...mods } = extra
+  const self = {}
   return {
     event: {
-      nativeEvent: { key: k, repeat: extra.repeat ?? false },
+      nativeEvent: { key: k, repeat: false, ...mods },
       preventDefault,
+      ...(fromChild ? { target: {}, currentTarget: self } : {}),
     },
     preventDefault,
   }
@@ -110,6 +124,38 @@ describe('Pressable: Espaço nos papéis que não são botão (T-35)', () => {
     expect(onPress).not.toHaveBeenCalled()
   })
 
+  it('tecla presa: a página não rola, mas a ação não repete', () => {
+    setOS('web')
+    const onPress = jest.fn()
+    render(
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Oculta"
+        onPress={onPress}
+      />
+    )
+    const { event, preventDefault } = key(' ', { repeat: true })
+    fireEvent(screen.getByLabelText('Oculta'), 'keyDown', event)
+    expect(preventDefault).toHaveBeenCalled()
+    expect(onPress).not.toHaveBeenCalled()
+  })
+
+  it('Espaço de um descendente focável não é do Pressable', () => {
+    setOS('web')
+    const onPress = jest.fn()
+    render(
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityLabel="Linha"
+        onPress={onPress}
+      />
+    )
+    const { event, preventDefault } = key(' ', { fromChild: true })
+    fireEvent(screen.getByLabelText('Linha'), 'keyDown', event)
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(onPress).not.toHaveBeenCalled()
+  })
+
   it('no app, nada muda: o Espaço é do sistema', () => {
     setOS('ios')
     const onPress = jest.fn()
@@ -125,6 +171,41 @@ describe('Pressable: Espaço nos papéis que não são botão (T-35)', () => {
 })
 
 describe('useRovingFocus (T-35)', () => {
+  it.each([
+    ['Alt+←', { altKey: true }],
+    ['Cmd+←', { metaKey: true }],
+    ['Ctrl+←', { ctrlKey: true }],
+    ['Shift+←', { shiftKey: true }],
+    ['← de um descendente', { fromChild: true }],
+  ] as const)(
+    '%s não é do grupo: sem preventDefault, sem mover',
+    (_, extra) => {
+      setOS('web')
+      const onActivate = jest.fn()
+      const { result } = renderHook(() =>
+        useRovingFocus({ count: 3, active: 1, activate: 'focus', onActivate })
+      )
+      const items = [0, 1, 2].map(i => result.current(i))
+      const nodes = items.map(() => ({ focus: jest.fn() }))
+      items.forEach((p, i) => p.ref?.(nodes[i]))
+      const { event, preventDefault } = key('ArrowLeft', extra)
+      items[1]?.onKeyDown?.(event as never)
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(nodes[0]?.focus).not.toHaveBeenCalled()
+      expect(onActivate).not.toHaveBeenCalled()
+    }
+  )
+
+  it('Shift não bloqueia Home e End (só as setas)', () => {
+    setOS('web')
+    const { result } = renderHook(() => useRovingFocus({ count: 2, active: 0 }))
+    const items = [0, 1].map(i => result.current(i))
+    const node = { focus: jest.fn() }
+    items[1]?.ref?.(node)
+    items[0]?.onKeyDown?.(key('End', { shiftKey: true }).event as never)
+    expect(node.focus).toHaveBeenCalled()
+  })
+
   it('rovingTarget: setas dão a volta; Home e End vão às pontas', () => {
     expect(rovingTarget('ArrowRight', 2, 3)).toBe(0)
     expect(rovingTarget('ArrowLeft', 0, 3)).toBe(2)
