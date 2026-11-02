@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import {
   Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   Platform,
   Text as RNText,
@@ -151,7 +153,7 @@ describe('T-10: a folha acompanha o teclado no Android', () => {
     expect(withOS(os, sheetRootBehavior)).toBe(expected)
   })
 
-  it('KeyboardArea: KeyboardAvoidingView com flex 1 e o behavior da plataforma', () => {
+  it('KeyboardArea: flex 1, sem padding com o teclado fechado', () => {
     withOS('android', () =>
       render(
         <KeyboardArea testID="area" style={{ padding: 4 }}>
@@ -159,9 +161,6 @@ describe('T-10: a folha acompanha o teclado no Android', () => {
         </KeyboardArea>
       )
     )
-    const avoiding = screen.UNSAFE_getByType(KeyboardAvoidingView)
-    expect(avoiding.props.behavior).toBe('padding')
-    expect(StyleSheet.flatten(avoiding.props.style)).toEqual({ flex: 1 })
     expect(styleOf(screen.getByTestId('area'))).toEqual({
       flex: 1,
       padding: 4,
@@ -169,43 +168,89 @@ describe('T-10: a folha acompanha o teclado no Android', () => {
     expect(screen.getByText('campo')).toBeTruthy()
   })
 
-  it('KeyboardArea: o deslocamento é a posição da área na janela (cabeçalho e safe area acima)', () => {
-    const measureInWindow = jest
+  // A área está a 95 da janela (cabeçalho e safe area acima), com 700 de
+  // altura; o teclado começa em 500: cobre 295 dela
+  const keyboardOn = (os: OS) => {
+    const listeners = new Map<string, (e: unknown) => void>()
+    const add = jest.spyOn(Keyboard, 'addListener').mockImplementation(((
+      event: string,
+      fn: (e: unknown) => void
+    ) => {
+      listeners.set(event, fn)
+      return { remove: () => listeners.delete(event) }
+    }) as never)
+    const measure = jest
       .spyOn(View.prototype as never, 'measureInWindow' as never)
-      .mockImplementation(((cb: (x: number, y: number) => void) =>
-        cb(0, 95)) as never)
-    try {
-      withOS('android', () =>
-        render(
-          <KeyboardArea testID="area">
-            <RNText>campo</RNText>
-          </KeyboardArea>
-        )
-      )
-      fireEvent(screen.getByTestId('area'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 700 } },
-      })
-      expect(
-        screen.UNSAFE_getByType(KeyboardAvoidingView).props
-          .keyboardVerticalOffset
-      ).toBe(95)
-    } finally {
-      measureInWindow.mockRestore()
-    }
-  })
-
-  it('KeyboardArea no web: sem behavior e sem medir', () => {
-    withOS('web', () =>
+      .mockImplementation(((
+        cb: (x: number, y: number, w: number, h: number) => void
+      ) => cb(0, 95, 390, 700)) as never)
+    const { unmount } = withOS(os, () =>
       render(
         <KeyboardArea testID="area">
           <RNText>campo</RNText>
         </KeyboardArea>
       )
     )
-    expect(
-      screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior
-    ).toBeUndefined()
-    expect(screen.getByTestId('area').props.onLayout).toBeUndefined()
+    return {
+      emit: (event: string, e: unknown = {}) =>
+        act(() => listeners.get(event)?.(e)),
+      listeners,
+      unmount,
+      restore: () => {
+        add.mockRestore()
+        measure.mockRestore()
+      },
+    }
+  }
+
+  it('KeyboardArea no Android: encolhe o que o teclado cobre, medido quando ele abre', () => {
+    const k = keyboardOn('android')
+    try {
+      k.emit('keyboardDidShow', { endCoordinates: { screenY: 500 } })
+      expect(styleOf(screen.getByTestId('area')).paddingBottom).toBe(295)
+      k.emit('keyboardDidHide')
+      expect(styleOf(screen.getByTestId('area')).paddingBottom).toBeUndefined()
+      k.unmount()
+      expect(k.listeners.size).toBe(0)
+    } finally {
+      k.restore()
+    }
+  })
+
+  it('KeyboardArea no iOS: antes de o teclado abrir, com a animação dele', () => {
+    const configure = jest
+      .spyOn(LayoutAnimation, 'configureNext')
+      .mockImplementation(() => undefined)
+    const k = keyboardOn('ios')
+    try {
+      k.emit('keyboardWillShow', {
+        endCoordinates: { screenY: 900 },
+        duration: 250,
+      })
+      // O teclado não cobre a área: nada a encolher
+      expect(styleOf(screen.getByTestId('area')).paddingBottom).toBeUndefined()
+      expect(configure).toHaveBeenCalled()
+      k.emit('keyboardWillHide')
+    } finally {
+      k.restore()
+      configure.mockRestore()
+    }
+  })
+
+  it('KeyboardArea no web: não escuta o teclado', () => {
+    const add = jest.spyOn(Keyboard, 'addListener')
+    try {
+      withOS('web', () =>
+        render(
+          <KeyboardArea testID="area">
+            <RNText>campo</RNText>
+          </KeyboardArea>
+        )
+      )
+      expect(add).not.toHaveBeenCalled()
+    } finally {
+      add.mockRestore()
+    }
   })
 
   it('o Esc no web continua fechando a folha (T-71)', () => {
