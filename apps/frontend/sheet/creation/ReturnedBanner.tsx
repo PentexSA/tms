@@ -29,18 +29,33 @@ export function NarratorReasonBanner({
   )
 }
 
-/** A ficha em criação devolvida: o motivo do narrador, em qualquer modo. */
+/**
+ * A ficha em criação devolvida ou com ajuste pedido (D-04): o motivo do
+ * narrador, em qualquer modo. Só um existe por vez: o pedido de ajuste apaga
+ * a devolução, e vice-versa (a API limpa os marcadores).
+ */
 export function ReturnedBanner() {
   const creation = useCreation()
   const { roles } = useSheet()
-  const returned = creation?.info?.returned
-  if (creation?.status !== 'creating' || !returned) return null
+  if (creation?.status !== 'creating') return null
+  const storyteller = roles.has('storyteller')
+  const adjust = creation.info?.adjust
+  if (adjust)
+    return (
+      <NarratorReasonBanner
+        title={
+          storyteller ? 'Você pediu um ajuste' : 'O narrador pediu um ajuste'
+        }
+        reason={adjust.reason}
+        testID="creation-adjust"
+      />
+    )
+  const returned = creation.info?.returned
+  if (!returned) return null
   return (
     <NarratorReasonBanner
       title={
-        roles.has('storyteller')
-          ? 'Você devolveu esta ficha'
-          : 'O narrador devolveu a ficha'
+        storyteller ? 'Você devolveu esta ficha' : 'O narrador devolveu a ficha'
       }
       reason={returned.reason}
       testID="creation-returned"

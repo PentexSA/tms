@@ -313,6 +313,9 @@ function narratorOf(
     model: state.model,
     status: state.character.status,
     locked,
+    // D-04: o narrador pede ajuste em PC de outra pessoa
+    adjustable:
+      state.character.kind !== 'npc' && !state.roles.includes('owner'),
     // O mesmo estado da lista e da Mesa, sem "Concluída em" no gatilho
     state: characterState(
       sheetStateRow({

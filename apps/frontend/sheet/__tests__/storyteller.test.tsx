@@ -464,3 +464,164 @@ describe('sobra de bônus na confirmação do narrador (T-18)', () => {
     expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
   })
 })
+
+// P04-D (D-04, R-14): o narrador pede ajuste, com motivo, numa ficha em
+// criação, pelo mesmo menu; o servidor confere papel e estado
+describe('pedir ajuste', () => {
+  const creating = (over: Record<string, unknown> = {}) =>
+    ok({
+      ...character(['storyteller']).data,
+      status: 'creating',
+      lockedAt: null,
+      member: true,
+      creation: {
+        revision: 2,
+        mode: 'free',
+        accounting: true,
+        choices: {},
+        config: {},
+        effective: effectiveCreationConfig(modelOf('vtm-v20')),
+        returned: null,
+        adjust: null,
+        ready: null,
+        approval: false,
+      },
+      ...over,
+    })
+  const openMenu = async () => {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador/ }))
+    await sheetsDismissed()
+  }
+
+  it('aparece em creating, no PC de outra pessoa; o motivo é obrigatório', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(ok({ revision: 3 }))
+    await openMenu()
+    const actions = screen
+      .getAllByRole('button')
+      .map(b => b.props.testID)
+      .filter((id): id is string => /^status-/.test(String(id)))
+    expect(actions).toEqual([
+      'status-complete',
+      'status-adjust',
+      'status-archive',
+      'status-dead',
+    ])
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    expect(screen.getByRole('header', { name: 'Pedir ajuste' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'O jogador vê o motivo na ficha, como numa devolução. A ficha continua em criação.'
+      )
+    ).toBeTruthy()
+    const field = screen.getByTestId('status-adjust-reason')
+    expect(field.props.maxLength).toBe(500)
+    expect(screen.getByTestId('status-adjust-confirm')).toBeDisabled()
+    fireEvent.changeText(field, '   ')
+    expect(screen.getByTestId('status-adjust-confirm')).toBeDisabled()
+    fireEvent.changeText(field, '  Refaça os Antecedentes ')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    await waitFor(() =>
+      expect(calls.creationAdjustPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({
+          reason: 'Refaça os Antecedentes',
+          revision: 2,
+        })
+      )
+    )
+    expect(
+      await screen.findByText('Ajuste pedido. O jogador vê o motivo na ficha.')
+    ).toBeTruthy()
+  })
+
+  it('o "enviar" do teclado manda o texto do evento (e0a4078)', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(ok({ revision: 3 }))
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    const field = screen.getByTestId('status-adjust-reason')
+    fireEvent.changeText(field, 'Refaça')
+    fireEvent(field, 'submitEditing', {
+      nativeEvent: { text: 'Refaça os Antecedentes' },
+    })
+    await waitFor(() =>
+      expect(calls.creationAdjustPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({ reason: 'Refaça os Antecedentes' })
+      )
+    )
+  })
+
+  it('422 fica na folha, com o texto; 409 avisa e rebusca', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(fail(422, 'motivo inválido'))
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    fireEvent.changeText(screen.getByTestId('status-adjust-reason'), 'x > y')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'Escreva o que precisa ser ajustado (até 500 caracteres, sem < nem >).'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-adjust-reason').props.value).toBe('x > y')
+    calls.creationAdjustPost.mockResolvedValue(
+      fail(409, 'a configuração da criação mudou')
+    )
+    const before = calls.characterGet.mock.calls.length
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'A ficha mudou desde que você abriu. Confira e peça de novo.'
+      )
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(calls.characterGet.mock.calls.length).toBeGreaterThan(before)
+    )
+  })
+
+  it.each([
+    [
+      'NPC',
+      {
+        projection: 'full',
+        kind: 'npc',
+        visibility: 'hidden',
+        visibilityRevision: 0,
+        presentationRevision: 0,
+        identity: {
+          name: 'Sentinela',
+          chip: '',
+          subtitle: null,
+          portraitUrl: null,
+        },
+      },
+      'creating',
+    ],
+    [
+      'ficha do próprio narrador',
+      { roles: ['owner', 'storyteller'] },
+      'creating',
+    ],
+    ['pending', {}, 'pending'],
+    ['ativa', {}, 'active'],
+  ])('não aparece: %s', async (_, over, status) => {
+    calls.characterGet.mockResolvedValue(creating({ ...over, status }))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    // Em pending, o menu do narrador não tem ação (aprovar e devolver ficam
+    // no painel)
+    const narrator = screen.queryByRole('button', {
+      name: /^Ações do narrador/,
+    })
+    if (narrator) {
+      fireEvent.press(narrator)
+      await sheetsDismissed()
+      expect(screen.getByTestId('status-archive')).toBeTruthy()
+    }
+    expect(screen.queryByTestId('status-adjust')).toBeNull()
+  })
+})

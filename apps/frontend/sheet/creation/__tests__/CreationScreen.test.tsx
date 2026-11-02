@@ -97,6 +97,8 @@ const character = (
       config: {},
       effective: effectiveCreationConfig(vtm),
       returned: null,
+      adjust: null,
+      ready: null,
       approval: false,
     },
   })
@@ -593,5 +595,62 @@ describe('devolver para correção', () => {
     expect(screen.queryByTestId('creation-return-reason')).toBeNull()
     fireEvent.press(screen.getByTestId('creation-return-open'))
     expect(screen.getByTestId('creation-return-reason').props.value).toBe('')
+  })
+})
+
+// P04-D (D-04, R-14): o pedido de ajuste do narrador aparece como a
+// devolução, em qualquer modo; só um banner por vez
+describe('ajuste pedido', () => {
+  const ADJUST = {
+    reason: 'Refaça os Antecedentes',
+    at: '2026-11-02T10:00:00Z',
+  }
+  const asked = (roles: string[], over: Record<string, unknown> = {}) => {
+    const base = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    return ok({
+      ...base.data,
+      roles,
+      creation: { ...base.data.creation, adjust: ADJUST, ...over },
+    })
+  }
+  const render = async (roles: string[], over?: Record<string, unknown>) => {
+    calls.characterGet.mockResolvedValue(asked(roles, over))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+  }
+
+  it('a dona vê "O narrador pediu um ajuste" com o motivo, também em Jogo', async () => {
+    await render(['owner'])
+    const banner = await screen.findByTestId('creation-adjust')
+    expect(banner.props.accessibilityLabel).toBe(
+      'O narrador pediu um ajuste. Refaça os Antecedentes'
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Aguardando ajuste'
+    )
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(screen.getByTestId('creation-adjust')).toBeTruthy()
+  })
+
+  it('o narrador vê "Você pediu um ajuste"', async () => {
+    await render(['storyteller'])
+    expect(
+      (await screen.findByTestId('creation-adjust')).props.accessibilityLabel
+    ).toBe('Você pediu um ajuste. Refaça os Antecedentes')
+  })
+
+  it('só um banner por vez: o pedido vence a devolução', async () => {
+    await render(['owner'], {
+      returned: { reason: 'Antiga', at: '2026-10-20T00:00:00Z' },
+    })
+    expect(await screen.findByTestId('creation-adjust')).toBeTruthy()
+    expect(screen.queryByTestId('creation-returned')).toBeNull()
   })
 })

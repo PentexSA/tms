@@ -41,7 +41,8 @@ export function SheetMenu({
         narrator.model,
         narrator.status,
         narrator.locked,
-        draft.approval
+        draft.approval,
+        narrator.adjustable
       )
     : []
   const state = narrator?.state?.label ?? null
