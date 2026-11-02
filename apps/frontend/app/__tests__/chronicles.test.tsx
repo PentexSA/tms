@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
+import { createMemoryDraftStore } from '../../sheet/sync/draftStore'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import {
   json,
@@ -129,6 +130,34 @@ describe('Crônicas (lista)', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Sair' }))
     })
     await waitFor(() => expect(session.getState().status).toBe('signedOut'))
+  })
+})
+
+// P03-C (T-03): o rascunho guardado também entra no aviso de "Sair"
+describe('Crônicas: sair com rascunho guardado', () => {
+  it('pergunta antes de descartar o rascunho', async () => {
+    calls.chroniclesGet.mockResolvedValue(ok([]))
+    const drafts = createMemoryDraftStore()
+    await drafts.write({
+      v: 1,
+      characterId: '00000000-0000-4000-8000-00000000c001',
+      templateVersion: '1.0.0',
+      baseVersion: 1,
+      mode: 'create',
+      savedAt: Date.now(),
+      edits: [{ path: 'values.strength', from: 1, to: 3 }],
+    })
+    const session = await signedIn()
+    renderWithSession(<ChroniclesScreen />, session, { drafts })
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Sair' }))
+    })
+    expect(
+      await screen.findByText(
+        'O rascunho não salvo de 1 ficha será descartado neste aparelho.'
+      )
+    ).toBeTruthy()
+    expect(session.getState().status).toBe('signedIn')
   })
 })
 

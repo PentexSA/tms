@@ -107,20 +107,27 @@ export interface LocalChanges {
   readonly drafts: number
 }
 
+/** Sem SyncProvider não há nada guardado no aparelho. */
+const NOTHING = () => 0
+const NO_SUBSCRIPTION = () => () => undefined
+
 /**
  * O que só existe neste aparelho e o logout apaga: a fila e os rascunhos. É a
- * conta do aviso de "Sair" (P02, T-14).
+ * conta do aviso de "Sair" (P02, T-14). Sem SyncProvider, zero e zero.
  */
 export function useLocalChanges(): LocalChanges {
-  const sync = useSync()
-  const { pending } = useSyncStatus()
+  const sync = useOptionalSync()
+  const pending = useSyncExternalStore(
+    sync?.status.subscribe ?? NO_SUBSCRIPTION,
+    () => sync?.status.getSnapshot().pending ?? 0
+  )
   const drafts = useSyncExternalStore(
-    sync.drafts.count.subscribe,
-    sync.drafts.count.getSnapshot
+    sync?.drafts.count.subscribe ?? NO_SUBSCRIPTION,
+    sync?.drafts.count.getSnapshot ?? NOTHING
   )
   useEffect(() => {
     // A primeira contagem lê o disco (os rascunhos de antes de abrir o app)
-    void sync.drafts.characters().catch(() => undefined)
+    void sync?.drafts.characters().catch(() => undefined)
   }, [sync])
   return { pending, drafts }
 }
