@@ -669,3 +669,13 @@ Registrados na implementação (branch `pacote/p08-layout`, 2026-11-02). Nenhum 
     - o mapa de sub-abas do `creation-feedback.spec.ts`: é só do V20 e documentado; um nome fora dele é aba da zona;
     - a ida e volta das props: resolvida junto com o `draftOf`;
     - o narrador cruzando 900 com a confirmação aberta: caso raro, de redimensionar no meio da confirmação. Fica para a conferência no tablet.
+
+**Primeiro E2E da integração (2026-11-02):** 6 testes falhavam nos dois navegadores.
+- 1 era defeito do produto: no web, o Esc com o foco ainda no gatilho, durante a animação de entrada de uma folha sem campo em autoFocus ("Convidar"), não fechava a folha. A correção (`94b225e`) põe as folhas abertas numa pilha, e o Esc no documento fecha a de cima, com teste no Jest. O T-71 não regrediu: o `a11y-keyboard.spec.ts` passa.
+- 5 eram dos specs (`3cdef79`):
+  - o nome da célula no web leva o valor;
+  - a faixa só troca de seção quando ela chega ao topo;
+  - a folha é o `aria-modal` dentro da `bottom-sheet-root`;
+  - no `advantages`, duas folhas convivem durante a animação.
+
+Resultado em Chromium e WebKit: `layout` e `advantages`, 20 de 20; `a11y-keyboard` e `lifecycle`, 16 de 16.
