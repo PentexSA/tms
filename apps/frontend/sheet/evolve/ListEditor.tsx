@@ -51,11 +51,14 @@ type Write = string | null
 function useListNotice(list: ResolvedList) {
   const store = useSheetStore()
   const notice = useDraftNotice(`values.${list.id}`)
-  const clear = () => store.getState().clearNotice()
+  // Só o aviso desta lista: o de outra linha da ficha (um Atributo) fica
+  const clear = () => {
+    if (notice) store.getState().clearNotice()
+  }
   const text = notice ? (
     <DraftNoticeText notice={notice} field={list.id} />
   ) : null
-  return { text, clear }
+  return { notice, text, clear }
 }
 
 /** Item sem campos vazios: o validador do core recusa chave sem esquema. */
@@ -260,14 +263,14 @@ function AddItemSheet({
           }}
           maxLength={ITEM_NAME_MAX}
           autoFocus
-          error={guide}
+          // Recusado pelo Enter, o aviso é o erro do próprio campo (marcado
+          // inválido e ligado à frase), com o foco nele
+          error={guide ?? (at === 'field' ? notice.notice?.text : null)}
           returnKeyType="done"
           submitBehavior="submit"
           {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
           onSubmitEditing={submit}
         />
-        {/* Recusado pelo Enter, o aviso fica logo abaixo do campo */}
-        {noticeAt('field')}
         {options.map(name => {
           const taken = have.has(fold(name))
           return (
@@ -321,7 +324,8 @@ function useItemAdvice(
   const advice = useStepAdvice(`values.${list.id}#${item.id}`)
   const min = list.field.def.item.value?.min ?? 0
   const fresh = (draft.value ?? min) === (item.value ?? min)
-  if (!advice || !fresh) return { note: null }
+  // Sem Valor no item (Dons do W20: um ponto por item), não há "+" a prever
+  if (!advice || !fresh || !list.field.def.item.value) return { note: null }
   // Com o aviso aberto, o aviso fala pelo motivo
   const id = `advice-${list.id}-${item.id}`
   const written = !refused && advice.text ? advice.text : null
@@ -329,7 +333,8 @@ function useItemAdvice(
     stepper: {
       blocked: advice.blocked !== null,
       hint: advice.text,
-      hintID: written ? id : null,
+      // Com o aviso aberto, o "+" aponta o aviso, como nas linhas
+      hintID: refused ? `notice-${list.id}` : written ? id : null,
     },
     note: written ? (
       <Text variant="caption" color="inkMuted" nativeID={id} testID={id}>

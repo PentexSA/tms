@@ -183,6 +183,10 @@ const SPENT = [
   { id: 'm3', name: 'Senso de Direção', meta: { cost: 1 } },
 ]
 
+const step = (name: string) =>
+  fireEvent(screen.getByRole('adjustable', { name }), 'accessibilityAction', {
+    nativeEvent: { actionName: 'increment' },
+  })
 const alertsIn = (testID: string) =>
   within(screen.getByTestId(testID)).queryAllByRole('alert')
 
@@ -278,6 +282,36 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
   })
 
+  it('item sem Valor (Dons do W20): nenhuma previsão de "+" na folha', async () => {
+    await open(
+      {
+        gifts: [
+          { id: 'g1', name: 'Pulo', meta: { rank: 1 } },
+          { id: 'g2', name: 'Faro', meta: { rank: 1 } },
+          { id: 'g3', name: 'Uivo', meta: { rank: 1 } },
+        ],
+      },
+      { system: 'wta-w20' }
+    )
+    fireEvent.press(screen.getByRole('button', { name: /^Pulo/ }))
+    expect(screen.getByTestId('item-sheet-gifts')).toBeTruthy()
+    expect(screen.queryByTestId('advice-gifts-g1')).toBeNull()
+  })
+
+  it('fechar a folha não apaga o aviso de outra linha da ficha', async () => {
+    await open({ strength: 4, dexterity: 3, stamina: 3 })
+    tab('Ficha')
+    step('Vigor')
+    expect(screen.getByTestId('notice-stamina')).toBeTruthy()
+    tab('Vantagens')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+    tab('Ficha')
+    expect(screen.getByTestId('notice-stamina')).toBeTruthy()
+  })
+
   it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
     await open(THREE)
     tab('Orçamento')
@@ -340,6 +374,8 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(alertsIn('add-sheet-disciplines')[0]).toHaveTextContent(
       /Disciplinas/
     )
+    // É o erro do próprio campo, não uma frase solta ao lado dele
+    expect(screen.queryByTestId('notice-disciplines')).toBeNull()
   })
 })
 
