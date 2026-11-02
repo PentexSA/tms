@@ -17,6 +17,7 @@ import {
   Pressable,
   Text,
   tokens,
+  useLayout,
   useRovingFocus,
   useTheme,
   useToast,
@@ -34,8 +35,9 @@ import { saveDraftNow } from './saveDraft'
 // Modos da ficha (DS: ModeBar). O modo é UX: o que cada um libera vem de
 // `editableIn` por campo e das permissões, conferidas pelo core e pelo
 // servidor. Em Evoluir as alterações formam um rascunho ("N alterações")
-// que vira UM lote ao salvar (doc/arquitetura §6.5). Em Criação, o botão é
-// um só: salva o rascunho e, com a conta fechada, conclui (salvando antes).
+// que vira UM lote ao salvar (doc/arquitetura §6.5). Em Criação, "Salvar"
+// fica sempre; com a conta fechada, "Concluir criação" (ou "Enviar para
+// aprovação") aparece ao lado e conclui, salvando antes (D-01).
 
 export const MODE_LABELS: Readonly<Record<SheetMode, string>> = {
   read: 'Leitura',
@@ -196,30 +198,37 @@ export function useModeBar({
   const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
   const actionBar =
     mode === 'evolve' ? (
-      <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
+      <EvolveBar
+        count={count}
+        save={{ title: 'Concluir', onPress: () => go(returnTo.current) }}
+      />
     ) : mode === 'create' ? (
-      // Um botão só: com a conta fechada, conclui (salvando antes)
+      // D-01: "Salvar" sempre; com a conta fechada, a conclusão ao lado
       <EvolveBar
         count={count}
         label="Criação"
         detail={freebies}
-        finish={
-          finishing.waitingSync
-            ? 'Sincronizando…'
-            : finishing.ready
-              ? finishing.label
-              : 'Salvar alterações'
-        }
-        primary={finishing.ready}
-        busy={finishing.busy}
-        disabled={!finishing.ready && count === 0}
-        testID="creation-action"
-        onFinish={() =>
+        save={{
+          // "Salvar" visível; o nome é o do Editar (WCAG 2.5.3: começa
+          // pelo texto visível) e não colide com o "Salvar" do resumo
+          title: 'Salvar',
+          accessibilityLabel: 'Salvar alterações',
+          testID: 'mode-save',
+          disabled: count === 0 || finishing.busy,
+          onPress: () => review('create'),
+        }}
+        next={
           finishing.ready
-            ? review('create', true)
-            : count
-              ? review('create')
-              : undefined
+            ? {
+                title: finishing.waitingSync
+                  ? 'Sincronizando…'
+                  : finishing.label,
+                primary: true,
+                busy: finishing.busy,
+                testID: 'creation-action',
+                onPress: () => review('create', true),
+              }
+            : null
         }
       />
     ) : null
@@ -300,53 +309,98 @@ function ModeSwitch({
   )
 }
 
-function EvolveBar({
-  count,
-  onFinish,
-  label = 'Editar',
-  finish = 'Concluir',
-  detail = null,
-  primary = false,
-  busy = false,
-  disabled = false,
-  testID,
-}: {
-  readonly count: number
-  readonly onFinish: () => void
-  readonly label?: string
-  readonly finish?: string
-  // Ao lado da contagem (o saldo de bônus, na criação)
-  readonly detail?: string | null
+/** Uma ação da barra de modos. */
+interface BarAction {
+  readonly title: string
+  // Padrão: o título. Começa pelo título visível (WCAG 2.5.3)
+  readonly accessibilityLabel?: string
+  readonly onPress: () => void
   readonly primary?: boolean
   readonly busy?: boolean
   readonly disabled?: boolean
   readonly testID?: string
+}
+
+/**
+ * A barra de ação do rascunho: o texto ("Criação · N alterações") e as
+ * ações. `save` está sempre; `next` é a ação seguinte (concluir ou enviar;
+ * no Editar da criação livre, o aviso da D-03); `note` é uma linha sob o
+ * texto (o próximo passo). No celular com duas ações (ou com a nota), e com
+ * fonte grande, o texto fica em cima e as ações embaixo, numa linha que
+ * quebra se não couber.
+ */
+function EvolveBar({
+  count,
+  label = 'Editar',
+  detail = null,
+  save,
+  next = null,
+  note = null,
+}: {
+  readonly count: number
+  readonly label?: string
+  // Ao lado da contagem (o saldo de bônus, na criação)
+  readonly detail?: string | null
+  readonly save: BarAction
+  readonly next?: BarAction | null
+  readonly note?: ReactNode
 }) {
   const { colors } = useTheme()
+  const { breakpoint, stacked } = useLayout()
+  const twoLines = stacked || (breakpoint === 'compact' && (next || note))
+  const text = (
+    <Text
+      variant="caption"
+      aria-live="polite"
+      style={note || twoLines ? undefined : styles.flex}
+    >
+      {[label === 'Editar' ? 'Editando' : label, changesLabel(count), detail]
+        .filter(Boolean)
+        .join(' · ')}
+    </Text>
+  )
+  // A principal fica à direita, como nos rodapés das folhas
+  const actions = [save, next].map(a =>
+    a ? (
+      <Button
+        key={a.testID ?? a.title}
+        title={a.title}
+        accessibilityLabel={a.accessibilityLabel}
+        variant={a.primary ? 'primary' : 'secondary'}
+        busy={a.busy}
+        disabled={a.disabled || a.busy}
+        testID={a.testID}
+        onPress={a.onPress}
+      />
+    ) : null
+  )
   return (
     <View
       accessibilityLabel={`Modo ${label}`}
+      testID="mode-bar"
       style={[
-        styles.bar,
+        twoLines ? styles.barStacked : styles.bar,
         {
           backgroundColor: colors.surfaceRaised,
           borderColor: colors.borderSubtle,
         },
       ]}
     >
-      <Text variant="caption" aria-live="polite" style={styles.flex}>
-        {[label === 'Editar' ? 'Editando' : label, changesLabel(count), detail]
-          .filter(Boolean)
-          .join(' · ')}
-      </Text>
-      <Button
-        title={finish}
-        variant={primary ? 'primary' : 'secondary'}
-        busy={busy}
-        disabled={disabled || busy}
-        testID={testID}
-        onPress={onFinish}
-      />
+      {note || twoLines ? (
+        <View style={twoLines ? undefined : styles.flex}>
+          {text}
+          {note}
+        </View>
+      ) : (
+        text
+      )}
+      {twoLines ? (
+        <View testID="mode-bar-actions" style={styles.barActions}>
+          {actions}
+        </View>
+      ) : (
+        actions
+      )}
     </View>
   )
 }
@@ -533,6 +587,20 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
     borderTopWidth: tokens.borderWidth.hair,
     borderBottomWidth: tokens.borderWidth.hair,
+  },
+  // Duas linhas (D-01): o texto em cima, as ações embaixo
+  barStacked: {
+    gap: tokens.space[2],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingVertical: tokens.space[2],
+    borderTopWidth: tokens.borderWidth.hair,
+    borderBottomWidth: tokens.borderWidth.hair,
+  },
+  barActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: tokens.space[2],
   },
   summary: { gap: tokens.space[2] },
   change: {
