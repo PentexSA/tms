@@ -373,10 +373,19 @@ test('desktop: "Pedir ajuste" pelo botão largo, no diálogo de 560', async ({
     await st.goto(`/characters/${id}`)
     await st.getByTestId('status-menu').click()
     await st.getByTestId('status-adjust').click()
-    const dialog = st.getByRole('dialog').or(st.locator('[aria-modal]')).first()
+    // O painel do diálogo, não a camada da folha (que ocupa a tela toda),
+    // como no T-69 do layout.spec
+    const dialog = st
+      .getByTestId('bottom-sheet-root')
+      .locator('[aria-modal="true"]')
     await expect(dialog.getByLabel('O que precisa ser ajustado')).toBeVisible()
-    const box = await dialog.boundingBox()
-    expect(box?.width ?? 0).toBeLessThanOrEqual(560)
+    // A animação de entrada termina antes de medir
+    await expect
+      .poll(async () => (await dialog.boundingBox())?.y ?? -1)
+      .toBeGreaterThan(0)
+    const box = (await dialog.boundingBox())!
+    expect(box.width).toBeLessThanOrEqual(560)
+    expect(Math.abs(box.x + box.width / 2 - 1280 / 2)).toBeLessThanOrEqual(2)
   } finally {
     await desk.close()
     await player.close()
