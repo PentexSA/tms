@@ -426,6 +426,59 @@ describe('modo de abertura (T-05)', () => {
     expect(await radio('Editar')).toBeChecked()
     expect(screen.getByText('Editando · 2 alterações')).toBeTruthy()
   })
+
+  // Integração da onda 2: o cache persistido monta a ficha ainda em
+  // criação (Editar); a resposta do servidor diz que o narrador concluiu
+  it('a criação livre concluída com o Editar da abertura e nada a salvar vai a Jogo', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    calls.characterGet.mockResolvedValue(
+      creating({ status: 'active', creation: creation('free') })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    await waitFor(
+      () => expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked(),
+      WAIT
+    )
+    expect(screen.queryByText(/^Editando/)).toBeNull()
+  })
+
+  it('com alterações no Editar, a conclusão não tira a pessoa do rascunho', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Força' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    calls.characterGet.mockResolvedValue(
+      creating({ status: 'active', creation: creation('free') })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    await waitFor(() =>
+      expect(calls.characterGet.mock.calls.length).toBeGreaterThan(1)
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+  })
 })
 
 // T-06: a devolução aparece em qualquer modo, e a ficha aberta em `pending`

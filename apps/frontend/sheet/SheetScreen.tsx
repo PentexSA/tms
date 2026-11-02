@@ -449,11 +449,28 @@ function LiveSheet({
   // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha vai
   // ao modo de abertura: a montagem, se ainda em criação (T-05); o Jogo, para
   // a dona da ficha em uso
+  // O modo de abertura da renderização anterior: a ficha aberta no Editar da
+  // criação livre (inclusive pelo cache persistido, antes da resposta do
+  // servidor) segue o modo de abertura novo quando a criação acaba
+  const openedAs = useRef(opening)
   useEffect(() => {
     const s = store.getState()
+    const before = openedAs.current
+    openedAs.current = opening
     let next = forced ?? (s.mode === 'read' ? opening : null)
     // A criação por pontos acabou (ou virou livre): o modo dela não vale mais
     if (!next && s.mode === 'create' && !active) next = opening
+    // A criação livre acabou com a ficha no Editar da abertura e nada a
+    // salvar: o modo de abertura novo (o Jogo, para a dona). Com alterações,
+    // o Editar fica: o servidor decide o lote
+    if (
+      !next &&
+      s.mode === 'evolve' &&
+      before === 'evolve' &&
+      opening !== 'evolve' &&
+      !s.draft?.size
+    )
+      next = opening
     // Voltou à criação por pontos com Evoluir aberto: o rascunho continua
     if (!next && s.mode === 'evolve' && active) next = 'create'
     if (!next || next === s.mode) return
