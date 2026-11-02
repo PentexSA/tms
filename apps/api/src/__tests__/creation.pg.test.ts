@@ -306,4 +306,74 @@ describe.skipIf(!URL_)('criação num Postgres real', () => {
       true
     )
   })
+
+  const marksOf = async (id: string) =>
+    (await ctx.db
+      .selectFrom('characters')
+      .select(['status', 'creation'])
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow()) as {
+      status: string
+      creation: Record<string, unknown>
+    }
+
+  it('pedir ajuste × a dona concluir: nunca ativa com o pedido (P04-D, R-14)', async () => {
+    await setApproval(false)
+    const seen = new Set<string>()
+    for (let round = 0; round < ROUNDS; round++) {
+      const id = await ready(400 + round)
+      const [adjusted, done] = await Promise.all([
+        as(ctx, storyteller, 'POST', `/characters/${id}/creation/adjust`, {
+          reason: 'Refaça os Antecedentes',
+        }),
+        // A dona conclui com a revisão que viu
+        as(ctx, owner, 'POST', `/characters/${id}/creation/complete`, {
+          revision: 1,
+        }),
+      ])
+      expect([adjusted.status, done.status].sort()).toEqual([200, 409])
+      const row = await marksOf(id)
+      if (done.status === 200) {
+        seen.add('conclusão antes')
+        expect(row.status).toBe('active')
+        expect(row.creation).not.toHaveProperty('adjust')
+        expect(await adjusted.json()).toMatchObject({
+          code: 'CREATION_NOT_CREATING',
+        })
+      } else {
+        seen.add('pedido antes')
+        expect(row.status).toBe('creating')
+        expect(row.creation).toHaveProperty('adjust')
+        expect(await done.json()).toMatchObject({
+          code: 'CREATION_REVISION_CONFLICT',
+        })
+      }
+    }
+    expect(seen.size).toBeGreaterThan(0)
+  })
+
+  it('avisar × o narrador concluir: termina ativa e sem o aviso (P04-D, R-13)', async () => {
+    for (let round = 0; round < ROUNDS; round++) {
+      const id = await createCharacter(ctx, owner, chronicleId, {
+        name: `Livre ${round}`,
+      })
+      await ctx.db
+        .updateTable('characters')
+        .set({ creation: JSON.stringify({ config: { mode: 'free' } }) })
+        .where('id', '=', id)
+        .execute()
+      const [told, done] = await Promise.all([
+        as(ctx, owner, 'POST', `/characters/${id}/creation/ready`, {
+          revision: 0,
+        }),
+        as(ctx, storyteller, 'POST', `/characters/${id}/creation/complete`),
+      ])
+      expect(done.status).toBe(200)
+      // O aviso que chega depois é recusado; o que chega antes é apagado
+      expect([200, 409]).toContain(told.status)
+      const row = await marksOf(id)
+      expect(row.status).toBe('active')
+      expect(row.creation).not.toHaveProperty('ready')
+    }
+  })
 })

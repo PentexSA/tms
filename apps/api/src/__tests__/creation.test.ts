@@ -8,6 +8,7 @@ import {
   createCharacter,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   setStatus,
   type TestUser,
@@ -1025,5 +1026,357 @@ describe('Mesa', () => {
       await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/table`)
     ).json()) as unknown as { id: string; status: string }[]
     expect(table.map(r => [r.id, r.status])).toEqual([[id, 'pending']])
+  })
+})
+
+// P04-D (D-04 e D-03): o narrador pede ajuste numa ficha em criação, com a
+// aprovação ligada ou não; o dono da criação livre avisa que terminou
+describe('pedir ajuste e avisar que terminei', () => {
+  const adjust = (id: string, body: unknown, by = storyteller) =>
+    as(ctx, by, 'POST', `/characters/${id}/creation/adjust`, body)
+  const ready = (id: string, body?: unknown, by = owner) =>
+    as(ctx, by, 'POST', `/characters/${id}/creation/ready`, body)
+  const creationOf = async (id: string, by: TestUser = owner) =>
+    (await json(await as(ctx, by, 'GET', `/characters/${id}`)))
+      .creation as Record<string, unknown>
+  const updatedAt = async (id: string) =>
+    (
+      await ctx.db
+        .selectFrom('characters')
+        .select('updated_at')
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow()
+    ).updated_at
+  const freeCharacter = async () => {
+    const id = await character({ name: 'Livre' })
+    await freeCreation(ctx, id)
+    return id
+  }
+  const npcOf = async (visibility: 'hidden' | 'identity' | 'full') => {
+    const id = await createCharacter(ctx, storyteller, chronicleId, {
+      name: 'Sentinela',
+    })
+    await ctx.db
+      .updateTable('characters')
+      .set({ kind: 'npc', visibility })
+      .where('id', '=', id)
+      .execute()
+    return id
+  }
+
+  it('o narrador pede ajuste na criação livre e na por pontos, com e sem aprovação (R-14)', async () => {
+    const reason = 'Refaça os Antecedentes: motivo-do-ajuste-17'
+    const free = await freeCharacter()
+    const points = await character()
+    for (const id of [free, points]) {
+      const before = await row(id)
+      const at = await updatedAt(id)
+      ctx.clock.advance(60_000)
+      const res = await adjust(id, { reason: `  ${reason}  ` })
+      expect(res.status).toBe(200)
+      expect(await json(res)).toEqual({
+        revision: before.creation_revision + 1,
+        duplicate: false,
+      })
+      for (const by of [owner, storyteller])
+        expect(await creationOf(id, by)).toMatchObject({
+          adjust: { reason, at: expect.any(String) },
+          ready: null,
+          returned: null,
+        })
+      const after = await row(id)
+      expect(after.status).toBe('creating')
+      expect(after.creation_revision).toBe(before.creation_revision + 1)
+      // Não mexe nos dados da ficha: "alterada às" da Mesa fica
+      expect(await updatedAt(id)).toEqual(at)
+    }
+    // Com a aprovação ligada, também
+    await approval(true)
+    const third = await character({ ...COMPLETE, name: 'Terceira' })
+    expect((await adjust(third, { reason })).status).toBe(200)
+    // O registro tem a ação, sem o motivo
+    const audit = await auditOf(points)
+    expect(audit.map(a => [a.action, a.payload])).toEqual([
+      ['character.creation.adjust', {}],
+    ])
+    expect(JSON.stringify(await auditOf(free))).not.toContain(
+      'motivo-do-ajuste'
+    )
+  })
+
+  it('o pedido substitui a devolução e o aviso anteriores', async () => {
+    const id = await freeCharacter()
+    expect((await ready(id)).status).toBe(200)
+    expect(await creationOf(id)).toMatchObject({
+      ready: { at: expect.any(String) },
+    })
+    expect((await adjust(id, { reason: 'Primeiro' })).status).toBe(200)
+    expect(await creationOf(id)).toMatchObject({
+      adjust: { reason: 'Primeiro' },
+      ready: null,
+    })
+    expect((await adjust(id, { reason: 'Segundo' })).status).toBe(200)
+    expect(await creationOf(id)).toMatchObject({
+      adjust: { reason: 'Segundo' },
+    })
+    // Uma devolução guardada (de um envio anterior) também sai
+    await ctx.db
+      .updateTable('characters')
+      .set({
+        creation: JSON.stringify({
+          config: { mode: 'free' },
+          returned: { reason: 'Antiga', at: '2026-10-20T00:00:00Z' },
+        }),
+      })
+      .where('id', '=', id)
+      .execute()
+    expect((await adjust(id, { reason: 'Terceiro' })).status).toBe(200)
+    expect(await creationOf(id)).toMatchObject({
+      adjust: { reason: 'Terceiro' },
+      returned: null,
+    })
+  })
+
+  it('só o narrador da crônica pede ajuste: 403 para a dona, 404 para os outros', async () => {
+    const id = await character()
+    const reason = 'Ajuste: motivo-negado-33'
+    const mine = await adjust(id, { reason }, owner)
+    expect(mine.status).toBe(403)
+    expect(await json(mine)).toMatchObject({ code: 'FORBIDDEN' })
+    expect((await adjust(id, { reason }, player)).status).toBe(404)
+    // Narrador de outra crônica
+    const other = await createUser(ctx, 'outra-narradora')
+    await createChronicle(ctx, other, 'acct-teste')
+    const foreign = await adjust(id, { reason }, other)
+    expect(foreign.status).toBe(404)
+    expect(await foreign.text()).not.toContain('motivo-negado')
+    // Ex-membro sem ficha nesta linha
+    await ctx.db
+      .deleteFrom('chronicle_members')
+      .where('user_id', '=', player.id)
+      .execute()
+    expect((await adjust(id, { reason }, player)).status).toBe(404)
+    // O jogador que vê o NPC revelado (viewer) também não alcança a rota
+    await addMember(ctx, chronicleId, player)
+    const npc = await npcOf('identity')
+    expect((await adjust(npc, { reason }, player)).status).toBe(404)
+    expect((await row(id)).creation_revision).toBe(0)
+    expect(await auditOf(id)).toEqual([])
+  })
+
+  it('fora da criação, no NPC e na ficha do próprio narrador: 409', async () => {
+    const reason = 'Refaça'
+    const id = await character()
+    await setStatus(ctx, id, 'pending')
+    const pending = await adjust(id, { reason })
+    expect(pending.status).toBe(409)
+    expect(await json(pending)).toMatchObject({
+      code: 'CREATION_NOT_CREATING',
+    })
+    await setStatus(ctx, id, 'active')
+    expect(await json(await adjust(id, { reason }))).toMatchObject({
+      code: 'CREATION_NOT_CREATING',
+    })
+    const npc = await npcOf('hidden')
+    const onNpc = await adjust(npc, { reason })
+    expect(onNpc.status).toBe(409)
+    expect(await json(onNpc)).toMatchObject({
+      code: 'CREATION_ADJUST_UNAVAILABLE',
+    })
+    const own = await createCharacter(ctx, storyteller, chronicleId, {
+      name: 'Da narradora',
+    })
+    expect(await json(await adjust(own, { reason }))).toMatchObject({
+      code: 'CREATION_ADJUST_UNAVAILABLE',
+    })
+    // A revisão velha (a dona já mudou as escolhas) também é 409
+    const fresh = await character({ ...COMPLETE, name: 'Fresca' })
+    await choose(fresh)
+    expect(
+      await json(await adjust(fresh, { reason, revision: 0 }))
+    ).toMatchObject({ code: 'CREATION_REVISION_CONFLICT' })
+  })
+
+  it('motivo vazio, longo, com marcação ou controle é 422, sem ecoar o texto', async () => {
+    const id = await character()
+    for (const reason of [
+      '   ',
+      `motivo-longo-${'x'.repeat(500)}`,
+      '<b>motivo-html</b>',
+      'motivo-controle\u0007',
+      'motivo-bidi‮',
+    ]) {
+      const res = await adjust(id, { reason })
+      expect(res.status).toBe(422)
+      const text = await res.text()
+      expect(text).not.toContain('motivo-')
+      expect(JSON.parse(text)).toMatchObject({
+        issues: [{ path: 'reason' }],
+      })
+    }
+    // 500 caracteres depois do trim passam
+    expect((await adjust(id, { reason: ` ${'a'.repeat(500)} ` })).status).toBe(
+      200
+    )
+  })
+
+  it('a mesma chave devolve o resultado gravado; com outro motivo, 409', async () => {
+    const id = await character()
+    const key = crypto.randomUUID()
+    const first = await adjust(id, { reason: 'Refaça', clientCommandId: key })
+    expect(await json(first)).toEqual({ revision: 1, duplicate: false })
+    // O motivo entra no hash já aparado
+    const replay = await adjust(id, {
+      reason: '  Refaça ',
+      clientCommandId: key,
+    })
+    expect(await json(replay)).toEqual({ revision: 1, duplicate: true })
+    const reused = await adjust(id, { reason: 'Outro', clientCommandId: key })
+    expect(reused.status).toBe(409)
+    expect(await json(reused)).toMatchObject({ code: 'COMMAND_KEY_REUSED' })
+    expect(await auditOf(id)).toHaveLength(1)
+  })
+
+  it('salvar escolhas e orçamento mantém os marcadores; concluir apaga; devolver não os traz (R-14)', async () => {
+    // Por pontos: o narrador ajusta o orçamento depois do pedido
+    const id = await character()
+    expect((await adjust(id, { reason: 'Refaça' })).status).toBe(200)
+    expect((await choose(id, owner, 1)).status).toBe(200)
+    const budget = await as(
+      ctx,
+      storyteller,
+      'PATCH',
+      `/characters/${id}/creation`,
+      { revision: 2, config: { freebies: 12 } }
+    )
+    expect(budget.status).toBe(200)
+    expect(await json(budget)).toMatchObject({
+      creation: { adjust: { reason: 'Refaça' } },
+    })
+    // A dona conclui sem ajustar (aprovação desligada): o pedido sai
+    expect(await json(await complete(id))).toMatchObject({ status: 'active' })
+    expect((await row(id)).creation).not.toHaveProperty('adjust')
+    // Livre: as escolhas da dona depois do aviso não o apagam
+    const free = await freeCharacter()
+    expect((await ready(free)).status).toBe(200)
+    expect((await choose(free, owner, 1)).status).toBe(200)
+    expect(await creationOf(free)).toMatchObject({
+      ready: { at: expect.any(String) },
+    })
+    expect(await json(await complete(free, storyteller))).toMatchObject({
+      status: 'active',
+    })
+    expect((await row(free)).creation).not.toHaveProperty('ready')
+    // Aprovação ligada: enviar apaga o pedido; devolver não o traz de volta
+    await approval(true)
+    const sent = await character({ ...COMPLETE, name: 'Enviada' })
+    await choose(sent)
+    expect((await adjust(sent, { reason: 'Refaça' })).status).toBe(200)
+    expect(await json(await complete(sent))).toMatchObject({
+      status: 'pending',
+    })
+    expect((await row(sent)).creation).not.toHaveProperty('adjust')
+    // Um pedido gravado à mão em pending (dado antigo) também não volta
+    await ctx.db
+      .updateTable('characters')
+      .set({
+        creation: JSON.stringify({
+          ...((await row(sent)).creation as object),
+          adjust: { reason: 'Velho', at: '2026-10-20T00:00:00Z' },
+          ready: { at: '2026-10-20T00:00:00Z' },
+        }),
+      })
+      .where('id', '=', sent)
+      .execute()
+    const back = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/characters/${sent}/creation/return`,
+      { reason: 'Devolvida' }
+    )
+    expect(back.status).toBe(200)
+    expect(await creationOf(sent)).toMatchObject({
+      returned: { reason: 'Devolvida' },
+      adjust: null,
+      ready: null,
+    })
+  })
+
+  it('a dona avisa que terminou na criação livre; de novo é 409 (R-13)', async () => {
+    const id = await freeCharacter()
+    const at = await updatedAt(id)
+    ctx.clock.advance(60_000)
+    const done = await ready(id, { revision: 0 })
+    expect(done.status).toBe(200)
+    expect(await json(done)).toEqual({ revision: 1, duplicate: false })
+    expect(await creationOf(id, storyteller)).toMatchObject({
+      ready: { at: expect.any(String) },
+      adjust: null,
+    })
+    expect((await row(id)).status).toBe('creating')
+    expect(await updatedAt(id)).toEqual(at)
+    const again = await ready(id)
+    expect(again.status).toBe(409)
+    expect(await json(again)).toMatchObject({ code: 'CREATION_ALREADY_READY' })
+    expect((await auditOf(id)).map(a => [a.action, a.payload])).toEqual([
+      ['character.creation.ready', {}],
+    ])
+    // A edição continua liberada
+    expect((await send(id, owner, 'name', 'Livre', 'Pronta')).status).toBe(200)
+  })
+
+  it('o aviso apaga o pedido de ajuste e a devolução', async () => {
+    const id = await freeCharacter()
+    expect((await adjust(id, { reason: 'Refaça' })).status).toBe(200)
+    expect((await ready(id, { revision: 1 })).status).toBe(200)
+    expect(await creationOf(id)).toMatchObject({
+      adjust: null,
+      returned: null,
+      ready: { at: expect.any(String) },
+    })
+  })
+
+  it('avisar: por pontos, fora da criação, pelo narrador ou por outro é recusado', async () => {
+    const points = await character()
+    const p = await ready(points)
+    expect(p.status).toBe(409)
+    expect(await json(p)).toMatchObject({ code: 'CREATION_NOT_FREE' })
+    const id = await freeCharacter()
+    // O narrador conclui; na ficha dele, também
+    const st = await ready(id, undefined, storyteller)
+    expect(st.status).toBe(403)
+    expect(await json(st)).toMatchObject({
+      code: 'CREATION_STORYTELLER_CONCLUDES',
+    })
+    const own = await createCharacter(ctx, storyteller, chronicleId, {
+      name: 'Da narradora',
+    })
+    await freeCreation(ctx, own)
+    expect((await ready(own, undefined, storyteller)).status).toBe(403)
+    expect((await ready(id, undefined, player)).status).toBe(404)
+    const npc = await npcOf('full')
+    expect((await ready(npc, undefined, player)).status).toBe(404)
+    // Revisão velha (o narrador pediu ajuste antes): 409
+    expect((await adjust(id, { reason: 'Refaça' })).status).toBe(200)
+    expect(await json(await ready(id, { revision: 0 }))).toMatchObject({
+      code: 'CREATION_REVISION_CONFLICT',
+    })
+    await setStatus(ctx, id, 'pending')
+    expect(await json(await ready(id))).toMatchObject({
+      code: 'CREATION_NOT_CREATING',
+    })
+    await setStatus(ctx, id, 'creating')
+    // Ex-dona: saiu da crônica, a ficha fica, o aviso não
+    await ctx.db
+      .deleteFrom('chronicle_members')
+      .where('user_id', '=', owner.id)
+      .execute()
+    const former = await ready(id)
+    expect(former.status).toBe(403)
+    expect(await json(former)).toMatchObject({ code: 'NOT_MEMBER' })
+    expect(
+      (await auditOf(id)).filter(a => a.action === 'character.creation.ready')
+    ).toEqual([])
   })
 })

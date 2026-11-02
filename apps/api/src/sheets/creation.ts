@@ -54,6 +54,8 @@ import {
 // | concluir (pontos ou livre)   | narrador: conclui e aprova, direto a active |
 // | aprovar                      | narrador, pending → active, revalidando     |
 // | devolver                     | narrador, pending → creating, com motivo    |
+// | pedir ajuste (D-04)          | narrador, em creating, PC de outra pessoa   |
+// | avisar que terminei (D-03)   | dono membro, em creating, criação livre     |
 //
 // Tudo roda com a ficha travada (`FOR UPDATE`) e relê vínculo, estado e
 // metadados dentro da transação. A conta é a do core, a mesma do app; o
@@ -72,6 +74,8 @@ type CommandKind =
   | 'creation.approve'
   | 'creation.return'
   | 'creation.update'
+  | 'creation.adjust'
+  | 'creation.ready'
 
 const hashOf = (kind: CommandKind, request: unknown) =>
   createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
@@ -178,7 +182,26 @@ export function creationView(
     config: creation.config ?? {},
     effective: input.config,
     returned: creation.returned ?? null,
+    // D-04 e D-03: o pedido de ajuste (motivo e data) e o aviso de "terminei"
+    adjust: creation.adjust ?? null,
+    ready: creation.ready ?? null,
   }
+}
+
+/** Os metadados sem os marcadores do ciclo (devolução, ajuste e aviso). */
+function withoutMarks(creation: CharacterCreation): CharacterCreation {
+  const { returned: _, adjust: __, ready: ___, ...kept } = creation
+  return kept
+}
+
+/** O motivo do narrador (devolução ou ajuste), aparado e validado. */
+function reasonOf(raw: string): string {
+  const reason = raw.trim()
+  if (!reason || reason.length > RETURN_REASON_MAX || !isSafeText(reason))
+    throw new ApiError(422, 'motivo inválido', {
+      issues: [{ path: 'reason', message: 'motivo inválido' }],
+    })
+  return reason
 }
 
 /**
@@ -298,11 +321,17 @@ export function creationRoutes(
       readonly set: Updateable<DB['characters']>
       readonly action: AuditAction
       readonly payload: Readonly<Record<string, string | boolean | null>>
+      // Pedir ajuste e avisar não mexem nos dados da ficha: a Mesa usa o
+      // `updated_at` em "alterada às" (P04-D §3.1)
+      readonly touch?: false
     }
   ) => {
     const updated = await trx
       .updateTable('characters')
-      .set({ ...args.set, updated_at: args.at })
+      .set({
+        ...args.set,
+        ...(args.touch !== false && { updated_at: args.at }),
+      })
       .where('id', '=', args.id)
       .returning([
         'status',
@@ -509,6 +538,9 @@ export function creationRoutes(
                 ...(next.choices && { choices: next.choices }),
                 ...(config && { config }),
                 ...(next.returned && { returned: next.returned }),
+                // O ajuste do orçamento não apaga o pedido nem o aviso
+                ...(next.adjust && { adjust: next.adjust }),
+                ...(next.ready && { ready: next.ready }),
               }
               // Escolha ou orçamento que piorariam a conta não são gravados
               // sozinhos (§3.1); o narrador também passa por aqui (§2.3, 21)
@@ -639,7 +671,8 @@ export function creationRoutes(
                     .forShare()
                     .executeTakeFirstOrThrow()
                 ).character_approval
-              const { returned: _, ...kept } = creation
+              // Concluir apaga a devolução, o pedido de ajuste e o aviso
+              const kept = withoutMarks(creation)
               const revision = row.creationRevision + 1
               const base = {
                 creation_completed_at: now,
@@ -756,11 +789,7 @@ export function creationRoutes(
         const a = await access(me, params.id)
         if (!a.roles.has('storyteller'))
           throw storytellerOnly('só o narrador devolve a ficha')
-        const reason = body.reason.trim()
-        if (!reason || reason.length > RETURN_REASON_MAX || !isSafeText(reason))
-          throw new ApiError(422, 'motivo inválido', {
-            issues: [{ path: 'reason', message: 'motivo inválido' }],
-          })
+        const reason = reasonOf(body.reason)
         const model = await modelOf(a)
         const { clientCommandId, ...request } = body
         return db.transaction().execute(async trx => {
@@ -793,7 +822,7 @@ export function creationRoutes(
                   // O motivo fica na ficha, legível por dono e narrador
                   // (§2.3, 22), nunca no registro da crônica
                   creation: JSON.stringify({
-                    ...creation,
+                    ...withoutMarks(creation),
                     returned: { reason, at: now.toISOString() },
                   }),
                   creation_revision: row.creationRevision + 1,
@@ -812,5 +841,152 @@ export function creationRoutes(
           reason: t.String({ minLength: 1, maxLength: RETURN_REASON_MAX + 50 }),
         }),
       }
+    )
+    .post(
+      // D-04: o narrador pede ajuste, com motivo, numa ficha em criação, com
+      // a aprovação ligada ou não. A ficha continua em criação; o motivo vai
+      // para a ficha, como o da devolução, e nunca para o registro
+      '/characters/:id/creation/adjust',
+      async ({ params, body, userId }) => {
+        const me = requireUser(userId)
+        const a = await access(me, params.id)
+        if (!a.roles.has('storyteller'))
+          throw storytellerOnly('só o narrador pede ajuste')
+        const reason = reasonOf(body.reason)
+        const model = await modelOf(a)
+        const { clientCommandId, ...request } = body
+        return db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const now = options.now()
+          return once(
+            trx,
+            {
+              characterId: params.id,
+              key: clientCommandId,
+              kind: 'creation.adjust',
+              request: { ...request, reason },
+              by: me,
+              at: now,
+            },
+            async () => {
+              if (row.status !== 'creating')
+                throw conflict(
+                  'só uma ficha em criação recebe pedido de ajuste',
+                  {
+                    code: 'CREATION_NOT_CREATING',
+                  }
+                )
+              // NPC e a ficha do próprio narrador: ele mesmo ajusta
+              if (row.kind !== 'pc' || row.userId === me)
+                throw conflict('o narrador ajusta a própria ficha', {
+                  code: 'CREATION_ADJUST_UNAVAILABLE',
+                })
+              checkExpected(row, body)
+              const creation = parseCharacterCreation(model, row.creation)
+              const { revision } = await settle(trx, {
+                id: params.id,
+                row,
+                me,
+                at: now,
+                set: {
+                  // O pedido novo substitui a devolução e o aviso anteriores
+                  creation: JSON.stringify({
+                    ...withoutMarks(creation),
+                    adjust: { reason, at: now.toISOString() },
+                  }),
+                  creation_revision: row.creationRevision + 1,
+                },
+                action: 'character.creation.adjust',
+                payload: {},
+                touch: false,
+              })
+              return { revision }
+            }
+          )
+        })
+      },
+      {
+        params: idParams,
+        body: t.Object({
+          clientCommandId: t.Optional(uuid),
+          reason: t.String({ minLength: 1, maxLength: RETURN_REASON_MAX + 50 }),
+          revision: t.Optional(t.Integer({ minimum: 0 })),
+        }),
+      }
+    )
+    .post(
+      // D-03: na criação livre, o dono avisa que terminou; o narrador vê o
+      // aviso e conclui. Não trava a edição nem conclui nada
+      '/characters/:id/creation/ready',
+      async ({ params, body, userId }) => {
+        const me = requireUser(userId)
+        const a = await access(me, params.id)
+        if (a.roles.has('storyteller') || !a.roles.has('owner'))
+          throw new ApiError(403, 'o narrador conclui a criação', {
+            code: 'CREATION_STORYTELLER_CONCLUDES',
+            paths: [],
+          })
+        const model = await modelOf(a)
+        const { clientCommandId, ...request } = body ?? {}
+        return db.transaction().execute(async trx => {
+          const row = await lockCharacter(trx, params.id)
+          const now = options.now()
+          return once(
+            trx,
+            {
+              characterId: params.id,
+              key: clientCommandId,
+              kind: 'creation.ready',
+              request,
+              by: me,
+              at: now,
+            },
+            async () => {
+              if (row.status !== 'creating')
+                throw conflict('a ficha não está em criação', {
+                  code: 'CREATION_NOT_CREATING',
+                })
+              // O ex-membro e a ficha travada caem aqui, como no concluir
+              const verdict = writePolicy(
+                await writeAccess(trx, a.roles, row.chronicleId, me),
+                row.status,
+                row.lockedAt !== null,
+                []
+              )
+              if (!verdict.ok)
+                throw refusal(verdict, { model, roles: a.roles, paths: [] })
+              checkExpected(row, body)
+              const creation = parseCharacterCreation(model, row.creation)
+              if (creationInputOf(model, creation).config.mode !== 'free')
+                throw conflict(
+                  'na criação por pontos, conclua ou envie para aprovação',
+                  { code: 'CREATION_NOT_FREE' }
+                )
+              if (creation.ready)
+                throw conflict('você já avisou que terminou', {
+                  code: 'CREATION_ALREADY_READY',
+                })
+              const { revision } = await settle(trx, {
+                id: params.id,
+                row,
+                me,
+                at: now,
+                set: {
+                  creation: JSON.stringify({
+                    ...withoutMarks(creation),
+                    ready: { at: now.toISOString() },
+                  }),
+                  creation_revision: row.creationRevision + 1,
+                },
+                action: 'character.creation.ready',
+                payload: {},
+                touch: false,
+              })
+              return { revision }
+            }
+          )
+        })
+      },
+      { params: idParams, body: t.Optional(t.Object(commandBody)) }
     )
 }
