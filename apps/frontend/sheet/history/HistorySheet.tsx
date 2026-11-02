@@ -29,9 +29,15 @@ export interface HistoryItem {
   readonly by: { readonly username: string } | null
   readonly byRole: string
   readonly operationId?: string | null
-  // Um evento da ficha que não é mudança de campo (T-80): a conclusão da
-  // criação, vinda do registro da crônica, sem "Desfazer"
-  readonly event?: 'creation.completed'
+  // Um passo do ciclo da criação, que não é mudança de campo, vindo do
+  // registro da crônica e sem "Desfazer": a conclusão (T-80) e, desde o
+  // P04-D, enviar, devolver, pedir ajuste e avisar. O motivo nunca vem
+  readonly event?:
+    | 'creation.completed'
+    | 'creation.submitted'
+    | 'creation.returned'
+    | 'creation.adjust'
+    | 'creation.ready'
   readonly reversible?: boolean
   readonly changes: readonly {
     readonly label: string
@@ -45,6 +51,10 @@ const EVENT_LABELS: Readonly<
   Record<NonNullable<HistoryItem['event']>, string>
 > = {
   'creation.completed': 'Criação concluída',
+  'creation.submitted': 'Enviada para aprovação',
+  'creation.returned': 'Devolvida para correção',
+  'creation.adjust': 'Ajuste pedido',
+  'creation.ready': 'Avisou que terminou',
 }
 
 export const whoLabel = (item: Pick<HistoryItem, 'by' | 'byRole'>) =>
@@ -65,7 +75,9 @@ function HistoryRow({
   const lines = item.changes.length
     ? item.changes.map(c => `${c.label}: ${c.change}`)
     : item.event
-      ? [EVENT_LABELS[item.event]]
+      ? // Um passo que esta versão do app não conhece fica só com a data e
+        // o autor (app antigo, P04-D pergunta 8)
+        [EVENT_LABELS[item.event]].filter((l): l is string => Boolean(l))
       : []
   const meta = `${whenLabel(item.at)} · ${whoLabel(item)}`
   return (

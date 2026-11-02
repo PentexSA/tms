@@ -58,7 +58,9 @@ test('F5 com 3 alterações em Editar: "Recuperar" devolve as 3; o logout apaga'
   ).toBeVisible()
   await page.getByRole('button', { name: 'Recuperar' }).click()
   await expect(page.getByText('Editando · 3 alterações')).toBeVisible()
-  await page.getByRole('button', { name: 'Concluir' }).click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
   await expect(page.getByText('Salvar 3 alterações?')).toBeVisible()
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   // Salvo e no outbox: o registro do aparelho sai

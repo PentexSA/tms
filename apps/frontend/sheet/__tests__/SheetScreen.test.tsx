@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
+import { RefreshControl, StyleSheet } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { example, modelOf, templateJson } from '../../test/fixtures'
@@ -22,7 +23,13 @@ jest.mock('../../lib/api', () => {
 const calls = (
   apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
 ).fake.calls
-const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+const router = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  setParams: jest.fn(),
+  canGoBack: jest.fn(),
+}
 const ID = '00000000-0000-4000-8000-00000000c001'
 
 beforeEach(() => {
@@ -73,6 +80,7 @@ const npcIdentity = () =>
     kind: 'npc',
     visibility: 'identity',
     identity,
+    chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
   })
 const npcFull = () =>
   ok({
@@ -136,6 +144,33 @@ describe('SheetScreen: redução da visibilidade de um NPC', () => {
     expect(screen.queryByText('Oráculo')).toBeNull()
   })
 
+  it('o "‹" do NPC com a identidade revelada volta para a crônica (T-81)', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcIdentity())
+    renderWithSession(<SheetScreen id={NPC} />, await signedIn())
+    expect(
+      await screen.findByText(
+        'O narrador revelou apenas a identidade.',
+        {},
+        WAIT
+      )
+    ).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
+    )
+    expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
+  })
+
+  it('a ficha revelada ocupa a tela: o contêiner do viewer tem flex 1 (T-15)', async () => {
+    calls.characterGet.mockResolvedValueOnce(npcFull())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={NPC} />, await signedIn())
+    const viewer = await screen.findByTestId('viewer-sheet', {}, WAIT)
+    // O Jest não faz layout: o estilo prova a causa (Yoga, pai sem flex),
+    // não a tela, que se confere no aparelho
+    expect(StyleSheet.flatten(viewer.props.style)).toMatchObject({ flex: 1 })
+    expect(screen.getByLabelText('Destreza, 2 de 5')).toBeTruthy()
+  })
+
   it('sem rede, a ficha do viewer em cache não volta à tela', async () => {
     calls.characterGet.mockResolvedValueOnce(npcFull())
     calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
@@ -180,6 +215,38 @@ describe('SheetScreen', () => {
       screen.getByRole('button', { name: 'Voltar para Crônica da Liberdade' })
     )
     expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
+  })
+
+  // T-39 (P09-C): com a crônica embaixo na pilha, o "‹" volta a ela (com a
+  // aba e a rolagem), em vez de montar outra crônica
+  it('o "‹" volta pela pilha quando há tela de baixo', async () => {
+    router.canGoBack.mockReturnValue(true)
+    calls.characterGet.mockResolvedValue(character())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', {
+        name: 'Voltar para Crônica da Liberdade',
+      })
+    )
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
+  })
+
+  // T-40 (P09-C): puxar para atualizar na ficha, sem intervalo novo
+  it('puxar rebusca a ficha', async () => {
+    calls.characterGet.mockResolvedValue(character())
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByLabelText('Destreza, 2 de 5')
+    const before = calls.characterGet.mock.calls.length
+    const control = screen.UNSAFE_getByType(RefreshControl)
+    expect(control.props.refreshing).toBe(false)
+    await act(async () => {
+      await control.props.onRefresh()
+    })
+    expect(calls.characterGet.mock.calls.length).toBe(before + 1)
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false)
   })
 
   it('sem acesso (404)', async () => {
@@ -361,9 +428,11 @@ describe('modo de abertura (T-05)', () => {
       <SheetScreen id={ID} />,
       await signedIn()
     )
-    expect(
-      await screen.findByText('Aguardando aprovação', {}, WAIT)
-    ).toBeTruthy()
+    expect(await screen.findByTestId('creation-pending', {}, WAIT)).toBeTruthy()
+    // O selo sob o nome diz o mesmo (P04-D)
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Aguardando aprovação'
+    )
     expect(screen.queryByRole('radio', { name: 'Criação' })).toBeNull()
     unmount()
     calls.characterGet.mockResolvedValue(creating({ member: false }))
@@ -380,7 +449,7 @@ describe('modo de abertura (T-05)', () => {
       <SheetScreen id={ID} />,
       await signedIn()
     )
-    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    await screen.findByTestId('creation-pending', {}, WAIT)
     calls.characterGet.mockResolvedValue(
       creating({
         creation: creation('points', {
@@ -479,6 +548,91 @@ describe('modo de abertura (T-05)', () => {
     expect(await radio('Editar')).toBeChecked()
     expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
   })
+
+  // Nota do P04-C (P04-D §3.7): o Editar fica, mas a dona fica sabendo
+  it('com alterações no Editar, a conclusão avisa; descartar tira o aviso', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ creation: creation('free') })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Força' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    calls.characterGet.mockResolvedValue(
+      creating({
+        status: 'active',
+        creation: { ...creation('free'), activatedAt: '2026-11-01T12:00:00Z' },
+      })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    const banner = await screen.findByTestId(
+      'completed-while-editing',
+      {},
+      WAIT
+    )
+    expect(banner.props.accessibilityLabel).toBe(
+      'O narrador concluiu a criação. As alterações não salvas agora são evolução: subir um traço passa pelo narrador. Salve ou descarte.'
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    // Sair do Editar descartando: o aviso some
+    fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
+    await waitFor(() =>
+      expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    )
+  })
+
+  it('montada do cache com o aviso e a resposta já ativa: nada fica preso', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({
+        creation: {
+          ...creation('free'),
+          ready: { at: '2026-11-01T10:00:00Z' },
+        },
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { queryClient } = renderWithSession(
+      <SheetScreen id={ID} />,
+      await signedIn()
+    )
+    expect(await radio('Editar')).toBeChecked()
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Você avisou que terminou'
+    )
+    calls.characterGet.mockResolvedValue(
+      creating({
+        status: 'active',
+        creation: { ...creation('free'), activatedAt: '2026-11-01T12:00:00Z' },
+      })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: ['characters', ID] })
+    )
+    await waitFor(
+      () => expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked(),
+      WAIT
+    )
+    expect(screen.getByTestId('sheet-state')).toHaveTextContent(
+      'Concluída em 01/11'
+    )
+    expect(screen.queryByTestId('completed-while-editing')).toBeNull()
+    expect(screen.queryByTestId('creation-ready')).toBeNull()
+  })
 })
 
 // T-06: a devolução aparece em qualquer modo, e a ficha aberta em `pending`
@@ -505,6 +659,29 @@ describe('devolução na ficha aberta (T-06)', () => {
     [{ status: 'active', roles: ['owner'] }, false],
     [{ status: 'pending' }, false],
     [null, false],
+    // D-03 (P04-D): quem avisou que terminou espera o narrador
+    [
+      {
+        status: 'creating',
+        roles: ['owner'],
+        creation: { ready: { at: 'x' } },
+      },
+      true,
+    ],
+    [
+      {
+        status: 'creating',
+        roles: ['storyteller'],
+        creation: { ready: { at: 'x' } },
+      },
+      false,
+    ],
+    [
+      { status: 'creating', roles: ['owner'], creation: { ready: null } },
+      false,
+    ],
+    [{ status: 'creating', roles: ['owner'], creation: null }, false],
+    [{ status: 'creating', roles: ['owner'] }, false],
   ])('awaitsStoryteller(%j) = %s', (data, expected) => {
     expect(awaitsStoryteller(data)).toBe(expected)
   })
@@ -514,7 +691,7 @@ describe('devolução na ficha aberta (T-06)', () => {
     calls.characterGet.mockResolvedValue(creating({ status: 'pending' }))
     calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
-    await screen.findByText('Aguardando aprovação', {}, WAIT)
+    await screen.findByTestId('creation-pending', {}, WAIT)
     const before = calls.characterGet.mock.calls.length
     calls.characterGet.mockResolvedValue(returned())
     await act(async () => {

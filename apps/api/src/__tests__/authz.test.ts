@@ -49,6 +49,9 @@ useTestDb()
 // Marca única nas Notas do Narrador: nenhuma resposta a quem não é narrador
 // pode trazê-la, nem o 200 da dona nem o 404 do outro jogador.
 const SECRET = 'marca-secreta-do-narrador-7f3a'
+// O nome do NPC oculto do cenário: nenhuma resposta a quem não narra o traz
+// (lista, Mesa, auditoria, identidade)
+const HIDDEN_NPC = 'NPC oculto'
 
 interface Scenario {
   readonly ctx: TestContext
@@ -92,7 +95,7 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   // A matriz é de AuthZ, não da conta da criação
   await freeCreation(ctx, characterId)
   const npcId = await createCharacter(ctx, users.storyteller, chronicleId, {
-    name: 'NPC oculto',
+    name: HIDDEN_NPC,
   })
   await ctx.db
     .updateTable('characters')
@@ -226,7 +229,10 @@ async function check(
   const res = await request(sc, s, row, actor)
   expect(res.status).toBe(status)
   const text = await res.text()
-  if (actor !== 'storyteller') expect(text).not.toContain(SECRET)
+  if (actor !== 'storyteller') {
+    expect(text).not.toContain(SECRET)
+    expect(text).not.toContain(HIDDEN_NPC)
+  }
   // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
   if (actor === 'former')
     for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])
@@ -270,6 +276,35 @@ for (const system of MATRIX_SYSTEMS) {
       )
       expect(res.status).toBe(403)
       expect(await res.text()).not.toContain(SECRET)
+    })
+
+    // P09-C (T-83): a Mesa diz quem alterou por último sem dizer o id de
+    // ninguém além do dono de cada linha, e o NPC oculto vem só ao narrador
+    it('a Mesa do narrador: lastChange é um enum, sem id de autor', async () => {
+      const res = await as(
+        shared.ctx,
+        shared.users.storyteller,
+        'GET',
+        `/chronicles/${shared.chronicleId}/table`
+      )
+      const rows = (await res.json()) as {
+        id: string
+        owner: { id: string }
+        lastChange: { at: string; by: string } | null
+      }[]
+      const sheet = rows.find(r => r.id === shared.characterId)
+      // As notas do narrador foram o último lote da ficha da dona
+      expect(sheet?.lastChange).toEqual({ at: expect.any(String), by: 'you' })
+      expect(rows.find(r => r.id === shared.npcId)?.lastChange).toBeNull()
+      for (const row of rows) {
+        expect(Object.keys(row.lastChange ?? {}).sort()).toEqual(
+          row.lastChange ? ['at', 'by'] : []
+        )
+        expect(['you', 'owner', 'other', undefined]).toContain(
+          row.lastChange?.by
+        )
+      }
+      expect(JSON.stringify(rows)).not.toContain('created_by')
     })
   })
 

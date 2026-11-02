@@ -1,13 +1,29 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
-import { type SheetModel, type TemplateRecovery } from '@tms/sheet-core'
-import { Button, Chip, Skeleton, TabPanel, Tabs, Text, tokens } from '@tms/ui'
+import type { SheetModel } from '@tms/sheet-core'
+import {
+  Button,
+  Chip,
+  SectionHeader,
+  Skeleton,
+  TabPanel,
+  Tabs,
+  Text,
+  tokens,
+  useLayout,
+} from '@tms/ui'
 import { useRouter } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { hhmm } from '../../lib/format'
-import { useOnline } from '../../lib/network'
 import {
   type TableScope,
   useChronicleTable,
@@ -17,17 +33,18 @@ import { rollKeys } from '../../lib/queries/rolls'
 import { useChronicleXpRequests } from '../../lib/queries/xp'
 import { useTableOrder } from '../../lib/tableOrder'
 import { compileSafe, templateQuery } from '../../sheet/data'
-import { OperationSheet } from './OperationSheet'
 import { RollFeed } from './RollFeed'
 import { TableRow } from './TableRow'
+import { useTableSelection } from './TableSelection'
 import {
   arrange,
   buildItem,
+  bySection,
   type TableItem,
   type TableRowData,
   type TableSort,
 } from './tableItems'
-import { GrantXpSheet, grantable, XpRequestsSheet } from './XpSheets'
+import { XpRequestsSheet } from './XpSheets'
 
 // A Mesa do narrador (doc/plano-v0.md, Etapa 19; doc/plano-v3.md, Etapa 9;
 // design/telas/mesa.html): uma linha por personagem com o dock e os alertas
@@ -37,6 +54,60 @@ import { GrantXpSheet, grantable, XpRequestsSheet } from './XpSheets'
 // arquivadas e fora de jogo vêm pelo filtro, do servidor.
 
 export type { TableRowData } from './tableItems'
+
+// T-48 (P09-C): a Mesa em grade nas telas largas. Cada cartão pede ~340 de
+// largura; até 3 colunas, na largura do conteúdo (limitada a 1200 pelo
+// Screen), menos as margens. Com fonte grande ou tela estreita (`stacked`),
+// uma coluna.
+export const TABLE_CARD_MIN = 340
+export const TABLE_COLUMNS_MAX = 3
+
+export function tableColumns(width: number, stacked: boolean): number {
+  if (stacked) return 1
+  const usable =
+    Math.min(width, tokens.layout.contentMaxExpanded) - 2 * tokens.layout.gutter
+  return Math.max(
+    1,
+    Math.min(TABLE_COLUMNS_MAX, Math.floor(usable / TABLE_CARD_MIN))
+  )
+}
+
+/**
+ * A grade, na ordem da lista: a leitura e o Tab seguem linha a linha. Um
+ * contêiner só, com cada cartão numa célula de 1/colunas da largura e a key
+ * da ficha: trocar a ordem ou o filtro move os cartões sem remontá-los.
+ */
+function TableGrid({
+  items,
+  columns,
+  renderItem,
+  testID = 'table-grid',
+}: {
+  readonly items: readonly TableItem[]
+  readonly columns: number
+  readonly renderItem: (item: TableItem, framed: boolean) => ReactNode
+  readonly testID?: string
+}) {
+  if (columns <= 1) return <>{items.map(i => renderItem(i, false))}</>
+  const width = `${100 / columns}%` as const
+  return (
+    <View style={styles.grid} testID={testID}>
+      {items.map(item => (
+        <View
+          key={item.row.id}
+          style={[styles.cell, { width }]}
+          testID={`table-cell-${item.row.id}`}
+        >
+          {renderItem(item, true)}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+// Sem resposta ainda: o mesmo array vazio a cada render, para os itens (e a
+// seleção, que os recebe) não mudarem à toa
+const NO_ROWS: readonly TableRowData[] = []
 
 // Fora do componente: com a mesma função, o TanStack não refaz o array
 const dataOf = (results: readonly { readonly data: unknown }[]) =>
@@ -121,51 +192,56 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [scope, setScope] = useState<TableScope>('playing')
   const [sort, setSort] = useState<TableSort>('name')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
-  const online = useOnline()
-  const [selecting, setSelecting] = useState(false)
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const [operation, setOperation] = useState<{
-    kind: 'damage' | 'heal' | 'recovery'
-    recovery?: TemplateRecovery
-    items: readonly TableItem[]
-  } | null>(null)
-  const [xpSheet, setXpSheet] = useState<'grant' | 'requests' | null>(null)
+  const { width, stacked } = useLayout()
+  const columns = tableColumns(width, stacked)
+  // A seleção vive na crônica (T-49): a barra fica fora da rolagem
+  const selection = useTableSelection()
+  const { selecting, selected, toggle: select, sync } = selection
+  const [requests, setRequests] = useState(false)
   const xpRequests = useChronicleXpRequests(chronicleId)
-  const select = useCallback(
-    (id: string) =>
-      setSelected(old => {
-        const next = new Set(old)
-        if (next.has(id)) next.delete(id)
-        else if (next.size < 20) next.add(id)
-        return next
-      }),
-    []
-  )
   const table = useChronicleTable(chronicleId, true, scope)
   useRefetchOnFocus(() => {
     void queryClient.invalidateQueries({ queryKey: rollKeys.feed(chronicleId) })
+    // T-40: o pedido de XP feito com a crônica aberta aparece na volta
+    void xpRequests.refetch({ cancelRefetch: false })
     return table.refetch({ cancelRefetch: false })
   })
-  const rows = (table.data ?? []) as TableRowData[]
+  const rows = (table.data ?? NO_ROWS) as TableRowData[]
   const items = useItems(rows)
-  const chosen = useMemo(
-    () => items.filter(i => selected.has(i.row.id)),
-    [items, selected]
-  )
+  // A barra sabe o que está marcado pelos itens da Mesa; enquanto a Mesa
+  // carrega, nada (o vazio do carregamento não é uma Mesa vazia)
+  const loaded = table.data !== undefined
+  useEffect(() => {
+    if (loaded) sync(items)
+  }, [loaded, items, sync])
   const shown = useMemo(
     () => arrange(items, { sort, onlyAlerts }),
     [items, sort, onlyAlerts]
   )
+  // PCs e, depois, NPCs numa seção própria (T-52)
+  const sections = useMemo(() => bySection(shown), [shown])
   // A ordem da tela, lida ao abrir: o callback não muda com o filtro, e as
   // linhas não redesenham por causa dele
   const order = useRef<readonly string[]>([])
-  order.current = shown.map(i => i.row.id)
+  order.current = [...sections.pcs, ...sections.npcs].map(i => i.row.id)
   const open = useCallback(
     (id: string) => {
       remember(chronicleId, order.current)
       router.push(`/characters/${id}`)
     },
     [chronicleId, remember, router]
+  )
+  // A mesma linha nas duas seções (PCs e NPCs), na mesma grade (T-48)
+  const row = (item: TableItem, framed: boolean) => (
+    <TableRow
+      key={item.row.id}
+      item={item}
+      onOpen={open}
+      selecting={selecting}
+      selected={selected.has(item.row.id)}
+      onSelect={select}
+      framed={framed}
+    />
   )
 
   return (
@@ -182,7 +258,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           selected={scope}
           onSelect={id => {
             setScope(id as TableScope)
-            setSelected(new Set())
+            selection.clear()
           }}
         />
         <View style={styles.chips}>
@@ -210,69 +286,17 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             title={`Pedidos de XP (${xpRequests.data.length})`}
             variant="secondary"
             testID="table-xp-requests"
-            onPress={() => setXpSheet('requests')}
+            onPress={() => setRequests(true)}
           />
         ) : null}
-        <Button
-          title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
-          variant="secondary"
-          onPress={() => {
-            setSelecting(v => !v)
-            setSelected(new Set())
-          }}
-        />
-        {selecting ? (
-          <View style={styles.hint}>
-            <Text>{chosen.length} de 20 selecionados</Text>
-            <View style={styles.chips}>
-              <Button
-                title="Aplicar dano"
-                disabled={!online || !chosen.length}
-                onPress={() => setOperation({ kind: 'damage', items: chosen })}
-              />
-              <Button
-                title="Curar"
-                variant="secondary"
-                disabled={!online || !chosen.length}
-                onPress={() => setOperation({ kind: 'heal', items: chosen })}
-              />
-              <Button
-                title="Conceder XP"
-                variant="secondary"
-                testID="table-xp-grant"
-                disabled={!online || !grantable(chosen)}
-                onPress={() => setXpSheet('grant')}
-              />
-              {(chosen[0]?.model?.template.recoveries ?? [])
-                .filter(r =>
-                  chosen.every(i =>
-                    i.model?.template.recoveries?.some(
-                      other => other.id === r.id
-                    )
-                  )
-                )
-                .map(recovery => (
-                  <Button
-                    key={recovery.id}
-                    title={recovery.label}
-                    variant="secondary"
-                    disabled={!online}
-                    onPress={() =>
-                      setOperation({
-                        kind: 'recovery',
-                        recovery,
-                        items: chosen,
-                      })
-                    }
-                  />
-                ))}
-            </View>
-            {!online ? (
-              <Text color="inkMuted">
-                Conecte-se para aplicar uma operação em grupo.
-              </Text>
-            ) : null}
-          </View>
+        {/* Mesa vazia: nada a selecionar (NW-17). A contagem e as ações
+            ficam na barra fixa embaixo (T-49) */}
+        {rows.length || selecting ? (
+          <Button
+            title={selecting ? 'Cancelar seleção' : 'Selecionar personagens'}
+            variant="secondary"
+            onPress={selecting ? selection.stop : selection.start}
+          />
         ) : null}
       </View>
       <TabPanel tabsId="table-scope" tab={scope}>
@@ -296,38 +320,32 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
                 : 'Nenhuma ficha na crônica ainda.'}
           </Text>
         ) : (
-          shown.map(item => (
-            <TableRow
-              key={item.row.id}
-              item={item}
-              onOpen={open}
-              selecting={selecting}
-              selected={selected.has(item.row.id)}
-              onSelect={select}
+          <>
+            <TableGrid
+              items={sections.pcs}
+              columns={columns}
+              renderItem={row}
             />
-          ))
+            {sections.npcs.length ? (
+              <>
+                <View style={styles.section} testID="table-npcs">
+                  <SectionHeader title="NPCs" level="group" />
+                </View>
+                <TableGrid
+                  items={sections.npcs}
+                  columns={columns}
+                  renderItem={row}
+                  testID="table-grid-npcs"
+                />
+              </>
+            ) : null}
+          </>
         )}
       </TabPanel>
-      {xpSheet === 'grant' ? (
-        <GrantXpSheet
-          chronicleId={chronicleId}
-          items={chosen}
-          onClose={() => setXpSheet(null)}
-        />
-      ) : null}
-      {xpSheet === 'requests' ? (
+      {requests ? (
         <XpRequestsSheet
           chronicleId={chronicleId}
-          onClose={() => setXpSheet(null)}
-        />
-      ) : null}
-      {operation ? (
-        <OperationSheet
-          chronicleId={chronicleId}
-          items={operation.items}
-          kind={operation.kind}
-          recovery={operation.recovery}
-          onClose={() => setOperation(null)}
+          onClose={() => setRequests(false)}
         />
       ) : null}
       <RollFeed chronicleId={chronicleId} />
@@ -342,9 +360,21 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
+  section: {
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[3],
+  },
   hint: {
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[2],
     gap: tokens.space[2],
   },
+  // O espaço entre os cartões é o recuo de cada célula (metade de cada lado)
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: tokens.layout.gutter - tokens.space[3] / 2,
+    paddingVertical: tokens.space[2] - tokens.space[3] / 2,
+  },
+  cell: { padding: tokens.space[3] / 2 },
 })

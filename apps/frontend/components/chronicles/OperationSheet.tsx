@@ -22,6 +22,9 @@ import {
 import type { TableItem } from './tableItems'
 import { useRevertOperation } from './useRevertOperation'
 
+// O "Desfazer" da operação em grupo dura mais (T-76, P09-C)
+export const GROUP_TOAST_MS = 10_000
+
 /** A mesma folha para trilhas e recursos: alvos, tipos e rótulos vêm do template. */
 export function OperationSheet({
   chronicleId,
@@ -136,6 +139,9 @@ export function OperationSheet({
       onClose()
       toast.show({
         message: `${kind === 'recovery' ? recovery?.label : kind === 'damage' ? 'Dano aplicado' : 'Cura aplicada'} em ${items.length} ${items.length === 1 ? 'personagem' : 'personagens'}.`,
+        // T-76: até 20 fichas, conferidas antes de desfazer; os outros
+        // avisos ficam nos 5 s do DS
+        durationMs: GROUP_TOAST_MS,
         action: {
           label: 'Desfazer',
           onPress: () => {

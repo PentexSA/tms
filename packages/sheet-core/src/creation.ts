@@ -849,8 +849,10 @@ export function creationFreeze(
 
 // Metadados de criação gravados na ficha (`characters.creation`, doc/plano-v4.md
 // §3.4): as escolhas do jogador, o ajuste do narrador (uma camada da
-// configuração, já com o padrão da crônica de quando a ficha nasceu) e o
-// motivo da última devolução. Só dono e narrador leem.
+// configuração, já com o padrão da crônica de quando a ficha nasceu), o
+// motivo da última devolução e os marcadores do ciclo (D-03, D-04): o pedido
+// de ajuste do narrador e o aviso de "terminei" do dono. Só dono e narrador
+// leem.
 
 export const RETURN_REASON_MAX = 500
 
@@ -859,10 +861,25 @@ export interface CreationReturn {
   readonly at: string
 }
 
+export interface CreationReady {
+  readonly at: string
+}
+
 export interface CharacterCreation {
   readonly choices?: CreationChoices
   readonly config?: CreationConfigLayer
   readonly returned?: CreationReturn
+  // D-04: o narrador pediu ajuste (motivo e data), com a ficha em criação
+  readonly adjust?: CreationReturn
+  // D-03: o dono avisou que terminou (criação livre)
+  readonly ready?: CreationReady
+}
+
+function reasonOf(json: unknown): CreationReturn | undefined {
+  const r = rec(json)
+  return r && typeof r.reason === 'string' && typeof r.at === 'string'
+    ? { reason: r.reason, at: r.at }
+    : undefined
 }
 
 /**
@@ -879,6 +896,8 @@ export function parseCharacterCreation(
     choices?: CreationChoices
     config?: CreationConfigLayer
     returned?: CreationReturn
+    adjust?: CreationReturn
+    ready?: CreationReady
   } = {}
   if (
     c.choices !== undefined &&
@@ -887,9 +906,12 @@ export function parseCharacterCreation(
     out.choices = c.choices as CreationChoices
   if (c.config !== undefined && !validateCreationConfig(model, c.config).length)
     out.config = c.config as CreationConfigLayer
-  const r = rec(c.returned)
-  if (r && typeof r.reason === 'string' && typeof r.at === 'string')
-    out.returned = { reason: r.reason, at: r.at }
+  const returned = reasonOf(c.returned)
+  if (returned) out.returned = returned
+  const adjust = reasonOf(c.adjust)
+  if (adjust) out.adjust = adjust
+  const ready = rec(c.ready)
+  if (ready && typeof ready.at === 'string') out.ready = { at: ready.at }
   return out
 }
 

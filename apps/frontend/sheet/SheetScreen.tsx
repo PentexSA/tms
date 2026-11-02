@@ -21,10 +21,10 @@ import {
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
-import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
+import { characterState } from '../components/chronicles/characterState'
 import { messageOf, statusOf } from '../lib/errors'
 import {
   useSetNpcPresentation,
@@ -33,24 +33,41 @@ import {
 import { useRefetchOnFocus } from '../lib/queries/focus'
 import { CreationContext } from './creation/CreationContext'
 import {
+  type CreationInfo,
   completionFreebies,
   creationActive,
   creationInfoOf,
   creationInputOf,
   freebiesNotes,
+  sheetStateRow,
 } from './creation/creation'
 import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
 import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
-import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
+import { useSheetBack } from './navigation'
+import {
+  blockedBy,
+  deadLabel,
+  LifecycleContext,
+  type SheetLifecycle,
+} from './policy'
 import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
 import {
   createSheetStore,
   type SheetState as SheetStoreState,
 } from './store/sheetStore'
+import {
+  lowerDone,
+  type NpcVisibility,
+  npcVisibilityOf,
+  REVEAL_COPY,
+  type Reveal,
+  RevealNpcSheet,
+  revealsMore,
+} from './storyteller/RevealNpcSheet'
 import {
   StatusMenuButton,
   type StatusMenuDraft,
@@ -72,7 +89,6 @@ export function SheetScreen({
   // conta por pontos vale (v4)
   readonly initialMode?: SheetMode
 }) {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const sync = useSync()
   const state = useSheetData(id)
@@ -122,16 +138,15 @@ export function SheetScreen({
       void sync.drafts.remove(id).catch(() => undefined)
     }
   }, [id, queryClient, state, sync])
+  // O NPC com a identidade revelada também volta para a crônica dele (T-81)
   const chronicle =
-    state.status === 'ready' || state.status === 'viewer'
-      ? state.character.chronicle
+    state.status === 'ready' ||
+    state.status === 'viewer' ||
+    state.status === 'identity'
+      ? (state.character.chronicle ?? null)
       : null
-  const back = chronicle
-    ? {
-        label: chronicle.name,
-        onPress: () => router.replace(`/chronicles/${chronicle.id}`),
-      }
-    : { label: 'Crônicas', onPress: () => router.replace('/') }
+  // T-39: o "‹" volta à crônica de baixo, com a aba e a rolagem dela
+  const back = useSheetBack(chronicle)
   const title =
     state.status === 'ready'
       ? state.character.name
@@ -159,8 +174,11 @@ export function SheetScreen({
       body = <IdentityProjection character={state.character} />
       break
     case 'viewer':
+      // T-15: no nativo (Yoga), o filho com flex 1 num pai de altura
+      // automática fica com altura 0, e só o aviso aparecia. O contêiner
+      // ocupa a tela: o aviso fica em cima e a ficha rola embaixo.
       body = (
-        <View>
+        <View style={styles.viewer} testID="viewer-sheet">
           <View style={styles.readNotice}>
             <Text variant="fieldLabel">Leitura</Text>
             <Text color="inkMuted">
@@ -218,7 +236,10 @@ export function SheetScreen({
             {state.status !== 'ready' ? null : wide ? (
               <>
                 {state.roles.includes('storyteller') ? (
-                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
+                  <StatusMenuButton
+                    {...narratorOf(id, state, creation)}
+                    {...draft}
+                  />
                 ) : null}
                 {xpLedgerFields(state.model).length ? (
                   <Button
@@ -240,7 +261,7 @@ export function SheetScreen({
               <SheetMenu
                 narrator={
                   state.roles.includes('storyteller')
-                    ? narratorOf(id, state)
+                    ? narratorOf(id, state, creation)
                     : null
                 }
                 draft={draft}
@@ -297,14 +318,30 @@ export function SheetScreen({
 /** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
 function narratorOf(
   id: string,
-  state: Extract<SheetState, { status: 'ready' }>
+  state: Extract<SheetState, { status: 'ready' }>,
+  // O mesmo `creationInfoOf` da tela: uma leitura só da criação
+  info: CreationInfo | null
 ): StatusMenuTarget {
+  const locked = state.character.lockedAt !== null
   return {
     characterId: id,
     chronicleId: state.character.chronicle.id,
     model: state.model,
     status: state.character.status,
-    locked: state.character.lockedAt !== null,
+    locked,
+    // D-04: o narrador pede ajuste em PC de outra pessoa
+    adjustable:
+      state.character.kind !== 'npc' && !state.roles.includes('owner'),
+    // O mesmo estado da lista e da Mesa, sem "Concluída em" no gatilho
+    state: characterState(
+      sheetStateRow({
+        status: state.character.status,
+        kind: state.character.kind === 'npc' ? 'npc' : 'pc',
+        locked,
+        info,
+      }),
+      { narrating: true, deadLabel: deadLabel(state.model), completed: false }
+    ),
   }
 }
 
@@ -390,7 +427,9 @@ function LiveSheet({
 }) {
   const sync = useSync()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
+  const kind: 'pc' | 'npc' = state.character.kind === 'npc' ? 'npc' : 'pc'
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
     [status, lockedAt, member]
@@ -494,6 +533,29 @@ function LiveSheet({
   // O modo de abertura da renderização anterior: a ficha aberta no Editar da
   // criação livre (inclusive pelo cache persistido, antes da resposta do
   // servidor) segue o modo de abertura novo quando a criação acaba
+  // Nota do P04-C (P04-D §3.7): a criação acabou com a dona no Editar e
+  // alterações não salvas. O Editar fica, mas em silêncio ela não saberia que
+  // o próximo "Concluir" vira evolução. Antes do efeito do modo, que pode
+  // descartar o rascunho
+  const [completedWhileEditing, setCompletedWhileEditing] = useState(false)
+  const statusBefore = useRef(status)
+  useEffect(() => {
+    const before = statusBefore.current
+    statusBefore.current = status
+    if (before !== 'creating' || status !== 'active') return
+    const s = store.getState()
+    if (s.mode === 'evolve' && (s.draft?.size ?? 0) > 0)
+      setCompletedWhileEditing(true)
+  }, [store, status])
+  useEffect(() => {
+    if (!completedWhileEditing) return
+    const clear = (s: ReturnType<typeof store.getState>) => {
+      if (!isDraftMode(s.mode) || !s.draft?.size)
+        setCompletedWhileEditing(false)
+    }
+    clear(store.getState())
+    return store.subscribe(clear)
+  }, [store, completedWhileEditing])
   const openedAs = useRef(opening)
   useEffect(() => {
     const s = store.getState()
@@ -531,10 +593,20 @@ function LiveSheet({
       characterId: id,
       chronicleId: state.character.chronicle.id,
       status,
+      kind,
       info,
       active,
+      completedWhileEditing,
     }),
-    [id, state.character.chronicle.id, status, info, active]
+    [
+      id,
+      state.character.chronicle.id,
+      status,
+      kind,
+      info,
+      active,
+      completedWhileEditing,
+    ]
   )
   return (
     <>
@@ -545,6 +617,13 @@ function LiveSheet({
           <SheetView
             store={store}
             editable
+            // T-40: puxar rebusca a ficha; a resposta passa pelo received
+            onRefresh={() =>
+              queryClient.invalidateQueries(
+                { queryKey: sheetKeys.character(id) },
+                { cancelRefetch: false }
+              )
+            }
             header={
               <>
                 <NpcVisibilityBar state={state} />
@@ -566,6 +645,7 @@ function LiveSheet({
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+  viewer: { flex: 1 },
   readNotice: {
     gap: tokens.space[1],
     paddingHorizontal: tokens.layout.gutter,
@@ -624,11 +704,52 @@ function NpcVisibilityBar({
     key: string
   } | null>(null)
   const presentationKey = useRef<string | null>(null)
+  const toast = useToast()
+  // T-46: revelar mais abre a confirmação; o rádio só muda com a resposta
+  const [reveal, setReveal] = useState<{
+    readonly target: Reveal
+    readonly open: boolean
+  } | null>(null)
+  // O aviso do sucesso espera a folha sair da tela (onClosed)
+  const revealed = useRef<string | null>(null)
   useEffect(() => {
     setPortraitUrl(character.identity.portraitUrl ?? '')
   }, [character.identity.portraitUrl])
+  // A folha aberta sobre dado velho (o 409 rebuscou a ficha): se a
+  // visibilidade já chegou ao alvo ou passou dele, confirmar baixaria o NPC
+  // com o texto de "Revelar". A folha fecha, sem enviar, e o erro fica sob
+  // o rádio
+  const current = npcVisibilityOf(character.visibility)
+  const pending = change.isPending
+  useEffect(() => {
+    if (reveal?.open && !pending && !revealsMore(current, reveal.target))
+      setReveal({ target: reveal.target, open: false })
+  }, [current, pending, reveal])
   if (character.kind !== 'npc' || !state.roles.includes('storyteller'))
     return null
+  const send = (visibility: NpcVisibility, done: () => void) => {
+    const pending =
+      visibilityCommand.current?.visibility === visibility
+        ? visibilityCommand.current
+        : { visibility, key: randomUUID() }
+    visibilityCommand.current = pending
+    change.mutate(
+      {
+        visibility,
+        revision: character.visibilityRevision,
+        clientCommandId: pending.key,
+      },
+      {
+        onSuccess: () => {
+          visibilityCommand.current = null
+          done()
+        },
+        onError: error => {
+          if (statusOf(error)) visibilityCommand.current = null
+        },
+      }
+    )
+  }
   const choices = [
     { id: 'hidden' as const, label: 'Oculto' },
     {
@@ -656,30 +777,50 @@ function NpcVisibilityBar({
         onChange={id => {
           const choice = choices.find(c => c.id === id)
           if (!choice || character.visibility === choice.id) return
-          const pending =
-            visibilityCommand.current?.visibility === choice.id
-              ? visibilityCommand.current
-              : { visibility: choice.id, key: randomUUID() }
-          visibilityCommand.current = pending
-          change.mutate(
-            {
-              visibility: choice.id,
-              revision: character.visibilityRevision,
-              clientCommandId: pending.key,
-            },
-            {
-              onSuccess: () => {
-                visibilityCommand.current = null
-              },
-              onError: error => {
-                if (statusOf(error)) visibilityCommand.current = null
-              },
-            }
+          if (revealsMore(current, choice.id)) {
+            // O erro de uma tentativa anterior não abre a folha nova
+            change.reset()
+            setReveal({ target: choice.id, open: true })
+            return
+          }
+          send(choice.id, () =>
+            toast.show({ message: lowerDone(choice.id, character.name) })
           )
         }}
       />
-      {change.isError ? (
+      {change.isError && !reveal?.open ? (
         <Text color="danger">{messageOf(change.error)}</Text>
+      ) : null}
+      {reveal ? (
+        <RevealNpcSheet
+          visible={reveal.open}
+          target={reveal.target}
+          name={character.name}
+          busy={change.isPending}
+          error={change.isError ? messageOf(change.error) : null}
+          onConfirm={() => {
+            // Só sobe: a revelação nunca baixa a visibilidade
+            if (!revealsMore(current, reveal.target)) {
+              setReveal({ target: reveal.target, open: false })
+              return
+            }
+            send(reveal.target, () => {
+              revealed.current = REVEAL_COPY[reveal.target].done
+              setReveal({ target: reveal.target, open: false })
+            })
+          }}
+          // Com o envio em curso, fechar não desfaria a revelação: espera
+          onClose={() => {
+            if (!change.isPending)
+              setReveal({ target: reveal.target, open: false })
+          }}
+          onClosed={() => {
+            setReveal(null)
+            const message = revealed.current
+            revealed.current = null
+            if (message) toast.show({ message })
+          }}
+        />
       ) : null}
       <TextField
         label="Retrato HTTPS"

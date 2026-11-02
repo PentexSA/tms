@@ -5,7 +5,7 @@ import {
   type RoleName,
 } from '@tms/sheet-core'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
@@ -19,7 +19,11 @@ import {
   tokens,
 } from '../../test/session'
 import { SheetScreen } from '../SheetScreen'
-import { storytellerOnlyText } from '../storyteller/StorytellerBar'
+import { hiddenFromOwner } from '../storyteller/privacy'
+import {
+  narratorTarget,
+  storytellerOnlyText,
+} from '../storyteller/StorytellerBar'
 import type { QueuedBatch } from '../sync/outbox'
 import type { PostOutcome } from '../sync/sender'
 
@@ -98,13 +102,47 @@ const openHistory = async () => {
   await sheetsDismissed()
 }
 
+// A ficha em criação vista pelo narrador; `points` liga a conta da V20
+const creating = (values: Record<string, unknown> | null, points = true) =>
+  ok({
+    ...character(['storyteller']).data,
+    status: 'creating',
+    lockedAt: null,
+    member: true,
+    sheet: {
+      values: values ?? { name: 'Nova', clan: 'tremere' },
+      specialties: {},
+    },
+    ...(points
+      ? {
+          creation: {
+            revision: 1,
+            mode: 'points',
+            accounting: true,
+            choices: {
+              priorities: {
+                attributes: ['physical', 'social', 'mental'],
+                abilities: ['talents', 'skills', 'knowledges'],
+              },
+            },
+            config: {},
+            effective: effectiveCreationConfig(modelOf('vtm-v20')),
+            returned: null,
+            approval: false,
+          },
+        }
+      : {}),
+  })
+
 describe('Editar como narrador', () => {
   it('a ficha do jogador abre em Leitura; editar é explícito e avisado', async () => {
     await open(['storyteller'])
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
     expect(
-      screen.queryByRole('button', { name: 'Editar Notas do Narrador' })
+      screen.queryByRole('button', { name: /^Editar Notas do Narrador/ })
     ).toBeNull()
+    // T-33: em Leitura, sem seletor de modo
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     fireEvent.press(
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
@@ -114,8 +152,13 @@ describe('Editar como narrador', () => {
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
       'Editando como narrador. As alterações ficam assinadas no histórico.'
     )
+    // A ficha em uso vai ao Jogo, como antes; o seletor aparece para trocar
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeTruthy()
+    expect(screen.queryByRole('radio', { name: 'Leitura' })).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
   })
 
   it('o narrador edita as Notas do Narrador; o lote sai com o from atual', async () => {
@@ -129,7 +172,7 @@ describe('Editar como narrador', () => {
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
     fireEvent.press(
-      screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+      screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
     )
     const field = screen.getByLabelText('Notas do Narrador')
     expect(field.props.value).toBe(
@@ -161,7 +204,7 @@ describe('Editar como narrador', () => {
     )
     const edit = () =>
       fireEvent.press(
-        screen.getByRole('button', { name: 'Editar Notas do Narrador' })
+        screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
       )
     edit()
     fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
@@ -196,6 +239,201 @@ describe('Editar como narrador', () => {
         expect(canWrite(model, f.id, ['owner'])).toBe(false)
       }
     }
+  })
+})
+
+// R-09 (P09-C): as Notas do Narrador dizem que são privadas, na Leitura e na
+// folha de edição; na ficha em criação, a folha aponta o "Pedir ajuste"
+describe('Notas do Narrador privadas (R-09)', () => {
+  it('hiddenFromOwner vem das permissões, nos três sistemas', () => {
+    for (const system of ['vtm-v20', 'mta-m20', 'wta-w20']) {
+      const model = modelOf(system)
+      expect(hiddenFromOwner(model, 'storytellerNotes')).toBe(true)
+      expect(hiddenFromOwner(model, 'notes')).toBe(false)
+    }
+  })
+
+  it('na Leitura, a legenda e o nome acessível dizem que são privadas', async () => {
+    await open(['storyteller'])
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    expect(
+      screen.getByText('Notas do Narrador · privadas: o jogador não vê')
+    ).toBeTruthy()
+    expect(screen.getByLabelText(/Privadas: o jogador não vê$/)).toBeTruthy()
+    // As Notas do jogador não ganham o rótulo
+    expect(screen.queryByText(/^Notas · privadas/)).toBeNull()
+  })
+
+  it('a folha de edição diz que o jogador não vê; o botão também avisa', async () => {
+    await open(['storyteller'])
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Editar como narrador' })
+    )
+    // O aviso no nome do botão, começando pelo texto visível (no web, a
+    // dica não chega ao DOM)
+    const edit = screen.getByRole('button', {
+      name: 'Editar Notas do Narrador. Privadas: o jogador não vê',
+    })
+    fireEvent.press(edit)
+    const notice = screen.getByText('Privadas: o jogador não vê estas notas.')
+    // O campo continua com o nome do rótulo e ouve o aviso pela dica (app)
+    const field = screen.getByLabelText('Notas do Narrador')
+    expect(field.props.accessibilityHint).toBe(
+      'Privadas: o jogador não vê estas notas.'
+    )
+    expect(notice.props.nativeID).toMatch(/-privacy$/)
+    // A ficha em uso não tem o "Pedir ajuste"
+    expect(screen.queryByText(/Pedir ajuste/)).toBeNull()
+    // O título e o nome do campo continuam (o E2E os usa)
+    expect(screen.getByLabelText('Notas do Narrador')).toBeTruthy()
+  })
+
+  it('no web, o campo aponta o aviso pelo aria-describedby', async () => {
+    const original = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      await open(['storyteller'])
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Editar como narrador' })
+      )
+      fireEvent.press(
+        screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
+      )
+      const notice = screen.getByText('Privadas: o jogador não vê estas notas.')
+      expect(screen.getByLabelText('Notas do Narrador').props).toMatchObject({
+        'aria-describedby': notice.props.nativeID,
+      })
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        value: original,
+        configurable: true,
+      })
+    }
+  })
+
+  it('na ficha em criação, a folha aponta o "Pedir ajuste"', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({
+        name: 'Nova',
+        clan: 'tremere',
+        storytellerNotes: 'corrija a Força',
+      })
+    )
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Editar como narrador' })
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: /^Editar Notas do Narrador/ })
+    )
+    expect(
+      screen.getByText('Privadas: o jogador não vê estas notas.')
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Para pedir uma correção ao jogador, use 'Pedir ajuste' em Ações do narrador."
+      )
+    ).toBeTruthy()
+  })
+})
+
+// T-33 (P09-C): o narrador revisa em Leitura, com a conta, e só edita pelo
+// "Editar como narrador", que abre a edição de fato
+describe('Leitura do narrador com a conta (T-33)', () => {
+  const pointsSheet = () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere', strength: 3 })
+    )
+  }
+  const render = async (post?: () => Promise<PostOutcome>) => {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), { post })
+    return screen.findByRole('button', { name: 'Editar como narrador' })
+  }
+
+  it('em criação por pontos, abre em Leitura com o Orçamento, sem editar', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    pointsSheet()
+    await render(post as never)
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    // A conta: o saldo e o que falta, sem as "Regras da casa" (que gravam)
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies')).toBeTruthy()
+    expect(screen.queryByTestId('creation-budget')).toBeNull()
+    expect(screen.queryByText('Regras da casa')).toBeNull()
+    // Nada editável: nenhum controle de pontos, e nenhum lote na fila
+    expect(screen.queryAllByRole('adjustable')).toHaveLength(0)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('"Editar como narrador" abre a Criação; voltar com alteração pergunta', async () => {
+    pointsSheet()
+    fireEvent.press(await render())
+    expect(screen.getByRole('radio', { name: 'Criação' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Jogo' })).toBeTruthy()
+    expect(
+      screen.getByLabelText('Editando como narrador', { exact: true })
+    ).toBeTruthy()
+    // As "Regras da casa" voltam na Criação
+    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    expect(screen.getByTestId('creation-budget')).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Destreza' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
+    expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
+    await sheetsDismissed()
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
+  })
+
+  it('sem alterações, "Voltar à leitura" volta direto', async () => {
+    pointsSheet()
+    fireEvent.press(await render())
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
+    expect(screen.queryByText(/^Salvar \d/)).toBeNull()
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+  })
+
+  it('salvar no Editar volta à Leitura, de onde o narrador entrou', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere' }, false)
+    )
+    fireEvent.press(await render(post as never))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Destreza' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    // O botão de salvar do Editar (P03-D, D-01)
+    fireEvent.press(screen.getByRole('button', { name: /^Salvar alterações$/ }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await sheetsDismissed()
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(screen.getByText('Ficha de dona.')).toBeTruthy()
+  })
+
+  it('na criação livre, "Editar como narrador" vai ao Editar', async () => {
+    calls.characterGet.mockResolvedValue(
+      creating({ name: 'Nova', clan: 'tremere' }, false)
+    )
+    fireEvent.press(await render())
+    expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
+    // Sem conta, sem Orçamento, em qualquer modo
+    expect(screen.queryByRole('tab', { name: 'Orçamento' })).toBeNull()
+  })
+
+  it('narratorTarget: Criação, Editar ou Jogo', () => {
+    expect(narratorTarget({ active: true, status: 'creating' })).toBe('create')
+    expect(narratorTarget({ active: true, status: 'pending' })).toBe('create')
+    expect(narratorTarget({ active: false, status: 'creating' })).toBe('evolve')
+    expect(narratorTarget({ active: false, status: 'active' })).toBe('play')
+    expect(narratorTarget(null)).toBe('play')
   })
 })
 
@@ -259,6 +497,47 @@ describe('Histórico de alterações', () => {
       )
     ).toBeTruthy()
     expect(screen.getByText('Criação concluída')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
+  })
+
+  // P04-D (R-12): os outros passos do ciclo, sem "Desfazer" e sem o motivo
+  it('enviar, devolver, pedir ajuste e avisar aparecem como passos', async () => {
+    const stepOf = (
+      id: string,
+      byRole: 'owner' | 'storyteller',
+      event: string
+    ) => ({
+      ...item(id, byRole, []),
+      event,
+      reversible: false,
+      sheetVersion: null,
+      operationId: null,
+    })
+    calls.historyGet.mockResolvedValue(
+      ok({
+        items: [
+          stepOf('a4', 'owner', 'creation.ready'),
+          stepOf('a3', 'storyteller', 'creation.adjust'),
+          stepOf('a2', 'storyteller', 'creation.returned'),
+          stepOf('a1', 'owner', 'creation.submitted'),
+          // Um passo que esta versão não conhece: só a data e o autor
+          stepOf('a0', 'owner', 'creation.reopened'),
+        ],
+        next: null,
+      })
+    )
+    await open(['owner'])
+    await openHistory()
+    expect(
+      await screen.findByLabelText(
+        /^Avisou que terminou\. às \d\d:\d\d · dona$/
+      )
+    ).toBeTruthy()
+    expect(
+      screen.getByLabelText(/^Ajuste pedido\. às \d\d:\d\d · ana \(narrador\)$/)
+    ).toBeTruthy()
+    expect(screen.getByText('Devolvida para correção')).toBeTruthy()
+    expect(screen.getByText('Enviada para aprovação')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
   })
 
@@ -402,36 +681,6 @@ describe('sobra de bônus na confirmação do narrador (T-18)', () => {
     selfControl: 3,
     courage: 3,
   }
-  const creating = (values: Record<string, unknown> | null, points = true) =>
-    ok({
-      ...character(['storyteller']).data,
-      status: 'creating',
-      lockedAt: null,
-      member: true,
-      sheet: {
-        values: values ?? { name: 'Nova', clan: 'tremere' },
-        specialties: {},
-      },
-      ...(points
-        ? {
-            creation: {
-              revision: 1,
-              mode: 'points',
-              accounting: true,
-              choices: {
-                priorities: {
-                  attributes: ['physical', 'social', 'mental'],
-                  abilities: ['talents', 'skills', 'knowledges'],
-                },
-              },
-              config: {},
-              effective: effectiveCreationConfig(modelOf('vtm-v20')),
-              returned: null,
-              approval: false,
-            },
-          }
-        : {}),
-    })
   const confirm = async () => {
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     // Abaixo de 900, as ações do narrador ficam no "Mais opções" (T-11)
@@ -462,5 +711,189 @@ describe('sobra de bônus na confirmação do narrador (T-18)', () => {
     calls.characterGet.mockResolvedValue(creating(COMPLETE, false))
     await confirm()
     expect(screen.queryByText(/pontos? de bônus/)).toBeNull()
+  })
+})
+
+// P04-D (D-04, R-14): o narrador pede ajuste, com motivo, numa ficha em
+// criação, pelo mesmo menu; o servidor confere papel e estado
+describe('pedir ajuste', () => {
+  const creating = (over: Record<string, unknown> = {}) =>
+    ok({
+      ...character(['storyteller']).data,
+      status: 'creating',
+      lockedAt: null,
+      member: true,
+      creation: {
+        revision: 2,
+        mode: 'free',
+        accounting: true,
+        choices: {},
+        config: {},
+        effective: effectiveCreationConfig(modelOf('vtm-v20')),
+        returned: null,
+        adjust: null,
+        ready: null,
+        approval: false,
+      },
+      ...over,
+    })
+  const openMenu = async () => {
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador/ }))
+    await sheetsDismissed()
+  }
+
+  it('aparece em creating, no PC de outra pessoa; o motivo é obrigatório', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(ok({ revision: 3 }))
+    await openMenu()
+    const actions = screen
+      .getAllByRole('button')
+      .map(b => b.props.testID)
+      .filter((id): id is string => /^status-/.test(String(id)))
+    expect(actions).toEqual([
+      'status-complete',
+      'status-adjust',
+      'status-archive',
+      'status-dead',
+    ])
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    expect(screen.getByRole('header', { name: 'Pedir ajuste' })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'O jogador vê o motivo na ficha, como numa devolução. A ficha continua em criação.'
+      )
+    ).toBeTruthy()
+    const field = screen.getByTestId('status-adjust-reason')
+    expect(field.props.maxLength).toBe(500)
+    expect(screen.getByTestId('status-adjust-confirm')).toBeDisabled()
+    fireEvent.changeText(field, '   ')
+    expect(screen.getByTestId('status-adjust-confirm')).toBeDisabled()
+    fireEvent.changeText(field, '  Refaça os Antecedentes ')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    await waitFor(() =>
+      expect(calls.creationAdjustPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({
+          reason: 'Refaça os Antecedentes',
+          revision: 2,
+        })
+      )
+    )
+    expect(
+      await screen.findByText('Ajuste pedido. O jogador vê o motivo na ficha.')
+    ).toBeTruthy()
+  })
+
+  it('o "enviar" do teclado manda o texto do evento (e0a4078)', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(ok({ revision: 3 }))
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    const field = screen.getByTestId('status-adjust-reason')
+    fireEvent.changeText(field, 'Refaça')
+    fireEvent(field, 'submitEditing', {
+      nativeEvent: { text: 'Refaça os Antecedentes' },
+    })
+    await waitFor(() =>
+      expect(calls.creationAdjustPost).toHaveBeenCalledWith(
+        ID,
+        expect.objectContaining({ reason: 'Refaça os Antecedentes' })
+      )
+    )
+  })
+
+  it('422 fica na folha, com o texto; 409 avisa e rebusca', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue(fail(422, 'motivo inválido'))
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    fireEvent.changeText(screen.getByTestId('status-adjust-reason'), 'x > y')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'Escreva o que precisa ser ajustado (até 500 caracteres, sem < nem >).'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-adjust-reason').props.value).toBe('x > y')
+    calls.creationAdjustPost.mockResolvedValue(
+      fail(409, 'a configuração da criação mudou')
+    )
+    const before = calls.characterGet.mock.calls.length
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'A ficha mudou desde que você abriu. Confira e peça de novo.'
+      )
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(calls.characterGet.mock.calls.length).toBeGreaterThan(before)
+    )
+  })
+
+  it('o 409 com motivo próprio diz por que o pedido não vale', async () => {
+    calls.characterGet.mockResolvedValue(creating())
+    calls.creationAdjustPost.mockResolvedValue({
+      data: null,
+      error: {
+        status: 409,
+        value: {
+          error: 'só uma ficha em criação recebe pedido de ajuste',
+          code: 'CREATION_NOT_CREATING',
+        },
+      },
+    })
+    await openMenu()
+    fireEvent.press(screen.getByTestId('status-adjust'))
+    fireEvent.changeText(screen.getByTestId('status-adjust-reason'), 'Refaça')
+    fireEvent.press(screen.getByTestId('status-adjust-confirm'))
+    expect(
+      await screen.findByText(
+        'A ficha não está mais em criação: o pedido de ajuste não vale aqui.'
+      )
+    ).toBeTruthy()
+  })
+
+  it.each([
+    [
+      'NPC',
+      {
+        projection: 'full',
+        kind: 'npc',
+        visibility: 'hidden',
+        visibilityRevision: 0,
+        presentationRevision: 0,
+        identity: {
+          name: 'Sentinela',
+          chip: '',
+          subtitle: null,
+          portraitUrl: null,
+        },
+      },
+      'creating',
+    ],
+    [
+      'ficha do próprio narrador',
+      { roles: ['owner', 'storyteller'] },
+      'creating',
+    ],
+    ['pending', {}, 'pending'],
+    ['ativa', {}, 'active'],
+  ])('não aparece: %s', async (_, over, status) => {
+    calls.characterGet.mockResolvedValue(creating({ ...over, status }))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Mais opções' }))
+    // Em pending, o menu do narrador não tem ação (aprovar e devolver ficam
+    // no painel)
+    const narrator = screen.queryByRole('button', {
+      name: /^Ações do narrador/,
+    })
+    if (narrator) {
+      fireEvent.press(narrator)
+      await sheetsDismissed()
+      expect(screen.getByTestId('status-archive')).toBeTruthy()
+    }
+    expect(screen.queryByTestId('status-adjust')).toBeNull()
   })
 })

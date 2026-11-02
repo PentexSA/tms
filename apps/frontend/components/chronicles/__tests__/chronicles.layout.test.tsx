@@ -1,12 +1,16 @@
-import { screen } from '@testing-library/react-native'
+import { render, screen, within } from '@testing-library/react-native'
 import { tokens } from '@tms/ui'
 import { StyleSheet } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
+import { example, modelOf, sheetFor } from '../../../test/fixtures'
 import { renderWithQueryClient } from '../../../test/utils'
 import { CampaignBackstage } from '../CampaignBackstage'
 import { RollFeed } from '../RollFeed'
+import { TableRow } from '../TableRow'
+import { tableColumns } from '../TableView'
+import { buildItem } from '../tableItems'
 
 // P08 (onda 2), T-67: os títulos dos Bastidores e da Mesa ficam com a
 // margem da página, como os da lista de fichas. O SectionHeader não tem
@@ -66,5 +70,82 @@ describe('T-67: títulos com a margem da página', () => {
       await screen.findByRole('header', { name: 'Rolagens da mesa' })
     ).toBeTruthy()
     expect(gutterOf('roll-feed-header')).toBe(tokens.layout.gutter)
+  })
+})
+
+// T-48 (P09-C): o cartão da Mesa compacto, com os recursos numa linha
+describe('T-48: cartão da Mesa', () => {
+  const HELENA = '00000000-0000-4000-8000-00000000c001'
+  const item = () => {
+    const c = example('helena')
+    return buildItem(
+      {
+        id: HELENA,
+        name: String(c.sheet.values.name),
+        owner: { id: 'u-dona', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 2,
+        status: 'creating',
+        updatedAt: new Date().toISOString(),
+        sheet: sheetFor('helena', ['storyteller']).sheet,
+      },
+      modelOf('vtm-v20')
+    )
+  }
+  const flat = (el: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(el.props.style as never) ?? {}
+
+  it('os recursos numa linha, cada um com a mesma fração da largura', () => {
+    render(<TableRow item={item()} onOpen={jest.fn()} />)
+    const dock = screen.getByTestId(`table-dock-${HELENA}`)
+    expect(flat(dock).flexDirection).toBe('row')
+    const cells = dock.children as unknown as { props: { style?: unknown } }[]
+    expect(cells).toHaveLength(modelOf('vtm-v20').template.dock.length)
+    for (const cell of cells)
+      expect(flat(cell)).toMatchObject({ flex: 1, minWidth: 0 })
+    // O dock fica fora da coluna de texto: na largura inteira do cartão
+    const card = screen.getByTestId(`table-row-${HELENA}`)
+    expect(flat(card).flexDirection).not.toBe('row')
+    // Os selos ficam na linha do selo de identidade, que quebra quando não
+    // cabe: sem uma linha só para eles, o cartão comum fica abaixo de 170
+    // a 390 (medido no E2E)
+    const badges = screen.getByTestId(`table-badges-${HELENA}`)
+    expect(flat(badges)).toMatchObject({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    })
+    expect(within(badges).getByText('Tremere')).toBeTruthy()
+    expect(within(badges).getByText('Em criação')).toBeTruthy()
+    expect(
+      within(screen.getByTestId(`table-row-${HELENA}`)).queryAllByTestId(
+        /^table-badges-/
+      )
+    ).toHaveLength(1)
+  })
+
+  it('a grade: 1 coluna a 390, 2 a 750, 3 a 1280; fonte grande, 1', () => {
+    expect(tableColumns(390, false)).toBe(1)
+    expect(tableColumns(750, false)).toBe(2)
+    expect(tableColumns(1024, false)).toBe(2)
+    expect(tableColumns(1280, false)).toBe(3)
+    // A largura do conteúdo para em 1200: nunca mais de 3
+    expect(tableColumns(2560, false)).toBe(3)
+    // Fonte ≥ 130% ou tela estreita: uma coluna
+    expect(tableColumns(1280, true)).toBe(1)
+    expect(tableColumns(320, false)).toBe(1)
+  })
+
+  it('na grade, o cartão tem borda e raio; na coluna, o separador', () => {
+    const { rerender } = render(
+      <TableRow item={item()} onOpen={jest.fn()} framed />
+    )
+    const framed = flat(screen.getByTestId(`table-row-${HELENA}`))
+    expect(framed.borderWidth).toBe(tokens.borderWidth.hair)
+    expect(framed.borderRadius).toBe(tokens.radius.md)
+    rerender(<TableRow item={item()} onOpen={jest.fn()} />)
+    const listed = flat(screen.getByTestId(`table-row-${HELENA}`))
+    expect(listed.borderRadius).toBeUndefined()
+    expect(listed.borderBottomWidth).toBe(tokens.borderWidth.hair)
   })
 })

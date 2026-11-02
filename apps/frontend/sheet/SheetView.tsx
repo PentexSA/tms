@@ -29,6 +29,7 @@ import {
 } from 'react'
 import {
   Platform,
+  RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -36,6 +37,7 @@ import {
 } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { usePullRefresh } from '../lib/queries/focus'
 import { ConflictBanner } from './ConflictBanner'
 import { SheetProvider } from './context'
 import {
@@ -45,10 +47,13 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
-import { ReturnedBanner } from './creation/ReturnedBanner'
+import {
+  CompletedWhileEditingBanner,
+  ReturnedBanner,
+} from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
-import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
+import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
 import {
   GroupTabsContext,
@@ -89,6 +94,12 @@ export type SheetViewProps =
        * (T-27).
        */
       readonly header?: ReactNode
+      /**
+       * "Puxar para atualizar" (P09-C, T-40): a rebusca da ficha. O que volta
+       * passa pelo `received` do store, que confere a versão e o conflito
+       * com o rascunho. Sem ele, sem o gesto.
+       */
+      readonly onRefresh?: () => unknown
     }
   | {
       readonly model: SheetModel
@@ -139,11 +150,16 @@ export function SheetView(props: SheetViewProps) {
       store={store}
       editable={editable}
       header={'store' in props ? props.header : undefined}
+      onRefresh={'store' in props ? props.onRefresh : undefined}
     />
   )
 }
 
-/** As partes da barra de modos, para quem escreve (T-27). */
+/**
+ * As partes da barra de modos, para quem escreve (T-27), e o `go` dela para a
+ * barra do narrador, que fica no header (T-33). Quem não escreve fica sem o
+ * `go`: sem "Editar como narrador".
+ */
 function ModeBarSlots({
   enabled,
   children,
@@ -151,18 +167,30 @@ function ModeBarSlots({
   readonly enabled: boolean
   readonly children: (bar: ModeBarParts) => ReactNode
 }) {
-  return children(useModeBar({ enabled }))
+  const bar = useModeBar({ enabled })
+  const actions = useMemo(
+    () => (enabled ? { go: bar.go } : null),
+    [enabled, bar.go]
+  )
+  return (
+    <ModeBarActions.Provider value={actions}>
+      {children(bar)}
+    </ModeBarActions.Provider>
+  )
 }
 
 function SheetBody({
   store,
   editable,
   header,
+  onRefresh,
 }: {
   readonly store: SheetStore
   readonly editable: boolean
   readonly header?: ReactNode
+  readonly onRefresh?: () => unknown
 }) {
+  const pull = usePullRefresh(() => onRefresh?.())
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
   const lifecycle = useLifecycle()
@@ -177,7 +205,13 @@ function SheetBody({
   const [tab, setTab] = useState<string>(zones[0]?.id ?? 'build')
   const mode = useStore(store, s => s.mode)
   const creating = useCreating()
-  const budget = editable && mode === 'create' && creating
+  // T-33: a conta (aba Orçamento) também em Leitura, para o narrador na ficha
+  // alheia em criação por pontos; o que é de edição (o aviso de bônus, as
+  // recusas e as "Regras da casa") continua só na Criação
+  const narrator = roles.includes('storyteller') && !roles.includes('owner')
+  const budgetEdit = editable && mode === 'create' && creating
+  const budget =
+    budgetEdit || (editable && mode === 'read' && creating && narrator)
   const onBudget = budget && tab === BUDGET_TAB
   const active: CompiledZone | undefined = onBudget
     ? undefined
@@ -265,6 +299,7 @@ function SheetBody({
       editable ? <CreationStatusPanel key="status" /> : null,
       // A devolução aparece em qualquer modo (T-06)
       editable ? <ReturnedBanner key="returned" /> : null,
+      editable ? <CompletedWhileEditingBanner key="completed" /> : null,
       editable && mode === 'create' ? <CreationAlerts key="alerts" /> : null,
       mode === 'play' ? (
         <View key="toolbar" style={styles.toolbar}>
@@ -349,6 +384,14 @@ function SheetBody({
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             stickyHeaderIndices={nav >= 0 ? [nav] : undefined}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={pull.refreshing}
+                  onRefresh={pull.onRefresh}
+                />
+              ) : undefined
+            }
             scrollEventThrottle={16}
             onScroll={e =>
               groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
@@ -358,7 +401,9 @@ function SheetBody({
           </ScrollView>
         </KeyboardArea>
         {docked ? <CombatDock /> : null}
-        {budget ? <BonusNotice onBudget={() => showTab(BUDGET_TAB)} /> : null}
+        {budgetEdit ? (
+          <BonusNotice onBudget={() => showTab(BUDGET_TAB)} />
+        ) : null}
       </View>
     )
   }

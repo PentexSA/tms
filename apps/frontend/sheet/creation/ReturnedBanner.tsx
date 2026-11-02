@@ -29,21 +29,54 @@ export function NarratorReasonBanner({
   )
 }
 
-/** A ficha em criação devolvida: o motivo do narrador, em qualquer modo. */
+/**
+ * A ficha em criação devolvida ou com ajuste pedido (D-04): o motivo do
+ * narrador, em qualquer modo. Só um existe por vez: o pedido de ajuste apaga
+ * a devolução, e vice-versa (a API limpa os marcadores).
+ */
 export function ReturnedBanner() {
   const creation = useCreation()
   const { roles } = useSheet()
-  const returned = creation?.info?.returned
-  if (creation?.status !== 'creating' || !returned) return null
+  if (creation?.status !== 'creating') return null
+  const storyteller = roles.has('storyteller')
+  const adjust = creation.info?.adjust
+  if (adjust)
+    return (
+      <NarratorReasonBanner
+        title={
+          storyteller ? 'Você pediu um ajuste' : 'O narrador pediu um ajuste'
+        }
+        reason={adjust.reason}
+        testID="creation-adjust"
+      />
+    )
+  const returned = creation.info?.returned
+  if (!returned) return null
   return (
     <NarratorReasonBanner
       title={
-        roles.has('storyteller')
-          ? 'Você devolveu esta ficha'
-          : 'O narrador devolveu a ficha'
+        storyteller ? 'Você devolveu esta ficha' : 'O narrador devolveu a ficha'
       }
       reason={returned.reason}
       testID="creation-returned"
+    />
+  )
+}
+
+/**
+ * Nota do P04-C (P04-D §3.7): o narrador concluiu a criação livre com a dona
+ * no Editar e alterações não salvas. O Editar e o rascunho ficam (o servidor
+ * decide o lote), mas ela fica sabendo que agora é evolução. Some quando o
+ * rascunho esvazia ou a ficha sai do Editar.
+ */
+export function CompletedWhileEditingBanner() {
+  const creation = useCreation()
+  if (!creation?.completedWhileEditing) return null
+  return (
+    <NarratorReasonBanner
+      title="O narrador concluiu a criação"
+      reason="As alterações não salvas agora são evolução: subir um traço passa pelo narrador. Salve ou descarte."
+      testID="completed-while-editing"
     />
   )
 }

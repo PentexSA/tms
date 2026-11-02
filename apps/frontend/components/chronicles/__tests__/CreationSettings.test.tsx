@@ -5,6 +5,7 @@ import { Dimensions } from 'react-native'
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
 import { templateJson } from '../../../test/fixtures'
+import { sheetsDismissed } from '../../../test/queries'
 import {
   json,
   memoryStore,
@@ -168,6 +169,8 @@ describe('sair com as regras mudadas', () => {
       last()?.[1]?.({ data: { action: { type: 'GO_BACK' } }, repeat } as never)
     })
     fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    // A saída vem depois que a folha sai da tela (onClosed, P03-D)
+    await sheetsDismissed()
     expect(repeat).toHaveBeenCalledTimes(1)
     // De volta ao salvo: nada a perder
     expect(last()?.[0]).toBe(false)

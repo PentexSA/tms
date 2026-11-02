@@ -1,7 +1,23 @@
 import { onlineManager } from '@tanstack/react-query'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
+import { useToast } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
+import { useFocusEffect } from 'expo-router'
+import { BackHandler, Platform } from 'react-native'
+import { GROUP_TOAST_MS } from '../../components/chronicles/OperationSheet'
 import { operationError } from '../../components/chronicles/operationErrors'
+import {
+  SELECTION_FULL,
+  selectionLabel,
+  TableActionBar,
+  TableSelectionProvider,
+} from '../../components/chronicles/TableSelection'
 import { TableView } from '../../components/chronicles/TableView'
 import * as apiModule from '../../lib/api'
 import { HistorySheet } from '../../sheet/history/HistorySheet'
@@ -45,7 +61,15 @@ const preview = (id: string, name: string, version = 2) => ({
   changes: [{ label: 'Vitalidade', change: '+2 letais' }],
 })
 
-async function render(ui = <TableView chronicleId={cid} />) {
+// A Mesa como a crônica a monta: a seleção na tela e a barra fora da Mesa
+const Mesa = () => (
+  <TableSelectionProvider>
+    <TableView chronicleId={cid} />
+    <TableActionBar chronicleId={cid} />
+  </TableSelectionProvider>
+)
+
+async function render(ui = <Mesa />) {
   const { session } = testSession(
     () => json(200, tokens()),
     memoryStore(true, 'refresh-0')
@@ -299,6 +323,226 @@ it.each([true, false])(
     }
   }
 )
+
+// T-49, T-75, T-76 (P09-C): a barra fixa da seleção
+describe('barra da seleção', () => {
+  // O View da barra não é um elemento só para o leitor de tela (os botões
+  // dela continuam alcançáveis): acha-se pelo nome, e o papel é conferido
+  const bar = () => {
+    const el = screen.getByLabelText('Ações da seleção')
+    expect(el.props.role).toBe('toolbar')
+    return el
+  }
+  const start = async () => {
+    await screen.findByRole('button', { name: /^Helena Varga,/ })
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Selecionar personagens' })
+    )
+  }
+
+  it('selectionLabel: nenhum, 1 e n, sempre com o máximo', () => {
+    expect(selectionLabel(0)).toBe('Nenhum selecionado (máx. 20)')
+    expect(selectionLabel(1)).toBe('1 selecionado (máx. 20)')
+    expect(selectionLabel(2)).toBe('2 selecionados (máx. 20)')
+  })
+
+  it('a contagem e as ações ficam na barra; depois da operação, a seleção fica', async () => {
+    await render()
+    await select()
+    expect(within(bar()).getByText('2 selecionados (máx. 20)')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Confirmar operação' }))
+    await screen.findByText('Dano aplicado em 2 personagens.')
+    // A seleção continua para a próxima operação (Nova noite depois do dano)
+    expect(within(bar()).getByText('2 selecionados (máx. 20)')).toBeTruthy()
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+    ).toBeChecked()
+  })
+
+  it('"Limpar seleção" zera e continua selecionando; "Cancelar seleção" sai', async () => {
+    await render()
+    await start()
+    expect(within(bar()).getByText('Nenhum selecionado (máx. 20)')).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+    )
+    expect(within(bar()).getByText('1 selecionado (máx. 20)')).toBeTruthy()
+    fireEvent.press(
+      within(bar()).getByRole('button', { name: 'Limpar seleção' })
+    )
+    expect(within(bar()).getByText('Nenhum selecionado (máx. 20)')).toBeTruthy()
+    expect(
+      screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+    ).not.toBeChecked()
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar seleção' }))
+    expect(screen.queryByLabelText('Ações da seleção')).toBeNull()
+  })
+
+  it('o 21º toque não marca e explica o máximo', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok(Array.from({ length: 21 }, (_, i) => row(`id-${i}`)))
+    )
+    await render()
+    await screen.findAllByRole('button', { name: /^Helena Varga,/ })
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Selecionar personagens' })
+    )
+    const boxes = screen.getAllByRole('checkbox')
+    expect(boxes).toHaveLength(21)
+    for (const box of boxes.slice(0, 20)) fireEvent.press(box)
+    expect(within(bar()).getByText('20 selecionados (máx. 20)')).toBeTruthy()
+    expect(screen.queryByText(SELECTION_FULL)).toBeNull()
+    fireEvent.press(boxes[20] as never)
+    expect(within(bar()).getByText('20 selecionados (máx. 20)')).toBeTruthy()
+    expect(boxes[20]).not.toBeChecked()
+    expect(screen.getByText(SELECTION_FULL)).toBeTruthy()
+    // Desmarcar uma libera a vez e tira o aviso
+    fireEvent.press(boxes[0] as never)
+    expect(screen.queryByText(SELECTION_FULL)).toBeNull()
+  })
+
+  it('a ficha que sai da Mesa sai da seleção: a contagem e o limite batem', async () => {
+    const focus: (() => void)[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => void)
+    })
+    try {
+      await render()
+      await start()
+      for (const box of screen.getAllByRole('checkbox')) fireEvent.press(box)
+      expect(within(bar()).getByText('2 selecionados (máx. 20)')).toBeTruthy()
+      // Caio foi arquivado em outra tela: a volta à Mesa já não o traz
+      calls.chronicle.tableGet.mockResolvedValue(ok([row('a')]))
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      await waitFor(() =>
+        expect(within(bar()).getByText('1 selecionado (máx. 20)')).toBeTruthy()
+      )
+    } finally {
+      jest.mocked(useFocusEffect).mockReset()
+    }
+  })
+
+  it('Mesa vazia: sem "Selecionar personagens"', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok([]))
+    await render()
+    expect(
+      await screen.findByText('Nenhuma ficha na crônica ainda.')
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Selecionar personagens' })
+    ).toBeNull()
+  })
+
+  it('o voltar do Android desliga a seleção antes de sair', async () => {
+    const focus: (() => undefined | (() => void))[] = []
+    jest.mocked(useFocusEffect).mockImplementation(cb => {
+      focus.push(cb as () => undefined | (() => void))
+    })
+    type Handler = Parameters<typeof BackHandler.addEventListener>[1]
+    const handlers: Handler[] = []
+    const remove = jest.fn()
+    jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_, handler) => {
+        handlers.push(handler)
+        return { remove }
+      })
+    const original = Platform.OS
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+    })
+    try {
+      await render()
+      await start()
+      // A tela em foco: os efeitos de foco registrados rodam (o da seleção
+      // ligada registra o voltar)
+      act(() => {
+        for (const cb of focus) cb()
+      })
+      expect(handlers.length).toBeGreaterThan(0)
+      let handled: boolean | undefined
+      act(() => {
+        handled = handlers.at(-1)?.({} as Parameters<Handler>[0])
+      })
+      expect(handled).toBe(true)
+      expect(screen.queryByLabelText('Ações da seleção')).toBeNull()
+      expect(
+        screen.getByRole('button', { name: 'Selecionar personagens' })
+      ).toBeTruthy()
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        value: original,
+        configurable: true,
+      })
+      jest.mocked(useFocusEffect).mockReset()
+    }
+  })
+
+  // No web o BackHandler não existe (e loga erro, que no dev cobria a
+  // barra); no iOS não há o botão
+  it.each(['web', 'ios'] as const)(
+    'no %s, ligar a seleção não chama o BackHandler',
+    async os => {
+      const focus: (() => undefined | (() => void))[] = []
+      jest.mocked(useFocusEffect).mockImplementation(cb => {
+        focus.push(cb as () => undefined | (() => void))
+      })
+      const add = jest.spyOn(BackHandler, 'addEventListener')
+      const original = Platform.OS
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+      try {
+        await render()
+        await start()
+        fireEvent.press(
+          screen.getByRole('checkbox', { name: 'Selecionar Helena Varga' })
+        )
+        act(() => {
+          for (const cb of focus) cb()
+        })
+        expect(add).not.toHaveBeenCalled()
+        expect(bar()).toBeTruthy()
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          value: original,
+          configurable: true,
+        })
+        jest.mocked(useFocusEffect).mockReset()
+      }
+    }
+  )
+
+  it('o aviso da operação em grupo dura 10 s', async () => {
+    const shown: unknown[] = []
+    function Spy() {
+      const toast = useToast()
+      const original = toast.show
+      toast.show = m => {
+        shown.push(m)
+        original(m)
+      }
+      return null
+    }
+    await render(
+      <>
+        <Spy />
+        <Mesa />
+      </>
+    )
+    await select()
+    fireEvent.press(screen.getByRole('button', { name: 'Confirmar operação' }))
+    await screen.findByText('Dano aplicado em 2 personagens.')
+    expect(GROUP_TOAST_MS).toBe(10_000)
+    expect(shown).toContainEqual(
+      expect.objectContaining({
+        message: 'Dano aplicado em 2 personagens.',
+        durationMs: GROUP_TOAST_MS,
+      })
+    )
+  })
+})
 
 it('o conflito de reversão nomeia o campo e o personagem', () => {
   expect(

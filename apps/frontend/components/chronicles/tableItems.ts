@@ -5,12 +5,25 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 
+import { whenLabel } from '../../lib/format'
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
+import {
+  type CharacterState,
+  characterState,
+  npcVisibilityText,
+} from './characterState'
 
 // O que cada linha da Mesa mostra, calculado uma vez por ficha (doc/plano-v3.md,
 // Etapa 9). Puro: o mesmo item enquanto a linha e o modelo não mudam, para
 // que filtrar e ordenar não redesenhem as linhas que continuam na tela.
+
+// Quem fez a última alteração (P09-C, T-83), calculado no servidor contra quem
+// pede: a resposta não leva id nem nome de quem fez
+export interface TableLastChange {
+  readonly at: string | Date
+  readonly by: 'you' | 'owner' | 'other'
+}
 
 export interface TableRowData {
   readonly id: string
@@ -19,10 +32,21 @@ export interface TableRowData {
   readonly systemCode: string
   readonly templateVersion: string
   readonly sheetVersion: number
+  readonly kind?: 'pc' | 'npc'
   readonly status?: string
+  // O estado da criação (P04-D): o modo e os marcadores, sem o motivo
+  readonly creationMode?: 'free' | 'points' | null
+  readonly returned?: boolean
+  readonly adjust?: boolean
+  readonly ready?: boolean
+  readonly activatedAt?: string | Date | null
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
+  readonly lastChange?: TableLastChange | null
   readonly sheet: unknown
+  // A visibilidade do NPC (T-52): a Mesa separa os NPCs (pelo `kind`) e
+  // mostra o selo dela. A API já manda os dois
+  readonly visibility?: string
 }
 
 export interface TableItem {
@@ -32,27 +56,37 @@ export interface TableItem {
   // Store só de leitura (sem fila) para desenhar o dock com o registry
   readonly store: SheetStore | null
   readonly alerts: readonly ActiveAlert[]
-  // O estado quando ele importa: "Em criação", "Travada", "Arquivada"...
-  readonly state: string | null
+  // O estado da ficha (D-02): "Em criação · livre", "Aguardando aprovação",
+  // "Avisou que terminou", "Concluída em dd/mm", "Travada"...
+  readonly state: CharacterState | null
+  // O selo de visibilidade do NPC ("Oculto", "Identidade revelada", "Ficha
+  // revelada"); null no PC (T-52). Não passa pelo characterState
+  readonly visibility: string | null
 }
 
-/** O rótulo do estado da ficha na Mesa; null em `active` sem trava. */
-export function stateLabel(
-  model: SheetModel | null | undefined,
-  status: string | undefined,
-  locked: boolean
-): string | null {
-  switch (status) {
-    case 'creating':
-      return 'Em criação'
-    case 'active':
-      return locked ? 'Travada' : null
-    case 'archived':
-      return 'Arquivada'
-    case 'dead':
-      return model ? deadLabel(model) : 'Fora de jogo'
+/**
+ * A meta do cartão: quem alterou por último e quando (T-83). O nome do dono
+ * aparece uma vez. Sem `lastChange` (ficha sem lote, ou a API antiga) ou com
+ * um `by` desconhecido, fica o texto de antes, pelo `updatedAt` e sem autor
+ * (fail secure).
+ */
+export function changeLabel(row: TableRowData, now = new Date()): string {
+  const owner = row.owner.username
+  const change = row.lastChange
+  if (!change) return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
+  const when = whenLabel(change.at, now)
+  switch (change.by) {
+    case 'you':
+      // O NPC é do próprio narrador: o nome dele não diz nada
+      return row.kind === 'npc'
+        ? `alterada por você ${when}`
+        : `${owner} · alterada por você ${when}`
+    case 'owner':
+      return `alterada por ${owner} ${when}`
+    case 'other':
+      return `${owner} · alterada ${when}`
     default:
-      return null
+      return `${owner} · alterada ${whenLabel(row.updatedAt, now)}`
   }
 }
 
@@ -81,8 +115,27 @@ export function buildItem(
       model && store
         ? alertsOf(model, store.getState().resolved, ['storyteller'])
         : [],
-    state: stateLabel(model, row.status, Boolean(row.lockedAt)),
+    // A Mesa é só do narrador
+    state: characterState(
+      { ...row, locked: Boolean(row.lockedAt) },
+      { narrating: true, deadLabel: model ? deadLabel(model) : undefined }
+    ),
+    visibility: row.kind === 'npc' ? npcVisibilityText(row.visibility) : null,
   }
+}
+
+/**
+ * PCs e NPCs em seções (T-52, plano v5 §1.2), cada uma na ordem da tela. A
+ * ordem que a navegação da Mesa lembra é a da tela: PCs e depois NPCs.
+ */
+export function bySection(items: readonly TableItem[]): {
+  readonly pcs: readonly TableItem[]
+  readonly npcs: readonly TableItem[]
+} {
+  const pcs: TableItem[] = []
+  const npcs: TableItem[] = []
+  for (const item of items) (item.row.kind === 'npc' ? npcs : pcs).push(item)
+  return { pcs, npcs }
 }
 
 export type TableSort = 'name' | 'updated'

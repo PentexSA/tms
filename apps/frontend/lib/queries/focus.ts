@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router'
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
 
 /**
@@ -30,4 +30,34 @@ export function useRefetchOnFocus(refetch: () => unknown) {
       return () => page.removeEventListener?.('focus', onFocus)
     }, [])
   )
+}
+
+/**
+ * "Puxar para atualizar" (P09-C, T-40): `refreshing` liga só durante o
+ * puxão, até as rebuscas responderem, e não a cada rebusca de fundo (o
+ * indicador não pisca com o foco). Nenhum intervalo: só o gesto.
+ */
+export function usePullRefresh(...refetches: (() => unknown)[]): {
+  readonly refreshing: boolean
+  readonly onRefresh: () => Promise<void>
+} {
+  const [refreshing, setRefreshing] = useState(false)
+  const latest = useRef(refetches)
+  latest.current = refetches
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.allSettled(latest.current.map(r => r()))
+    } finally {
+      if (alive.current) setRefreshing(false)
+    }
+  }, [])
+  return { refreshing, onRefresh }
 }
