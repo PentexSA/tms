@@ -504,6 +504,7 @@ Bloco de identidade recolhível no topo do corpo.
 
 - **Classes:** `ds-identity` (botão de 64 com avatar grande, `voice` e resumo), `__text`, `__summary`, `__more`; `ds-voice` (citação na fonte `voice` da skin); `ds-facts` (`dl` em 2 colunas; `--wide` e `.is-stacked` em 1).
 - **Comportamento:** recolhido por padrão no celular, aberto a partir de 900. Os fatos vêm das seções de zona `identity`; glifo de skin entra ao lado do valor.
+- **Colunas no Editar (RN, T-65):** com `identity.columns` no template, cada coluna precisa de 120 dp (metade do `minColWidth`) × escala da fonte. Quando as colunas do template não cabem, elas quebram em linhas, na ordem do template e sem misturar campos de colunas diferentes: a 360–411 dp, o V20 fica [Nome | Natureza, Comportamento, Conceito] e, embaixo, [Clã, Geração, Senhor]; com fonte de 200%, uma coluna.
 - **API RN:** `{ name: string; voice?: string; summary: string; facts: { label: string; value: string; glyph?: ReactNode }[]; open: boolean; onToggle(): void }`.
 - **Estados:** aberto, fechado.
 - **A11y:** `aria-expanded` + `aria-controls`; texto oculto ". Mostrar identidade" / ". Recolher identidade". RN `accessibilityState={{ expanded }}`.

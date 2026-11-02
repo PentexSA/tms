@@ -1,10 +1,33 @@
 import { identityOf, isDraftMode, jsonEqual } from '@tms/sheet-core'
-import { Avatar, Text, tokens, useTheme } from '@tms/ui'
+import { Avatar, Text, tokens, useLayout, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from './context'
 import { CompactEditors } from './evolve/compact'
 import { FieldSlot } from './FieldSlot'
 import { SectionView } from './SectionView'
+
+// T-65: largura mínima de uma coluna da identidade (metade da coluna de
+// grupo do DS), que cresce com a fonte. "Comportamento" no rótulo de campo
+// mede ~114 dp: em três colunas de 112 dp (393 dp de tela) quebrava no meio.
+const FACT_MIN = tokens.layout.minColWidth / 2
+const COLUMN_GAP = tokens.space[3]
+
+/**
+ * Quantas colunas da identidade cabem por linha: as do template, se cabem;
+ * senão menos, com as colunas quebrando em linhas na ordem do template.
+ */
+export function identityColumnsPerRow(
+  width: number,
+  fontScale: number,
+  columns: number
+): number {
+  const available =
+    Math.min(width, tokens.layout.contentMaxExpanded) - 2 * tokens.layout.gutter
+  const fits = Math.floor(
+    (available + COLUMN_GAP) / (FACT_MIN * fontScale + COLUMN_GAP)
+  )
+  return Math.max(1, Math.min(columns, fits))
+}
 
 // Nome, selo e resumo, e as seções da zona `identity` (DS: IdentityBlock).
 // Esses campos nunca são de seção restrita: o validador do template garante.
@@ -13,6 +36,7 @@ export function IdentityBlock() {
   const { model, mode } = useSheet()
   const { accent } = useTheme()
   const id = useSheetSelector(s => identityOf(s.resolved), jsonEqual)
+  const { width, fontScale } = useLayout()
   const sections = model.zones.find(z => z.id === 'identity')?.sections ?? []
   // Em Evoluir, o nome, o selo e o resumo que não estão em seção nenhuma
   // (Nome, Clã e Geração no Vampiro; Classe e Nível no D&D) ganham editor
@@ -28,6 +52,9 @@ export function IdentityBlock() {
     ? (model.template.identity.columns ?? null)
     : null
   const inColumns = new Set(columns?.flat())
+  const perRow = columns
+    ? identityColumnsPerRow(width, fontScale, columns.length)
+    : 1
   const rest = columns
     ? [...loose, ...sections.flatMap(s => s.fieldIds)].filter(
         f => !inColumns.has(f)
@@ -69,7 +96,10 @@ export function IdentityBlock() {
         <CompactEditors value>
           <View testID="identity-columns" style={styles.columns}>
             {columns.map(col => (
-              <View key={col.join(':')} style={styles.column}>
+              <View
+                key={col.join(':')}
+                style={[styles.column, { width: `${100 / perRow}%` }]}
+              >
                 {col.map(f => (
                   <FieldSlot key={f} id={f} variant="fact" />
                 ))}
@@ -101,13 +131,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   names: { flex: 1, gap: tokens.space[1] },
+  // As colunas quebram em linhas quando não cabem (T-65). O espaço entre
+  // elas é o padding de cada coluna, para a largura em % somar 100
   columns: {
     flexDirection: 'row',
-    gap: tokens.space[3],
-    paddingHorizontal: tokens.layout.gutter,
+    flexWrap: 'wrap',
+    rowGap: tokens.space[3],
+    paddingHorizontal: tokens.layout.gutter - COLUMN_GAP / 2,
   },
   // minWidth 0: o valor longo quebra dentro da coluna
-  column: { flex: 1, minWidth: 0, gap: tokens.space[1] },
+  column: {
+    minWidth: 0,
+    gap: tokens.space[1],
+    paddingHorizontal: COLUMN_GAP / 2,
+  },
   chip: {
     alignSelf: 'flex-start',
     borderWidth: tokens.borderWidth.control,
