@@ -1,4 +1,3 @@
-import { tokens } from '@tms/ui'
 import { createContext, useContext } from 'react'
 
 // Célula densa (T-68; DS Grid / Cell: "container ≤ 400: padding menor").
@@ -12,8 +11,3 @@ export const useDenseCells = () => useContext(Dense)
 
 /** Largura da grade até a qual as células ficam densas (DS: ≤ 400). */
 export const DENSE_GRID_MAX = 400
-
-/** A largura útil da grade numa janela: o conteúdo menos as margens. */
-export const gridWidthOf = (windowWidth: number) =>
-  Math.min(windowWidth, tokens.layout.contentMaxExpanded) -
-  2 * tokens.layout.gutter

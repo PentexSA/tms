@@ -1,10 +1,11 @@
 import { type CompiledGroup, isDraftMode } from '@tms/sheet-core'
 import { SectionHeader, Text, tokens, useLayout } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { contentWidthOf } from '../contentWidth'
 import { useSheet } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
-import { DENSE_GRID_MAX, DenseCells, gridWidthOf } from '../views/dense'
+import { DENSE_GRID_MAX, DenseCells } from '../views/dense'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -18,7 +19,7 @@ export function GridLayout({ section }: LayoutProps) {
   const { mode } = useSheet()
   const { stacked, breakpoint, width } = useLayout()
   // Grade estreita: célula com padding e espaço menores (T-68)
-  const dense = gridWidthOf(width) <= DENSE_GRID_MAX
+  const dense = contentWidthOf(width) <= DENSE_GRID_MAX
   const groups: readonly CompiledGroup[] = section.groups ?? [
     { id: section.id, title: '', fieldIds: section.fieldIds },
   ]

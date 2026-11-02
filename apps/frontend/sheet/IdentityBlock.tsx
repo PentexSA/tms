@@ -1,6 +1,7 @@
 import { identityOf, isDraftMode, jsonEqual } from '@tms/sheet-core'
 import { Avatar, Text, tokens, useLayout, useTheme } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { contentWidthOf } from './contentWidth'
 import { useSheet, useSheetSelector } from './context'
 import { CompactEditors } from './evolve/compact'
 import { FieldSlot } from './FieldSlot'
@@ -21,8 +22,7 @@ export function identityColumnsPerRow(
   fontScale: number,
   columns: number
 ): number {
-  const available =
-    Math.min(width, tokens.layout.contentMaxExpanded) - 2 * tokens.layout.gutter
+  const available = contentWidthOf(width)
   const fits = Math.floor(
     (available + COLUMN_GAP) / (FACT_MIN * fontScale + COLUMN_GAP)
   )
