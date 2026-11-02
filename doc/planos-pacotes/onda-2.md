@@ -282,3 +282,76 @@ A lista completa está na seção 9 de cada plano. Estas cruzam pacotes ou mudam
   - o NPC oculto e o `viewer` (404 no Histórico, como hoje).
 - **E2E escritos e não rodados nos pacotes.** Os quatro specs novos rodam pela primeira vez na integração, como na onda 1, que só ali pegou os seletores exatos do T-61 e o Esc do T-71.
 - **Recursos locais.** O E2E usa portas fixas e roda um por vez, só na integração. Os `*.pg.test` (P04-C) usam um banco `_test` por worktree. O build nativo roda uma vez, na integração.
+
+## 10. Integração (02/11/2026)
+
+Os quatro pacotes foram implementados em paralelo, um agente por plano, cada um no seu worktree, e integrados em série na `onda/2-correcoes-criacao`. O P05-C, o P07-C e o P08 receberam a onda na própria branch antes do merge e resolveram os conflitos lá. O P05-C ligou a sobra de bônus ao `notes` do P04-C, o P07-C trocou a frase local pelo aviso do P05-C, e o P08 reaplicou a confirmação e o aviso na rolagem nova.
+
+| Ordem | Pacote | Merge na onda | Revisão |
+|---|---|---|---|
+| 1 | P04-C | `5650c9f` | `/security-review`: nenhuma vulnerabilidade. `/code-review` (high): 10 achados, 5 corrigidos |
+| 2 | P05-C | `fa8ecfa` | `/code-review` (high): 10 achados, 6 corrigidos. Depois do merge com o P04-C (medium): 7 corrigidos |
+| 3 | P07-C | `591a557` | `/code-review` (high): 9 achados, 6 corrigidos. Depois do merge com o P05-C (medium): 6 achados, 4 corrigidos |
+| 4 | P08 | `7a161c9` (e `f3f3b8a`) | `/code-review` (high): 10 achados, 7 corrigidos. Depois do merge com os três (medium): 10 achados, 7 corrigidos |
+
+**Perguntas técnicas: o que foi aplicado.** Sem resposta do time, cada pacote seguiu a proposta do próprio plano, com estas escolhas:
+
+- **Pergunta 1 (teclado no Android).** O `react-native-keyboard-controller` não entrou. No AVD, a folha "Adicionar Defeito" sobe acima do teclado só com o `padding` do `KeyboardArea`.
+- **Pergunta 2.** O "+" fica tocável, com `aria-disabled`, e a previsão usa o preço de tabela.
+- **Pergunta 4.** O "Mais opções" vale só abaixo de 900 px.
+- **Pergunta 5.** O polling é de 30 s em `pending`.
+- **Pergunta 6.** Não houve migration para os lotes de freeze antigos.
+- **Pergunta 8 (folha seguinte no iOS).** A `BottomSheet` ganhou `onClosed`, que é uma prop nova e não muda nenhuma das existentes. A revisão do P08 achou a troca de folha falhando no iOS. A troca foi conferida no Android; no iOS não deu para conferir (ver abaixo).
+- **Pergunta 9.** A faixa fixa passou no WebKit (`layout.spec.ts`).
+- **Pergunta 10.** A faixa não tem animação.
+- **Commits que podiam sair sozinhos.** O T-23 entrou na forma genérica, e o extrato do R-17, o T-59 e as duas partes do T-27 também entraram.
+
+**Achados da integração (commits na onda):**
+
+- **`e8cfaf8` (P05-C, achado pelo E2E).** No web, o "+" bloqueado ficava morto. O react-native-web 0.21 transforma `aria-disabled` e `accessibilityDisabled` em `disabled` com `tabIndex=-1` num `<button>`. Agora o `aria-disabled` vai direto no elemento (`markSoftDisabled`). O Jest não renderiza o DOM e não pegava o defeito.
+- **`c7c1423` (P04-C, achado pelo E2E da jornada da v3).** O cache persistido montava a ficha ainda em criação, aberta em Editar. Quando o servidor respondia que a criação estava concluída, ela não saía do Editar. Agora, se a ficha está no Editar da abertura e não tem nada a salvar, ela vai para o modo de abertura novo. Isso foi conferido no AVD.
+- **`f3f3b8a` (P08, achado pelo E2E).** Na folha sem campo em autoFocus ("Convidar"), o Esc durante a animação de entrada não fechava nada. Agora o Esc fecha a folha de cima. Os specs novos tiveram os seletores corrigidos.
+- **`e0a4078` (P07-C e P08, achado no AVD).** "Ambidestro" com "✓" entrava como "Ambi", porque o "✓" chegava antes do último `onChangeText`. Agora a folha "Adicionar …" e o Enter da senha no cadastro usam o texto do evento. No cadastro, a conta podia nascer com a senha cortada.
+- **`909d12e` (P08, achado no web a 1280).** Os cinco grupos de Vantagens ficavam lado a lado, com 240 px cada, e o rótulo do Stepper quebrava no meio da palavra ("Corag em"). A coluna do grupo passou a ter pelo menos 320 px: a 1280, Vantagens fica em 3 + 2, e Atributos e Habilidades continuam em três colunas.
+- **`7ef8b0b`.** O teste do T-62 passou a mandar o texto do campo no Enter, como o app.
+
+**Resultado na onda com os quatro pacotes:**
+
+| Verificação | Resultado |
+|---|---|
+| typecheck | 16/16 |
+| lint | verde |
+| sheet-core | 980 testes |
+| config | 36 testes |
+| db | 33 testes |
+| api | 1663 testes |
+| ui | 186 testes |
+| frontend | 1073 testes; `test:coverage` dentro das metas por arquivo |
+| `*.pg.test` | 43 testes |
+| E2E Chromium e WebKit | 118 testes, com os quatro specs novos (`lifecycle`, `creation-feedback`, `advantages`, `layout`) |
+| Build nativo local (debug) | Android: `assembleDebug` (arm64) em ~3 min. iOS: `xcodebuild` Debug para o simulador em ~37 min |
+
+**Conferência manual (API local com o seed do roteiro; contas `@roteiro.test`, só dados fictícios):**
+
+| Onde | Conferido |
+|---|---|
+| Android, AVD Pixel 3a a 393 dp | T-26 (o Enter no e-mail leva à senha; cadeia Nome → Natureza → Comportamento → Conceito; "✓" no último campo sem enviar; campo acima do teclado) · T-29 (texto da crônica e da Nova ficha) · T-21 (rola, foca e abre o teclado no "Nome") · T-64 · T-67 · T-05 (Criação na v4, Editar na v3/v5) · T-37 · T-59 · T-27 (abas e sub-abas presas; "Ver orçamento" leva ao topo do Orçamento) · T-20/T-55/T-07/R-28 (o "+" apagado é tocável e explica ao lado; o aviso some ao escolher a prioridade) · T-58 · T-10 (a folha acima do teclado) · T-62 e T-23 ("Inimigo, Bônus 1"; "Ambidestro, Custo 1"; saldo 16 → 14) · T-11 ("Mais opções" → Histórico) · a ficha concluída pelo narrador abre em Jogo, com o dock · T-68 |
+| Android a 360 e 411 dp | T-11: com "1 alteração não salva", nada sai da tela. T-03 (onda 1): "Recuperar" depois de recriar a Activity |
+| Web a 390 (Chromium do Playwright) | O narrador conclui pelo "Mais opções" → "Ações do narrador" → "Concluir criação?" (T-32) · Histórico só com "Criação concluída · (narrador)" (T-80) · o "+" bloqueado com `aria-disabled`, sem `disabled`, no Tab, com o aviso |
+| Web a 1280 | T-28 (Atributos e Vantagens em colunas) · T-11 ("Experiência" e "Histórico" no cabeçalho) · T-69 (diálogo central de 560) · T-71 (Esc fecha e o foco volta ao gatilho) |
+| iOS, simulador iPhone SE (18.1) e iPhone 17 (26.5) | O app abre e desenha o login com os estilos do `@tms/ui` (S-01). No iPhone 17, o conteúdo fica abaixo da Dynamic Island. **Não houve navegação:** o `osascript` não tem acesso assistivo nesta máquina, só o `idb_companion` está instalado (sem o cliente `idb` nem o Maestro), e o deep link pede "Abrir com 'TMS'?" |
+
+**Observações para as próximas ondas (sem correção nesta):**
+
+- **Identidade em duas colunas (T-65).** A terceira coluna do template quebra para baixo da primeira e deixa um vão sob "Nome", que é o único campo da primeira coluna.
+- **Nome da ficha a 360 dp com alterações não salvas.** O título encurta até "Hele…". É o espaço que sobra para o selo do P04-D (§4.4).
+- **"Nenhum Qualidade".** O artigo não concorda com o rótulo do item no V20. O defeito é anterior à onda.
+- **Login.** O Enter da senha ainda lê o estado, e não o evento. É anterior à onda; ali, o pior caso é uma tentativa de login recusada.
+- **Anúncio da recusa no app.** O papel de alerta com `key` (P05-C e P07-C) pode não ser lido sozinho pelo VoiceOver e pelo TalkBack. Fica para ouvir no aparelho, com o T-34 da onda 1.
+- **Build de desenvolvimento.** O aviso de "linking em mais de um lugar" aparece quando a Activity é recriada, como na onda 1.
+
+**Fica para depois da integração local:**
+
+- **O roteiro do iOS com toque.** Precisa de acesso assistivo para o terminal ou de uma ferramenta de toque (`idb` ou Maestro). Os passos estão na seção 7 de cada plano.
+- **Os jobs nativos do CI** no PR da onda.
+- **Os pontos para o PO da seção 6** continuam sem decisão.
