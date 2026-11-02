@@ -9,6 +9,7 @@ import { Platform } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { templateJson } from '../../test/fixtures'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -396,6 +397,8 @@ describe('Nova ficha: guarda de saída', () => {
     tryLeave(repeat)
     expect(screen.getByText('Sair sem salvar?')).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Descartar e sair' }))
+    // A saída vem depois que a folha sai da tela (onClosed, P03-D)
+    await sheetsDismissed()
     expect(repeat).toHaveBeenCalledTimes(1)
   })
 

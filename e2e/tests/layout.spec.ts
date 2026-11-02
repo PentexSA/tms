@@ -140,7 +140,10 @@ for (const size of [PHONE, NARROW])
       await inViewport(st, st.getByRole('button', { name: 'Mais opções' }))
       await st.getByRole('button', { name: 'Mais opções' }).click()
       await st
-        .getByRole('button', { name: 'Ações do narrador · Em criação' })
+        // O estado da ficha (P04-D): por pontos, o padrão do V20
+        .getByRole('button', {
+          name: 'Ações do narrador · Em criação · por pontos',
+        })
         .click()
       await expect(
         st.getByRole('heading', { name: 'Ações do narrador' })

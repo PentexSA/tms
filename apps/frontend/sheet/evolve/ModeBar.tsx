@@ -1,7 +1,6 @@
 import {
   applyBatch,
   type ChangeLabel,
-  describeBatch,
   describeEvent,
   fieldPlace,
   inactiveChanges,
@@ -18,6 +17,7 @@ import {
   Pressable,
   Text,
   tokens,
+  useLayout,
   useRovingFocus,
   useTheme,
   useToast,
@@ -29,16 +29,17 @@ import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
 import { completionBy, completionCopy } from '../creation/completion'
-import { REFUSAL_TEXT } from '../creation/creation'
 import { READY_COPY } from '../creation/nextStep'
 import { useNextStep } from '../creation/useNextStep'
 import { useDraftCount } from './hooks'
+import { saveDraftNow } from './saveDraft'
 
 // Modos da ficha (DS: ModeBar). O modo é UX: o que cada um libera vem de
 // `editableIn` por campo e das permissões, conferidas pelo core e pelo
 // servidor. Em Evoluir as alterações formam um rascunho ("N alterações")
-// que vira UM lote ao salvar (doc/arquitetura §6.5). Em Criação, o botão é
-// um só: salva o rascunho e, com a conta fechada, conclui (salvando antes).
+// que vira UM lote ao salvar (doc/arquitetura §6.5). Em Criação, "Salvar"
+// fica sempre; com a conta fechada, "Concluir criação" (ou "Enviar para
+// aprovação") aparece ao lado e conclui, salvando antes (D-01).
 
 export const MODE_LABELS: Readonly<Record<SheetMode, string>> = {
   read: 'Leitura',
@@ -62,7 +63,7 @@ export const changesLabel = (n: number): string =>
 export interface ModeBarParts {
   /** O seletor de modo (Leitura · Jogo · Editar). */
   readonly switcher: ReactNode
-  /** A barra de ação do rascunho ("Criação · N alterações" e o botão). */
+  /** A barra de ação do rascunho ("Criação · N alterações" e as ações). */
   readonly actionBar: ReactNode
   /** O resumo antes de salvar (folha). */
   readonly summary: ReactNode
@@ -176,17 +177,9 @@ export function useModeBar({
       proceed()
       return
     }
-    const label = describeBatch(model, summary.events)
-    const result = store.getState().saveDraft(label)
-    if (result && !result.ok) {
-      const refused = store.getState().creationRefusal
-      setError(
-        result.kind === 'conflict'
-          ? 'Alguém mudou um destes campos enquanto você editava. Confira os valores e salve de novo.'
-          : result.kind === 'creation' && refused
-            ? REFUSAL_TEXT[refused.code]
-            : (result.issues[0]?.message ?? 'Não foi possível salvar.')
-      )
+    const result = saveDraftNow(store)
+    if (!result.ok) {
+      setError(result.message)
       return
     }
     const next = summary.next
@@ -195,13 +188,13 @@ export function useModeBar({
     // Concluir ou avisar: espera a fila confirmar o lote; sem Desfazer no
     // meio
     if (summary.finish || summary.announce) {
-      if (result?.ok) proceed()
+      if (result.batchId !== null) proceed()
       return
     }
-    if (result?.ok) {
-      const id = result.batch.clientBatchId
+    if (result.batchId !== null) {
+      const id = result.batchId
       toast.show({
-        message: `Salvo: ${label}`,
+        message: `Salvo: ${result.label}`,
         action: {
           label: 'Desfazer',
           onPress: () => {
@@ -220,12 +213,29 @@ export function useModeBar({
   }
 
   const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
+  // O próximo passo (D-03), sob a contagem. Muda pouco e não é região viva:
+  // o banner da ficha anuncia o pedido do narrador
+  const nextStepNote = step.copy ? (
+    <Text variant="caption" color="inkMuted" testID="next-step">
+      {step.copy}
+    </Text>
+  ) : null
   const actionBar =
     mode === 'evolve' ? (
+      // R-05 (D-01): o botão só salva; sem alterações, não há o que salvar,
+      // e a saída do modo é o seletor. Na criação livre, a dona tem a ação
+      // seguinte (D-03): com ela ao lado, o salvar mostra "Salvar" e mantém
+      // o nome "Salvar alterações" (onda-3 §4.1; ponto 1 para o PO)
       <EvolveBar
         count={count}
-        onFinish={() => go(returnTo.current)}
-        note={step.copy}
+        save={{
+          title: step.announce ? 'Salvar' : 'Salvar alterações',
+          accessibilityLabel: 'Salvar alterações',
+          testID: 'mode-save',
+          disabled: count === 0,
+          onPress: () => go(returnTo.current),
+        }}
+        note={nextStepNote}
         next={
           step.announce
             ? {
@@ -242,29 +252,33 @@ export function useModeBar({
         }
       />
     ) : mode === 'create' ? (
-      // Um botão só: com a conta fechada, conclui (salvando antes)
+      // D-01: "Salvar" sempre; com a conta fechada, a conclusão ao lado
       <EvolveBar
         count={count}
         label="Criação"
         detail={freebies}
-        note={step.copy}
-        finish={
-          finishing.waitingSync
-            ? 'Sincronizando…'
-            : finishing.ready
-              ? finishing.label
-              : 'Salvar alterações'
-        }
-        primary={finishing.ready}
-        busy={finishing.busy}
-        disabled={!finishing.ready && count === 0}
-        testID="creation-action"
-        onFinish={() =>
+        note={nextStepNote}
+        save={{
+          // "Salvar" visível; o nome é o do Editar (WCAG 2.5.3: começa
+          // pelo texto visível) e não colide com o "Salvar" do resumo
+          title: 'Salvar',
+          accessibilityLabel: 'Salvar alterações',
+          testID: 'mode-save',
+          disabled: count === 0 || finishing.busy,
+          onPress: () => review('create'),
+        }}
+        next={
           finishing.ready
-            ? review('create', true)
-            : count
-              ? review('create')
-              : undefined
+            ? {
+                title: finishing.waitingSync
+                  ? 'Sincronizando…'
+                  : finishing.label,
+                primary: true,
+                busy: finishing.busy,
+                testID: 'creation-action',
+                onPress: () => review('create', true),
+              }
+            : null
         }
       />
     ) : null
@@ -351,9 +365,11 @@ function ModeSwitch({
   )
 }
 
-/** A ação seguinte ao lado do botão da barra (P03-D define o lugar). */
+/** Uma ação da barra de modos. */
 interface BarAction {
   readonly title: string
+  // Padrão: o título. Começa pelo título visível (WCAG 2.5.3)
+  readonly accessibilityLabel?: string
   readonly onPress: () => void
   readonly primary?: boolean
   readonly busy?: boolean
@@ -361,86 +377,86 @@ interface BarAction {
   readonly testID?: string
 }
 
+/**
+ * A barra de ação do rascunho: o texto ("Criação · N alterações") e as
+ * ações. `save` está sempre; `next` é a ação seguinte (concluir ou enviar;
+ * no Editar da criação livre, o aviso da D-03); `note` é uma linha sob o
+ * texto (o próximo passo). No celular com duas ações (ou com a nota), e com
+ * fonte grande, o texto fica em cima e as ações embaixo, numa linha que
+ * quebra se não couber.
+ */
 function EvolveBar({
   count,
-  onFinish,
   label = 'Editar',
-  finish = 'Concluir',
   detail = null,
-  primary = false,
-  busy = false,
-  disabled = false,
-  testID,
+  save,
   next = null,
   note = null,
 }: {
   readonly count: number
-  readonly onFinish: () => void
   readonly label?: string
-  readonly finish?: string
   // Ao lado da contagem (o saldo de bônus, na criação)
   readonly detail?: string | null
-  readonly primary?: boolean
-  readonly busy?: boolean
-  readonly disabled?: boolean
-  readonly testID?: string
-  // A ação seguinte (D-03: "Avisar que terminei") e a linha do próximo
-  // passo, sob a contagem (P04-D)
+  readonly save: BarAction
   readonly next?: BarAction | null
-  readonly note?: string | null
+  readonly note?: ReactNode
 }) {
   const { colors } = useTheme()
+  const { breakpoint, stacked } = useLayout()
+  const twoLines = stacked || (breakpoint === 'compact' && (next || note))
+  const text = (
+    <Text
+      variant="caption"
+      aria-live="polite"
+      style={note || twoLines ? undefined : styles.flex}
+    >
+      {[label === 'Editar' ? 'Editando' : label, changesLabel(count), detail]
+        .filter(Boolean)
+        .join(' · ')}
+    </Text>
+  )
+  // A principal fica à direita, como nos rodapés das folhas
+  const actions = [save, next].map(a =>
+    a ? (
+      <Button
+        key={a.testID ?? a.title}
+        title={a.title}
+        accessibilityLabel={a.accessibilityLabel}
+        variant={a.primary ? 'primary' : 'secondary'}
+        busy={a.busy}
+        disabled={a.disabled || a.busy}
+        testID={a.testID}
+        onPress={a.onPress}
+      />
+    ) : null
+  )
   return (
     <View
       accessibilityLabel={`Modo ${label}`}
+      testID="mode-bar"
       style={[
-        styles.bar,
+        twoLines ? styles.barStacked : styles.bar,
         {
           backgroundColor: colors.surfaceRaised,
           borderColor: colors.borderSubtle,
         },
       ]}
     >
-      <View style={styles.barText}>
-        <Text variant="caption" aria-live="polite">
-          {[
-            label === 'Editar' ? 'Editando' : label,
-            changesLabel(count),
-            detail,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </Text>
-        {/* Muda pouco e não é região viva: o banner da ficha anuncia o
-            pedido do narrador */}
-        {note ? (
-          <Text variant="caption" color="inkMuted" testID="next-step">
-            {note}
-          </Text>
-        ) : null}
-      </View>
-      {/* Sem espaço, os botões descem para a linha de baixo, à direita,
-          sem transbordar a 360 dp */}
-      <View style={styles.barActions}>
-        <Button
-          title={finish}
-          variant={primary ? 'primary' : 'secondary'}
-          busy={busy}
-          disabled={disabled || busy}
-          testID={testID}
-          onPress={onFinish}
-        />
-        {next ? (
-          <Button
-            title={next.title}
-            variant={next.primary ? 'primary' : 'secondary'}
-            busy={next.busy}
-            disabled={next.disabled || next.busy}
-            testID={next.testID}
-            onPress={next.onPress}
-          />
-        ) : null}
-      </View>
+      {note || twoLines ? (
+        <View style={twoLines ? undefined : styles.flex}>
+          {text}
+          {note}
+        </View>
+      ) : (
+        text
+      )}
+      {twoLines ? (
+        <View testID="mode-bar-actions" style={styles.barActions}>
+          {actions}
+        </View>
+      ) : (
+        actions
+      )}
     </View>
   )
 }
@@ -605,16 +621,6 @@ function groupByPlace(
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  // A contagem e o próximo passo; não encolhem abaixo de ~140 dp: os
-  // botões descem antes
-  barText: { flex: 1, minWidth: 140, gap: tokens.space['0.5'] },
-  barActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: tokens.space[2],
-    marginLeft: 'auto',
-  },
   group: { gap: tokens.space[1] },
   discard: { flex: 1, alignItems: 'flex-start' },
   switch: {
@@ -632,13 +638,26 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     gap: tokens.space[3],
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[2],
     borderTopWidth: tokens.borderWidth.hair,
     borderBottomWidth: tokens.borderWidth.hair,
+  },
+  // Duas linhas (D-01): o texto em cima, as ações embaixo
+  barStacked: {
+    gap: tokens.space[2],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingVertical: tokens.space[2],
+    borderTopWidth: tokens.borderWidth.hair,
+    borderBottomWidth: tokens.borderWidth.hair,
+  },
+  barActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: tokens.space[2],
   },
   summary: { gap: tokens.space[2] },
   change: {

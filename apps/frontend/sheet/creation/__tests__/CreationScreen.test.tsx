@@ -9,11 +9,17 @@ import {
 import { effectiveCreationConfig } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
-import { AccessibilityInfo, Dimensions, ScrollView } from 'react-native'
+import {
+  AccessibilityInfo,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+} from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { modelOf, templateJson } from '../../../test/fixtures'
+import { summarySave } from '../../../test/queries'
 import {
   json,
   memoryStore,
@@ -427,14 +433,13 @@ describe('extrato do bônus (R-17)', () => {
   })
 })
 
-describe('aba Orçamento e botão único', () => {
-  it('a conta fica na aba, e a barra tem um botão só', async () => {
+describe('aba Orçamento; Salvar sempre', () => {
+  it('a conta fica na aba; antes de fechar, a barra só tem "Salvar"', async () => {
     await open(PRIORITIES)
     expect(screen.queryByTestId('creation-panel')).toBeNull()
     expect(screen.queryByText('Concluir criação')).toBeNull()
-    expect(screen.getByTestId('creation-action')).toHaveTextContent(
-      'Salvar alterações'
-    )
+    expect(screen.queryByTestId('creation-action')).toBeNull()
+    expect(screen.getByTestId('mode-save')).toHaveTextContent(/^Salvar$/)
     tab('Orçamento')
     expect(screen.getByTestId('creation-problems')).toBeTruthy()
   })
@@ -472,6 +477,201 @@ describe('aba Orçamento e botão único', () => {
         expect.objectContaining({ revision: 1, sheetVersion: 2 })
       )
     )
+  })
+})
+
+// P03-D (T-04, D-01): salvar o progresso sem concluir, em qualquer fase
+describe('Salvar e Concluir lado a lado (D-01)', () => {
+  const saved = () =>
+    calls.eventsPost.mockResolvedValue({
+      ...ok({
+        sheetVersion: 2,
+        sheet: {
+          values: { name: 'Nova', clan: 'tremere', ...ALMOST, stamina: 3 },
+          specialties: {},
+        },
+      }),
+      status: 200,
+      response: {} as Response,
+      headers: {},
+    })
+  const withApproval = (roles: string[] = ['owner']) => {
+    const c = character(PRIORITIES, ALMOST) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    return ok({
+      ...c.data,
+      roles,
+      creation: { ...c.data.creation, approval: true },
+    })
+  }
+  const openWith = async (body: unknown) => {
+    calls.characterGet.mockResolvedValue(body)
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Orçamento' })
+  }
+
+  it('antes de a conta fechar: "Salvar" (nome "Salvar alterações"), sem ação seguinte', async () => {
+    await open(PRIORITIES)
+    const save = screen.getByRole('button', { name: 'Salvar alterações' })
+    expect(save).toHaveTextContent(/^Salvar$/)
+    expect(save.props.testID).toBe('mode-save')
+    // Sem alterações, desabilitado
+    expect(save).toBeDisabled()
+    expect(screen.queryByTestId('creation-action')).toBeNull()
+  })
+
+  it('com a conta fechada, "Salvar" grava e fica em Criação, sem concluir', async () => {
+    saved()
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.getByTestId('mode-save')).toHaveTextContent(/^Salvar$/)
+    expect(screen.getByTestId('mode-save')).toBeEnabled()
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir criação'
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
+    await act(async () => {
+      fireEvent.press(summarySave())
+    })
+    await waitFor(() => expect(calls.eventsPost).toHaveBeenCalledTimes(1))
+    expect(calls.completePost).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio', { name: 'Criação' })).toBeChecked()
+    // A conclusão continua ao lado, e o "Salvar" volta a esperar alterações
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir criação'
+    )
+    expect(screen.getByTestId('mode-save')).toBeDisabled()
+  })
+
+  it('com a aprovação ligada, "Enviar para aprovação" ao lado; salvar não envia', async () => {
+    saved()
+    await openWith(withApproval())
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Enviar para aprovação'
+    )
+    fireEvent.press(screen.getByTestId('mode-save'))
+    await act(async () => {
+      fireEvent.press(summarySave())
+    })
+    await waitFor(() => expect(calls.eventsPost).toHaveBeenCalledTimes(1))
+    expect(calls.completePost).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio', { name: 'Criação' })).toBeChecked()
+  })
+
+  it('o narrador, com a aprovação ligada, vê "Concluir e aprovar" ao lado de "Salvar"', async () => {
+    await openWith(withApproval(['storyteller']))
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir e aprovar'
+    )
+    expect(screen.getByTestId('mode-save')).toHaveTextContent(/^Salvar$/)
+  })
+})
+
+// D-01: com duas ações, a barra fica em duas linhas no celular (o texto em
+// cima, as ações embaixo, numa linha que quebra); fora dele, numa linha só
+describe('barra de Criação em duas linhas (D-01)', () => {
+  const at = (width: number, fontScale = 1) =>
+    act(() => {
+      const size = { width, height: 844, scale: 3, fontScale }
+      Dimensions.set({ window: size, screen: size })
+    })
+  const style = (testID: string) =>
+    StyleSheet.flatten(screen.getByTestId(testID).props.style)
+
+  it('a 360 e a 393, o texto em cima e "Salvar" e "Concluir criação" numa linha embaixo', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    for (const width of [360, 393]) {
+      at(width)
+      expect(style('mode-bar').flexDirection).toBeUndefined()
+      const actions = screen.getByTestId('mode-bar-actions')
+      expect(StyleSheet.flatten(actions.props.style)).toMatchObject({
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
+      })
+      // "Salvar" e depois a ação seguinte (a principal à direita)
+      expect(
+        within(actions)
+          .getAllByRole('button')
+          .map(b => b.props.testID)
+      ).toEqual(['mode-save', 'creation-action'])
+    }
+  })
+
+  it('a 1280, numa linha: o texto e as duas ações à direita', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    at(1280)
+    expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
+    expect(style('mode-bar').flexDirection).toBe('row')
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    expect(screen.getByTestId('mode-save')).toBeTruthy()
+  })
+
+  it('com fonte de 130%, duas linhas também na tela larga', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    at(1280, 1.3)
+    expect(screen.getByTestId('mode-bar-actions')).toBeTruthy()
+  })
+
+  // P04-D (D-03): a linha do próximo passo é o `note`; no celular, com ela,
+  // a barra fica em duas linhas mesmo só com "Salvar" (onda-3 §4.1)
+  it('só "Salvar" (a conta aberta): com o próximo passo, duas linhas no celular', async () => {
+    await open(PRIORITIES)
+    at(390)
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    const actions = screen.getByTestId('mode-bar-actions')
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map(b => b.props.testID)
+    ).toEqual(['mode-save'])
+    // A tela larga continua numa linha
+    at(1280)
+    expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
+    expect(style('mode-bar').flexDirection).toBe('row')
+  })
+
+  it('Editar da criação livre: "Salvar" (nome "Salvar alterações") e "Avisar que terminei" numa linha embaixo', async () => {
+    const free = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...free.data, creation: { ...free.data.creation, mode: 'free' } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    await screen.findByTestId('creation-ready')
+    at(360)
+    const actions = screen.getByTestId('mode-bar-actions')
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map(b => b.props.testID)
+    ).toEqual(['mode-save', 'creation-ready'])
+    const save = screen.getByTestId('mode-save')
+    expect(save).toHaveTextContent('Salvar')
+    expect(save).not.toHaveTextContent('Salvar alterações')
+    expect(save.props.accessibilityLabel).toBe('Salvar alterações')
   })
 })
 
