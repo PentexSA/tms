@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { apiAs, freeCreation, signUp } from '../support/users'
+import { apiAs, completeCreation, freeCreation, signUp } from '../support/users'
 
 // Etapa 17: a dona abre a ficha em Jogo, gasta Sangue e leva dano; depois de
 // recarregar a página, os valores vieram do servidor (não do otimista).
@@ -17,13 +17,17 @@ async function newCharacter(page: Page) {
   await freeCreation(context, user, chronicle.id)
   // 13ª geração (padrão) e Sangue sem valor guardado: cheio, 10 de 10. A
   // criação só aceita os campos da identidade
-  return apiAs<{ id: string }>(
+  const character = await apiAs<{ id: string }>(
     context,
     user,
     'POST',
     `/chronicles/${chronicle.id}/characters`,
     { values: { name: 'Helena Varga' } }
   )
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador (aqui, a mesma pessoa)
+  await completeCreation(context, user, character.id)
+  return character
 }
 
 /** Espera o lote chegar ao servidor (a fila manda em segundo plano). */

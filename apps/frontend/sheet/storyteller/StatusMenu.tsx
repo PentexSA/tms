@@ -3,11 +3,9 @@ import type { SheetModel } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
-  IconButton,
   Pressable,
   Text,
   tokens,
-  useLayout,
   useTheme,
   useToast,
 } from '@tms/ui'
@@ -18,14 +16,30 @@ import { stateLabel } from '../../components/chronicles/tableItems'
 import { api } from '../../lib/api'
 import { messageOf } from '../../lib/errors'
 import { chronicleKeys } from '../../lib/queries/chronicles'
+import { useCompleteCreation } from '../../lib/queries/creation'
+import { CompletionMessage } from '../creation/CompletionMessage'
+import {
+  completionCopy,
+  isStaleCompletion,
+  QUEUED_BEFORE_COMPLETING,
+  STALE_COMPLETION,
+  unsavedBeforeCompleting,
+} from '../creation/completion'
+import {
+  creationRefusalOf,
+  errorBodyOf,
+  REFUSAL_TEXT,
+} from '../creation/creation'
 import { sheetKeys } from '../data'
 import { deadLabel } from '../policy'
 
 // O menu ⋯ do narrador na ficha (doc/plano-v3.md, Etapa 6): concluir a
 // criação, travar e destravar, arquivar, marcar com o rótulo de `dead` do
 // template e reativar. Só as ações válidas no estado; o servidor confere de
-// novo e grava cada uma no registro da crônica. Arquivar e `dead` pedem
-// confirmação.
+// novo e grava cada uma no registro da crônica. Concluir, arquivar e `dead`
+// pedem confirmação. Concluir (T-32) usa o mesmo texto da barra de Criação,
+// manda a chave, a revisão e a versão da ficha, e não descarta em silêncio o
+// rascunho aberto do narrador.
 
 export type StatusActionId =
   | 'complete'
@@ -40,6 +54,10 @@ export interface StatusAction {
   readonly label: string
   // A pergunta antes de aplicar; sem ela, aplica no toque
   readonly confirm?: string
+  // O título da folha de confirmação (sem ele, o rótulo) e o botão que
+  // confirma (sem ele, o rótulo)
+  readonly title?: string
+  readonly confirmLabel?: string
   // O aviso depois de aplicar
   readonly done: string
 }
@@ -48,7 +66,9 @@ export interface StatusAction {
 export function statusActions(
   model: SheetModel,
   status: string,
-  locked: boolean
+  locked: boolean,
+  // A crônica pede aprovação: o narrador conclui e aprova numa ação
+  approval = false
 ): StatusAction[] {
   const dead = deadLabel(model)
   const keepsReading = 'O jogador continua lendo, mas só você muda a ficha.'
@@ -70,16 +90,25 @@ export function statusActions(
     done: 'Ficha reativada.',
   }
   switch (status) {
-    case 'creating':
+    case 'creating': {
+      const copy = completionCopy({
+        by: 'storyteller',
+        approval,
+        action: 'complete',
+      })
       return [
         {
           id: 'complete',
           label: 'Concluir criação',
-          done: 'Criação concluída. Subir um traço agora passa por você.',
+          title: copy.title,
+          confirm: copy.body,
+          confirmLabel: copy.confirm,
+          done: copy.done,
         },
         archive,
         markDead,
       ]
+    }
     case 'active':
       return [
         locked
@@ -97,11 +126,12 @@ export function statusActions(
   }
 }
 
-async function run(characterId: string, action: StatusActionId) {
+async function run(
+  characterId: string,
+  action: Exclude<StatusActionId, 'complete'>
+) {
   const character = api.characters({ id: characterId })
   switch (action) {
-    case 'complete':
-      return character.creation.complete.post()
     case 'lock':
       return character.lock.post()
     case 'unlock':
@@ -115,43 +145,62 @@ async function run(characterId: string, action: StatusActionId) {
   }
 }
 
+/** O que concluir pelo menu precisa saber da ficha aberta (T-32). */
+export interface StatusMenuDraft {
+  // A revisão da criação e a versão da ficha em cache: o servidor recusa
+  // com 409 o que mudou desde então
+  readonly revision?: number
+  readonly sheetVersion?: number
+  // Alterações não salvas do rascunho aberto e lotes ainda na fila:
+  // concluir fica desabilitado (a barra também espera a fila)
+  readonly unsaved?: number
+  readonly queued?: number
+  // A crônica pede aprovação
+  readonly approval?: boolean
+  // Linhas extras da confirmação: a sobra de bônus (T-18)
+  readonly notes?: readonly string[]
+}
+
+/** De qual ficha são as ações do narrador. */
+export interface StatusMenuTarget {
+  readonly characterId: string
+  readonly chronicleId: string
+  readonly model: SheetModel
+  readonly status: string
+  readonly locked: boolean
+}
+
+/** O botão largo: a ficha e o rascunho aberto. */
+export interface StatusMenuButtonProps
+  extends StatusMenuTarget,
+    StatusMenuDraft {}
+
+/**
+ * O gatilho do menu na tela larga (≥ 900). Abaixo disso, as ações ficam no
+ * "Mais opções" da ficha (SheetMenu, T-11), com o estado no item. O botão
+ * diz de quem são as ações e em que estado a ficha está.
+ */
 export function StatusMenuButton({
   characterId,
   chronicleId,
   model,
   status,
   locked,
-}: {
-  readonly characterId: string
-  readonly chronicleId: string
-  readonly model: SheetModel
-  readonly status: string
-  readonly locked: boolean
-}) {
+  ...draft
+}: StatusMenuButtonProps) {
   const [open, setOpen] = useState(false)
-  const { breakpoint } = useLayout()
-  const actions = statusActions(model, status, locked)
+  const actions = statusActions(model, status, locked, draft.approval)
   if (!actions.length) return null
   const state = stateLabel(model, status, locked)
   return (
     <>
-      {breakpoint === 'compact' ? (
-        <IconButton
-          label="Ações do narrador"
-          glyph="⋯"
-          testID="status-menu"
-          onPress={() => setOpen(true)}
-        />
-      ) : (
-        // Na tela larga o ⋯ sozinho some entre "Experiência" e "Histórico":
-        // o botão diz de quem são as ações e em que estado a ficha está
-        <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
-      )}
+      <StatusMenuTrigger state={state} onPress={() => setOpen(true)} />
       {open ? (
         <StatusMenu
           characterId={characterId}
           chronicleId={chronicleId}
           actions={actions}
+          draft={draft}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -192,25 +241,71 @@ function StatusMenuTrigger({
   )
 }
 
-function StatusMenu({
+export function StatusMenu({
   characterId,
   chronicleId,
   actions,
+  draft,
   onClose,
 }: {
   readonly characterId: string
   readonly chronicleId: string
   readonly actions: readonly StatusAction[]
+  readonly draft: StatusMenuDraft
   readonly onClose: () => void
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
+  const complete = useCompleteCreation(characterId, chronicleId)
   const [asking, setAsking] = useState<StatusAction | null>(null)
   const [busy, setBusy] = useState(false)
+  const unsaved = draft.unsaved ?? 0
+  const queued = draft.queued ?? 0
+
+  // `refresh: false` quando a mutação já rebuscou (concluir)
+  const applied = (action: StatusAction, refresh = true) => {
+    toast.show({ message: action.done })
+    onClose()
+    if (!refresh) return
+    void queryClient.invalidateQueries({
+      queryKey: sheetKeys.character(characterId),
+    })
+    void queryClient.invalidateQueries({
+      queryKey: chronicleKeys.one(chronicleId),
+    })
+  }
+
+  // Pela mesma mutação da barra: chave por intenção, revisão, versão e a
+  // rebusca da ficha, da Mesa e da lista. O servidor decide; o cliente só
+  // não conclui sobre dado velho
+  const finish = async (action: StatusAction) => {
+    try {
+      await complete.mutateAsync({
+        revision: draft.revision,
+        sheetVersion: draft.sheetVersion,
+      })
+      // A mutação já rebuscou a ficha, a Mesa e a lista
+      applied(action, false)
+    } catch (error) {
+      const body = errorBodyOf(error)
+      const code = creationRefusalOf(body)
+      toast.show({
+        message: isStaleCompletion(body)
+          ? STALE_COMPLETION
+          : code
+            ? REFUSAL_TEXT[code]
+            : messageOf(error, 'Não foi possível concluir a criação.'),
+      })
+    }
+  }
 
   const apply = async (action: StatusAction) => {
     setBusy(true)
     try {
+      if (action.id === 'complete') {
+        await finish(action)
+        return
+      }
       const res = await run(characterId, action.id)
       if (res.error) {
         toast.show({
@@ -218,24 +313,28 @@ function StatusMenu({
         })
         return
       }
-      toast.show({ message: action.done })
-      onClose()
-      void queryClient.invalidateQueries({
-        queryKey: sheetKeys.character(characterId),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: chronicleKeys.one(chronicleId),
-      })
+      applied(action)
     } finally {
       setBusy(false)
     }
   }
 
-  if (asking)
+  if (asking) {
+    // Concluir com o rascunho aberto descartaria as alterações em silêncio;
+    // com lotes na fila, concluiria sobre uma versão que ainda vai mudar
+    const waiting =
+      asking.id !== 'complete'
+        ? null
+        : unsaved > 0
+          ? unsavedBeforeCompleting(unsaved)
+          : queued > 0
+            ? QUEUED_BEFORE_COMPLETING
+            : null
+    const blocked = waiting !== null
     return (
       <BottomSheet
         visible
-        title={asking.label}
+        title={asking.title ?? asking.label}
         onClose={onClose}
         footer={
           <>
@@ -245,16 +344,33 @@ function StatusMenu({
               onPress={() => setAsking(null)}
             />
             <Button
-              title={asking.label}
-              disabled={busy}
+              title={asking.confirmLabel ?? asking.label}
+              testID={`status-${asking.id}-confirm`}
+              busy={busy}
+              disabled={busy || blocked}
               onPress={() => void apply(asking)}
             />
           </>
         }
       >
-        <Text>{asking.confirm}</Text>
+        {asking.id === 'complete' ? (
+          <View style={styles.list}>
+            {waiting ? (
+              <Text color="danger" accessibilityRole="alert">
+                {waiting}
+              </Text>
+            ) : null}
+            <CompletionMessage
+              body={asking.confirm ?? ''}
+              notes={draft.notes}
+            />
+          </View>
+        ) : (
+          <Text>{asking.confirm}</Text>
+        )}
       </BottomSheet>
     )
+  }
 
   return (
     <BottomSheet visible title="Ações do narrador" onClose={onClose}>

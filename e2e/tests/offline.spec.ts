@@ -1,6 +1,12 @@
 import { expect, type Page, test } from '@playwright/test'
 import { API_URL, WEB_URL } from '../env'
-import { apiAs, eighthGeneration, freeCreation, signUp } from '../support/users'
+import {
+  apiAs,
+  completeCreation,
+  eighthGeneration,
+  freeCreation,
+  signUp,
+} from '../support/users'
 
 // Etapa 20: o jogo continua sem rede e sincroniza ao voltar.
 //
@@ -47,6 +53,9 @@ test('gastar Sangue e levar dano offline, recarregar e sincronizar', async ({
     { values: { name: 'Helena Varga', clan: 'tremere' } }
   )
   await eighthGeneration(context, user, character.id)
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador (aqui, a mesma pessoa)
+  await completeCreation(context, user, character.id)
 
   await page.goto(`/characters/${character.id}`)
   await expect(page.getByLabel('Pontos de Sangue, 15 de 15')).toBeVisible()
@@ -111,6 +120,9 @@ test('logout apaga o que ficou no aparelho', async ({ page }) => {
     `/chronicles/${chronicle.id}/characters`,
     { values: { name: 'Caio' } }
   )
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador (aqui, a mesma pessoa)
+  await completeCreation(context, user, character.id)
   await page.goto(`/characters/${character.id}`)
   await expect(page.getByLabel(/^Pontos de Sangue, /)).toBeVisible()
   await expect
@@ -266,6 +278,9 @@ test('sair com Sangue gasto offline avisa e, de volta à rede, não entra sozinh
     { values: { name: 'Helena Varga', clan: 'tremere' } }
   )
   await eighthGeneration(context, user, character.id)
+  // Ficha em uso: a dona abre em Jogo (em criação, abriria em Editar, T-05).
+  // Na criação livre, quem conclui é o narrador (aqui, a mesma pessoa)
+  await completeCreation(context, user, character.id)
   await page.goto(`/characters/${character.id}`)
   await expect(page.getByLabel('Pontos de Sangue, 15 de 15')).toBeVisible()
   const old = (await context.cookies(`${API_URL}/auth`)).find(

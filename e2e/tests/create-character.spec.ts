@@ -36,7 +36,8 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   // Em Editar, o Clã fica no cabeçalho em colunas, como na ficha impressa
   await expect(page.getByRole('button', { name: 'Clã: Tremere' })).toBeVisible()
   // Sem o antecedente Geração, a 13ª: o Sangue derivado tem 10 pontos, no
-  // editor do atual em Editar
+  // editor do atual. Na Criação, "Em jogo" começa recolhido (T-59)
+  await page.getByRole('button', { name: 'Em jogo' }).click()
   await expect(
     page.getByRole('group', { name: 'Pontos de Sangue atual' })
   ).toContainText('10')

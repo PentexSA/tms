@@ -17,6 +17,7 @@ import {
   Text,
   TextField,
   tokens,
+  useLayout,
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
@@ -30,12 +31,13 @@ import {
   useSetNpcVisibility,
 } from '../lib/queries/chronicles'
 import { useRefetchOnFocus } from '../lib/queries/focus'
-import { SheetProvider } from './context'
 import { CreationContext } from './creation/CreationContext'
 import {
+  completionFreebies,
   creationActive,
   creationInfoOf,
   creationInputOf,
+  freebiesNotes,
 } from './creation/creation'
 import { DraftRecovery, useDraftPersistence } from './DraftRecovery'
 import { type SheetState, sheetKeys, useSheetData } from './data'
@@ -43,9 +45,17 @@ import { canEditSomething } from './evolve/hooks'
 import { LeaveGuard } from './evolve/LeaveGuard'
 import { HistorySheet } from './history/HistorySheet'
 import { blockedBy, LifecycleContext, type SheetLifecycle } from './policy'
+import { SheetMenu } from './SheetMenu'
 import { SheetView } from './SheetView'
-import { createSheetStore } from './store/sheetStore'
-import { StatusMenuButton } from './storyteller/StatusMenu'
+import {
+  createSheetStore,
+  type SheetState as SheetStoreState,
+} from './store/sheetStore'
+import {
+  StatusMenuButton,
+  type StatusMenuDraft,
+  type StatusMenuTarget,
+} from './storyteller/StatusMenu'
 import { StorytellerBar } from './storyteller/StorytellerBar'
 import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
@@ -68,8 +78,36 @@ export function SheetScreen({
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
   const [xp, setXp] = useState(false)
-  // Alterações do rascunho aberto (T-17): o cabeçalho não diz "Salvo"
-  const [unsaved, setUnsaved] = useState(0)
+  // T-11: abaixo de 900, as ações do cabeçalho não cabem lado a lado e
+  // ficam no "Mais opções"; a partir de 900, como antes
+  const wide = useLayout().breakpoint === 'expanded'
+  // O rascunho aberto, para o cabeçalho, que fica fora do store: as
+  // alterações não salvas (T-17: o cabeçalho não diz "Salvo"; T-32: o menu
+  // do narrador não conclui por cima delas)
+  const [draftState, setDraftState] = useState<DraftState>(NO_DRAFT)
+  const unsaved = draftState.unsaved
+  // T-18: a sobra de bônus na confirmação de concluir pelo menu do narrador
+  const completionNotes = useMemo(
+    () => freebiesNotes(draftState.freebiesLeft),
+    [draftState.freebiesLeft]
+  )
+  // O que concluir pelo menu do narrador precisa (T-32, T-18): a revisão, a
+  // versão e o rascunho aberto, no botão largo e no "Mais opções"
+  const info = state.status === 'ready' ? state.character.creation : undefined
+  const sheetVersion =
+    state.status === 'ready' ? state.character.sheetVersion : undefined
+  const creation = useMemo(() => creationInfoOf(info), [info])
+  const draft = useMemo<StatusMenuDraft>(
+    () => ({
+      revision: creation?.revision,
+      sheetVersion,
+      approval: creation?.approval,
+      unsaved,
+      queued: draftState.queued,
+      notes: completionNotes,
+    }),
+    [creation, sheetVersion, unsaved, draftState.queued, completionNotes]
+  )
   // Sem tempo real: voltar para a ficha rebusca (e o histórico, que é filho)
   useRefetchOnFocus(() =>
     queryClient.invalidateQueries(
@@ -161,7 +199,7 @@ export function SheetScreen({
           key={`${state.character.templateVersion}:${state.roles.join(',')}`}
           state={state}
           initialMode={initialMode}
-          onUnsaved={setUnsaved}
+          onDraftState={setDraftState}
         />
       )
   }
@@ -177,32 +215,41 @@ export function SheetScreen({
             {state.status === 'ready' ? (
               <SyncIndicator unsaved={unsaved} />
             ) : null}
-            {state.status === 'ready' && state.roles.includes('storyteller') ? (
-              <StatusMenuButton
-                characterId={id}
-                chronicleId={state.character.chronicle.id}
-                model={state.model}
-                status={state.character.status}
-                locked={state.character.lockedAt !== null}
+            {state.status !== 'ready' ? null : wide ? (
+              <>
+                {state.roles.includes('storyteller') ? (
+                  <StatusMenuButton {...narratorOf(id, state)} {...draft} />
+                ) : null}
+                {xpLedgerFields(state.model).length ? (
+                  <Button
+                    title="Experiência"
+                    variant="ghost"
+                    testID="xp-open"
+                    accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
+                    onPress={() => setXp(true)}
+                  />
+                ) : null}
+                <Button
+                  title="Histórico"
+                  variant="ghost"
+                  accessibilityHint="Abre o histórico de alterações da ficha"
+                  onPress={() => setHistory(true)}
+                />
+              </>
+            ) : (
+              <SheetMenu
+                narrator={
+                  state.roles.includes('storyteller')
+                    ? narratorOf(id, state)
+                    : null
+                }
+                draft={draft}
+                onExperience={
+                  xpLedgerFields(state.model).length ? () => setXp(true) : null
+                }
+                onHistory={() => setHistory(true)}
               />
-            ) : null}
-            {state.status === 'ready' && xpLedgerFields(state.model).length ? (
-              <Button
-                title="Experiência"
-                variant="ghost"
-                testID="xp-open"
-                accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
-                onPress={() => setXp(true)}
-              />
-            ) : null}
-            {state.status === 'ready' ? (
-              <Button
-                title="Histórico"
-                variant="ghost"
-                accessibilityHint="Abre o histórico de alterações da ficha"
-                onPress={() => setHistory(true)}
-              />
-            ) : null}
+            )}
           </View>
         }
       />
@@ -247,12 +294,47 @@ export function SheetScreen({
   )
 }
 
+/** De qual ficha são as ações do narrador (botão largo e SheetMenu). */
+function narratorOf(
+  id: string,
+  state: Extract<SheetState, { status: 'ready' }>
+): StatusMenuTarget {
+  return {
+    characterId: id,
+    chronicleId: state.character.chronicle.id,
+    model: state.model,
+    status: state.character.status,
+    locked: state.character.lockedAt !== null,
+  }
+}
+
 /**
  * O dono abre a própria ficha em Jogo; os demais (narrador, outros jogadores),
  * em Leitura. É UX: quem decide se a escrita vale é o servidor.
  */
 export const defaultMode = (roles: readonly RoleName[]): SheetMode =>
   roles.includes('owner') ? 'play' : 'read'
+
+/**
+ * O modo em que a ficha abre sem pedido na URL (T-05): a ficha em criação da
+ * dona abre na montagem, por qualquer entrada (lista, link, recarga, troca de
+ * estado). Criação quando a conta por pontos vale; Editar na criação livre.
+ * Nos demais casos, o padrão do papel. O narrador, na ficha alheia, continua
+ * em Leitura; o NPC dele nasce em criação livre e pode ficar assim em jogo,
+ * então também não muda. É UX: o servidor valida cada escrita.
+ */
+export function openingMode(args: {
+  readonly roles: readonly RoleName[]
+  readonly status: string
+  readonly active: boolean
+  readonly writer: boolean
+  readonly npc?: boolean
+}): SheetMode {
+  const { roles, status, active, writer, npc = false } = args
+  if (status === 'creating' && writer && !npc && roles.includes('owner'))
+    return active ? 'create' : 'evolve'
+  return defaultMode(roles)
+}
 
 /**
  * O modo que a política deixa, quando ela tira algum (doc/plano-v3.md, Etapa
@@ -269,15 +351,42 @@ export function policyMode(
   return code === 'SHEET_LOCKED' ? 'play' : 'read'
 }
 
+/**
+ * O que o cabeçalho sabe do rascunho aberto e da conta da criação. O menu do
+ * narrador fica no AppBar, fora do SheetProvider: é por aqui que ele sabe.
+ */
+export interface DraftState {
+  // Alterações não salvas
+  readonly unsaved: number
+  // Lotes salvos ainda na fila, sem confirmação do servidor
+  readonly queued: number
+  // A sobra de bônus na hora de concluir (T-18), para a confirmação do menu
+  // do narrador: só para o narrador e só com a conta fechada (a conta vale
+  // na criação por pontos, em creating e pending, em qualquer modo). Null no
+  // resto: sem linha, e o jogador não re-renderiza a tela a cada bônus
+  readonly freebiesLeft: number | null
+}
+
+const NO_DRAFT: DraftState = { unsaved: 0, queued: 0, freebiesLeft: null }
+
+const draftStateOf = (
+  s: SheetStoreState,
+  storyteller: boolean
+): DraftState => ({
+  unsaved: s.draft?.size ?? 0,
+  queued: s.pending.length,
+  freebiesLeft: storyteller ? completionFreebies(s.check) : null,
+})
+
 /** A ficha viva: store por ficha, ligado à fila e à ficha do cache. */
 function LiveSheet({
   state,
   initialMode,
-  onUnsaved,
+  onDraftState,
 }: {
   readonly state: Extract<SheetState, { status: 'ready' }>
   readonly initialMode?: SheetMode
-  readonly onUnsaved?: (count: number) => void
+  readonly onDraftState?: (draft: DraftState) => void
 }) {
   const sync = useSync()
   const toast = useToast()
@@ -301,17 +410,28 @@ function LiveSheet({
     () => (inputJson ? JSON.parse(inputJson) : null),
     [inputJson]
   )
+  // Só quem escreve algum campo começa num modo de rascunho
+  const writer = useMemo(
+    () => canEditSomething(state.model, new Set(state.roles)),
+    [state.model, state.roles]
+  )
+  const opening = openingMode({
+    roles: state.roles,
+    status,
+    active,
+    writer,
+    npc: state.character.kind === 'npc',
+  })
   const [store] = useState(() => {
-    // Só quem escreve algum campo começa em Evoluir (ficha recém-criada); sem
-    // pedido, o modo padrão do papel
-    const writer = canEditSomething(state.model, new Set(state.roles))
+    // Com pedido de rascunho (ficha recém-criada), o modo de montagem; sem
+    // pedido, o modo de abertura da ficha (T-05)
     const draftMode: SheetMode = active ? 'create' : 'evolve'
     const mode: SheetMode =
       initialMode && isDraftMode(initialMode)
         ? writer
           ? draftMode
           : defaultMode(state.roles)
-        : (initialMode ?? defaultMode(state.roles))
+        : (initialMode ?? opening)
     const created = createSheetStore({
       characterId: id,
       model: state.model,
@@ -332,16 +452,24 @@ function LiveSheet({
   useEffect(() => {
     store.getState().setEditable(forced === null)
   }, [store, forced])
-  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero
+  // O cabeçalho acompanha o rascunho; ao sair da ficha, volta a zero. Só
+  // avisa quando o que ele mostra muda
   useEffect(() => {
-    if (!onUnsaved) return
-    onUnsaved(store.getState().draft?.size ?? 0)
-    const unsubscribe = store.subscribe(s => onUnsaved(s.draft?.size ?? 0))
+    if (!onDraftState) return
+    const storyteller = store.getState().roles.includes('storyteller')
+    let last = draftStateOf(store.getState(), storyteller)
+    onDraftState(last)
+    const unsubscribe = store.subscribe(s => {
+      const next = draftStateOf(s, storyteller)
+      if (jsonEqual(next, last)) return
+      last = next
+      onDraftState(next)
+    })
     return () => {
       unsubscribe()
-      onUnsaved(0)
+      onDraftState(NO_DRAFT)
     }
-  }, [store, onUnsaved])
+  }, [store, onDraftState])
   // O rascunho guardado no aparelho, e a oferta de recuperá-lo (T-03)
   const persistence = useDraftPersistence({
     store,
@@ -360,22 +488,40 @@ function LiveSheet({
     if (!jsonEqual(s.creation, creation)) s.setCreation(creation)
   }, [store, creation])
   // O estado mudou (o narrador travou, arquivou, reativou; a criação foi
-  // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha do
-  // dono volta ao Jogo
+  // concluída ou devolvida): o modo acompanha. Sem modo forçado, a ficha vai
+  // ao modo de abertura: a montagem, se ainda em criação (T-05); o Jogo, para
+  // a dona da ficha em uso
+  // O modo de abertura da renderização anterior: a ficha aberta no Editar da
+  // criação livre (inclusive pelo cache persistido, antes da resposta do
+  // servidor) segue o modo de abertura novo quando a criação acaba
+  const openedAs = useRef(opening)
   useEffect(() => {
     const s = store.getState()
-    let next = forced ?? (s.mode === 'read' ? defaultMode(state.roles) : null)
-    // A criação acabou (ou virou livre): o modo dela não vale mais
-    if (!next && s.mode === 'create' && !active) next = defaultMode(state.roles)
+    const before = openedAs.current
+    openedAs.current = opening
+    let next = forced ?? (s.mode === 'read' ? opening : null)
+    // A criação por pontos acabou (ou virou livre): o modo dela não vale mais
+    if (!next && s.mode === 'create' && !active) next = opening
+    // A criação livre acabou com a ficha no Editar da abertura e nada a
+    // salvar: o modo de abertura novo (o Jogo, para a dona). Com alterações,
+    // o Editar fica: o servidor decide o lote
+    if (
+      !next &&
+      s.mode === 'evolve' &&
+      before === 'evolve' &&
+      opening !== 'evolve' &&
+      !s.draft?.size
+    )
+      next = opening
     // Voltou à criação por pontos com Evoluir aberto: o rascunho continua
-    if (!next && s.mode === 'evolve' && active) {
-      s.setMode('create')
-      return
-    }
+    if (!next && s.mode === 'evolve' && active) next = 'create'
     if (!next || next === s.mode) return
-    if (isDraftMode(s.mode)) s.discardDraft()
+    // Entre modos de rascunho, o rascunho continua (liberar a criação livre
+    // leva da Criação ao Editar sem perder o que não foi salvo)
+    if (isDraftMode(s.mode) && !isDraftMode(next)) s.discardDraft()
+    else if (!isDraftMode(s.mode) && isDraftMode(next)) s.startDraft()
     s.setMode(next)
-  }, [store, forced, state.roles, active])
+  }, [store, forced, opening, active])
   // Rebuscada (foco, conflito): o store confere a versão e valida
   useEffect(() => {
     store.getState().received(sheet, sheetVersion)
@@ -392,13 +538,20 @@ function LiveSheet({
   )
   return (
     <>
-      <NpcVisibilityBar state={state} />
       <LifecycleContext.Provider value={lifecycle}>
         <CreationContext.Provider value={creationValue}>
-          <SheetProvider store={store}>
-            <StorytellerBar ownerName={state.character.owner.username} />
-          </SheetProvider>
-          <SheetView store={store} editable />
+          {/* O painel do NPC e a barra do narrador: fixos acima da ficha
+              fora do celular; no celular, rolam com ela (T-27) */}
+          <SheetView
+            store={store}
+            editable
+            header={
+              <>
+                <NpcVisibilityBar state={state} />
+                <StorytellerBar ownerName={state.character.owner.username} />
+              </>
+            }
+          />
           <LeaveGuard store={store} />
           <DraftRecovery
             persistence={persistence}

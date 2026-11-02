@@ -1,7 +1,10 @@
 import {
   describe,
+  fmtSigned,
   type ListItem,
+  type ListMeta,
   type ResolvedList,
+  saySigned,
   short,
 } from '@tms/sheet-core'
 import { RatingDots, Text, tokens, useTheme } from '@tms/ui'
@@ -43,7 +46,13 @@ export function describeItem(list: ResolvedList, item: ListItem): string {
     parts.push(`${value} de ${def.item.value.max}`)
   for (const m of def.item.meta ?? []) {
     const v = item.meta?.[m.id]
-    if (v !== undefined && v !== '') parts.push(`${m.label} ${v}`)
+    if (v === undefined || v === '') continue
+    // O sinal falado ("Ataque mais 2"), como o número com `signed`
+    parts.push(
+      m.display === 'signed' && typeof v === 'number'
+        ? `${m.label} ${saySigned(v)}`
+        : `${m.label} ${v}`
+    )
   }
   if (item.specialty) parts.push(`especialização ${item.specialty}`)
   return parts.join(', ')
@@ -68,6 +77,15 @@ export function ListHeader({
   )
 }
 
+/**
+ * Um meta na linha do item: o número com o rótulo ("Bônus 2", "Ataque +5"),
+ * como o leitor de tela já fala; o texto só com o valor ("Social").
+ */
+function metaText(m: ListMeta, v: number | string): string {
+  if (m.type !== 'number' || typeof v !== 'number') return String(v)
+  return `${m.label} ${m.display === 'signed' ? fmtSigned(v) : v}`
+}
+
 export function ItemLine({
   list,
   item,
@@ -77,8 +95,10 @@ export function ItemLine({
 }) {
   const def = list.field.def
   const meta = (def.item.meta ?? [])
-    .map(m => item.meta?.[m.id])
-    .filter(v => v !== undefined && v !== '')
+    .flatMap(m => {
+      const v = item.meta?.[m.id]
+      return v === undefined || v === '' ? [] : [metaText(m, v)]
+    })
     .join(' · ')
   const value = itemValue(list, item)
   return (

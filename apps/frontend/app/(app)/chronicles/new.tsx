@@ -3,6 +3,7 @@ import {
   Banner,
   Button,
   Choice,
+  KeyboardArea,
   Screen,
   Skeleton,
   TextField,
@@ -10,12 +11,7 @@ import {
 } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-} from 'react-native'
+import { ScrollView, StyleSheet } from 'react-native'
 
 import { messageOf } from '../../../lib/errors'
 import { useCreateChronicle, useSystems } from '../../../lib/queries/chronicles'
@@ -60,10 +56,8 @@ export default function NewChronicleScreen() {
         title="Nova crônica"
         back={{ label: 'Crônicas', onPress: () => router.back() }}
       />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* Encolhe acima do teclado também no Android (T-26) */}
+      <KeyboardArea>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -104,13 +98,12 @@ export default function NewChronicleScreen() {
             disabled={!systemCode}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardArea>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     gap: tokens.space[4],
     padding: tokens.layout.gutter,

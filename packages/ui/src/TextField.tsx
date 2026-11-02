@@ -1,5 +1,12 @@
+import type { Ref } from 'react'
 import { useId } from 'react'
-import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native'
+import {
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  type TextInputProps,
+  View,
+} from 'react-native'
 import { hitTarget } from './metrics'
 import { Text } from './Text'
 import { textStyle, useTheme } from './theme'
@@ -14,6 +21,9 @@ export interface TextFieldProps
   readonly hint?: string
   // Mostra o contador "12/80" quando há maxLength.
   readonly counter?: boolean
+  // Com o React 19 o ref é prop: quem chama foca o campo (T-21). O `...rest`
+  // o leva ao TextInput
+  readonly ref?: Ref<TextInputInstance>
 }
 
 export function TextField({
@@ -60,13 +70,20 @@ export function TextField({
         ]}
         {...rest}
       />
+      {/* T-64: a dica (ou o erro) quebra em linhas e o contador fica
+          inteiro à direita, com um respiro entre os dois */}
       <View style={styles.meta}>
         {error ? (
-          <Text variant="caption" color="danger" accessibilityRole="alert">
+          <Text
+            variant="caption"
+            color="danger"
+            accessibilityRole="alert"
+            style={styles.note}
+          >
             {error}
           </Text>
         ) : hint ? (
-          <Text variant="caption" color="inkMuted">
+          <Text variant="caption" color="inkMuted" style={styles.note}>
             {hint}
           </Text>
         ) : (
@@ -77,6 +94,7 @@ export function TextField({
             variant="numberSm"
             color="inkMuted"
             accessibilityLabel={`${value.length} de ${maxLength} caracteres`}
+            style={styles.counter}
           >
             {`${value.length}/${maxLength}`}
           </Text>
@@ -99,5 +117,12 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
   },
   multiline: { minHeight: 120 },
-  meta: { flexDirection: 'row', justifyContent: 'space-between' },
+  meta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: tokens.space[2],
+  },
+  note: { flex: 1 },
+  counter: { flexShrink: 0 },
 })

@@ -7,6 +7,7 @@ import { EditorShell } from './EditorShell'
 import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
 import { SpecialtyEditor } from './SpecialtyEditor'
 import { parseTyped, typingStore, useTyping } from './typing'
+import { useRowFeedback } from './useRowFeedback'
 
 // rating, number e percent em Evoluir (DS: FieldRow com Stepper inline). O
 // Stepper muda 1 por toque; tocar no valor abre o teclado numérico. O que
@@ -60,6 +61,11 @@ export function NumberEditorRow(props: FieldViewProps) {
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   const blocked = useBlockedNote(resolved.id)
+  const path = `values.${resolved.id}`
+  // A recusa de um toque mora no store e some quando a causa some (T-55);
+  // só o erro do "Digitar" é local, porque é do campo aberto. Na criação, a
+  // previsão do próximo ponto vai no "+" (T-20, R-17)
+  const feedback = useRowFeedback(path, resolved.id)
   const [error, setError] = useState<string | null>(null)
   const instance = useId()
   const typing = useTyping(instance)
@@ -92,8 +98,10 @@ export function NumberEditorRow(props: FieldViewProps) {
   const range = rangeOf(props)
   if (!range) return null
   const def = resolved.field.def
-  const path = `values.${resolved.id}`
-  const apply = (n: number) => setError(set(path, n))
+  const apply = (n: number) => {
+    setError(null)
+    set(path, n)
+  }
   // O evento traz o texto quando pode (Enter no app; Enter e blur no web);
   // senão vale o último onChangeText
   const textOf = (e: { nativeEvent: unknown }) => {
@@ -149,7 +157,8 @@ export function NumberEditorRow(props: FieldViewProps) {
     <EditorShell
       label={def.label}
       sub={blocked}
-      error={error ?? issue}
+      note={feedback.note}
+      error={error ?? feedback.notice ?? issue}
       below={
         capNote || modNote || specialty ? (
           <>
@@ -228,6 +237,7 @@ export function NumberEditorRow(props: FieldViewProps) {
           disabled={blocked !== null}
           onValuePress={blocked ? undefined : open}
           valueNativeID={valueId}
+          increase={feedback.increase}
         />
       )}
     </EditorShell>

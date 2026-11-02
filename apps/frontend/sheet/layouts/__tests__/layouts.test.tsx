@@ -12,6 +12,7 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { RatingDots } from '@tms/ui'
+import { ScrollView, StyleSheet } from 'react-native'
 import {
   example,
   modelOf,
@@ -21,6 +22,7 @@ import {
 import { fakeServer, renderLive } from '../../../test/live'
 import { fold } from '../../evolve/text'
 import { SheetView } from '../../SheetView'
+import { GROUP_COL_MIN } from '../GroupsLayout'
 
 // Etapa 18: os layouts ricos. `groups` com filtro e busca; `grid` em colunas
 // (variante `cell`), que vira lista com fonte grande ou tela estreita.
@@ -41,6 +43,23 @@ const dims = (width: number, fontScale = 1) =>
   })
 
 beforeEach(() => dims(800))
+
+// No celular, as sub-abas e o contador ficam na faixa fixa da ficha (T-27)
+const nav = () => within(screen.getByTestId('sheet-nav'))
+const layout = (testID: string, y: number, height = 400) =>
+  fireEvent(screen.getByTestId(testID), 'layout', {
+    nativeEvent: { layout: { x: 0, y, width: 390, height } },
+  })
+/** Rola até as Habilidades: a faixa passa a mostrar as abas delas. */
+const scrollToAbilities = () => {
+  layout('sheet-panel', 600)
+  layout('sheet-nav', 500, 120)
+  layout('section-attributes', 0)
+  layout('section-abilities', 900)
+  fireEvent.scroll(screen.UNSAFE_getByType(ScrollView), {
+    nativeEvent: { contentOffset: { x: 0, y: 1450 } },
+  })
+}
 
 const renderSheet = (
   model: SheetModel,
@@ -115,18 +134,20 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(
       section.queryAllByTestId('pip-on', { includeHiddenElements: true })
     ).toHaveLength(0)
-    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar
+    // Sem o filtro (todas as 30), linhas com pips em abas, como no Editar;
+    // as abas ficam na faixa fixa (T-27)
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    expect(section.queryByRole('tab')).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('header', { name: 'Talentos' })).toBeNull()
     expect(
       section.getAllByTestId('pip-on', { includeHiddenElements: true }).length
     ).toBeGreaterThan(0)
     expect(section.queryByLabelText(/^Ocultismo, /)).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByLabelText(/^Ocultismo, /)).toBeTruthy()
     // A busca procura em todas as abas
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -135,7 +156,7 @@ describe('groups: filtro e busca (Habilidades)', () => {
     // Religar o filtro tira as abas: chips de todos os grupos
     fireEvent.changeText(section.getByLabelText('Buscar em Habilidades'), '')
     fireEvent.press(section.getByRole('switch', { name: 'Só com pontos' }))
-    expect(section.queryByRole('tab')).toBeNull()
+    expect(screen.queryByTestId('group-tabs-abilities')).toBeNull()
   })
 
   it('no Editar do celular, abas por grupo; a busca procura em todos', async () => {
@@ -145,12 +166,16 @@ describe('groups: filtro e busca (Habilidades)', () => {
       fakeServer(model, sheet).post
     )
     const section = within(screen.getByTestId('groups-abilities'))
-    expect(section.getByRole('tab', { name: 'Talentos' })).toBeSelected()
+    // No topo, a faixa mostra os Atributos; rolando, as Habilidades
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    scrollToAbilities()
+    expect(nav().queryByRole('tab', { name: 'Físicos' })).toBeNull()
+    expect(nav().getByRole('tab', { name: 'Talentos' })).toBeSelected()
     expect(section.queryByRole('adjustable', { name: 'Ocultismo' })).toBeNull()
-    fireEvent.press(section.getByRole('tab', { name: 'Conhecimentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Conhecimentos' }))
     expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
 
-    fireEvent.press(section.getByRole('tab', { name: 'Talentos' }))
+    fireEvent.press(nav().getByRole('tab', { name: 'Talentos' }))
     fireEvent.changeText(
       section.getByLabelText('Buscar em Habilidades'),
       'ocultismo'
@@ -158,6 +183,71 @@ describe('groups: filtro e busca (Habilidades)', () => {
     // Achou fora da aba aberta, com o título do grupo
     expect(section.getByRole('adjustable', { name: 'Ocultismo' })).toBeTruthy()
     expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
+  })
+
+  it('T-28: a 1280, no Editar, os três grupos lado a lado; a 750 e a 390, empilhados', async () => {
+    const bodyStyle = () =>
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )
+    dims(1280)
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    expect(bodyStyle()).toEqual({ flexDirection: 'row', flexWrap: 'wrap' })
+    const groupsOf = screen.getByTestId('groups-abilities-body').children
+    expect(groupsOf).toHaveLength(3)
+    for (const g of groupsOf)
+      expect(
+        StyleSheet.flatten(
+          (g as unknown as { props: { style: never } }).props.style
+        )
+      ).toMatchObject({ flexBasis: GROUP_COL_MIN, flexGrow: 1, minWidth: 0 })
+    // A busca fica acima, na largura toda
+    expect(screen.getByLabelText('Buscar em Habilidades')).toBeTruthy()
+    screen.unmount()
+
+    for (const width of [750, 390]) {
+      dims(width)
+      await renderLive(
+        { model, sheet, mode: 'evolve' },
+        fakeServer(model, sheet).post
+      )
+      expect(bodyStyle()?.flexDirection).toBeUndefined()
+      screen.unmount()
+    }
+  })
+
+  // Integração da onda 2, no web a 1280: com 240 por coluna, os cinco
+  // grupos de Vantagens cabiam numa linha e o rótulo do Stepper ficava com
+  // 48 px ("Corag em"). A coluna tem de caber uma linha com controle
+  it('T-28: a coluna do grupo cabe uma linha com controle (Vantagens a 1280)', () => {
+    expect(GROUP_COL_MIN).toBeGreaterThanOrEqual(300)
+    dims(1280)
+    renderSheet(model, sheet)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const body = screen.getByTestId('groups-advantages-body')
+    expect(StyleSheet.flatten(body.props.style)).toEqual({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    })
+    for (const g of body.children)
+      expect(
+        StyleSheet.flatten(
+          (g as unknown as { props: { style: never } }).props.style
+        )
+      ).toMatchObject({ flexBasis: GROUP_COL_MIN })
+  })
+
+  it('T-28: fonte grande no desktop: empilhados', () => {
+    dims(1280, 1.4)
+    renderSheet(model, sheet)
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )?.flexDirection
+    ).toBeUndefined()
   })
 
   it('seção sem filtro nem busca (Vantagens) não tem barra', () => {
@@ -250,7 +340,7 @@ describe('grid: Atributos', () => {
       fakeServer(model, sheet).post
     )
     let grid = within(screen.getByTestId('grid-attributes'))
-    expect(grid.getByRole('tab', { name: 'Físicos' })).toBeSelected()
+    expect(nav().getByRole('tab', { name: 'Físicos' })).toBeSelected()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
     screen.unmount()
 
@@ -263,6 +353,34 @@ describe('grid: Atributos', () => {
     expect(grid.queryByRole('header', { name: 'Físicos' })).toBeNull()
     expect(grid.queryByRole('tab', { name: 'Físicos' })).toBeNull()
     expect(grid.getByRole('adjustable', { name: 'Força' })).toBeTruthy()
+  })
+
+  it('T-68: até 400 de grade (360 a 432 de tela), a célula fica densa e o número cabe', () => {
+    const cellOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes')).getByLabelText(label)
+          .props.style
+      )
+    const valueRowOf = (label: RegExp) =>
+      StyleSheet.flatten(
+        within(screen.getByTestId('grid-attributes'))
+          .getByLabelText(label)
+          .findAll(
+            el =>
+              (el.type as unknown) === 'View' &&
+              StyleSheet.flatten(el.props.style)?.flexDirection === 'row'
+          )[0]!.props.style
+      )
+    dims(360)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(4)
+    expect(valueRowOf(/^Força/).gap).toBe(4)
+    screen.unmount()
+
+    dims(1280)
+    renderSheet(model, sheet)
+    expect(cellOf(/^Força/).padding).toBe(8)
+    expect(valueRowOf(/^Força/).gap).toBe(8)
   })
 
   it('grade sem grupos (características do CoC) quebra em colunas', () => {
@@ -316,5 +434,83 @@ describe('a ficha de papel: Vantagens do Vampiro', () => {
     expect(xp.getByText('Experiência disponível')).toBeTruthy()
     // Total 14, gasta 9: o disponível é calculado, como no quadro do papel
     expect(xp.getByText('5')).toBeTruthy()
+  })
+})
+
+describe('T-58: um título e um contador por bloco', () => {
+  const evolve = async (id: string) => {
+    const c = example(id)
+    const model = modelOf(c.system)
+    await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+  }
+
+  it('V20 no Editar: "Disciplinas" uma vez, com "3 itens" no cabeçalho do grupo', async () => {
+    await evolve('helena')
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getAllByText('Disciplinas')).toHaveLength(1)
+    expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
+    // A lista não repete o próprio cabeçalho ("Disciplinas 3")
+    const editor = within(screen.getByTestId('editor-disciplines'))
+    expect(editor.queryByText('Disciplinas')).toBeNull()
+    expect(screen.getByTestId('items-merits')).toHaveTextContent('1 item')
+  })
+
+  it('W20 no Editar: "Dons" uma vez (seção e grupo de mesmo nome); "Cicatrizes" fica com os dois títulos', async () => {
+    await evolve('iara')
+    const gifts = within(screen.getByTestId('section-gifts'))
+    expect(gifts.getAllByText('Dons')).toHaveLength(1)
+    expect(gifts.getByTestId('items-gifts')).toBeTruthy()
+    // Títulos diferentes ficam: seção e lista "Cicatrizes de batalha", grupo
+    // "Cicatrizes"
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    const scars = within(screen.getByTestId('section-battle-scars'))
+    expect(scars.getAllByText('Cicatrizes de batalha')).toHaveLength(2)
+    expect(scars.getByText('Cicatrizes')).toBeTruthy()
+    expect(scars.queryByTestId('items-battleScars')).toBeNull()
+  })
+
+  it('M20 no Editar: a Ressonância (lista fixa) mostra as linhas preenchidas', async () => {
+    await evolve('otto')
+    const resonance = within(screen.getByTestId('section-resonance'))
+    expect(resonance.getAllByText('Ressonância')).toHaveLength(1)
+    expect(resonance.getByTestId('items-resonance')).toHaveTextContent(
+      /^\d\/3$/
+    )
+  })
+
+  it('lista que o papel não escreve no Editar: o cabeçalho dela fica e o bloco não conta de novo', async () => {
+    const json = templateJson('vtm-v20') as {
+      sections: { id: string; permissions?: unknown }[]
+    }
+    const merits = json.sections.find(x => x.id === 'merits-flaws')
+    if (merits)
+      merits.permissions = {
+        read: ['owner', 'storyteller'],
+        write: ['storyteller'],
+      }
+    const model = compileTemplate(json)
+    const { sheet } = example('helena')
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.queryByTestId('items-merits')).toBeNull()
+    expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
+    const block = within(screen.getByTestId('groups-merits-flaws'))
+    expect(block.getAllByText('Qualidades')).toHaveLength(2)
+  })
+
+  it('em Jogo, o cabeçalho da lista continua (abre o detalhe) e não há "N itens"', () => {
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    renderSheet(model, sheet)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getAllByText('Disciplinas')).toHaveLength(2)
+    expect(screen.queryByTestId('items-disciplines')).toBeNull()
   })
 })

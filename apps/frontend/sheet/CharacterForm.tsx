@@ -1,7 +1,7 @@
 import { canWrite, type SheetModel, validateSheet } from '@tms/sheet-core'
 import { Banner, Button, tokens } from '@tms/ui'
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, type TextInputInstance, View } from 'react-native'
 import { editors } from './editors'
 
 // Criação de ficha (Etapa 14): o formulário sai do template. São os campos de
@@ -19,11 +19,15 @@ export interface CharacterFormProps {
   readonly model: SheetModel
   readonly busy?: boolean
   readonly error?: string | null
-  // Erros do servidor (422), no formato "/values/<campo>"
+  // Erros do servidor (422), no formato "/values/<campo>". Uma lista nova
+  // por resposta (memoizada por quem chama): ela leva ao primeiro campo
   readonly serverIssues?: readonly ServerIssue[]
   readonly onSubmit: (values: Record<string, unknown>) => void
   // Algum campo preenchido (depois do trim): a tela segura a saída (T-56)
   readonly onDirtyChange?: (dirty: boolean) => void
+  // O primeiro campo com erro, na ordem da tela (T-21): `y` da linha dele
+  // dentro do formulário, para a tela rolar até ele antes do foco
+  readonly onInvalid?: (y: number) => void
 }
 
 // Linhas do formulário: o nome sozinho, textos curtos de dois em dois e os
@@ -45,13 +49,16 @@ function rowsOf(
 const fieldOfPath = (path: string) =>
   path.replace(/^\/?values[./]/, '').split(/[./]/)[0] ?? ''
 
+const NO_ISSUES: readonly ServerIssue[] = []
+
 export function CharacterForm({
   model,
   busy,
   error,
-  serverIssues = [],
+  serverIssues = NO_ISSUES,
   onSubmit,
   onDirtyChange,
+  onInvalid,
 }: CharacterFormProps) {
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -73,6 +80,45 @@ export function CharacterForm({
   const fromServer = Object.fromEntries(
     serverIssues.map(i => [fieldOfPath(i.path), i.message])
   )
+  const rows = rowsOf(model, fields, nameField)
+  // O `y` de cada linha e o campo de texto de cada editor (T-21)
+  const rowY = useRef(new Map<string, number>())
+  const inputs = useRef(new Map<string, TextInputInstance>())
+  // Leva ao primeiro campo com erro, na ordem da tela: rola até a linha e
+  // foca o campo, quando é de texto (no web, o foco também o traz à vista).
+  // Nenhuma validação nova: só o caminho até o erro
+  const goTo = (invalid: ReadonlySet<string>) => {
+    const row = rows.find(r => r.some(id => invalid.has(id)))
+    const id = row?.find(x => invalid.has(x))
+    if (!row || !id) return
+    onInvalid?.(rowY.current.get(row.join(':')) ?? 0)
+    inputs.current.get(id)?.focus()
+  }
+  // O 422 do servidor faz o mesmo ao chegar: cada resposta é uma lista nova
+  // (quem chama a guarda por resposta), então a mesma recusa repetida leva ao
+  // campo de novo
+  const reach = useRef(goTo)
+  reach.current = goTo
+  useEffect(() => {
+    if (serverIssues.length)
+      reach.current(new Set(serverIssues.map(i => fieldOfPath(i.path))))
+  }, [serverIssues])
+  // "Próximo" (T-26): os campos de texto de uma linha, na ordem do
+  // formulário, pelos mesmos campos do T-21. Os de escolha (o Clã) ficam
+  // fora da cadeia.
+  const chain = rows
+    .flat()
+    .filter(id => model.fields.get(id)?.def.type === 'text')
+  const chainOf = (id: string) => {
+    const at = chain.indexOf(id)
+    if (at < 0) return undefined
+    const following = chain[at + 1]
+    return {
+      next: following
+        ? () => inputs.current.get(following)?.focus()
+        : undefined,
+    }
+  }
 
   const submit = () => {
     const clean: Record<string, unknown> = {}
@@ -91,13 +137,21 @@ export function CharacterForm({
     }
     setErrors(found)
     if (Object.keys(found).length === 0) onSubmit(clean)
+    else goTo(new Set(Object.keys(found)))
   }
 
   return (
     <View style={styles.form}>
       {error ? <Banner tone="danger" message={error} /> : null}
-      {rowsOf(model, fields, nameField).map(row => (
-        <View key={row.join(':')} style={styles.row}>
+      {rows.map(row => (
+        <View
+          key={row.join(':')}
+          style={styles.row}
+          testID={`form-row-${row.join('-')}`}
+          onLayout={e => {
+            rowY.current.set(row.join(':'), e.nativeEvent.layout.y)
+          }}
+        >
           {row.map(id => {
             const def = model.fields.get(id)?.def
             const Editor = def ? editors[def.type] : undefined
@@ -110,7 +164,12 @@ export function CharacterForm({
                   value={values[id]}
                   required={id === nameField}
                   properName={id === nameField}
+                  inputRef={el => {
+                    if (el) inputs.current.set(id, el)
+                    else inputs.current.delete(id)
+                  }}
                   error={errors[id] ?? fromServer[id]}
+                  chain={chainOf(id)}
                   onChange={next => {
                     setValues(v => ({ ...v, [id]: next }))
                     setErrors(({ [id]: _, ...rest }) => rest)

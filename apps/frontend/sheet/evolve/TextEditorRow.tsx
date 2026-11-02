@@ -10,6 +10,7 @@ import {
 } from '@tms/ui'
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { submitField } from '../../lib/keyboard'
 import { useSheet } from '../context'
 import { properNameInput } from '../editors/properName'
 import { SuggestionChips } from '../editors/Suggestions'
@@ -108,6 +109,10 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           placeholder={def.placeholder}
           autoFocus
           {...(required ? properNameInput : {})}
+          // T-10: no campo de uma linha, o "✓" do teclado (Enter no web)
+          // aplica, como o "Digitar" (T-25); com erro, o campo fica aberto.
+          // No texto longo, Enter continua sendo nova linha.
+          {...(long ? {} : submitField('done', apply))}
         />
         {def.type === 'text' && def.suggestions?.length ? (
           <View style={styles.suggestions}>

@@ -9,15 +9,31 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import {
+  KeyboardArea,
+  Pressable,
   SectionHeader,
   TabPanel,
-  Tabs,
+  Text,
   ThemeProvider,
   tokens,
   useLayout,
+  useTheme,
 } from '@tms/ui'
-import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import {
+  Platform,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ConflictBanner } from './ConflictBanner'
@@ -29,16 +45,23 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
+import { ReturnedBanner } from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
-import { ModeBar } from './evolve/ModeBar'
+import { type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
+import {
+  GroupTabsContext,
+  StripScope,
+  useGroupTabsState,
+} from './layouts/groupTabsState'
 import { PolicyBanner } from './PolicyBanner'
 import { ActionsButton } from './play/ActionsMenu'
 import { CombatDock, dockFields } from './play/CombatDock'
 import { FieldSheetProvider } from './play/FieldSheet'
 import { blockedBy, useLifecycle } from './policy'
 import { SectionView } from './SectionView'
+import { SheetNav } from './SheetNav'
 import { createSheetStore, type SheetStore } from './store/sheetStore'
 
 // A ficha montada pelo template (doc/arquitetura §6.1): identidade, "Em jogo"
@@ -57,7 +80,16 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // (Leitura · Jogo · Evoluir) para quem escreve algum campo.
 
 export type SheetViewProps =
-  | { readonly store: SheetStore; readonly editable?: boolean }
+  | {
+      readonly store: SheetStore
+      readonly editable?: boolean
+      /**
+       * O que vem acima da ficha (o painel do NPC e a barra do narrador).
+       * Fora do celular, fica fixo, como antes; no celular, rola com a ficha
+       * (T-27).
+       */
+      readonly header?: ReactNode
+    }
   | {
       readonly model: SheetModel
       readonly sheet: SheetData
@@ -102,15 +134,34 @@ export function SheetView(props: SheetViewProps) {
     ]
   )
   const editable = 'store' in props && props.editable === true
-  return <SheetBody store={store} editable={editable} />
+  return (
+    <SheetBody
+      store={store}
+      editable={editable}
+      header={'store' in props ? props.header : undefined}
+    />
+  )
+}
+
+/** As partes da barra de modos, para quem escreve (T-27). */
+function ModeBarSlots({
+  enabled,
+  children,
+}: {
+  readonly enabled: boolean
+  readonly children: (bar: ModeBarParts) => ReactNode
+}) {
+  return children(useModeBar({ enabled }))
 }
 
 function SheetBody({
   store,
   editable,
+  header,
 }: {
   readonly store: SheetStore
   readonly editable: boolean
+  readonly header?: ReactNode
 }) {
   const { model, roles } = store.getState()
   const zones = useMemo(() => readableZones(model, roles), [model, roles])
@@ -162,74 +213,220 @@ function SheetBody({
     mode === 'play' &&
     breakpoint === 'compact' &&
     dockFields(model, new Set(roles)).length > 0
+  // T-59: na Criação, "Em jogo" começa recolhido (os Atributos ficam na
+  // primeira dobra) e abre com um toque; nos outros modos, aberto como antes
+  const collapsible = mode === 'create'
+  const [playOpen, setPlayOpen] = useState(false)
+  // T-27: no celular, o painel do NPC, a barra do narrador e o seletor de
+  // modo rolam com a ficha; a barra de ação (onde se salva e conclui) fica
+  // fixa. Fora do celular, tudo fixo acima, como antes.
+  const phone = breakpoint === 'compact'
+  const groupTabs = useGroupTabsState(phone)
+  // Trocar de aba com a faixa presa (rolado para dentro do painel): o painel
+  // novo começa logo abaixo dela, não no fim de um conteúdo mais curto
+  const scrollRef = useRef<ScrollViewInstance>(null)
+  const showTab = useCallback(
+    (id: string) => {
+      setTab(id)
+      const top = groupTabs.store.panelTop()
+      if (groupTabs.store.scrollY() > top)
+        scrollRef.current?.scrollTo({ y: top, animated: false })
+    },
+    [groupTabs.store]
+  )
+  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  const openBudget = useMemo(
+    () => (budget ? () => showTab(BUDGET_TAB) : null),
+    [budget, showTab]
+  )
+  // O header (painel do NPC e barra do narrador) é do app, não da ficha:
+  // fica com o tema de fora (a skin do app e o accent neutro), mesmo quando
+  // rola dentro da ficha, que usa a skin e o accent do personagem
+  const appSkin = useTheme().skin
+  const chrome = header ? (
+    <ThemeProvider skin={appSkin} accent="accent-neutral">
+      {header}
+    </ThemeProvider>
+  ) : null
+
+  // T-27 (parte 2): os filhos da rolagem num array sem nulos, porque o
+  // stickyHeaderIndices conta posições; a faixa de navegação fica presa no
+  // topo. No celular, ela leva as sub-abas e o contador da seção atual
+  const scrollItems = (bar: ModeBarParts | null): ReactElement[] => {
+    const items: (ReactElement | null | false)[] = [
+      phone && (header || bar) ? (
+        <View key="head" testID="sheet-scroll-header">
+          {chrome}
+          {bar?.switcher}
+        </View>
+      ) : null,
+      <ConflictBanner key="conflict" />,
+      editable ? <PolicyBanner key="policy" /> : null,
+      editable ? <CreationStatusPanel key="status" /> : null,
+      // A devolução aparece em qualquer modo (T-06)
+      editable ? <ReturnedBanner key="returned" /> : null,
+      editable && mode === 'create' ? <CreationAlerts key="alerts" /> : null,
+      mode === 'play' ? (
+        <View key="toolbar" style={styles.toolbar}>
+          {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
+          <DiceButton
+            characterId={store.getState().characterId}
+            store={store}
+          />
+          <ActionsButton />
+        </View>
+      ) : null,
+      <IdentityBlock key="identity" />,
+      play.length && !docked ? (
+        <View key="play">
+          {collapsible ? (
+            <PlayToggle open={playOpen} onToggle={() => setPlayOpen(v => !v)} />
+          ) : (
+            <View style={styles.title}>
+              <SectionHeader title="Em jogo" level="group" />
+            </View>
+          )}
+          {!collapsible || playOpen ? (
+            <View nativeID={PLAY_ID}>
+              {play.map(s => (
+                <SectionView key={s.id} section={s} hideTitle />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null,
+      tabs.length || phone ? (
+        <View key="nav-gap" style={styles.navGap} />
+      ) : null,
+      tabs.length || phone ? (
+        <SheetNav
+          key="nav"
+          tabs={tabs}
+          selected={shownTab ?? ''}
+          onSelect={showTab}
+        />
+      ) : null,
+      <View
+        key="panel"
+        testID="sheet-panel"
+        onLayout={e => groupTabs.store.panelAt(e.nativeEvent.layout.y)}
+      >
+        <StripScope.Provider value>
+          {paneled && shownTab !== undefined ? (
+            <TabPanel tabsId="sheet-parts" tab={shownTab}>
+              {zoneContent}
+            </TabPanel>
+          ) : (
+            zoneContent
+          )}
+        </StripScope.Provider>
+      </View>,
+    ]
+    return items.filter((i): i is ReactElement => Boolean(i))
+  }
+
+  const screen = (bar: ModeBarParts | null) => {
+    const items = scrollItems(bar)
+    const nav = items.findIndex(i => i.key === 'nav')
+    return (
+      <View style={styles.screen}>
+        {phone ? null : chrome}
+        {bar && !phone ? (
+          <View>
+            {bar.switcher}
+            {bar.actionBar}
+          </View>
+        ) : null}
+        {bar && phone ? bar.actionBar : null}
+        {bar?.summary}
+        {/* Só a rolagem encolhe acima do teclado (T-26): o campo do
+            "Digitar", a busca e os textos ficam à vista; o dock e o
+            aviso de bônus ficam atrás do teclado enquanto ele está
+            aberto */}
+        <KeyboardArea>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            stickyHeaderIndices={nav >= 0 ? [nav] : undefined}
+            scrollEventThrottle={16}
+            onScroll={e =>
+              groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
+            }
+          >
+            {items}
+          </ScrollView>
+        </KeyboardArea>
+        {docked ? <CombatDock /> : null}
+        {budget ? <BonusNotice onBudget={() => showTab(BUDGET_TAB)} /> : null}
+      </View>
+    )
+  }
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider store={store}>
+      <SheetProvider store={store} openBudget={openBudget}>
         <FieldSheetProvider>
-          <View style={styles.screen}>
-            {writer ? <ModeBar /> : null}
-            <ScrollView
-              contentContainerStyle={styles.content}
-              keyboardShouldPersistTaps="handled"
-            >
-              <ConflictBanner />
-              {editable ? <PolicyBanner /> : null}
-              {editable ? <CreationStatusPanel /> : null}
-              {editable && mode === 'create' ? <CreationAlerts /> : null}
-              {mode === 'play' ? (
-                <View style={styles.toolbar}>
-                  {/* Some quando o template não tem rolagem (D&D, CoC, Fate) */}
-                  <DiceButton
-                    characterId={store.getState().characterId}
-                    store={store}
-                  />
-                  <ActionsButton />
-                </View>
-              ) : null}
-              <IdentityBlock />
-              {play.length && !docked ? (
-                <View>
-                  <View style={styles.title}>
-                    <SectionHeader title="Em jogo" level="group" />
-                  </View>
-                  {play.map(s => (
-                    <SectionView key={s.id} section={s} hideTitle />
-                  ))}
-                </View>
-              ) : null}
-              {tabs.length ? (
-                <View style={styles.tabs}>
-                  <Tabs
-                    id="sheet-parts"
-                    accessibilityLabel="Partes da ficha"
-                    items={tabs}
-                    selected={shownTab ?? ''}
-                    onSelect={setTab}
-                  />
-                </View>
-              ) : null}
-              {paneled && shownTab !== undefined ? (
-                <TabPanel tabsId="sheet-parts" tab={shownTab}>
-                  {zoneContent}
-                </TabPanel>
-              ) : (
-                <View>{zoneContent}</View>
-              )}
-            </ScrollView>
-            {docked ? <CombatDock /> : null}
-            {budget ? (
-              <BonusNotice onBudget={() => setTab(BUDGET_TAB)} />
-            ) : null}
-          </View>
+          <GroupTabsContext.Provider value={groupTabs}>
+            {/* A barra de modos é da ficha viva (editable não muda numa ficha
+              montada); quem não escreve, por papel ou pela política, fica
+              sem as partes, e a ficha não remonta quando isso muda */}
+            {editable ? (
+              <ModeBarSlots enabled={writer}>
+                {bar => screen(writer ? bar : null)}
+              </ModeBarSlots>
+            ) : (
+              screen(null)
+            )}
+          </GroupTabsContext.Provider>
         </FieldSheetProvider>
       </SheetProvider>
     </ThemeProvider>
   )
 }
 
+const PLAY_ID = 'sheet-play'
+
+/** O título "Em jogo" que abre e recolhe o bloco (T-59). */
+function PlayToggle({
+  open,
+  onToggle,
+}: {
+  readonly open: boolean
+  readonly onToggle: () => void
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Em jogo"
+      accessibilityState={{ expanded: open }}
+      aria-expanded={open}
+      {...(Platform.OS === 'web' ? { 'aria-controls': PLAY_ID } : {})}
+      testID="play-toggle"
+      onPress={onToggle}
+      style={styles.toggle}
+    >
+      <Text variant="title" style={styles.toggleText}>
+        Em jogo
+      </Text>
+      <Text variant="caption" color="inkMuted" aria-hidden>
+        {open ? '▾' : '▸'}
+      </Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[2],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingTop: tokens.space[4],
+    paddingBottom: tokens.space[2],
+  },
+  toggleText: { flex: 1 },
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -242,5 +439,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.layout.gutter,
     paddingTop: tokens.space[4],
   },
-  tabs: { marginTop: tokens.space[6] },
+  navGap: { height: tokens.space[6] },
 })

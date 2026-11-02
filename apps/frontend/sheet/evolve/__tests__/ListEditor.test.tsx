@@ -137,6 +137,174 @@ describe('ListEditor', () => {
   })
 })
 
+describe('T-23: o item nasce com o valor que o editor mostra', () => {
+  const flawsOf = (live: { store: () => { getState: () => unknown } }) =>
+    (
+      live.store().getState() as {
+        draftEvents: () => { path: string; to: unknown }[]
+      }
+    )
+      .draftEvents()
+      .find(e => e.path === 'values.flaws')?.to as ListItem[] | undefined
+
+  it('Defeito novo grava o Bônus 1 que a folha mostra; a linha diz "Bônus 1"', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
+    fireEvent.changeText(textInput('Nome'), 'Pesadelos')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Pesadelos”' })
+    )
+    expect(flawsOf(live)?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Pesadelos',
+      meta: { bonus: 1 },
+    })
+    const flaws = within(screen.getByTestId('editor-flaws'))
+    expect(flaws.getByText('Bônus 1')).toBeTruthy()
+    // O meta de texto continua só com o valor; o número ganha o rótulo
+    expect(flaws.getByText('Social · Bônus 2')).toBeTruthy()
+  })
+
+  it('Defeito gravado sem bônus: abrir e Aplicar grava o 1 que a folha mostra', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: { ...helena.values, flaws: [{ id: 'f1', name: 'Inimigo' }] },
+    }
+    const live = await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Inimigo' }))
+    expect(
+      screen.getByRole('adjustable', { name: 'Inimigo, Bônus' })
+    ).toHaveAccessibilityValue({ now: 1 })
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(flawsOf(live)).toEqual([
+      { id: 'f1', name: 'Inimigo', meta: { bonus: 1 } },
+    ])
+  })
+
+  it('D&D: meta numérico sem mínimo (Ataque) não ganha valor inventado', async () => {
+    const c = example('lia')
+    const model = modelOf(c.system)
+    const { store } = await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: /^Poderes|Combate/ }))
+    // A linha do ataque mostra o rótulo e o sinal do template
+    expect(
+      within(screen.getByTestId('editor-attacks')).getByText(
+        'Ataque +2 · 1d6 − 1 contundente'
+      )
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Ataque' }))
+    fireEvent.changeText(textInput('Nome'), 'Adaga')
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Adaga”' }))
+    const attacks = store()
+      .getState()
+      .draftEvents()
+      .find(e => e.path === 'values.attacks')?.to as ListItem[]
+    expect(attacks.at(-1)).toEqual({ id: 'i3', name: 'Adaga' })
+  })
+})
+
+describe('T-62: Enter e "✓" adicionam', () => {
+  const eventFor = (
+    live: Awaited<ReturnType<typeof helenaInEvolve>>,
+    field: string
+  ) =>
+    live
+      .store()
+      .getState()
+      .draftEvents()
+      .find(e => e.path === `values.${field}`)?.to as ListItem[] | undefined
+  // Como no app: o Enter traz o texto do campo
+  const enter = (label: string, text?: string) =>
+    fireEvent(textInput(label), 'submitEditing', {
+      nativeEvent: { text: text ?? textInput(label).props.value },
+    })
+
+  it('lista sem catálogo (Qualidade): o Enter adiciona o texto livre', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    const name = textInput('Nome')
+    expect(name.props.returnKeyType).toBe('done')
+    expect(name.props.submitBehavior).toBe('submit')
+    fireEvent.changeText(name, ' Ambidestro ')
+    enter('Nome')
+    expect(eventFor(live, 'merits')?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Ambidestro',
+      meta: { cost: 1 },
+    })
+    // Entrou: a folha fechou
+    expect(screen.queryByTestId('add-sheet-merits')).toBeNull()
+  })
+
+  // Integração da onda 2, no AVD: o "✓" chegou antes do último
+  // onChangeText, e a Qualidade entrou como "Ambi"
+  it('o Enter usa o texto que chega com ele, não o do último onChangeText', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'Ambi')
+    enter('Nome', 'Ambidestro')
+    expect(eventFor(live, 'merits')?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Ambidestro',
+      meta: { cost: 1 },
+    })
+  })
+
+  it('nome exato do catálogo adiciona a Disciplina; sugestão parcial não vira texto livre', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'fort')
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')).toBeUndefined()
+    // Com sugestões à vista, o campo diz o que tocar
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(sheet.getByRole('alert')).toHaveTextContent(
+      'Toque numa sugestão, ou em “Adicionar “fort”” para usar o nome como está.'
+    )
+
+    // O que já está na ficha não entra de novo pelo Enter
+    fireEvent.changeText(
+      screen.getByLabelText('Buscar Disciplina'),
+      'auspicios'
+    )
+    expect(sheet.queryByRole('alert')).toBeNull()
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')).toBeUndefined()
+    expect(sheet.getByRole('alert')).toHaveTextContent(
+      'Auspícios já está na ficha.'
+    )
+
+    fireEvent.changeText(
+      screen.getByLabelText('Buscar Disciplina'),
+      'fortitude'
+    )
+    enter('Buscar Disciplina')
+    expect(eventFor(live, 'disciplines')?.at(-1)).toEqual({
+      id: 'i4',
+      name: 'Fortitude',
+      value: 1,
+    })
+  })
+
+  it('campo vazio: o Enter não faz nada', async () => {
+    const live = await helenaInEvolve()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    enter('Nome')
+    expect(eventFor(live, 'merits')).toBeUndefined()
+    expect(screen.getByTestId('add-sheet-merits')).toBeTruthy()
+  })
+})
+
 describe('outros sistemas, o mesmo editor', () => {
   it('D&D: ataque com meta numérica e de texto', async () => {
     const c = example('lia')
@@ -147,7 +315,7 @@ describe('outros sistemas, o mesmo editor', () => {
     )
     fireEvent.press(screen.getByRole('tab', { name: /^Poderes|Combate/ }))
     fireEvent.press(
-      screen.getByRole('button', { name: /^Bordão, Ataque 2, Dano/ })
+      screen.getByRole('button', { name: /^Bordão, Ataque mais 2, Dano/ })
     )
     fireEvent(
       screen.getByRole('adjustable', { name: 'Bordão, Ataque' }),

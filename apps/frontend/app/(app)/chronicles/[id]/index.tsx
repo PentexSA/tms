@@ -18,7 +18,10 @@ import { useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
-import { CreationSettings } from '../../../../components/chronicles/CreationSettings'
+import {
+  type ChronicleCreationInfo,
+  CreationSettings,
+} from '../../../../components/chronicles/CreationSettings'
 import { DeleteChronicleSheet } from '../../../../components/chronicles/DeleteChronicleSheet'
 import { InviteSheet } from '../../../../components/chronicles/InviteSheet'
 import {
@@ -209,6 +212,8 @@ interface ChronicleData {
   readonly id: string
   readonly system: { readonly code: string }
   readonly storyteller: { readonly username: string }
+  // As regras da criação (o ex-membro não recebe)
+  readonly creation?: ChronicleCreationInfo
   readonly members: readonly {
     readonly id: string
     readonly username: string
@@ -250,16 +255,20 @@ function SheetsPanel({
         chronicleId={c.id}
         systemCode={c.system.code}
         narrating={narrating}
+        creation={c.creation}
       />
 
-      <SectionHeader
-        title="Participantes"
-        right={
-          narrating ? (
-            <Button title="Convidar" variant="secondary" onPress={onInvite} />
-          ) : undefined
-        }
-      />
+      {/* O título e o "Convidar" com a margem da página (T-67) */}
+      <View style={styles.header} testID="members-header">
+        <SectionHeader
+          title="Participantes"
+          right={
+            narrating ? (
+              <Button title="Convidar" variant="secondary" onPress={onInvite} />
+            ) : undefined
+          }
+        />
+      </View>
       <ListItem
         title={c.storyteller.username}
         subtitle="Narrador"
@@ -315,6 +324,7 @@ const styles = StyleSheet.create({
   content: { gap: tokens.space[2], paddingBottom: tokens.space[12] },
   info: { gap: tokens.space[1], padding: tokens.layout.gutter },
   empty: { paddingHorizontal: tokens.layout.gutter },
+  header: { paddingHorizontal: tokens.layout.gutter },
   danger: {
     paddingHorizontal: tokens.layout.gutter,
     paddingTop: tokens.space[8],

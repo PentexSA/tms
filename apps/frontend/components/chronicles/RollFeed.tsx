@@ -78,7 +78,10 @@ export function RollFeed({ chronicleId }: { readonly chronicleId: string }) {
 
   return (
     <View style={styles.root}>
-      <SectionHeader title="Rolagens da mesa" />
+      {/* Com a margem da página (T-67) */}
+      <View style={styles.inset} testID="roll-feed-header">
+        <SectionHeader title="Rolagens da mesa" />
+      </View>
       {roll ? (
         <View style={styles.form}>
           <TextField

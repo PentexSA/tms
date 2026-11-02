@@ -207,6 +207,8 @@ Edições do narrador em `creating` e `pending` passam pela mesma avaliação pa
 
 Criação livre dispensa a conta, mas mantém validação estrutural e permissões; a conclusão pelo narrador já satisfaz a aprovação. Ao ativar, o jogador passa a evoluir por pedidos de XP.
 
+**Freeze e Histórico (onda 2, P04-C, T-80).** O lote que congela os iniciais com fórmula ao concluir (`creationFreeze`) grava o "de" efetivo, igual ao "para": o valor congelado é o que a ficha já mostrava. O `from_absent` continua, e desfazer devolve o campo vazio. O Histórico tira os eventos sem mudança (texto e especialização, gravados sem conteúdo, continuam como "atualizado") e mostra a conclusão e a aprovação como "Criação concluída", lidas do `chronicle_audit` da ficha: sem `payload`, com o autor e o papel calculados no servidor, para o dono e o narrador (o `viewer` continua com 404). Os lotes de freeze gravados antes da correção continuam com o "de" nulo.
+
 ### 3.5 Integridade de XP
 
 Adotar uma fonte única de saldo e extrato. A proposta de persistência é um extrato `xp_entries`, vinculado às operações/lotes, com `xpTotal` e `xpSpent` como projeções atualizadas na mesma transação. Outra estrutura só substitui essa proposta com reconciliação e rastreabilidade demonstradas. A ligação entre campos e experiência é declarativa, sem busca por rótulos de tela.

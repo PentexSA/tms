@@ -247,6 +247,8 @@ Texto como cidadão de primeira classe.
 
 - **Classes:** `ds-field` (rótulo envolvendo), `ds-field__label` (caption 700, `ink-muted`), `ds-input` (44) e `ds-textarea` (8rem, redimensiona na vertical), `ds-field__help`, `ds-field__error` (ícone + texto em `danger`), `.has-error` (borda `danger`). O **AspectField** ainda é `p-aspect` no protótipo: tipo do campo + texto na fonte `voice`, fixado no topo pela seção com `pinTop`.
 - **Editor em sheet:** contador "20 de 80 caracteres" em `aria-live="polite"`, `maxlength` do template, Cancelar e Salvar, foco inicial no campo.
+- **Foco e "Próximo" (RN, T-26):** `ref?: Ref<TextInputInstance>` vai ao `TextInput` (no React 19, `ref` é prop). Nos formulários, os campos de uma linha encadeiam o "Próximo" do teclado (login: e-mail → senha; cadastro: e-mail → usuário → senha; Nova ficha: os textos na ordem do formulário, sem os de escolha). Só a última ação envia onde já enviava (a senha); na Nova ficha, o último campo mostra "concluído" e não cria a ficha. As telas com formulário e a rolagem da ficha ficam num `KeyboardArea`, que encolhe acima do teclado também no Android.
+- **Linha da dica e do contador (RN, T-64):** a dica (ou o erro) ocupa o resto da linha e quebra em várias; o contador fica inteiro, à direita, com `gap` de 8 entre os dois.
 - **API RN:**
 
   ```ts
@@ -403,6 +405,7 @@ Grade primária (atributos) sem abas e pirâmide por degrau.
 - **Por tipo:** `rating` põe o rótulo sozinho na 1ª linha e pips + número embaixo; `number score+mod` mostra o modificador grande, o valor em `__sub` e o selo ◆; `percent` mostra o valor grande e "½ · ⅕". Com `groups`, cada grupo vira uma coluna, lida linha a linha.
 - **API RN:** `GridProps = { columns: number; headers?: string[]; children: ReactNode }`; `CellProps = { label: string; value: ReactNode; sub?: string; badge?: string; accessibilityLabel: string; onPress(): void }`; `PyramidProps = { tiers: { rung: string; items: { id: string; label: string; accessibilityLabel: string }[] }[] }`.
 - **Estados:** pressionado; container ≤ 400 (padding menor, rótulo 15, pip 12); `.is-stacked` (uma coluna, sem cabeçalhos).
+- **Célula densa no app (RN, T-68):** com a grade até 400 de largura útil (360 a 432 de tela), o `GridLayout` liga o `DenseCells`, e a `RatingCell` usa padding 4 e espaço 4 entre os pips e o número: a 360, 94 dp úteis para 76 de pips, 4 de espaço e o número. Abaixo de 360, a grade já vira lista.
 - **A11y:** cada célula é um botão com a gramática do tipo e o selo em texto; cabeçalhos de grupo ocultos.
 - **Multi-sistema:** 9 atributos de WoD em 3×3 sem abas; 6 atributos de D&D com modificador; 8 características do CoC em % (2 colunas); perícias do Fate na pirâmide (`layout: pyramid`).
 - **Resolve:** C-07, C-09, C-10, DS-06.
@@ -428,6 +431,7 @@ Navegação da ficha: **3 abas fixas, uma por zona do template** (Ficha · Poder
   - As 3 dividem a largura em grade e **nunca rolam de lado**: com fonte muito grande, o rótulo quebra em 2 linhas, com hífen.
   - Caixa normal, 15 px, peso 700.
   - Em `.ds-header.is-collapsed`, a faixa some ao rolar para baixo e volta ao rolar para cima ou com foco.
+- **Faixa fixa no app (RN, T-27):** as abas ficam numa faixa (`SheetNav`) presa no topo da rolagem (`stickyHeaderIndices`; no web, `position: sticky`), em todos os tamanhos. No celular, a faixa leva também as sub-abas e o contador da seção com grupos que está no topo da tela (Físicos | Sociais | Mentais perto dos Atributos; Talentos | Perícias | Conhecimentos nas Habilidades), e o corpo continua filtrando pelo grupo escolhido. A escolha fica num contexto por ficha (`GroupTabsContext`); sem ele (prévias), cada seção guarda a própria aba. A versão que recolhe ao rolar, com animação, fica para depois.
 - **Comportamento:**
   - Os painéis existem todos; os inativos ficam `hidden`. Na impressão aparecem todos.
   - Cada personagem lembra a aba ativa e a rolagem de cada aba.
@@ -482,6 +486,7 @@ Filtro "só investidos" e busca dentro de uma seção.
 - **Estados:** filtro ligado ou desligado, busca vazia ou preenchida.
 - **A11y:** busca com `aria-label="Buscar em {seção}"`; filtro com `aria-pressed`.
 - **Multi-sistema:** "Só com pontos" (WoD), "Só proficientes" (D&D), "Acima da base" (CoC), "Só com bônus" (Fate).
+- **Grupos lado a lado (RN, T-28, C-10):** no `expanded` (≥ 900), sem refluxo, uma seção com mais de um grupo põe os grupos em colunas (`flexBasis` de `minColWidth`, 240, crescendo), cada um com título e contador. A busca e o "Mostrando N de M" ficam acima, na largura toda. Abaixo de 900, empilhados.
 - **Resolve:** C-07, C-09, C-20.
 
 ### CharacterHeader
@@ -493,6 +498,7 @@ Header compacto e fixo da ficha.
 - **API RN:** `{ name: string; identity: { label: string; accent?: AccentName }; backLabel: string; onBack(): void; sync: SyncState; onMenu(): void; collapsed?: boolean }`.
 - **Estados:** expandido (com chips), recolhido.
 - **A11y:** voltar "Voltar para {crônica}"; ⋯ "Mais opções" com `aria-haspopup="dialog"`; nome como `h1`.
+- **No app (RN, T-11):** abaixo de 900, o cabeçalho tem o voltar (até 96 no `compact`), o nome (que encolhe até caber), o `SyncIndicator` e um ⋯ "Mais opções" (`SheetMenu`) com, nesta ordem: "Ações do narrador · {estado}" (só para o narrador, com ação no estado), "Experiência" (com extrato de XP no template) e "Histórico". O item tocado fecha o menu, e a folha dele abre no `onClosed` do menu. A partir de 900, os botões ficam no cabeçalho, com o gatilho largo "Narrador [estado] ▾". A ficha revelada (viewer) não tem menu. A `AppBar` tem `subtitle` (uma linha sob o nome) para o estado da ficha (D-02, P04-D): a 360 dp com "2 alterações não salvas" sobram ~64 dp para o nome e o selo.
 - **Multi-sistema:** o esqueleto é fixo; o template dá o campo do nome, o formato do chip (`"{class} nv {level}"` no D&D, o clã no Vampiro) e o accent. Ações de sistema entram por `actions[]` ("Descanso longo", "Descanso curto" no D&D).
 - **Resolve:** C-04, C-15, C-20, C-21.
 
@@ -502,6 +508,7 @@ Bloco de identidade recolhível no topo do corpo.
 
 - **Classes:** `ds-identity` (botão de 64 com avatar grande, `voice` e resumo), `__text`, `__summary`, `__more`; `ds-voice` (citação na fonte `voice` da skin); `ds-facts` (`dl` em 2 colunas; `--wide` e `.is-stacked` em 1).
 - **Comportamento:** recolhido por padrão no celular, aberto a partir de 900. Os fatos vêm das seções de zona `identity`; glifo de skin entra ao lado do valor.
+- **Colunas no Editar (RN, T-65):** com `identity.columns` no template, cada coluna precisa de 120 dp (metade do `minColWidth`) × escala da fonte. Quando as colunas do template não cabem, elas quebram em linhas, na ordem do template e sem misturar campos de colunas diferentes: a 360–411 dp, o V20 fica [Nome | Natureza, Comportamento, Conceito] e, embaixo, [Clã, Geração, Senhor]; com fonte de 200%, uma coluna.
 - **API RN:** `{ name: string; voice?: string; summary: string; facts: { label: string; value: string; glyph?: ReactNode }[]; open: boolean; onToggle(): void }`.
 - **Estados:** aberto, fechado.
 - **A11y:** `aria-expanded` + `aria-controls`; texto oculto ". Mostrar identidade" / ". Recolher identidade". RN `accessibilityState={{ expanded }}`.
@@ -540,6 +547,7 @@ Estado de salvamento no header.
 - **API RN:** `type SyncState = 'saved' | 'saving' | 'offline' | 'error'`; `{ state: SyncState; pending?: number; onPress(): void }`.
 - **Estados:** os quatro acima.
 - **A11y:** `aria-label` por extenso ("Sem conexão. 3 alterações serão enviadas quando a conexão voltar."); forma do ponto + texto, nunca só cor. Anunciar a passagem para offline ou erro: proposta.
+- **No celular (RN, T-11):** até 112 de largura, com o texto quebrando em linhas ("2 alterações / não salvas"), sem cortar: o erro com rascunho mantém a contagem. O texto não muda.
 - **Multi-sistema:** o evento é por caminho (`{ id, from, to }`) e não depende do tipo: pips, PV, %, texto e listas usam a mesma fila.
 - **Resolve:** C-08, DS-04.
 
@@ -553,6 +561,7 @@ Faixa que diz em que modo a ficha está.
 - **Estados:** as quatro variantes.
 - **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
+- **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e o botão) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `SheetView` monta as três juntas, fixas acima, como antes.
 - **Resolve:** C-01, C-19, DS-04.
 
 ### CombatDock / DockChip
@@ -561,6 +570,8 @@ Recursos de combate na zona do polegar, com valor visível.
 
 - **Classes:** `ds-dock` (fixo embaixo, `surface-raised`, `elevation-2`, safe area, `layer-dock`), `__handle` ("Todos os recursos"), `__row` (3 chips + Dados), `ds-dock-chip` (56; rótulo curto + valor tabular), `__label`, `__value`, `--action` (Dados em `action`, foco `focus-on-action`). Com `.is-stacked`, 2 colunas. A partir de 600 o dock some e o painel "Em jogo" (`p-play-panel`, protótipo; proposta de `PlayPanel` no core) mostra os mesmos campos.
 - **Valor com forma:** mini-trilha + penalidade, "9/15", amostras cheia e hachurada da roda + números, "1º 3/4", nome da forma.
+- **"Em jogo" na Criação (RN, T-59):** a partir de 600 (sem dock), o bloco "Em jogo" começa recolhido na Criação, com o título como botão (`aria-expanded`; no web, `aria-controls`); um toque mostra os mesmos campos. Em Jogo, Leitura e Editar, aberto como antes. O estado é local: não vai ao servidor nem ao armazenamento.
+- **Safe area no app:** o dock fica dentro do `Screen`, que já soma o inset de baixo; o dock não soma de novo (T-37, onda 2). Abaixo dele, na área do indicador de início, aparece o fundo da tela.
 - **Comportamento:** toque abre o sheet; **toque longo (500 ms)** executa a `defaultAction` (`spend1`, `gain1`, `damage1`, `use1`) com toast e háptico; "Todos os recursos" abre a lista da zona `play`. Puxar o dock para cima: proposta.
 - **API RN:**
 
@@ -618,8 +629,12 @@ Folha que hospeda detalhe, editores, dano, parada e menu.
 - **`ui.js`:** `sheet({ title, body, footer, onClose, kind, initialFocus })` → `{ close, panel }`, com pilha. O protótipo acrescenta `liveSheet`, que refaz o corpo a cada alteração e preserva o foco.
 - **API RN:** `{ title: string; open: boolean; onClose(): void; footer?: ReactNode; initialFocus?: 'title' | RefObject<View>; children: ReactNode }`.
 - **Estados:** abrindo (`ds-slide` ou `ds-fade`), aberto, empilhado. Arrastar para fechar: proposta (nativo no `formSheet` do Expo Router).
+- **`onClosed` (RN):** chamado depois que a folha sai da tela (o `onDismiss` do Modal no iOS e no web, depois da devolução do foco; no Android, assim que fica invisível). É onde um menu abre a folha seguinte: no iOS, apresentar um Modal enquanto outro sai falha, e no web a folha seguinte guarda o gatilho certo.
+- **Diálogo central (RN, T-69):** fora do `compact` (≥ 600), a raiz centraliza e a folha ganha `maxWidth` 560, `maxHeight` 85%, os quatro cantos redondos e animação `fade` (`none` com "reduzir movimento"), sem o inset de baixo. No `compact`, presa embaixo com `slide`. O Esc, o fundo inerte e o foco de volta são os mesmos nos dois.
+- **Teclado (RN, T-10):** a raiz é um `KeyboardAvoidingView` com o `keyboardBehavior()` do `@tms/ui` (`padding` no iOS e no Android; nada no web). No Android edge-to-edge a janela do `Modal` não redimensiona com o teclado: sem o `padding`, ele cobria o campo e o rodapé. As telas usam o `KeyboardArea`, que mede a própria posição na janela a cada vez que o teclado abre e encolhe o que ele cobre (o `KeyboardAvoidingView` compara o layout relativo ao pai e encolhia de menos sob o cabeçalho). Nas folhas de texto de uma linha, o "✓" do teclado aplica; no texto longo, Enter é nova linha.
 - **A11y:** `role="dialog"`, `aria-modal`, `aria-labelledby`; foco preso; Esc fecha o do topo; foco inicial no título; foco volta a quem abriu. RN `Modal` + `onRequestClose` (voltar do Android) + `accessibilityViewIsModal`.
   - **Um "Fechar" só:** o fundo fecha no toque, mas fica fora da árvore (`aria-hidden`, `accessible={false}`); no web é um `View` sem tabindex (um Pressable sempre é focável, e o trap do modal focava o fundo oculto ao entrar), e o react-native-web não esconde os irmãos do modal.
+  - **Esc com o foco fora da folha (web):** aberta pelo teclado, a folha sem campo em autoFocus deixa o foco no gatilho até o fim da animação de entrada. As folhas abertas ficam numa pilha, e o Esc no documento (captura) fecha a de cima, esteja o foco onde estiver.
   - **Esc no web:** tratado na fase de captura da raiz da folha, a qualquer momento em que o foco esteja nela (o Modal do react-native-web só aceitava o Esc depois da animação de entrada, e o TextInput não deixa o keydown subir). É o único caminho no web; o `onRequestClose` fica para o voltar do Android. Como o fundo sai do alcance do VoiceOver, a folha fecha com o gesto de escape (`onAccessibilityEscape`, o "Z" do iOS).
   - **Foco de volta (web, `@tms/ui`):** a folha guarda o elemento focado ao abrir (num insertion effect, antes do autoFocus de qualquer campo da folha; se o foco já estiver no body, como no botão que ficou ocupado e foi desabilitado, vale o último elemento focado; o ModalFocusTrap do react-native-web lê o foco depois e, com autoFocus, guarda o campo de dentro, que some ao fechar) e o devolve depois que o modal sai (`onDismiss`) ou quando a folha desmonta aberta, se ele ainda estiver na tela e nenhum outro elemento tiver pego o foco.
 - **Multi-sistema:** o mesmo sheet edita Vitalidade (WoD), PV com temporários (D&D), SAN (CoC) e estresse (Fate), e hospeda a parada de qualquer modelo.
@@ -708,7 +723,8 @@ Barra de topo das telas de lista e voltar como alvo único.
 
 - **Classes:** `ds-appbar` (sticky, safe area, borda inferior), `ds-appbar__title` (`h1` com reticências), `ds-back` (chevron + nome, 44).
 - **Usos:** Crônicas, Mesa e estados de erro da ficha ("‹ Noites de São Paulo").
-- **API RN:** `{ title: string; back?: { label: string; onPress(): void }; actions?: ReactNode }`.
+- **API RN:** `{ title: string; back?: { label: string; onPress(): void }; actions?: ReactNode; subtitle?: ReactNode }`. O título encolhe até caber (`minWidth: 0`, uma linha); `subtitle` é uma linha sob ele, na mesma coluna. O voltar tem até 96 no `compact` e 160 fora dele, com o rótulo truncado e o nome acessível inteiro.
+- **Safe area:** a barra fica sempre dentro de um `Screen`, que soma o inset de cima uma vez. A barra não soma de novo (T-37, onda 2).
 - **Estados:** estático.
 - **A11y:** voltar com texto visível; título `h1`.
 - **Multi-sistema:** o rótulo do voltar é o nome da crônica, seja de Vampiro ("Noites de São Paulo") ou de CoC ("Sombras sobre Ouro Preto").

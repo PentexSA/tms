@@ -22,11 +22,13 @@ import {
   useTheme,
   useToast,
 } from '@tms/ui'
-import { useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../context'
+import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
+import { completionBy, completionCopy } from '../creation/completion'
 import { REFUSAL_TEXT } from '../creation/creation'
 import { useDraftCount } from './hooks'
 
@@ -54,11 +56,31 @@ const OTHER_CREATE: readonly SheetMode[] = ['read', 'play', 'create']
 export const changesLabel = (n: number): string =>
   n === 1 ? '1 alteração' : `${n} alterações`
 
-export function ModeBar({
+/** As três partes da barra de modos, com um estado só (T-27). */
+export interface ModeBarParts {
+  /** O seletor de modo (Leitura · Jogo · Editar). */
+  readonly switcher: ReactNode
+  /** A barra de ação do rascunho ("Criação · N alterações" e o botão). */
+  readonly actionBar: ReactNode
+  /** O resumo antes de salvar (folha). */
+  readonly summary: ReactNode
+}
+
+/**
+ * A lógica da barra de modos (ir, revisar, salvar, descartar e o resumo),
+ * com as partes separadas: no celular, o seletor rola com a ficha e a barra
+ * de ação fica fixa (T-27). Fora dele, o SheetView monta as três juntas,
+ * fixas acima da ficha.
+ */
+export function useModeBar({
   modes: only,
+  enabled = true,
 }: {
   readonly modes?: readonly SheetMode[]
-}) {
+  // Quem não escreve (pelo papel ou pela política) fica sem as partes: o
+  // resumo aberto fecha, e não volta sozinho quando o Editar voltar
+  readonly enabled?: boolean
+} = {}): ModeBarParts {
   const { model, mode, roles } = useSheet()
   const creating = useCreation()?.active === true
   const owner = roles.has('owner')
@@ -85,6 +107,9 @@ export function ModeBar({
     readonly inactive: readonly ChangeLabel[]
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!enabled) setSummary(null)
+  }, [enabled])
   // Ao sair de Editar, volta ao modo de antes, se ele estiver no seletor
   const back = (m: SheetMode): SheetMode =>
     !isDraftMode(m) && modes.includes(m) ? m : (modes[0] ?? 'read')
@@ -177,53 +202,61 @@ export function ModeBar({
     switchTo(next)
   }
 
-  return (
-    <View>
-      <ModeSwitch modes={modes} mode={mode} onChange={go} />
-      {mode === 'evolve' ? (
-        <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
-      ) : mode === 'create' ? (
-        // Um botão só: com a conta fechada, conclui (salvando antes)
-        <EvolveBar
-          count={count}
-          label="Criação"
-          detail={freebies}
-          finish={
-            finishing.waitingSync
-              ? 'Sincronizando…'
-              : finishing.ready
-                ? finishing.label
-                : 'Salvar alterações'
-          }
-          primary={finishing.ready}
-          busy={finishing.busy}
-          disabled={!finishing.ready && count === 0}
-          testID="creation-action"
-          onFinish={() =>
-            finishing.ready
-              ? review('create', true)
-              : count
-                ? review('create')
-                : undefined
-          }
-        />
-      ) : null}
-      <SummarySheet
-        visible={summary !== null}
+  const switcher = <ModeSwitch modes={modes} mode={mode} onChange={go} />
+  const actionBar =
+    mode === 'evolve' ? (
+      <EvolveBar count={count} onFinish={() => go(returnTo.current)} />
+    ) : mode === 'create' ? (
+      // Um botão só: com a conta fechada, conclui (salvando antes)
+      <EvolveBar
+        count={count}
+        label="Criação"
+        detail={freebies}
         finish={
-          summary?.finish
-            ? { label: finishing.label, approval: finishing.approval }
-            : null
+          finishing.waitingSync
+            ? 'Sincronizando…'
+            : finishing.ready
+              ? finishing.label
+              : 'Salvar alterações'
         }
-        events={summary?.events ?? []}
-        inactive={summary?.inactive ?? []}
-        error={error}
-        onSave={save}
-        onDiscard={discard}
-        onClose={() => setSummary(null)}
+        primary={finishing.ready}
+        busy={finishing.busy}
+        disabled={!finishing.ready && count === 0}
+        testID="creation-action"
+        onFinish={() =>
+          finishing.ready
+            ? review('create', true)
+            : count
+              ? review('create')
+              : undefined
+        }
       />
-    </View>
+    ) : null
+  const summarySheet = (
+    <SummarySheet
+      visible={summary !== null}
+      finish={
+        summary?.finish
+          ? {
+              label: finishing.label,
+              body: completionCopy({
+                by: completionBy(roles),
+                approval: finishing.approval,
+                action: 'complete',
+              }).body,
+              notes: finishing.notes,
+            }
+          : null
+      }
+      events={summary?.events ?? []}
+      inactive={summary?.inactive ?? []}
+      error={error}
+      onSave={save}
+      onDiscard={discard}
+      onClose={() => setSummary(null)}
+    />
   )
+  return { switcher, actionBar, summary: summarySheet }
 }
 
 function ModeSwitch({
@@ -338,8 +371,13 @@ function SummarySheet({
   onClose,
 }: {
   readonly visible: boolean
-  // Conclusão da criação: confirma em vez de oferecer Descartar
-  readonly finish: { readonly label: string; readonly approval: boolean } | null
+  // Conclusão da criação: confirma em vez de oferecer Descartar. O corpo é o
+  // do `completionCopy` (T-32), com as linhas extras em `notes`
+  readonly finish: {
+    readonly label: string
+    readonly body: string
+    readonly notes?: readonly string[]
+  } | null
   readonly events: readonly SheetEvent[]
   readonly inactive: readonly ChangeLabel[]
   readonly error: string | null
@@ -388,12 +426,13 @@ function SummarySheet({
           </Text>
         ) : null}
         {finish ? (
-          <Text color="inkMuted">
-            {finish.approval
-              ? 'A ficha vai para o narrador aprovar e fica somente para leitura até lá.'
-              : 'Depois de concluir, subir um traço passa pelo narrador.'}
-            {events.length ? ' As alterações abaixo são salvas antes.' : ''}
-          </Text>
+          <CompletionMessage
+            body={finish.body}
+            notes={finish.notes}
+            suffix={
+              events.length ? ' As alterações abaixo são salvas antes.' : ''
+            }
+          />
         ) : null}
         {groupByPlace(model, events).map(group => (
           <View key={group.key} style={styles.group}>

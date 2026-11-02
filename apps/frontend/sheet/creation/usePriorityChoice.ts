@@ -7,6 +7,7 @@ import { useCreation } from './CreationContext'
 import {
   creationRefusalOf,
   errorBodyOf,
+  priorityNote,
   REFUSAL_TEXT,
   rankLabel,
   reorder,
@@ -44,26 +45,31 @@ export function usePriorityChoice(
   const values =
     (info.effective.budgets?.[budget.id] as number[] | undefined) ??
     budget.budgets
-  const choose = (rank: number) =>
+  const choose = (rank: number) => {
+    const next = reorder(
+      order,
+      budget.groups.map(g => g.id),
+      group,
+      rank
+    )
     save.mutate(
       {
         revision: info.revision,
         choices: {
           priorities: {
             ...(info.choices.priorities ?? {}),
-            [budget.id]: reorder(
-              order,
-              budget.groups.map(g => g.id),
-              group,
-              rank
-            ),
+            [budget.id]: next,
           },
         },
       },
       {
         // A prioridade é gravada na hora, à parte do rascunho dos pontos
-        // (T-17): a pessoa vê que ela está salva e os pontos ainda não
-        onSuccess: () => toast.show({ message: 'Prioridades salvas' }),
+        // (T-17): a pessoa vê que ela está salva e os pontos ainda não. E
+        // vê quais outros grupos mudaram de lugar junto (R-28)
+        onSuccess: () =>
+          toast.show({
+            message: priorityNote(budget, values, order, next, group),
+          }),
         onError: error => {
           const code = creationRefusalOf(errorBodyOf(error))
           toast.show({
@@ -74,6 +80,7 @@ export function usePriorityChoice(
         },
       }
     )
+  }
   return {
     rank: order ? order.indexOf(group) : -1,
     values,
