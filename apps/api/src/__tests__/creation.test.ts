@@ -505,6 +505,56 @@ describe('concluir, aprovar e devolver', () => {
     ).toBe(409)
   })
 
+  it('a lista marca a ficha devolvida, sem o motivo (T-06)', async () => {
+    await approval(true)
+    const id = await character()
+    const other = await createCharacter(ctx, owner, chronicleId, {
+      ...COMPLETE,
+      name: 'Ativa',
+    })
+    await setStatus(ctx, other, 'active')
+    await choose(id)
+    await complete(id)
+    const reason = 'Troque um ponto: motivo-da-lista-42'
+    expect(
+      (
+        await as(
+          ctx,
+          storyteller,
+          'POST',
+          `/characters/${id}/creation/return`,
+          {
+            reason,
+          }
+        )
+      ).status
+    ).toBe(200)
+    const listOf = async (user: TestUser) => {
+      const res = await as(
+        ctx,
+        user,
+        'GET',
+        `/chronicles/${chronicleId}/characters`
+      )
+      const text = await res.text()
+      expect(text).not.toContain('motivo-da-lista')
+      return JSON.parse(text) as { id: string; returned?: boolean }[]
+    }
+    for (const user of [owner, storyteller]) {
+      const list = await listOf(user)
+      expect(list.find(c => c.id === id)?.returned).toBe(true)
+      // A ficha ativa nunca é devolvida
+      expect(list.find(c => c.id === other)?.returned).toBe(false)
+    }
+    // O outro jogador não tem a linha
+    expect((await listOf(player)).some(c => c.id === id)).toBe(false)
+    // Enviada de novo, deixa de ser devolvida
+    expect((await complete(id)).status).toBe(200)
+    expect((await listOf(storyteller)).find(c => c.id === id)?.returned).toBe(
+      false
+    )
+  })
+
   it('motivo vazio ou com HTML é 422', async () => {
     const id = await character()
     await setStatus(ctx, id, 'pending')
