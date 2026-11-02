@@ -161,6 +161,50 @@ describe('groups: filtro e busca (Habilidades)', () => {
     expect(section.getByRole('header', { name: 'Conhecimentos' })).toBeTruthy()
   })
 
+  it('T-28: a 1280, no Editar, os três grupos lado a lado; a 750 e a 390, empilhados', async () => {
+    const bodyStyle = () =>
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )
+    dims(1280)
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    expect(bodyStyle()).toEqual({ flexDirection: 'row', flexWrap: 'wrap' })
+    const groupsOf = screen.getByTestId('groups-abilities-body').children
+    expect(groupsOf).toHaveLength(3)
+    for (const g of groupsOf)
+      expect(
+        StyleSheet.flatten(
+          (g as unknown as { props: { style: never } }).props.style
+        )
+      ).toMatchObject({ flexBasis: 240, flexGrow: 1, minWidth: 0 })
+    // A busca fica acima, na largura toda
+    expect(screen.getByLabelText('Buscar em Habilidades')).toBeTruthy()
+    screen.unmount()
+
+    for (const width of [750, 390]) {
+      dims(width)
+      await renderLive(
+        { model, sheet, mode: 'evolve' },
+        fakeServer(model, sheet).post
+      )
+      expect(bodyStyle()?.flexDirection).toBeUndefined()
+      screen.unmount()
+    }
+  })
+
+  it('T-28: fonte grande no desktop: empilhados', () => {
+    dims(1280, 1.4)
+    renderSheet(model, sheet)
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('groups-abilities-body').props.style
+      )?.flexDirection
+    ).toBeUndefined()
+  })
+
   it('seção sem filtro nem busca (Vantagens) não tem barra', () => {
     renderSheet(model, sheet)
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))

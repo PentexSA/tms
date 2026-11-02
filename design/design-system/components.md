@@ -485,6 +485,7 @@ Filtro "só investidos" e busca dentro de uma seção.
 - **Estados:** filtro ligado ou desligado, busca vazia ou preenchida.
 - **A11y:** busca com `aria-label="Buscar em {seção}"`; filtro com `aria-pressed`.
 - **Multi-sistema:** "Só com pontos" (WoD), "Só proficientes" (D&D), "Acima da base" (CoC), "Só com bônus" (Fate).
+- **Grupos lado a lado (RN, T-28, C-10):** no `expanded` (≥ 900), sem refluxo, uma seção com mais de um grupo põe os grupos em colunas (`flexBasis` de `minColWidth`, 240, crescendo), cada um com título e contador. A busca e o "Mostrando N de M" ficam acima, na largura toda. Abaixo de 900, empilhados.
 - **Resolve:** C-07, C-09, C-20.
 
 ### CharacterHeader

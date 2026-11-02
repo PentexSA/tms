@@ -7,6 +7,7 @@ import {
   Text,
   textStyle,
   tokens,
+  useLayout,
   useTheme,
 } from '@tms/ui'
 import { useState } from 'react'
@@ -62,6 +63,11 @@ export function GroupsLayout({ section }: LayoutProps) {
   })
   // O título do grupo some quando a aba já diz qual é
   const titled = !tabs.bar || searching
+  // T-28 (C-10): no desktop, os grupos lado a lado, cada um com pelo menos
+  // minColWidth; a busca e o "Mostrando" ficam acima, na largura toda
+  const { breakpoint, stacked } = useLayout()
+  const columns =
+    breakpoint === 'expanded' && !stacked && !tabs.bar && groups.length > 1
 
   return (
     <View testID={`groups-${section.id}`}>
@@ -91,12 +97,16 @@ export function GroupsLayout({ section }: LayoutProps) {
           />
         </View>
       ) : null}
-      <View {...tabs.panelProps}>
+      <View
+        {...tabs.panelProps}
+        style={columns ? styles.columns : undefined}
+        testID={`groups-${section.id}-body`}
+      >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
           if (searching && tabs.bar && !ids.length) return null
           return (
-            <View key={g.id}>
+            <View key={g.id} style={columns ? styles.column : undefined}>
               {g.title && titled ? (
                 <View style={styles.title}>
                   <SectionHeader
@@ -217,6 +227,12 @@ function FilterBar({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  columns: { flexDirection: 'row', flexWrap: 'wrap' },
+  column: {
+    flexBasis: tokens.layout.minColWidth,
+    flexGrow: 1,
+    minWidth: 0,
+  },
   title: { paddingHorizontal: tokens.layout.gutter },
   bar: {
     flexDirection: 'row',
