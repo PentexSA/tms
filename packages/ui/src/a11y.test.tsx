@@ -548,7 +548,7 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
     </BottomSheet>
   )
 
-  it('o fundo fecha no toque, mas fica fora da árvore e do Tab', () => {
+  it('o fundo fecha no clique, mas fica fora da árvore e não é focável', () => {
     setOS('web')
     const onClose = jest.fn()
     render(sheet(true, onClose))
@@ -557,9 +557,49 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
       includeHiddenElements: true,
     })
     expect(scrim.props['aria-hidden']).toBe(true)
-    expect(scrim.props.tabIndex).toBe(-1)
+    // Sem tabindex: nem o Tab nem o trap do modal o focam (um Pressable
+    // sempre tem tabindex, e o trap focava o fundo oculto ao entrar)
+    expect(scrim.props.tabIndex).toBeUndefined()
     expect(scrim.props.accessibilityRole).toBeUndefined()
-    fireEvent.press(scrim)
+    fireEvent(scrim, 'click')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('web: Esc fecha pela raiz da folha, a qualquer momento (um caminho só)', () => {
+    setOS('web')
+    const onClose = jest.fn()
+    render(sheet(true, onClose))
+    // O Modal do react-native-web não recebe onRequestClose no web: o Esc
+    // dele só valia depois da animação de entrada
+    expect(screen.UNSAFE_getByType(Modal).props.onRequestClose).toBeUndefined()
+    const preventDefault = jest.fn()
+    // Na captura: o Esc de um campo de texto (que não deixa o evento subir)
+    // também chega
+    fireEvent(
+      screen.getByRole('button', { name: 'Fechar' }),
+      'keyDownCapture',
+      {
+        nativeEvent: { key: 'Escape' },
+        preventDefault,
+      }
+    )
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(preventDefault).toHaveBeenCalled()
+    fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
+      nativeEvent: { key: 'a' },
+      preventDefault: jest.fn(),
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('app: o voltar do Android fecha pelo onRequestClose; sem Esc de teclado', () => {
+    setOS('android')
+    const onClose = jest.fn()
+    render(sheet(true, onClose))
+    expect(
+      screen.getByTestId('bottom-sheet-root').props.onKeyDownCapture
+    ).toBeUndefined()
+    fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose')
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -644,6 +684,40 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
       fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
       jest.runAllTimers()
       expect(trigger.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('Esc logo depois de abrir (QAW-28): fecha e o foco volta ao gatilho', () => {
+      // O fluxo do E2E: Enter abre, o campo em autoFocus pega o foco, e o Esc
+      // chega antes do fim da animação de entrada
+      const field = { focus: jest.fn(), isConnected: true }
+      function AutoFocus({ field: f }: { readonly field: object }) {
+        useLayoutEffect(() => {
+          fake.activeElement = f
+        }, [f])
+        return null
+      }
+      const onClose = jest.fn()
+      const sheetWith = (visible: boolean) => (
+        <BottomSheet visible={visible} title="Antecedente" onClose={onClose}>
+          {visible ? <AutoFocus field={field} /> : null}
+        </BottomSheet>
+      )
+      const { rerender } = render(sheetWith(false))
+      rerender(sheetWith(true))
+      expect(fake.activeElement).toBe(field)
+      fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
+        nativeEvent: { key: 'Escape' },
+        preventDefault: jest.fn(),
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+      // Quem chama fecha a folha
+      rerender(sheetWith(false))
+      field.isConnected = false
+      fake.activeElement = fake.body
+      fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+      jest.runAllTimers()
+      expect(trigger.focus).toHaveBeenCalledTimes(1)
+      expect(field.focus).not.toHaveBeenCalled()
     })
 
     it('ao desmontar aberta (quem chama some com a folha)', () => {
