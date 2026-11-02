@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import type { SheetData } from '@tms/sheet-core'
+import { effectiveCreationConfig, type SheetData } from '@tms/sheet-core'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import { AccessibilityInfo, Dimensions } from 'react-native'
@@ -17,7 +17,7 @@ import {
 } from '../../test/session'
 import type { SheetLifecycle } from '../policy'
 import { SheetScreen } from '../SheetScreen'
-import { statusActions } from '../storyteller/StatusMenu'
+import { StatusMenuButton, statusActions } from '../storyteller/StatusMenu'
 
 // v3, Etapa 6: a ficha usa a política só para desabilitar o que o servidor
 // vai recusar, com o motivo no lugar; o narrador muda o estado pelo menu ⋯.
@@ -190,6 +190,24 @@ describe('as ações do narrador por estado', () => {
     const asks = statusActions(vtm, 'active', false).filter(a => a.confirm)
     expect(asks.map(a => a.id)).toEqual(['archive', 'dead'])
   })
+
+  it('concluir a criação também pede confirmação, com o texto do narrador (T-32)', () => {
+    const asks = statusActions(vtm, 'creating', false).filter(a => a.confirm)
+    expect(asks.map(a => a.id)).toEqual(['complete', 'archive', 'dead'])
+    const [complete] = asks
+    expect(complete).toMatchObject({
+      title: 'Concluir criação?',
+      confirmLabel: 'Concluir criação',
+      done: 'Criação concluída. Subir um traço agora passa por você.',
+    })
+    expect(complete?.confirm).toContain('passa por você')
+    expect(complete?.confirm).not.toContain('pelo narrador')
+    // Com a aprovação ligada, o narrador conclui e aprova numa ação
+    expect(statusActions(vtm, 'creating', false, true)[0]).toMatchObject({
+      title: 'Concluir e aprovar?',
+      confirmLabel: 'Concluir e aprovar',
+    })
+  })
 })
 
 describe('a tela da ficha com o estado', () => {
@@ -205,9 +223,23 @@ describe('a tela da ficha com o estado', () => {
   const character = (
     roles: string[],
     status: string,
-    lockedAt: string | null = null
+    lockedAt: string | null = null,
+    // Os metadados da criação, quando o caso precisa deles (T-32)
+    creation?: { readonly revision: number }
   ) =>
     ok({
+      ...(creation && {
+        creation: {
+          mode: 'points',
+          accounting: true,
+          choices: {},
+          config: {},
+          effective: effectiveCreationConfig(vtm),
+          returned: null,
+          approval: false,
+          ...creation,
+        },
+      }),
       id: ID,
       name: 'Helena Varga',
       chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
@@ -223,8 +255,15 @@ describe('a tela da ficha com o estado', () => {
       sheet: helena,
     })
 
-  async function open(roles: string[], status: string, lockedAt?: string) {
-    calls.characterGet.mockResolvedValue(character(roles, status, lockedAt))
+  async function open(
+    roles: string[],
+    status: string,
+    lockedAt?: string,
+    creation?: { readonly revision: number }
+  ) {
+    calls.characterGet.mockResolvedValue(
+      character(roles, status, lockedAt, creation)
+    )
     calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     expect(await screen.findByLabelText('Destreza, 2 de 5')).toBeTruthy()
@@ -260,7 +299,7 @@ describe('a tela da ficha com o estado', () => {
   )
 
   it('o dono não tem o menu do narrador', async () => {
-    await open(['owner'], 'creating')
+    await open(['owner'], 'active')
     expect(screen.queryByLabelText('Ações do narrador')).toBeNull()
     expect(screen.queryByTestId('policy-banner')).toBeNull()
   })
@@ -280,21 +319,113 @@ describe('a tela da ficha com o estado', () => {
     expect(screen.queryByRole('radio', { name: 'Editar' })).toBeNull()
   })
 
-  it('o narrador conclui a criação pelo menu ⋯', async () => {
+  // T-32: o menu confirma, com o texto de quem lê, e manda a chave, a
+  // revisão e a versão da ficha, como a barra
+  it('o narrador conclui a criação pelo menu ⋯, depois de confirmar', async () => {
     calls.completePost.mockResolvedValue(
       ok({ status: 'active', lockedAt: null, creationCompletedAt: 'x' })
     )
-    await open(['storyteller'], 'creating')
+    await open(['storyteller'], 'creating', undefined, { revision: 2 })
     fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    // A folha pergunta antes; nada vai ao servidor
+    expect(screen.getByText('Concluir criação?')).toBeTruthy()
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      /passa por você/
+    )
+    expect(calls.completePost).not.toHaveBeenCalled()
+    // "Voltar" volta à lista de ações
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar' }))
+    expect(screen.getByTestId('status-archive')).toBeTruthy()
+    fireEvent.press(screen.getByTestId('status-complete'))
     await act(async () => {
-      fireEvent.press(screen.getByTestId('status-complete'))
+      fireEvent.press(screen.getByTestId('status-complete-confirm'))
     })
-    expect(calls.completePost).toHaveBeenCalledWith(ID)
+    expect(calls.completePost).toHaveBeenCalledWith(ID, {
+      revision: 2,
+      sheetVersion: 3,
+      clientCommandId: expect.any(String),
+    })
     expect(
       await screen.findByText(
         'Criação concluída. Subir um traço agora passa por você.'
       )
     ).toBeTruthy()
+  })
+
+  it('com alterações não salvas, concluir pelo menu fica desabilitado', async () => {
+    await open(['storyteller'], 'creating')
+    fireEvent.press(screen.getByRole('radio', { name: 'Editar' }))
+    for (const name of ['Força', 'Destreza'])
+      fireEvent(
+        screen.getByRole('adjustable', { name }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(
+      screen.getByText(
+        'Você tem 2 alterações não salvas nesta ficha. Salve ou descarte antes de concluir.'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-complete-confirm')).toBeDisabled()
+    fireEvent.press(screen.getByTestId('status-complete-confirm'))
+    expect(calls.completePost).not.toHaveBeenCalled()
+  })
+
+  // Achado do /code-review: a barra espera a fila; o menu também
+  it('com lotes ainda na fila, concluir pelo menu espera sincronizar', async () => {
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(
+      <StatusMenuButton
+        characterId={ID}
+        chronicleId="c1"
+        model={vtm}
+        status="creating"
+        locked={false}
+        unsaved={0}
+        queued={1}
+      />,
+      session
+    )
+    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    expect(
+      screen.getByText(
+        'Há alterações salvas ainda sendo enviadas. Espere sincronizar antes de concluir.'
+      )
+    ).toBeTruthy()
+    expect(screen.getByTestId('status-complete-confirm')).toBeDisabled()
+  })
+
+  it('um 409 de versão diz que a ficha mudou e rebusca', async () => {
+    calls.completePost.mockResolvedValue({
+      data: null,
+      error: {
+        status: 409,
+        value: { error: 'a ficha mudou', code: 'SHEET_VERSION_CONFLICT' },
+      },
+    })
+    await open(['storyteller'], 'creating', undefined, { revision: 2 })
+    const before = calls.characterGet.mock.calls.length
+    fireEvent.press(screen.getByLabelText('Ações do narrador'))
+    fireEvent.press(screen.getByTestId('status-complete'))
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('status-complete-confirm'))
+    })
+    expect(
+      await screen.findByText(
+        'A ficha mudou desde que você abriu. Confira e conclua de novo.'
+      )
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(calls.characterGet.mock.calls.length).toBeGreaterThan(before)
+    )
   })
 
   it('no celular, o menu do narrador é o ⋯', async () => {

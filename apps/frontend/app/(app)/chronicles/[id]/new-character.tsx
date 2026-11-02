@@ -29,6 +29,10 @@ import {
   CharacterForm,
   type ServerIssue,
 } from '../../../../sheet/CharacterForm'
+import {
+  chronicleCreationSummary,
+  newCharacterIntro,
+} from '../../../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate } from '../../../../sheet/data'
 import { UnsupportedTemplate } from '../../../../sheet/UnsupportedTemplate'
 
@@ -59,6 +63,13 @@ export default function NewCharacterScreen() {
   // da linha vem do formulário, e o do formulário, daqui
   const scroll = useRef<ScrollViewInstance>(null)
   const formY = useRef(0)
+  // As regras de criação da crônica (T-29): o texto de topo diz em que modo
+  // a ficha vai abrir e o orçamento combinado
+  // (o ex-membro não recebe as regras, e não cria ficha)
+  const creation =
+    chronicle.data && 'creation' in chronicle.data
+      ? chronicle.data.creation
+      : undefined
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
     onPress: () => router.back(),
@@ -91,10 +102,13 @@ export default function NewCharacterScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text color="inkMuted">
+        <Text color="inkMuted" testID="new-character-intro">
           {npc
             ? 'O NPC nasce oculto e em criação livre. Só você o vê até escolher o que revelar.'
-            : 'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'}
+            : creation
+              ? newCharacterIntro(chronicleCreationSummary(model, creation))
+              : // L-01: sem as regras da crônica, nada de "criação livre"
+                'Comece pela identidade. Atributos, habilidades e poderes você monta depois, na ficha.'}
         </Text>
         <View
           testID="new-character-form"

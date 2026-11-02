@@ -61,8 +61,9 @@ async function render() {
 const FREE = /criação livre/
 const save = () =>
   screen.getByRole('button', { name: 'Salvar regras da criação' })
+// O nome acessível tem o efeito da opção depois do rótulo (T-29)
 const turnApprovalOn = () =>
-  fireEvent.press(screen.getByRole('radio', { name: 'Ligada' }))
+  fireEvent.press(screen.getByRole('radio', { name: /^Ligada, / }))
 
 describe('Regras da criação', () => {
   it('mostra o nome de cada prioridade e de cada orçamento', async () => {
@@ -78,6 +79,23 @@ describe('Regras da criação', () => {
     expect(screen.getAllByText('Terciária')).toHaveLength(2)
     expect(screen.getByText('Antecedentes')).toBeTruthy()
     expect(screen.getByText('Pontos de bônus')).toBeTruthy()
+  })
+
+  // T-29 (R-10, NW-02, NA-01): o efeito de cada opção, à vista e no nome
+  it('cada opção diz o efeito que tem hoje', async () => {
+    await render()
+    for (const name of [
+      'Desligada, Na criação por pontos, a ficha entra em jogo quando o jogador conclui.',
+      'Ligada, Na criação por pontos, o jogador envia a ficha e ela fica só para leitura até você aprovar ou devolver.',
+      'Por pontos, A ficha conta os pontos do orçamento e avisa o que falta; o jogador conclui.',
+      'Livre, Sem conta de pontos: o jogador monta no modo Editar e você conclui.',
+    ])
+      expect(screen.getByRole('radio', { name })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Sem conta de pontos: o jogador monta no modo Editar e você conclui.'
+      )
+    ).toBeTruthy()
   })
 
   it('no celular, uma coluna; na tela larga, duas', async () => {

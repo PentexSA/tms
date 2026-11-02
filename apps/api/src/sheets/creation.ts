@@ -231,7 +231,10 @@ async function freeze(
         batch_id: batch.id,
         seq,
         path: `values.${id}`,
-        from_value: JSON.stringify(null),
+        // O "de" é o efetivo, que já valia: o valor congelado é o mesmo que a
+        // ficha mostrava (T-80). O Histórico tira o evento sem mudança, e o
+        // `from_absent` faz desfazer devolver o campo vazio, como antes
+        from_value: JSON.stringify(values[id]),
         to_value: JSON.stringify(values[id]),
         from_absent: true,
       }))

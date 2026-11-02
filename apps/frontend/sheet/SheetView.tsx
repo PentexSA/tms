@@ -29,6 +29,7 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
+import { ReturnedBanner } from './creation/ReturnedBanner'
 import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBar } from './evolve/ModeBar'
@@ -181,6 +182,8 @@ function SheetBody({
               <ConflictBanner />
               {editable ? <PolicyBanner /> : null}
               {editable ? <CreationStatusPanel /> : null}
+              {/* A devolução aparece em qualquer modo (T-06) */}
+              {editable ? <ReturnedBanner /> : null}
               {editable && mode === 'create' ? <CreationAlerts /> : null}
               {mode === 'play' ? (
                 <View style={styles.toolbar}>

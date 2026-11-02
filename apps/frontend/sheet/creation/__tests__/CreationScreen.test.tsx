@@ -1,5 +1,6 @@
 import {
   act,
+  cleanup,
   fireEvent,
   screen,
   waitFor,
@@ -453,6 +454,38 @@ describe('aba Orçamento e botão único', () => {
   })
 })
 
+// T-32: a barra usa o mesmo texto do menu, escrito para quem lê
+describe('confirmação da barra', () => {
+  it('a dona lê "passa pelo narrador"; o narrador, "passa por você"', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    fireEvent.press(screen.getByTestId('creation-action'))
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      'A ficha entra em jogo. Depois disso, subir um traço passa pelo narrador. Não dá para voltar à criação.'
+    )
+    cleanup()
+    const mine = character(PRIORITIES, { ...ALMOST, stamina: 3 }) as {
+      data: Record<string, unknown>
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...mine.data, roles: ['storyteller'] })
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
+    fireEvent.press(await screen.findByTestId('creation-action'))
+    expect(screen.getByText('Concluir criação?')).toBeTruthy()
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      /passa por você/
+    )
+    expect(screen.getByTestId('completion-message')).not.toHaveTextContent(
+      /pelo narrador/
+    )
+  })
+})
+
 describe('aviso dos pontos de bônus', () => {
   it('o último ponto básico abre o aviso e passa para os bônus', async () => {
     await open(PRIORITIES, ALMOST)
@@ -468,6 +501,35 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus · +1 = 5 bônus'
     )
+  })
+})
+
+// T-32: "Aprovar ficha" confirma antes, com o mesmo texto do concluir
+describe('aprovar ficha', () => {
+  it('abre "Aprovar ficha?" sem chamar a API; confirmar aprova', async () => {
+    const pending = character(PRIORITIES) as { data: Record<string, unknown> }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...pending.data, status: 'pending', roles: ['storyteller'] })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    calls.creationApprovePost.mockResolvedValue(ok({ status: 'active' }))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    fireEvent.press(await screen.findByTestId('creation-approve'))
+    expect(screen.getByText('Aprovar ficha?')).toBeTruthy()
+    expect(screen.getByTestId('completion-message')).toHaveTextContent(
+      /passa por você/
+    )
+    expect(calls.creationApprovePost).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('creation-approve-confirm'))
+    })
+    expect(calls.creationApprovePost).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText('Ficha aprovada e liberada.')).toBeTruthy()
   })
 })
 

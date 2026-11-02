@@ -530,6 +530,35 @@ describe('GET /characters/:id/history', () => {
     ])
   })
 
+  it('sem mudança no efetivo, sem linha; o texto continua "atualizado" (T-80)', async () => {
+    const fresh = await createCharacter(ctx, owner, chronicleId, {
+      name: 'Nova',
+    })
+    // Grava o padrão que já valia (Sangue 10): "de" e "para" iguais
+    const same = await as(ctx, owner, 'POST', `/characters/${fresh}/events`, {
+      clientBatchId: batchId(),
+      events: [{ path: 'values.blood', from: null, to: { current: 10 } }],
+    })
+    expect(same.status).toBe(200)
+    ctx.clock.advance(1000)
+    const text = await as(ctx, owner, 'POST', `/characters/${fresh}/events`, {
+      clientBatchId: batchId(),
+      events: [
+        { path: 'values.blood', from: { current: 10 }, to: { current: 10 } },
+        { path: 'values.notes', from: null, to: 'algo novo' },
+      ],
+    })
+    expect(text.status).toBe(200)
+    const body = (await (
+      await as(ctx, owner, 'GET', `/characters/${fresh}/history`)
+    ).json()) as { items: { changes: { label: string }[] }[] }
+    // O primeiro lote some; do segundo fica só o texto
+    expect(body.items.map(i => i.changes.map(c => c.label))).toEqual([
+      ['Notas'],
+    ])
+    expect(JSON.stringify(body)).toContain('atualizado')
+  })
+
   it('texto aparece como "atualizado", sem conteúdo', async () => {
     await send(owner, [
       { path: 'values.notes', from: helena.notes, to: 'novo segredo' },
