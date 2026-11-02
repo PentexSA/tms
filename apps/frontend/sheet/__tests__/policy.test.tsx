@@ -354,9 +354,7 @@ describe('a tela da ficha com o estado', () => {
     '%s, o narrador abre em Leitura, sem o seletor',
     async (_, status, locked) => {
       await open(['storyteller'], status, locked ?? undefined)
-      expect(
-        screen.queryByRole('radiogroup', { name: 'Modo da ficha' })
-      ).toBeNull()
+      expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
       fireEvent.press(
         screen.getByRole('button', { name: 'Editar como narrador' })
       )

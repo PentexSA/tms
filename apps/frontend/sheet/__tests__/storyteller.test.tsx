@@ -142,9 +142,7 @@ describe('Editar como narrador', () => {
       screen.queryByRole('button', { name: 'Editar Notas do Narrador' })
     ).toBeNull()
     // T-33: em Leitura, sem seletor de modo
-    expect(
-      screen.queryByRole('radiogroup', { name: 'Modo da ficha' })
-    ).toBeNull()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     fireEvent.press(
       screen.getByRole('button', { name: 'Editar como narrador' })
     )
@@ -160,9 +158,7 @@ describe('Editar como narrador', () => {
     expect(screen.queryByRole('radio', { name: 'Leitura' })).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Voltar à leitura' }))
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
-    expect(
-      screen.queryByRole('radiogroup', { name: 'Modo da ficha' })
-    ).toBeNull()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
   })
 
   it('o narrador edita as Notas do Narrador; o lote sai com o from atual', async () => {
@@ -330,9 +326,7 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     const post = jest.fn(async () => ({ status: 200, body: null }))
     pointsSheet()
     await render(post as never)
-    expect(
-      screen.queryByRole('radiogroup', { name: 'Modo da ficha' })
-    ).toBeNull()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
     fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
     // A conta: o saldo e o que falta, sem as "Regras da casa" (que gravam)
     expect(screen.getByTestId('creation-panel')).toBeTruthy()
@@ -366,9 +360,7 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Descartar' }))
     await sheetsDismissed()
     expect(screen.getByText('Ficha de dona.')).toBeTruthy()
-    expect(
-      screen.queryByRole('radiogroup', { name: 'Modo da ficha' })
-    ).toBeNull()
+    expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
   })
 
   it('sem alterações, "Voltar à leitura" volta direto', async () => {
