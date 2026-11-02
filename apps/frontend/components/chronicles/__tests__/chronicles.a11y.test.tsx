@@ -174,12 +174,15 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
   })
 })
 
-describe('Cartão da Mesa: sem ".." no nome acessível (T-61)', () => {
-  it('a mensagem que já termina em ponto não dobra a pontuação', () => {
+describe('Cartão da Mesa: sem ".." e sem mexer no texto (T-61)', () => {
+  // Ficha que esta versão do app não entende: a linha leva a mensagem do
+  // problema, que termina em ponto (o P01-C troca o texto; o teste não
+  // depende dele)
+  const rowNamed = (name: string) => {
     const item = {
       row: {
         id: 'r1',
-        name: 'Helena Varga',
+        name,
         owner: { id: 'u2', username: 'dona' },
         systemCode: 'vtm-v20',
         templateVersion: '9.0.0',
@@ -190,13 +193,23 @@ describe('Cartão da Mesa: sem ".." no nome acessível (T-61)', () => {
       model: null,
       store: null,
       alerts: [],
-      state: 'Em criação.',
+      state: null,
     } as unknown as TableItem
     render(<TableRow item={item} onOpen={jest.fn()} />)
-    const label = screen.getByTestId('table-row-r1').props
-      .accessibilityLabel as string
-    expect(label).toContain('Atualize o app para ver esta ficha. dona')
-    expect(label).toContain('Em criação. Atualize')
-    expect(label).not.toContain('..')
-  })
+    return screen.getByTestId('table-row-r1').props.accessibilityLabel as string
+  }
+
+  it.each(['Quem?', 'Dr. Who Jr.', 'Helena Varga'])(
+    '"%s": o nome fica como na tela, e a junção não dobra a pontuação',
+    name => {
+      const label = rowNamed(name)
+      // O nome acessível começa pelo texto visível, inteiro (WCAG 2.5.3)
+      expect(screen.getByText(name)).toBeTruthy()
+      expect(label.startsWith(name)).toBe(true)
+      expect(label).not.toMatch(/\.\.|\?\./)
+      // Depois de pontuação, só o espaço; sem pontuação, ". "
+      const next = label.slice(name.length, name.length + 2)
+      expect(next).toBe(/[.?]$/.test(name) ? ' ' + next[1] : '. ')
+    }
+  )
 })
