@@ -671,4 +671,6 @@ Implementado em 13 commits, na ordem da seção 8.1. Os padrões das perguntas d
 - **T-70:** a linha da sincronização no cabeçalho (`SyncIndicator`) usa `hitTarget()`. O desenho do `Clock` (`ClockViews.tsx:49` e o padrão de `Clock.tsx:91`) continua com o `hit-size`: é tamanho visual, e o alvo é a linha (`row-min` 48 mais o alvo do `Pressable`).
 - **Ambiente:** o P01-C (na onda) instala `@types/react-test-renderer`; o `matrix.test.tsx` recebe a mesma linha do P01-C, e o `textInput()` o mesmo cast.
 
+**Telas novas da onda, conferidas depois do merge** (`LogoutButton` do P02; `DraftRecovery` e `ConflictSheet` do P03-C): herdam o `BottomSheet` (um "Fechar") e o `Button` (`hitTarget()`). Dois ajustes: o `BottomSheet` volta ao último elemento focado quando o gatilho perdeu o foco ao ficar ocupado (o "Sair" desabilitado durante a checagem), e os botões "Usar o meu" e "Ficar com o atual" de cada campo em conflito dizem qual campo ("Usar o meu: Identidade › Senhor").
+
 **Não rodado no pacote** (portas e build nativo só na integração): o `a11y-keyboard.spec.ts` e as jornadas alteradas (`journey-backstage`, `journey-storyteller`), o Maestro `08-backstage.yaml` e as conferências da seção 7 no VoiceOver e no TalkBack.

@@ -40,12 +40,38 @@ import { tokens } from './tokens'
 // fase de layout e, portanto, antes de qualquer autoFocus.
 
 type Focusable = { focus?: () => void; isConnected?: boolean }
-type WebDocument = { activeElement?: unknown; body?: unknown }
+type WebDocument = {
+  activeElement?: unknown
+  body?: unknown
+  addEventListener?: (
+    type: string,
+    listener: (e: { target?: unknown }) => void,
+    capture?: boolean
+  ) => void
+}
 
 const webDocument = (): WebDocument | undefined =>
   Platform.OS === 'web'
     ? (globalThis as { document?: WebDocument }).document
     : undefined
+
+// O último elemento que recebeu foco no documento (web). Um botão que fica
+// ocupado ao abrir a folha (o "Sair" do logout) é desabilitado, e o
+// navegador tira o foco dele: na abertura o foco está no body, e quem abriu
+// a folha é o último focado.
+let lastFocused: Focusable | null = null
+const tracked = new WeakSet<object>()
+function trackFocus(doc: WebDocument) {
+  if (tracked.has(doc) || typeof doc.addEventListener !== 'function') return
+  tracked.add(doc)
+  doc.addEventListener(
+    'focusin',
+    e => {
+      if (e.target && e.target !== doc.body) lastFocused = e.target as Focusable
+    },
+    true
+  )
+}
 
 export interface BottomSheetProps {
   readonly visible: boolean
@@ -71,9 +97,14 @@ export function BottomSheet({
   const trigger = useRef<Focusable | null>(null)
   useInsertionEffect(() => {
     const doc = webDocument()
-    if (visible && doc)
-      trigger.current = (doc.activeElement as Focusable) ?? null
+    if (!visible || !doc) return
+    const active = doc.activeElement as Focusable | null | undefined
+    trigger.current = active && active !== doc.body ? active : lastFocused
   }, [visible])
+  useEffect(() => {
+    const doc = webDocument()
+    if (doc) trackFocus(doc)
+  }, [])
   // Um caminho só para devolver o foco, uma vez por abertura (o gatilho é
   // zerado na primeira chamada). Roda depois que o modal sai da tela, quando
   // o trap já soltou o foco: no onDismiss (a folha fecha e continua montada)

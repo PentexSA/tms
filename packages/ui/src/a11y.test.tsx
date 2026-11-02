@@ -625,6 +625,27 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
       expect(field.focus).not.toHaveBeenCalled()
     })
 
+    it('gatilho que perdeu o foco ao ficar ocupado ("Sair"): volta ao último focado', () => {
+      // O botão ocupado é desabilitado, e o navegador tira o foco dele: na
+      // abertura da folha o foco está no body
+      let onFocusIn: ((e: { target?: unknown }) => void) | undefined
+      const tracking = {
+        ...fake,
+        addEventListener: (_: string, listener: typeof onFocusIn) => {
+          onFocusIn = listener
+        },
+      }
+      doc.document = tracking
+      const { rerender } = render(sheet(false))
+      onFocusIn?.({ target: trigger })
+      tracking.activeElement = tracking.body
+      rerender(sheet(true))
+      rerender(sheet(false))
+      fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+      jest.runAllTimers()
+      expect(trigger.focus).toHaveBeenCalledTimes(1)
+    })
+
     it('ao desmontar aberta (quem chama some com a folha)', () => {
       const { unmount } = render(sheet(true))
       fake.activeElement = null
