@@ -8,6 +8,7 @@ import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, templateJson } from '../../test/fixtures'
 import { renderLive } from '../../test/live'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -49,9 +50,11 @@ const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
 const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
 
 /** No celular, as ações do narrador ficam no "Mais opções" (T-11). */
-const openNarratorMenu = () => {
+const openNarratorMenu = async () => {
   fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
   fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador/ }))
+  // As ações abrem depois que o menu sai da tela
+  await sheetsDismissed()
 }
 const ID = '00000000-0000-4000-8000-00000000c001'
 
@@ -296,7 +299,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'active', lockedAt: null, creationCompletedAt: 'x' })
     )
     await open(['storyteller'], 'creating')
-    openNarratorMenu()
+    await openNarratorMenu()
     await act(async () => {
       fireEvent.press(screen.getByTestId('status-complete'))
     })
@@ -319,8 +322,9 @@ describe('a tela da ficha com o estado', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Ações do narrador · Em criação' })
     )
-    // O menu fecha e as ações abrem no mesmo toque
+    // O menu fecha; as ações abrem depois que ele sai da tela
     expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+    await sheetsDismissed()
     expect(
       screen.getByRole('header', { name: 'Ações do narrador' })
     ).toBeTruthy()
@@ -344,7 +348,7 @@ describe('a tela da ficha com o estado', () => {
       ok({ status: 'archived', lockedAt: null, creationCompletedAt: null })
     )
     await open(['storyteller'], 'active')
-    openNarratorMenu()
+    await openNarratorMenu()
     fireEvent.press(screen.getByTestId('status-archive'))
     expect(calls.statusPost).not.toHaveBeenCalled()
     expect(

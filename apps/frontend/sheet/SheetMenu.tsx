@@ -1,5 +1,5 @@
 import { BottomSheet, Button, IconButton, tokens } from '@tms/ui'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { stateLabel } from '../components/chronicles/tableItems'
@@ -14,8 +14,9 @@ import {
 // esta folha, com as mesmas condições de hoje. Nada sai da ficha: cada item
 // continua a um toque do menu.
 //
-// O item tocado fecha o menu e abre a folha dele no mesmo render, como o
-// StatusMenu troca a lista pela confirmação.
+// O item tocado fecha o menu, e a folha dele abre depois que o menu sai da
+// tela (onClosed): no iOS, dois Modais não se apresentam ao mesmo tempo, e
+// no web o foco volta ao ⋯ antes, para a folha seguinte devolvê-lo a ele.
 
 export interface SheetMenuProps {
   /** As ações do narrador (só para quem narra), com as props do StatusMenu. */
@@ -39,9 +40,10 @@ export function SheetMenu({
   const state = narrator
     ? stateLabel(narrator.model, narrator.status, narrator.locked)
     : null
+  const next = useRef<(() => void) | null>(null)
   const pick = (then: () => void) => () => {
+    next.current = then
     setOpen(false)
-    then()
   }
   return (
     <>
@@ -51,38 +53,45 @@ export function SheetMenu({
         testID="sheet-menu"
         onPress={() => setOpen(true)}
       />
-      {open ? (
-        <BottomSheet visible title="Mais opções" onClose={() => setOpen(false)}>
-          <View style={styles.list}>
-            {narrator && actions.length ? (
-              <Button
-                title={
-                  state ? `Ações do narrador · ${state}` : 'Ações do narrador'
-                }
-                variant="secondary"
-                testID="sheet-menu-narrator"
-                onPress={pick(() => setNarrating(true))}
-              />
-            ) : null}
-            {onExperience ? (
-              <Button
-                title="Experiência"
-                variant="secondary"
-                testID="xp-open"
-                accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
-                onPress={pick(onExperience)}
-              />
-            ) : null}
+      <BottomSheet
+        visible={open}
+        title="Mais opções"
+        onClose={() => setOpen(false)}
+        onClosed={() => {
+          const run = next.current
+          next.current = null
+          run?.()
+        }}
+      >
+        <View style={styles.list}>
+          {narrator && actions.length ? (
             <Button
-              title="Histórico"
+              title={
+                state ? `Ações do narrador · ${state}` : 'Ações do narrador'
+              }
               variant="secondary"
-              testID="sheet-menu-history"
-              accessibilityHint="Abre o histórico de alterações da ficha"
-              onPress={pick(onHistory)}
+              testID="sheet-menu-narrator"
+              onPress={pick(() => setNarrating(true))}
             />
-          </View>
-        </BottomSheet>
-      ) : null}
+          ) : null}
+          {onExperience ? (
+            <Button
+              title="Experiência"
+              variant="secondary"
+              testID="xp-open"
+              accessibilityHint="Abre o saldo, os pedidos e o extrato de XP"
+              onPress={pick(onExperience)}
+            />
+          ) : null}
+          <Button
+            title="Histórico"
+            variant="secondary"
+            testID="sheet-menu-history"
+            accessibilityHint="Abre o histórico de alterações da ficha"
+            onPress={pick(onHistory)}
+          />
+        </View>
+      </BottomSheet>
       {narrator && narrating ? (
         // As mesmas props do StatusMenuButton: o que ele ganhar, o menu
         // repassa (onda-2 §4.4)

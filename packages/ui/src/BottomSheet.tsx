@@ -95,6 +95,13 @@ export interface BottomSheetProps {
   readonly children: ReactNode
   readonly footer?: ReactNode
   readonly testID?: string
+  /**
+   * Depois que a folha sai da tela (fim da animação de saída), com o foco
+   * já de volta ao gatilho no web. É onde se abre a folha seguinte: no iOS,
+   * apresentar um Modal enquanto outro ainda sai falha, e no web a folha
+   * seguinte guarda o gatilho certo para devolver o foco.
+   */
+  readonly onClosed?: () => void
 }
 
 export function BottomSheet({
@@ -104,6 +111,7 @@ export function BottomSheet({
   children,
   footer,
   testID,
+  onClosed,
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
@@ -142,6 +150,21 @@ export function BottomSheet({
     }, 0)
   }, [])
   useEffect(() => () => restoreFocus(), [restoreFocus])
+  const closed = useRef(onClosed)
+  closed.current = onClosed
+  // iOS e web: o onDismiss do Modal; o aviso vem depois da devolução do
+  // foco, que espera um tick
+  const dismissed = useCallback(() => {
+    restoreFocus()
+    setTimeout(() => closed.current?.(), 0)
+  }, [restoreFocus])
+  // Android: sem onDismiss, o Modal sai assim que fica invisível
+  const wasVisible = useRef(visible)
+  useEffect(() => {
+    const closing = wasVisible.current && !visible
+    wasVisible.current = visible
+    if (closing && Platform.OS === 'android') closed.current?.()
+  }, [visible])
   const web = Platform.OS === 'web'
   const scrimStyle = [
     StyleSheet.absoluteFill,
@@ -153,7 +176,7 @@ export function BottomSheet({
       transparent
       animationType={reduceMotion ? 'none' : dialog ? 'fade' : 'slide'}
       onRequestClose={web ? undefined : onClose}
-      onDismiss={restoreFocus}
+      onDismiss={dismissed}
       statusBarTranslucent
     >
       <KeyboardAvoidingView

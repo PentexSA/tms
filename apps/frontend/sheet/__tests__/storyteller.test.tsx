@@ -6,6 +6,7 @@ import { AccessibilityInfo } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { modelOf, sheetFor, templateJson } from '../../test/fixtures'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -87,9 +88,10 @@ async function open(roles: RoleName[], post?: () => Promise<PostOutcome>) {
  * O Histórico pelo "Mais opções" (T-11): sem Dimensions, o mock do RN fica em
  * 750 (medium), abaixo dos 900 dos botões no cabeçalho.
  */
-const openHistory = () => {
+const openHistory = async () => {
   fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))
   fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+  await sheetsDismissed()
 }
 
 describe('Editar como narrador', () => {
@@ -210,7 +212,7 @@ describe('Histórico de alterações', () => {
       })
     )
     await open(['owner'])
-    openHistory()
+    await openHistory()
     expect(
       await screen.findByLabelText(
         /^Vitalidade: \+1 letal\. às \d\d:\d\d · ana \(narrador\)$/
@@ -243,7 +245,7 @@ describe('Histórico de alterações', () => {
       })
     )
     await open(['owner'])
-    openHistory()
+    await openHistory()
     expect(
       await screen.findByLabelText(
         /^Vitalidade: \+1 letal\. às \d\d:\d\d · Conta excluída \(narrador\)$/
@@ -269,7 +271,7 @@ describe('Histórico de alterações', () => {
             })
     )
     await open(['owner'])
-    openHistory()
+    await openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Carregar mais' })
     )
@@ -286,7 +288,7 @@ describe('Histórico de alterações', () => {
     calls.historyGet.mockResolvedValueOnce(ok({ items: [], next: 'c' }))
     calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
     await open(['owner'])
-    openHistory()
+    await openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Carregar mais' })
     )
@@ -297,7 +299,7 @@ describe('Histórico de alterações', () => {
     calls.historyGet.mockResolvedValueOnce(fail(500, 'erro interno'))
     calls.historyGet.mockResolvedValue(ok({ items: [], next: null }))
     await open(['owner'])
-    openHistory()
+    await openHistory()
     fireEvent.press(
       await screen.findByRole('button', { name: 'Tentar de novo' })
     )

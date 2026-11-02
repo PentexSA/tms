@@ -14,6 +14,7 @@ import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import { fakeServer, type LiveProps, renderLive } from '../../test/live'
+import { sheetsDismissed } from '../../test/queries'
 import {
   json,
   memoryStore,
@@ -270,8 +271,12 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
         screen.queryByRole('button', { name: /^Ações do narrador/ })
       ).toBeNull()
       fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
-      // O menu fecha e o Histórico abre no mesmo toque
+      // O menu fecha; o Histórico abre depois que ele sai da tela
       expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+      expect(
+        screen.queryByRole('header', { name: 'Histórico de alterações' })
+      ).toBeNull()
+      await sheetsDismissed()
       expect(
         screen.getByRole('header', { name: 'Histórico de alterações' })
       ).toBeTruthy()
@@ -284,6 +289,7 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     fireEvent.press(menu())
     fireEvent.press(screen.getByRole('button', { name: 'Experiência' }))
     expect(screen.queryByRole('header', { name: 'Mais opções' })).toBeNull()
+    await sheetsDismissed()
     expect(screen.getByRole('header', { name: 'Experiência' })).toBeTruthy()
   })
 
@@ -294,6 +300,7 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Ações do narrador · Em criação' })
     )
+    await sheetsDismissed()
     expect(screen.getByTestId('status-complete')).toBeTruthy()
   })
 
@@ -302,6 +309,7 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     await openSheet(['storyteller'], 'active')
     fireEvent.press(menu())
     fireEvent.press(screen.getByRole('button', { name: /^Ações do narrador$/ }))
+    await sheetsDismissed()
     expect(screen.getByTestId('status-lock')).toBeTruthy()
     fireEvent.press(screen.getAllByRole('button', { name: 'Fechar' })[0]!)
     expect(screen.queryByTestId('status-lock')).toBeNull()

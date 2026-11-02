@@ -343,3 +343,38 @@ describe('T-11: cabeçalho que cabe, com o lugar do estado', () => {
     ).toBe(160)
   })
 })
+
+describe('BottomSheet.onClosed: a folha seguinte abre depois que esta sai', () => {
+  const sheet = (visible: boolean, onClosed: () => void) => (
+    <BottomSheet
+      visible={visible}
+      title="Mais opções"
+      onClose={() => undefined}
+      onClosed={onClosed}
+    >
+      <RNText>itens</RNText>
+    </BottomSheet>
+  )
+
+  it('iOS e web: no onDismiss do Modal, depois de um tick', async () => {
+    const onClosed = jest.fn()
+    const { rerender } = render(sheet(true, onClosed))
+    rerender(sheet(false, onClosed))
+    expect(onClosed).not.toHaveBeenCalled()
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss')
+    expect(onClosed).not.toHaveBeenCalled()
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+
+  it('Android: sem onDismiss, assim que fica invisível', () => {
+    const onClosed = jest.fn()
+    withOS('android', () => {
+      const { rerender } = render(sheet(true, onClosed))
+      rerender(sheet(false, onClosed))
+    })
+    expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+})
