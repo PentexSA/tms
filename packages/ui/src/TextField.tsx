@@ -60,13 +60,20 @@ export function TextField({
         ]}
         {...rest}
       />
+      {/* T-64: a dica (ou o erro) quebra em linhas e o contador fica
+          inteiro à direita, com um respiro entre os dois */}
       <View style={styles.meta}>
         {error ? (
-          <Text variant="caption" color="danger" accessibilityRole="alert">
+          <Text
+            variant="caption"
+            color="danger"
+            accessibilityRole="alert"
+            style={styles.note}
+          >
             {error}
           </Text>
         ) : hint ? (
-          <Text variant="caption" color="inkMuted">
+          <Text variant="caption" color="inkMuted" style={styles.note}>
             {hint}
           </Text>
         ) : (
@@ -77,6 +84,7 @@ export function TextField({
             variant="numberSm"
             color="inkMuted"
             accessibilityLabel={`${value.length} de ${maxLength} caracteres`}
+            style={styles.counter}
           >
             {`${value.length}/${maxLength}`}
           </Text>
@@ -99,5 +107,12 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.space[2],
   },
   multiline: { minHeight: 120 },
-  meta: { flexDirection: 'row', justifyContent: 'space-between' },
+  meta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: tokens.space[2],
+  },
+  note: { flex: 1 },
+  counter: { flexShrink: 0 },
 })

@@ -247,6 +247,7 @@ Texto como cidadão de primeira classe.
 
 - **Classes:** `ds-field` (rótulo envolvendo), `ds-field__label` (caption 700, `ink-muted`), `ds-input` (44) e `ds-textarea` (8rem, redimensiona na vertical), `ds-field__help`, `ds-field__error` (ícone + texto em `danger`), `.has-error` (borda `danger`). O **AspectField** ainda é `p-aspect` no protótipo: tipo do campo + texto na fonte `voice`, fixado no topo pela seção com `pinTop`.
 - **Editor em sheet:** contador "20 de 80 caracteres" em `aria-live="polite"`, `maxlength` do template, Cancelar e Salvar, foco inicial no campo.
+- **Linha da dica e do contador (RN, T-64):** a dica (ou o erro) ocupa o resto da linha e quebra em várias; o contador fica inteiro, à direita, com `gap` de 8 entre os dois.
 - **API RN:**
 
   ```ts
