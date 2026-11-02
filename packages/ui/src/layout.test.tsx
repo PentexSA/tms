@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import {
+  Dimensions,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Text as RNText,
   StyleSheet,
@@ -173,6 +175,79 @@ describe('T-10: a folha acompanha o teclado no Android', () => {
           <RNText>x</RNText>
         </BottomSheet>
       )
+      fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
+        nativeEvent: { key: 'Escape' },
+        preventDefault: () => undefined,
+      })
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('T-69: folha como diálogo central a partir de 600', () => {
+  const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
+  const DESKTOP = { width: 1280, height: 800, scale: 1, fontScale: 1 }
+  const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
+  afterEach(() => {
+    act(() => Dimensions.set({ window: TABLET, screen: TABLET }))
+  })
+
+  const renderSheet = (onClose = jest.fn()) => {
+    render(
+      <SafeAreaInsetsContext.Provider value={INSETS}>
+        <BottomSheet visible title="Convidar" onClose={onClose} testID="sheet">
+          <RNText>conteúdo</RNText>
+        </BottomSheet>
+      </SafeAreaInsetsContext.Provider>
+    )
+    return {
+      root: styleOf(screen.UNSAFE_getByType(KeyboardAvoidingView)),
+      sheet: styleOf(screen.getByTestId('sheet')),
+      animation: screen.UNSAFE_getByType(Modal).props.animationType,
+    }
+  }
+
+  it('a 1280: raiz centralizada, folha de até 560 com cantos redondos, fade e sem o inset de baixo', () => {
+    Dimensions.set({ window: DESKTOP, screen: DESKTOP })
+    const { root, sheet, animation } = renderSheet()
+    expect(root).toMatchObject({
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    })
+    expect(sheet).toMatchObject({
+      width: '100%',
+      maxWidth: 560,
+      maxHeight: '85%',
+      borderRadius: 16,
+      paddingBottom: 20,
+    })
+    expect(animation).toBe('fade')
+  })
+
+  it('a 390: presa embaixo, cantos de cima, slide e com o inset de baixo', () => {
+    Dimensions.set({ window: PHONE, screen: PHONE })
+    const { root, sheet, animation } = renderSheet()
+    expect(root.justifyContent).toBe('flex-end')
+    expect(root.alignItems).toBeUndefined()
+    expect(sheet.maxWidth).toBeUndefined()
+    expect(sheet).toMatchObject({
+      maxHeight: '90%',
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingBottom: 20 + 34,
+    })
+    expect(animation).toBe('slide')
+  })
+
+  it.each([
+    ['390', PHONE],
+    ['1280', DESKTOP],
+  ])('a %s, o Esc no web continua fechando (T-71)', (_, size) => {
+    Dimensions.set({ window: size, screen: size })
+    const onClose = jest.fn()
+    withOS('web', () => {
+      renderSheet(onClose)
       fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
         nativeEvent: { key: 'Escape' },
         preventDefault: () => undefined,

@@ -21,7 +21,7 @@ import { Pressable } from './Pressable'
 import { keyOf } from './roving'
 import { Text } from './Text'
 import { ModalToastHost } from './Toast'
-import { useTheme } from './theme'
+import { useLayout, useTheme } from './theme'
 import { tokens } from './tokens'
 
 // Sheet modal (design system §9.5): o voltar do Android fecha, o fundo fica
@@ -107,6 +107,9 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
+  // T-69 (DS: "a partir de 600 vira modal centralizado de até 560"): no
+  // compact a folha fica presa embaixo; fora dele, é um diálogo central
+  const dialog = useLayout().breakpoint !== 'compact'
   // Quem tinha o foco antes de abrir (web), lido antes do autoFocus de
   // qualquer campo da folha e antes do trap do modal
   const trigger = useRef<Focusable | null>(null)
@@ -148,14 +151,14 @@ export function BottomSheet({
     <Modal
       visible={visible}
       transparent
-      animationType={reduceMotion ? 'none' : 'slide'}
+      animationType={reduceMotion ? 'none' : dialog ? 'fade' : 'slide'}
       onRequestClose={web ? undefined : onClose}
       onDismiss={restoreFocus}
       statusBarTranslucent
     >
       <KeyboardAvoidingView
         testID="bottom-sheet-root"
-        style={styles.root}
+        style={[styles.root, dialog && styles.rootDialog]}
         behavior={keyboardBehavior()}
         {...(web
           ? {
@@ -191,10 +194,12 @@ export function BottomSheet({
           onAccessibilityEscape={onClose}
           style={[
             styles.sheet,
+            dialog ? styles.dialog : styles.bottom,
             {
               backgroundColor: colors.surfaceRaised,
               borderColor: colors.borderSubtle,
-              paddingBottom: tokens.space[5] + insets.bottom,
+              // O inset de baixo só vale para a folha presa embaixo
+              paddingBottom: tokens.space[5] + (dialog ? 0 : insets.bottom),
             },
           ]}
         >
@@ -227,13 +232,26 @@ export function BottomSheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
+  rootDialog: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: tokens.space[6],
+  },
   sheet: {
-    maxHeight: '90%',
-    borderTopLeftRadius: tokens.radius.lg,
-    borderTopRightRadius: tokens.radius.lg,
     borderWidth: tokens.borderWidth.hair,
     paddingHorizontal: tokens.space[5],
     paddingTop: tokens.space[3],
+  },
+  bottom: {
+    maxHeight: '90%',
+    borderTopLeftRadius: tokens.radius.lg,
+    borderTopRightRadius: tokens.radius.lg,
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '85%',
+    borderRadius: tokens.radius.lg,
   },
   header: { flexDirection: 'row', alignItems: 'center' },
   title: { flex: 1 },
