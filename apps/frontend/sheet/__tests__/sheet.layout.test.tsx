@@ -6,7 +6,7 @@ import {
   within,
 } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
-import { KeyboardArea } from '@tms/ui'
+import { KeyboardArea, ThemeProvider } from '@tms/ui'
 import { useRouter } from 'expo-router'
 import { Dimensions, ScrollView, StyleSheet, TextInput } from 'react-native'
 
@@ -364,6 +364,14 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     resize(PHONE)
     await openSheet(['storyteller'], 'active')
     expect(inScroll()).toBeTruthy()
+    // Com o tema do app (accent neutro), não com o da ficha
+    const chrome = screen
+      .UNSAFE_getAllByType(ThemeProvider)
+      .find(t => t.props.accent === 'accent-neutral')!
+    expect(chrome.props.skin).toBe('wod')
+    expect(
+      within(chrome).getByRole('button', { name: 'Editar como narrador' })
+    ).toBeTruthy()
     screen.unmount()
     resize(DESKTOP)
     await openSheet(['storyteller'], 'active')

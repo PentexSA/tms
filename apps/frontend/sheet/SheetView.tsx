@@ -17,6 +17,7 @@ import {
   ThemeProvider,
   tokens,
   useLayout,
+  useTheme,
 } from '@tms/ui'
 import { type ReactElement, type ReactNode, useMemo, useState } from 'react'
 import { Platform, ScrollView, StyleSheet, View } from 'react-native'
@@ -201,6 +202,15 @@ function SheetBody({
   // fixa. Fora do celular, tudo fixo acima, como antes.
   const phone = breakpoint === 'compact'
   const groupTabs = useGroupTabsState(phone)
+  // O header (painel do NPC e barra do narrador) é do app, não da ficha:
+  // fica com o tema de fora (a skin do app e o accent neutro), mesmo quando
+  // rola dentro da ficha, que usa a skin e o accent do personagem
+  const appSkin = useTheme().skin
+  const chrome = header ? (
+    <ThemeProvider skin={appSkin} accent="accent-neutral">
+      {header}
+    </ThemeProvider>
+  ) : null
 
   // T-27 (parte 2): os filhos da rolagem num array sem nulos, porque o
   // stickyHeaderIndices conta posições; a faixa de navegação fica presa no
@@ -209,7 +219,7 @@ function SheetBody({
     const items: (ReactElement | null | false)[] = [
       phone && (header || bar) ? (
         <View key="head" testID="sheet-scroll-header">
-          {header}
+          {chrome}
           {bar?.switcher}
         </View>
       ) : null,
@@ -279,7 +289,7 @@ function SheetBody({
     const nav = items.findIndex(i => i.key === 'nav')
     return (
       <View style={styles.screen}>
-        {phone ? null : header}
+        {phone ? null : chrome}
         {bar && !phone ? (
           <View>
             {bar.switcher}
