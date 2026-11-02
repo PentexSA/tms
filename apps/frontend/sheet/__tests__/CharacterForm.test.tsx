@@ -117,3 +117,94 @@ describe('CharacterForm (outro sistema: D&D 5e)', () => {
     expect(screen.getByRole('radio', { name: 'Mago' })).toBeTruthy()
   })
 })
+
+// T-21: "Criar ficha" com erro leva ao primeiro campo inválido, na ordem da
+// tela: o formulário diz o `y` da linha (a tela rola) e foca o campo de texto
+describe('Criar ficha leva ao erro (T-21)', () => {
+  const { TextInput } = jest.requireActual('react-native')
+  const focused = () =>
+    (
+      jest.mocked(TextInput.prototype.focus).mock.contexts as {
+        props: { testID?: string }
+      }[]
+    ).map(c => c.props.testID)
+  const layout = (row: string, y: number) =>
+    fireEvent(screen.getByTestId(`form-row-${row}`), 'layout', {
+      nativeEvent: { layout: { x: 0, y, width: 360, height: 72 } },
+    })
+  beforeEach(() => jest.mocked(TextInput.prototype.focus).mockClear())
+
+  it('com o nome vazio, rola até a linha do nome e foca o campo', () => {
+    const onInvalid = jest.fn()
+    const onSubmit = jest.fn()
+    render(
+      <CharacterForm
+        model={modelOf('vtm-v20')}
+        onSubmit={onSubmit}
+        onInvalid={onInvalid}
+      />
+    )
+    layout('name', 12)
+    layout('concept-sire', 180)
+    fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(onInvalid).toHaveBeenCalledWith(12)
+    expect(focused()).toEqual(['editor-name'])
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o nome')
+  })
+
+  it('com o 422 do servidor no Conceito, faz o mesmo para o Conceito', () => {
+    const onInvalid = jest.fn()
+    const { rerender } = render(
+      <CharacterForm
+        model={modelOf('vtm-v20')}
+        onSubmit={jest.fn()}
+        onInvalid={onInvalid}
+      />
+    )
+    layout('concept-sire', 180)
+    expect(onInvalid).not.toHaveBeenCalled()
+    rerender(
+      <CharacterForm
+        model={modelOf('vtm-v20')}
+        onSubmit={jest.fn()}
+        onInvalid={onInvalid}
+        serverIssues={[{ path: '/values/concept', message: 'longo demais' }]}
+      />
+    )
+    expect(onInvalid).toHaveBeenCalledWith(180)
+    expect(focused()).toEqual(['editor-concept'])
+    // O mesmo erro de servidor num render qualquer não rola de novo; uma
+    // resposta nova com a mesma recusa (lista nova) leva ao campo de novo
+    const same = [{ path: '/values/concept', message: 'longo demais' }]
+    const form = (issues: typeof same) => (
+      <CharacterForm
+        model={modelOf('vtm-v20')}
+        onSubmit={jest.fn()}
+        onInvalid={onInvalid}
+        serverIssues={issues}
+      />
+    )
+    rerender(form(same))
+    expect(onInvalid).toHaveBeenCalledTimes(2)
+    rerender(form(same))
+    expect(onInvalid).toHaveBeenCalledTimes(2)
+    rerender(form([...same]))
+    expect(onInvalid).toHaveBeenCalledTimes(3)
+  })
+
+  it('erro num campo de escolha rola até ele, sem foco de texto', () => {
+    const onInvalid = jest.fn()
+    render(
+      <CharacterForm
+        model={modelOf('vtm-v20')}
+        onSubmit={jest.fn()}
+        onInvalid={onInvalid}
+        serverIssues={[{ path: '/values/clan', message: 'opção inexistente' }]}
+      />
+    )
+    // Sem layout ainda: a linha vale 0
+    expect(onInvalid).toHaveBeenCalledWith(0)
+    expect(focused()).toEqual([])
+  })
+})

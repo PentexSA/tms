@@ -1,5 +1,7 @@
 import { act, render, screen } from '@testing-library/react-native'
-import { sheetFor } from '../../test/fixtures'
+import { effectiveCreationConfig } from '@tms/sheet-core'
+import { modelOf, sheetFor } from '../../test/fixtures'
+import * as advice from '../creation/useStepAdvice'
 import { SheetView } from '../SheetView'
 import { createSheetStore } from '../store/sheetStore'
 import * as views from '../views'
@@ -11,6 +13,21 @@ jest.mock('../views', () =>
   require('../../test/countViews').countingViews(jest.requireActual('../views'))
 )
 const renders = (views as unknown as { renders: Map<string, number> }).renders
+
+// A previsão do "+" (P05-C) conta os renders das linhas da Criação: cada
+// render de um editor numérico lê a previsão do próprio caminho uma vez
+jest.mock('../creation/useStepAdvice', () => {
+  const actual = jest.requireActual('../creation/useStepAdvice')
+  const reads = new Map<string, number>()
+  return {
+    reads,
+    useStepAdvice: (path: string) => {
+      reads.set(path, (reads.get(path) ?? 0) + 1)
+      return actual.useStepAdvice(path)
+    },
+  }
+})
+const reads = (advice as unknown as { reads: Map<string, number> }).reads
 
 it('gastar Sangue re-renderiza só o Sangue', () => {
   const { model, sheet } = sheetFor('helena', ['owner'])
@@ -106,4 +123,39 @@ it('trocar de forma re-renderiza a forma e os atributos que ela muda (v2)', () =
   expect(changed).toContain('form')
   for (const id of ['health', 'rage', 'gnosis', 'willpower', 'charisma'])
     expect(changed).not.toContain(id)
+})
+
+it('em Criação, um ponto em Força não re-renderiza as linhas das Habilidades (P05-C)', () => {
+  const model = modelOf('vtm-v20')
+  const store = createSheetStore({
+    characterId: 'c4',
+    model,
+    sheet: { values: { name: 'Nova', clan: 'tremere' }, specialties: {} },
+    sheetVersion: 1,
+    roles: ['owner'],
+    mode: 'create',
+    sync: { enqueue: jest.fn() },
+    uuid: () => '00000000-0000-4000-8000-000000000004',
+    creation: {
+      config: effectiveCreationConfig(model),
+      choices: {
+        priorities: {
+          attributes: ['physical', 'social', 'mental'],
+          abilities: ['talents', 'skills', 'knowledges'],
+        },
+      },
+    },
+  })
+  store.getState().startDraft()
+  render(<SheetView store={store} />)
+  expect(reads.get('values.alertness')).toBeGreaterThan(0)
+  reads.clear()
+
+  act(() => {
+    store.getState().setDraftValue('values.strength', 2)
+  })
+  // Só a Força (a previsão dela e o valor mudaram); nenhuma Habilidade
+  expect(reads.get('values.strength')).toBeGreaterThan(0)
+  for (const id of ['alertness', 'brawl', 'academics', 'stealth'])
+    expect(reads.get(`values.${id}`)).toBeUndefined()
 })

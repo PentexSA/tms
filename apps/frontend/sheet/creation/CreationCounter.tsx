@@ -26,6 +26,7 @@ export function CreationCounter({
   const creation = useCreation()
   const where = useMemo(() => groupFor(model, fieldIds), [model, fieldIds])
   const group = useSheetSelector(s => findGroup(s.check, where))
+  const phase = useSheetSelector(s => s.creationPhase)
   const budget = useMemo(
     () =>
       (model.template.creation?.budgets ?? []).find(
@@ -48,10 +49,10 @@ export function CreationCounter({
       <Text
         variant="caption"
         color={group.budget === null || over ? 'action' : 'inkMuted'}
-        accessibilityLabel={counterSpoken(group)}
+        accessibilityLabel={counterSpoken(group, phase)}
         testID={`counter-${group.id}`}
       >
-        {counterText(group)}
+        {counterText(group, phase)}
       </Text>
     )
   if (!pickable && !line) return counter

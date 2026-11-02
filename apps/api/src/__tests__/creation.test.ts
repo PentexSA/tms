@@ -295,6 +295,74 @@ describe('/events: avaliação parcial', () => {
     expect(over.status).toBe(200)
     expect((await send(id, storyteller, 'dex', 3, 5)).status).toBe(422)
   })
+
+  // P05-C: o app passa a sinalizar antes do toque ("+" com cara de
+  // indisponível, aviso ao lado). Isso é só UX: lotes que chegam direto à
+  // API, sem passar pelo app, continuam recusados pela mesma conta.
+  describe('o servidor recusa o que o app só sinaliza', () => {
+    const values = async (id: string) =>
+      ((await row(id)).sheet_data as { values: Record<string, unknown> }).values
+
+    it('teto da criação (hard-cap): Arete acima de 3', async () => {
+      const id = await character({ ...COMPLETE, arete: 3 })
+      await choose(id)
+      const res = await send(id, owner, 'arete', 3, 4)
+      expect(res.status).toBe(422)
+      const body = await json(res)
+      expect(body.code).toBe('CREATION_BUDGET_EXCEEDED')
+      expect(body.problems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'CREATION_HARD_CAP' }),
+        ])
+      )
+      expect((await values(id)).arete).toBe(3)
+    })
+
+    it('baseline travado: Aparência da linhagem C fica em 0', async () => {
+      const id = await character({ ...COMPLETE, lineage: 'c', app: 0 })
+      await choose(id)
+      const res = await send(id, owner, 'app', 0, 1)
+      expect(res.status).toBe(422)
+      expect(await json(res)).toMatchObject({
+        code: 'CREATION_BUDGET_EXCEEDED',
+        problems: [{ code: 'CREATION_LOCKED', paths: ['values.app'] }],
+      })
+      expect((await values(id)).app).toBe(0)
+    })
+
+    it('saldo de bônus: o lote inteiro é recusado, nada aplicado', async () => {
+      const id = await character()
+      await choose(id)
+      // 2 + 2 pontos de atributo acima dos básicos, a 5 cada: 20 de 10
+      const res = await as(
+        ctx,
+        storyteller,
+        'POST',
+        `/characters/${id}/events`,
+        {
+          clientBatchId: crypto.randomUUID(),
+          events: [
+            { path: 'values.str', from: 3, to: 5 },
+            { path: 'values.dex', from: 3, to: 5 },
+          ],
+        }
+      )
+      expect(res.status).toBe(422)
+      expect(await json(res)).toMatchObject({
+        code: 'CREATION_BUDGET_EXCEEDED',
+        problems: [{ code: 'CREATION_FREEBIES_EXCEEDED', amount: 10 }],
+      })
+      expect(await values(id)).toMatchObject({ str: 3, dex: 3 })
+    })
+
+    it('o 4º ponto acima do creation-cap passa, pago com bônus (a trava de Básicos é só do app)', async () => {
+      const id = await character()
+      await choose(id)
+      const res = await send(id, owner, 'alert', 3, 4)
+      expect(res.status).toBe(200)
+      expect((await values(id)).alert).toBe(4)
+    })
+  })
 })
 
 describe('concluir, aprovar e devolver', () => {

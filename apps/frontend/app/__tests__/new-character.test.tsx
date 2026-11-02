@@ -103,6 +103,34 @@ describe('Nova ficha', () => {
     })
   })
 
+  // T-21: o erro fica fora da tela; a tela rola até o campo e o foca
+  it('Criar ficha sem nome rola até o Nome e o foca', async () => {
+    const { ScrollView, TextInput } = jest.requireActual('react-native')
+    const scrollTo = jest.mocked(ScrollView.prototype.scrollTo)
+    const focus = jest.mocked(TextInput.prototype.focus)
+    scrollTo.mockClear()
+    focus.mockClear()
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const layout = (testID: string, y: number) =>
+      fireEvent(screen.getByTestId(testID), 'layout', {
+        nativeEvent: { layout: { x: 0, y, width: 360, height: 400 } },
+      })
+    await screen.findByTestId('new-character-form')
+    layout('new-character-form', 64)
+    layout('form-row-name', 0)
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(calls.chronicle.charactersPost).not.toHaveBeenCalled()
+    expect(scrollTo).toHaveBeenCalledWith({ y: 48, animated: true })
+    expect(
+      (focus.mock.contexts as { props: { testID?: string } }[]).map(
+        c => c.props.testID
+      )
+    ).toEqual(['editor-name'])
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o nome')
+  })
+
   it('422 do servidor marca o campo', async () => {
     calls.chronicle.charactersPost.mockResolvedValue({
       data: null,

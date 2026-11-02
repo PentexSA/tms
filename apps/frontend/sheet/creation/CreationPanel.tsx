@@ -9,7 +9,7 @@ import {
   tokens,
   useToast,
 } from '@tms/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
@@ -27,10 +27,15 @@ import {
   basicsDone,
   type CreationPhase,
   completeLabel,
+  completionFreebies,
   creationRefusalOf,
   errorBodyOf,
+  freebieLedger,
+  freebiesBalance,
+  freebiesNotes,
   problemText,
   REFUSAL_TEXT,
+  restam,
 } from './creation'
 import { RadioChips } from './RadioChips'
 
@@ -49,8 +54,6 @@ const PHASES: readonly {
   { id: 'freebies', label: 'Pontos de bônus' },
 ]
 
-const NO_NOTES: readonly string[] = []
-
 /** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
 export function useCreating(): boolean {
   const creation = useCreation()
@@ -59,16 +62,20 @@ export function useCreating(): boolean {
   )
 }
 
-/** "Bônus: 10 de 15", para a barra; null sem bônus. */
+/** "Bônus: restam 10 de 15", para a barra; null sem bônus (T-18). */
 export function useFreebiesText(): string | null {
-  return useSheetSelector(s => {
-    const f = s.check?.freebies
-    if (!f) return null
-    const total = f.available + f.credit
-    return f.remaining < 0
-      ? `Bônus: ${-f.remaining} acima`
-      : `Bônus: ${f.remaining} de ${total}`
-  })
+  return useSheetSelector(s => freebiesBalance(s.check))
+}
+
+/**
+ * A sobra de bônus nas confirmações de concluir e aprovar (T-18): "Sobram 4
+ * pontos de bônus. Eles não viram XP.", só com a conta fechada. Concluir com
+ * sobra continua permitido. O menu do narrador recebe o mesmo número pelo
+ * onDraftState (SheetScreen), porque fica fora da ficha.
+ */
+export function useFreebiesNotes(): readonly string[] {
+  const left = useSheetSelector(s => completionFreebies(s.check))
+  return useMemo(() => freebiesNotes(left), [left])
 }
 
 /**
@@ -83,6 +90,7 @@ export function useFinishCreation() {
   const ready = useSheetSelector(s => s.check?.complete === true)
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
+  const notes = useFreebiesNotes()
   const toast = useToast()
   const complete = useCompleteCreation(
     creation?.characterId ?? '',
@@ -131,8 +139,8 @@ export function useFinishCreation() {
     label: info ? completeLabel(info, roles) : '',
     // A ficha vai para o narrador aprovar
     approval: info?.approval === true && !roles.has('storyteller'),
-    // Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
-    notes: NO_NOTES,
+    // Linhas extras da confirmação: a sobra de bônus (T-18)
+    notes,
     busy: waiting || complete.isPending,
     waitingSync: waiting && queued,
     start: () => setWaiting(true),
@@ -203,9 +211,10 @@ export function CreationPanel() {
         >
           {freebies.remaining < 0
             ? `Bônus: ${-freebies.remaining} acima do saldo (${freebies.spent} de ${freebies.available + freebies.credit}).`
-            : `Bônus: ${freebies.remaining} de ${freebies.available + freebies.credit} restantes.`}
+            : `${freebiesBalance(check)}.`}
         </Text>
       ) : null}
+      <Ledger />
       {problems.length ? (
         <View
           style={styles.block}
@@ -225,10 +234,42 @@ export function CreationPanel() {
         </View>
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
-          A conta fechou: conclua a criação pela barra de cima.
+          {freebies && freebies.remaining > 0
+            ? `Pontos básicos completos; ${restam(freebies.remaining)} de bônus. Gaste-os nos grupos ou conclua pela barra de cima.`
+            : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
       {storyteller ? <BudgetControls /> : null}
+    </View>
+  )
+}
+
+/** "Onde foram os bônus" (R-17), logo abaixo do saldo. */
+function Ledger() {
+  const { model } = useSheet()
+  const check = useSheetSelector(s => s.check)
+  const ledger = freebieLedger(model, check)
+  if (!ledger) return null
+  return (
+    <View
+      style={styles.block}
+      accessibilityLabel="Onde foram os bônus"
+      testID="creation-ledger"
+    >
+      <SectionHeader title="Onde foram os bônus" level="group" />
+      {ledger.entries.map(e => (
+        <View key={e.key} style={styles.entry}>
+          <Text variant="caption">{e.text}</Text>
+          {e.detail ? (
+            <Text variant="caption" color="inkMuted">
+              {e.detail}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+      <Text variant="caption" color="inkMuted" testID="creation-ledger-total">
+        {ledger.total}
+      </Text>
     </View>
   )
 }
@@ -284,7 +325,7 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
       }
     >
       <Text>
-        {`Os pontos básicos de todos os grupos foram distribuídos. A partir de agora, cada ponto a mais gasta os pontos de bônus: ${remaining === 1 ? 'resta 1' : `restam ${remaining}`}.`}
+        {`Os pontos básicos de todos os grupos foram distribuídos. A partir de agora, cada ponto a mais gasta os pontos de bônus: ${restam(remaining)}.`}
       </Text>
     </BottomSheet>
   )
@@ -306,8 +347,10 @@ export function CreationStatusPanel() {
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // "Aprovar ficha" confirma antes, como concluir (T-32)
+  // "Aprovar ficha" confirma antes, como concluir (T-32), com a sobra de
+  // bônus (T-18)
   const [approving, setApproving] = useState(false)
+  const approveNotes = useFreebiesNotes()
   // O painel continua montado fora de `pending`: sem zerar, o formulário de
   // devolução reaparecia preenchido na próxima revisão (nota do QA app)
   const pending = creation?.status === 'pending'
@@ -451,8 +494,6 @@ const approveCopy = completionCopy({
   approval: true,
   action: 'approve',
 })
-// Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
-const approveNotes: readonly string[] = []
 
 /** O narrador ajusta o saldo de bônus da ficha ou libera a criação livre. */
 function BudgetControls() {
@@ -518,6 +559,7 @@ const styles = StyleSheet.create({
     paddingTop: tokens.space[4],
   },
   block: { gap: tokens.space[2] },
+  entry: { gap: tokens.space['0.5'] },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

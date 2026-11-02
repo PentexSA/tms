@@ -38,6 +38,22 @@ export interface StepperProps {
   // Rótulo visível acima do controle, para quando a tela não o mostra ao
   // lado. Fica fora da árvore de acessibilidade: o controle já tem o nome.
   readonly showLabel?: boolean
+  // O que o próximo ponto faria (T-20, R-17), dito antes do toque
+  readonly increase?: StepperIncrease
+}
+
+/**
+ * O "+" com a trava ou o custo, antes do toque. `blocked`: o "+" fica com a
+ * cara de indisponível (opacidade e `aria-disabled`), mas **continua
+ * tocável**: o toque chega a quem decide (a conta exata e o servidor), que
+ * explica o motivo; a previsão pode errar para o lado bloqueado. Segurar não
+ * repete. `hint`: o motivo ou o custo ("+1 = 2 bônus"); no app, a dica do
+ * controle ajustável; no web, o "+" aponta `hintID` com `aria-describedby`.
+ */
+export interface StepperIncrease {
+  readonly blocked?: boolean
+  readonly hint?: string | null
+  readonly hintID?: string | null
 }
 
 const HOLD_DELAY_MS = 400
@@ -56,6 +72,7 @@ export function Stepper({
   onValuePress,
   valueNativeID,
   showLabel = false,
+  increase,
 }: StepperProps) {
   const { colors } = useTheme()
   const [display, setDisplay] = useState(value)
@@ -113,6 +130,20 @@ export function Stepper({
   const spoken = valueText ? valueText(display) : String(display)
   const button = (delta: 1 | -1) => {
     const off = disabled || (delta < 0 ? display <= min : display >= max)
+    // Bloqueado pela previsão, não pelo controle: tocável, com cara de
+    // indisponível (o toque explica o motivo)
+    const soft = delta > 0 && !off && increase?.blocked === true
+    const describedBy =
+      web && delta > 0 && increase?.hintID
+        ? { 'aria-describedby': increase.hintID }
+        : {}
+    // No web, o "aria-disabled" do Pressable do react-native-web vem do
+    // `disabled` e sobrescreve o nosso; o `accessibilityDisabled` chega ao
+    // DOM como aria-disabled="true" sem tirar o toque nem o foco
+    // (createDOMProps 0.21). No app, os botões ficam fora do leitor de tela:
+    // quem diz a trava é a dica do controle ajustável.
+    const softWeb =
+      soft && web ? ({ accessibilityDisabled: true } as object) : {}
     return (
       <Pressable
         testID={testID ? `${testID}-${delta > 0 ? 'inc' : 'dec'}` : undefined}
@@ -122,15 +153,19 @@ export function Stepper({
               accessibilityLabel: `${delta > 0 ? 'Aumentar' : 'Diminuir'} ${label}`,
             }
           : { accessible: false, 'aria-hidden': true })}
+        {...describedBy}
         disabled={off}
+        {...softWeb}
         onPress={() => commit(value + delta)}
-        onLongPress={() => longPress(delta)}
+        // Segurar repetiria números que não vão valer
+        onLongPress={soft ? undefined : () => longPress(delta)}
         delayLongPress={HOLD_DELAY_MS}
         onPressOut={pressOut}
         style={[
           styles.button,
           big && styles.big,
           { borderColor: colors.borderControl },
+          soft && styles.blocked,
         ]}
       >
         <Text variant={big ? 'numberLg' : 'number'}>
@@ -153,6 +188,7 @@ export function Stepper({
         // ("7" de 0 a 1000 vira "1%").
         'aria-valuetext': spoken,
         'aria-disabled': disabled,
+        ...(increase?.hint ? { accessibilityHint: increase.hint } : {}),
         accessibilityActions: [
           { name: 'increment' },
           { name: 'decrement' },
@@ -221,6 +257,8 @@ const styles = StyleSheet.create({
     borderWidth: tokens.borderWidth.control,
   },
   big: { width: tokens.size.stepperSize, height: tokens.size.stepperSize },
+  // A mesma opacidade do Pressable desabilitado
+  blocked: { opacity: 0.5 },
   value: { minWidth: 32, textAlign: 'center' },
   valueTarget: { alignItems: 'center', justifyContent: 'center' },
   valueBig: { minWidth: 56 },

@@ -159,7 +159,7 @@ export interface StatusMenuDraft {
   readonly queued?: number
   // A crônica pede aprovação
   readonly approval?: boolean
-  // Linhas extras da confirmação (o P05-C põe a sobra de bônus, T-18)
+  // Linhas extras da confirmação: a sobra de bônus (T-18)
   readonly notes?: readonly string[]
 }
 
