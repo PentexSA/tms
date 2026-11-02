@@ -32,6 +32,9 @@ export interface StepperProps {
   // Tocar no valor (digitar o número). No web é um botão; no app, a ação
   // "activate" do controle ajustável (toque duplo do leitor de tela).
   readonly onValuePress?: () => void
+  // nativeID do botão "Digitar" (no web vira o id do elemento): quem abre o
+  // campo devolve o foco a ele ao fechar
+  readonly valueNativeID?: string
   // Rótulo visível acima do controle, para quando a tela não o mostra ao
   // lado. Fica fora da árvore de acessibilidade: o controle já tem o nome.
   readonly showLabel?: boolean
@@ -51,6 +54,7 @@ export function Stepper({
   size = 'inline',
   testID,
   onValuePress,
+  valueNativeID,
   showLabel = false,
 }: StepperProps) {
   const { colors } = useTheme()
@@ -178,6 +182,7 @@ export function Stepper({
       {typeable ? (
         <Pressable
           testID={testID ? `${testID}-value` : undefined}
+          nativeID={valueNativeID}
           {...(web
             ? {
                 accessibilityRole: 'button' as const,

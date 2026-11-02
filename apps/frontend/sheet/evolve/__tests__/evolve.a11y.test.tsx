@@ -172,3 +172,61 @@ describe('Editar: o Nome sem corretor (T-38)', () => {
     expect(name.props.spellCheck).toBe(false)
   })
 })
+
+describe('Digitar no web: Esc limpa a mensagem e o foco volta ao Digitar (T-25)', () => {
+  // O DOM do web, de mentira: o id do botão "Digitar" leva a um focus()
+  const focus = jest.fn()
+  const asked: string[] = []
+  const doc = globalThis as { document?: unknown }
+  const field = () => screen.getByLabelText('Força, de 1 a 5')
+
+  beforeEach(async () => {
+    focus.mockClear()
+    asked.length = 0
+    doc.document = {
+      getElementById: (id: string) => {
+        asked.push(id)
+        return { focus }
+      },
+    }
+    setOS('web')
+    await renderLive({ model, sheet: nova }, fakeServer(model, nova).post)
+    fireEvent(
+      screen.getByRole('radio', { name: 'Editar' }),
+      'keyDown',
+      keyDown(' ')
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Digitar Força' }))
+  })
+  afterEach(() => {
+    delete doc.document
+  })
+
+  it('Enter válido aplica e devolve o foco ao "Digitar Força"', () => {
+    fireEvent.changeText(field(), '4')
+    fireEvent(field(), 'submitEditing', { nativeEvent: { text: '4' } })
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(focus).toHaveBeenCalledTimes(1)
+    // O id pedido é o do botão que voltou à tela
+    const button = screen.getByRole('button', { name: 'Digitar Força' })
+    expect(asked).toEqual([button.props.nativeID])
+  })
+
+  it('Esc depois de um valor inválido: sem mensagem, foco no Digitar', () => {
+    fireEvent.changeText(field(), '3.5')
+    fireEvent(field(), 'submitEditing', { nativeEvent: { text: '3.5' } })
+    expect(screen.getByText('Digite um número inteiro de 1 a 5')).toBeTruthy()
+    expect(focus).not.toHaveBeenCalled()
+    fireEvent(field(), 'keyPress', { nativeEvent: { key: 'Escape' } })
+    expect(screen.queryByText('Digite um número inteiro de 1 a 5')).toBeNull()
+    expect(screen.getByText('Editando · 0 alterações')).toBeTruthy()
+    expect(focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('sair com Tab ou clique não mexe no foco (ele já foi para onde a pessoa quis)', () => {
+    fireEvent.changeText(field(), '3')
+    fireEvent(field(), 'blur', { nativeEvent: { text: '3' } })
+    expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+    expect(focus).not.toHaveBeenCalled()
+  })
+})

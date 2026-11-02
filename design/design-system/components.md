@@ -354,7 +354,7 @@ Edita qualquer número com − e +, um passo por toque.
 
 - **Classes:** `ds-stepper`, `__btn` (56, redondo), `__value` (`number-lg`), `__input` (campo numérico com borda `action`), `--inline` (botões de 44 e valor `number`).
 - **`ui.js`:** `stepper({ label, value, min, max, step, valueText, onChange, inline, allowInput, disabled, key })`, com `setValue(v)` para atualizar de fora.
-- **Comportamento:** 1 passo por toque, nunca salta; limita a `[min, max]` e desabilita − ou + no limite; segurar repete (depois de 400 ms, a cada 90 ms); com `allowInput`, tocar no número abre o teclado numérico (Enter confirma, Esc cancela; sair do campo também confirma, e abrir outro campo fecha este, que aplica o que foi digitado: um campo aberto por vez; só inteiro na faixa, e decimal recebe "Digite um número inteiro de {min} a {max}"; ao sair com valor inválido, o campo fecha sem aplicar e a mensagem fica); `data-key` devolve o foco depois de redesenhar.
+- **Comportamento:** 1 passo por toque, nunca salta; limita a `[min, max]` e desabilita − ou + no limite; segurar repete (depois de 400 ms, a cada 90 ms); com `allowInput`, tocar no número abre o teclado numérico (Enter confirma, Esc cancela; sair do campo também confirma, e abrir outro campo fecha este, que aplica o que foi digitado: um campo aberto por vez; só inteiro na faixa, e decimal recebe "Digite um número inteiro de {min} a {max}"; ao sair com valor inválido, o campo fecha sem aplicar e a mensagem fica; o Esc fecha sem aplicar e tira a mensagem; no web, Enter e Esc devolvem o foco ao botão "Digitar", via `valueNativeID`); `data-key` devolve o foco depois de redesenhar.
 - **API RN:**
 
   ```ts

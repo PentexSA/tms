@@ -106,8 +106,20 @@ test('T-25: Digitar aplica ao sair, um campo por vez, recusa decimal', async ({
   await expect(
     page.getByText('Digite um número inteiro de 1 a 5')
   ).toBeVisible()
+  // Esc fecha sem aplicar, tira a mensagem e devolve o foco ao "Digitar"
   await page.keyboard.press('Escape')
   await expect(page.getByText('Editando · 2 alterações')).toBeVisible()
+  await expect(page.getByText('Digite um número inteiro de 1 a 5')).toHaveCount(
+    0
+  )
+  const typeStrength = page.getByRole('button', { name: 'Digitar Força' })
+  await expect(typeStrength).toBeFocused()
+  // Enter válido também devolve o foco ao botão
+  await typeStrength.click()
+  await page.getByLabel('Força, de 1 a 5').fill('2')
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('Editando · 3 alterações')).toBeVisible()
+  await expect(typeStrength).toBeFocused()
 })
 
 test('T-42: "Oculta" da Mesa é um interruptor ligado que desliga', async ({

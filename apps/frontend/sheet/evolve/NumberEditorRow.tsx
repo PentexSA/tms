@@ -69,6 +69,26 @@ export function NumberEditorRow(props: FieldViewProps) {
   const done = useRef(true)
   // Sumir com o campo aberto (outra aba) não deixa o store apontando para cá
   useEffect(() => () => typingStore.close(instance), [instance])
+  // Enter e Esc desmontam o campo focado: no web, o foco volta ao "Digitar"
+  // (sem isso cairia no body). Ao sair com Tab ou clique, o foco já foi
+  // para onde a pessoa quis.
+  const valueId = `${instance}-digitar`
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (typing || !refocus.current) return
+    refocus.current = false
+    if (Platform.OS !== 'web') return
+    const doc = (
+      globalThis as {
+        document?: { getElementById?: (id: string) => unknown }
+      }
+    ).document
+    const button = doc?.getElementById?.(valueId) as
+      | { focus?: () => void }
+      | null
+      | undefined
+    button?.focus?.()
+  }, [typing, valueId])
   const range = rangeOf(props)
   if (!range) return null
   const def = resolved.field.def
@@ -89,11 +109,15 @@ export function NumberEditorRow(props: FieldViewProps) {
       if (how === 'submit') return
     }
     done.current = true
+    refocus.current = how === 'submit'
     typingStore.close(instance)
     if (n !== null) apply(n)
   }
+  // Esc: fecha sem aplicar e sem a mensagem de um valor que não vai valer
   const cancel = () => {
     done.current = true
+    refocus.current = true
+    setError(null)
     typingStore.close(instance)
   }
   const open = () => {
@@ -202,6 +226,7 @@ export function NumberEditorRow(props: FieldViewProps) {
           valueText={range.spoken}
           disabled={blocked !== null}
           onValuePress={blocked ? undefined : open}
+          valueNativeID={valueId}
         />
       )}
     </EditorShell>
