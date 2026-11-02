@@ -318,3 +318,58 @@ describe('a ficha de papel: Vantagens do Vampiro', () => {
     expect(xp.getByText('5')).toBeTruthy()
   })
 })
+
+describe('T-58: um título e um contador por bloco', () => {
+  const evolve = async (id: string) => {
+    const c = example(id)
+    const model = modelOf(c.system)
+    await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+  }
+
+  it('V20 no Editar: "Disciplinas" uma vez, com "3 itens" no cabeçalho do grupo', async () => {
+    await evolve('helena')
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getAllByText('Disciplinas')).toHaveLength(1)
+    expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
+    // A lista não repete o próprio cabeçalho ("Disciplinas 3")
+    const editor = within(screen.getByTestId('editor-disciplines'))
+    expect(editor.queryByText('Disciplinas')).toBeNull()
+    expect(screen.getByTestId('items-merits')).toHaveTextContent('1 item')
+  })
+
+  it('W20 no Editar: "Dons" uma vez (seção e grupo de mesmo nome); "Cicatrizes" fica com os dois títulos', async () => {
+    await evolve('iara')
+    const gifts = within(screen.getByTestId('section-gifts'))
+    expect(gifts.getAllByText('Dons')).toHaveLength(1)
+    expect(gifts.getByTestId('items-gifts')).toBeTruthy()
+    // Títulos diferentes ficam: seção e lista "Cicatrizes de batalha", grupo
+    // "Cicatrizes"
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    const scars = within(screen.getByTestId('section-battle-scars'))
+    expect(scars.getAllByText('Cicatrizes de batalha')).toHaveLength(2)
+    expect(scars.getByText('Cicatrizes')).toBeTruthy()
+    expect(scars.queryByTestId('items-battleScars')).toBeNull()
+  })
+
+  it('M20 no Editar: a Ressonância (lista fixa) mostra as linhas preenchidas', async () => {
+    await evolve('otto')
+    const resonance = within(screen.getByTestId('section-resonance'))
+    expect(resonance.getAllByText('Ressonância')).toHaveLength(1)
+    expect(resonance.getByTestId('items-resonance')).toHaveTextContent(
+      /^\d\/3$/
+    )
+  })
+
+  it('em Jogo, o cabeçalho da lista continua (abre o detalhe) e não há "N itens"', () => {
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    renderSheet(model, sheet)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getAllByText('Disciplinas')).toHaveLength(2)
+    expect(screen.queryByTestId('items-disciplines')).toBeNull()
+  })
+})

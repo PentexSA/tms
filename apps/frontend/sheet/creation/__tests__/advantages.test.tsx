@@ -68,13 +68,21 @@ const PRIORITIES = {
   abilities: ['talents', 'skills', 'knowledges'],
 }
 
-const character = (values: Record<string, unknown> = {}) =>
+interface Options {
+  readonly system?: 'vtm-v20' | 'wta-w20' | 'mta-m20'
+  readonly mode?: 'points' | 'free'
+}
+
+const character = (
+  values: Record<string, unknown> = {},
+  { system = 'vtm-v20', mode = 'points' }: Options = {}
+) =>
   ok({
     id: ID,
     name: 'Nova',
     chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
     owner: { id: 'u1', username: 'dona' },
-    systemCode: 'vtm-v20',
+    systemCode: system,
     templateVersion: '1.0.0',
     sheetVersion: 1,
     roles: ['owner'],
@@ -83,24 +91,32 @@ const character = (values: Record<string, unknown> = {}) =>
     member: true,
     updatedAt: '2026-10-18T12:00:00Z',
     sheet: {
-      values: { name: 'Nova', clan: 'tremere', ...values },
+      values: {
+        name: 'Nova',
+        ...(system === 'vtm-v20' ? { clan: 'tremere' } : {}),
+        ...values,
+      },
       specialties: {},
     },
     creation: {
       revision: 1,
-      mode: 'points',
+      mode,
       accounting: true,
       choices: { priorities: PRIORITIES },
       config: {},
-      effective: effectiveCreationConfig(vtm),
+      effective: effectiveCreationConfig(
+        system === 'vtm-v20' ? vtm : modelOf(system)
+      ),
       returned: null,
       approval: false,
     },
   })
 
-async function open(values?: Record<string, unknown>) {
-  calls.characterGet.mockResolvedValue(character(values))
-  calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+async function open(values?: Record<string, unknown>, options: Options = {}) {
+  calls.characterGet.mockResolvedValue(character(values, options))
+  calls.templateGet.mockResolvedValue(
+    ok(templateJson(options.system ?? 'vtm-v20'))
+  )
   const { session } = testSession(
     () => json(200, tokens()),
     memoryStore(true, 'r')
@@ -110,8 +126,8 @@ async function open(values?: Record<string, unknown>) {
     <SheetScreen id={ID} initialMode="create" />,
     session
   )
-  await screen.findByRole('tab', { name: 'Orçamento' })
-  fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+  // A criação livre não tem a aba Orçamento
+  fireEvent.press(await screen.findByRole('tab', { name: 'Vantagens' }))
   return view
 }
 
@@ -265,5 +281,47 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(alertsIn('add-sheet-disciplines')[0]).toHaveTextContent(
       /Disciplinas/
     )
+  })
+})
+
+describe('T-58: um título e um contador por bloco, na criação', () => {
+  it('V20 por pontos: "Disciplinas" uma vez, com a conta "0/3"', async () => {
+    await open()
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.getAllByText('Disciplinas')).toHaveLength(1)
+    expect(screen.getByTestId('counter-disciplines')).toHaveTextContent('0/3')
+    expect(screen.queryByTestId('items-disciplines')).toBeNull()
+    // Qualidades fora dos orçamentos: o contador é o da lista, com unidade
+    expect(screen.getByTestId('items-merits')).toHaveTextContent('0 itens')
+  })
+
+  it('W20 por pontos: "Dons" uma vez, com "0/3"', async () => {
+    await open({}, { system: 'wta-w20' })
+    const gifts = within(screen.getByTestId('section-gifts'))
+    expect(gifts.getAllByText('Dons')).toHaveLength(1)
+    expect(gifts.getAllByText('0/3')).toHaveLength(1)
+  })
+
+  it('M20 por pontos: "7/7" uma vez nos Antecedentes', async () => {
+    await open(
+      {
+        backgrounds: [
+          { id: 'b1', name: 'Avatar', value: 3 },
+          { id: 'b2', name: 'Biblioteca', value: 2 },
+          { id: 'b3', name: 'Aliados', value: 2 },
+        ],
+      },
+      { system: 'mta-m20' }
+    )
+    const backgrounds = within(screen.getByTestId('section-backgrounds'))
+    expect(backgrounds.getAllByText('Antecedentes')).toHaveLength(1)
+    expect(backgrounds.getAllByText('7/7')).toHaveLength(1)
+  })
+
+  it('criação livre: "3 itens" no lugar do número sem unidade', async () => {
+    await open(THREE, { mode: 'free' })
+    expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
+    const advantages = within(screen.getByTestId('groups-advantages'))
+    expect(advantages.queryByText('3')).toBeNull()
   })
 })

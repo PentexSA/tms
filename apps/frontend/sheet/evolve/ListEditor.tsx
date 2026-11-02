@@ -12,6 +12,7 @@ import {
 } from '@tms/ui'
 import { useState } from 'react'
 import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
+import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
   ItemLine,
@@ -61,6 +62,8 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const issue = useFieldIssue(resolved.id)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  // O cabeçalho do bloco já diz o nome e a conta da lista (T-58)
+  const headed = useHeadedList(resolved.id)
   if (resolved.type !== 'list') return null
   const list: ResolvedList = resolved
   const def = list.field.def
@@ -88,7 +91,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const border = { borderBottomColor: colors.borderSubtle }
   return (
     <View testID={`editor-${list.id}`} style={styles.wrap}>
-      <ListHeader resolved={list} sheet={sheet} />
+      {headed ? null : <ListHeader resolved={list} sheet={sheet} />}
       {list.items.map(item => (
         <Pressable
           key={item.id}
