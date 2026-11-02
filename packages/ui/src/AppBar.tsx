@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
 import { useTheme } from './theme'
@@ -41,15 +40,16 @@ export interface AppBarProps {
   readonly actions?: ReactNode
 }
 
+// A safe area de cima é do `Screen` (T-37): a barra fica sempre dentro de
+// um, que já soma o inset. Somar aqui de novo deixava uma faixa vazia de
+// 47 a 59 pt acima do cabeçalho no iPhone e no Android edge-to-edge.
 export function AppBar({ title, back, actions }: AppBarProps) {
   const { colors } = useTheme()
-  const insets = useInsets()
   return (
     <View
       style={[
         styles.bar,
         {
-          paddingTop: insets.top,
           backgroundColor: colors.bg,
           borderBottomColor: colors.borderSubtle,
         },

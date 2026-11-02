@@ -561,6 +561,7 @@ Recursos de combate na zona do polegar, com valor visível.
 
 - **Classes:** `ds-dock` (fixo embaixo, `surface-raised`, `elevation-2`, safe area, `layer-dock`), `__handle` ("Todos os recursos"), `__row` (3 chips + Dados), `ds-dock-chip` (56; rótulo curto + valor tabular), `__label`, `__value`, `--action` (Dados em `action`, foco `focus-on-action`). Com `.is-stacked`, 2 colunas. A partir de 600 o dock some e o painel "Em jogo" (`p-play-panel`, protótipo; proposta de `PlayPanel` no core) mostra os mesmos campos.
 - **Valor com forma:** mini-trilha + penalidade, "9/15", amostras cheia e hachurada da roda + números, "1º 3/4", nome da forma.
+- **Safe area no app:** o dock fica dentro do `Screen`, que já soma o inset de baixo; o dock não soma de novo (T-37, onda 2). Abaixo dele, na área do indicador de início, aparece o fundo da tela.
 - **Comportamento:** toque abre o sheet; **toque longo (500 ms)** executa a `defaultAction` (`spend1`, `gain1`, `damage1`, `use1`) com toast e háptico; "Todos os recursos" abre a lista da zona `play`. Puxar o dock para cima: proposta.
 - **API RN:**
 
@@ -709,6 +710,7 @@ Barra de topo das telas de lista e voltar como alvo único.
 - **Classes:** `ds-appbar` (sticky, safe area, borda inferior), `ds-appbar__title` (`h1` com reticências), `ds-back` (chevron + nome, 44).
 - **Usos:** Crônicas, Mesa e estados de erro da ficha ("‹ Noites de São Paulo").
 - **API RN:** `{ title: string; back?: { label: string; onPress(): void }; actions?: ReactNode }`.
+- **Safe area:** a barra fica sempre dentro de um `Screen`, que soma o inset de cima uma vez. A barra não soma de novo (T-37, onda 2).
 - **Estados:** estático.
 - **A11y:** voltar com texto visível; título `h1`.
 - **Multi-sistema:** o rótulo do voltar é o nome da crônica, seja de Vampiro ("Noites de São Paulo") ou de CoC ("Sombras sobre Ouro Preto").
