@@ -293,6 +293,61 @@ describe('/events: avaliação parcial', () => {
     expect(over.status).toBe(200)
     expect((await send(id, storyteller, 'dex', 3, 5)).status).toBe(422)
   })
+
+  // As listas (P07-C): o app grava o valor que o editor mostra e mostra a
+  // recusa na folha, mas quem decide continua sendo o servidor.
+  const listOf = async (id: string, field: string) =>
+    ((await row(id)).sheet_data as { values: Record<string, unknown> }).values[
+      field
+    ]
+
+  it('Qualidade sem custo é recusada e não entra', async () => {
+    const id = await character()
+    await choose(id)
+    const res = await send(id, owner, 'merits', null, [
+      { id: 'm1', name: 'Ambidestro' },
+    ])
+    expect(res.status).toBe(422)
+    expect(await json(res)).toMatchObject({
+      code: 'CREATION_BUDGET_EXCEEDED',
+      problems: [{ code: 'CREATION_NOT_PURCHASABLE', severity: 'blocking' }],
+    })
+    expect(await listOf(id, 'merits')).toBeUndefined()
+  })
+
+  it('Qualidade com custo acima do saldo é recusada e não entra', async () => {
+    const id = await character()
+    await choose(id)
+    // 10 de 10 bônus em Destreza 3 → 5
+    expect((await send(id, owner, 'dex', 3, 5)).status).toBe(200)
+    const res = await send(id, owner, 'merits', null, [
+      { id: 'm1', name: 'Ambidestro', meta: { cost: 1 } },
+    ])
+    expect(res.status).toBe(422)
+    expect(await json(res)).toMatchObject({
+      code: 'CREATION_BUDGET_EXCEEDED',
+      problems: [{ code: 'CREATION_FREEBIES_EXCEEDED', severity: 'blocking' }],
+    })
+    expect(await listOf(id, 'merits')).toBeUndefined()
+  })
+
+  it('tirar o Defeito depois de gastar o crédito é recusado', async () => {
+    const id = await character()
+    await choose(id)
+    const flaw = [{ id: 'f1', name: 'Inimigo', meta: { bonus: 3 } }]
+    expect((await send(id, owner, 'flaws', null, flaw)).status).toBe(200)
+    // 10 do saldo e 3 do crédito: Destreza a 5 e uma Qualidade de 3
+    expect((await send(id, owner, 'dex', 3, 5)).status).toBe(200)
+    const merit = [{ id: 'm1', name: 'Ambidestro', meta: { cost: 3 } }]
+    expect((await send(id, owner, 'merits', null, merit)).status).toBe(200)
+    const res = await send(id, owner, 'flaws', flaw, [])
+    expect(res.status).toBe(422)
+    expect(await json(res)).toMatchObject({
+      code: 'CREATION_BUDGET_EXCEEDED',
+      problems: [{ code: 'CREATION_FREEBIES_EXCEEDED', severity: 'blocking' }],
+    })
+    expect(await listOf(id, 'flaws')).toEqual(flaw)
+  })
 })
 
 describe('concluir, aprovar e devolver', () => {

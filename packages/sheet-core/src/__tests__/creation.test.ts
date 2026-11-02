@@ -246,6 +246,21 @@ describe('checkCreation: bônus', () => {
     })
   })
 
+  it('Defeito sem bonus dá crédito 0 (o app grava o mínimo, T-23)', () => {
+    // O servidor conta o que recebe: o item sem meta não devolve ponto
+    const c = check({ flaws: [{ id: 'f1', name: 'D' }] })
+    expect(c.freebies).toEqual({
+      available: 10,
+      credit: 0,
+      spent: 0,
+      remaining: 10,
+    })
+    expect(c.lines.find(l => l.id === 'flaws')).toMatchObject({
+      units: 0,
+      cost: 0,
+    })
+  })
+
   it('tirar o Defeito depois de gastar o crédito estoura', () => {
     // 10 de bônus nos Físicos e 2 na Moral, com 3 de crédito: 12 de 13
     const spending = {
