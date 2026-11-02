@@ -159,11 +159,14 @@ test('T-04: "Salvar e sair" grava e sai; Esc fica na ficha', async ({
 
   // A 390, em coluna: "Descartar e sair" em cima, "Salvar e sair" embaixo
   await back.click()
-  const discard = await box(
-    page.getByRole('button', { name: 'Descartar e sair' })
-  )
+  const discard = page.getByRole('button', { name: 'Descartar e sair' })
   const saveAndLeave = page.getByRole('button', { name: 'Salvar e sair' })
-  expect((await box(saveAndLeave)).y).toBeGreaterThan(discard.y)
+  // A folha ainda sobe durante a animação de entrada: as duas medidas têm de
+  // ser da mesma leitura, e repetidas até ela terminar. O "Descartar" vem
+  // primeiro: subindo, o movimento só diminui a diferença, não a inventa
+  await expect
+    .poll(async () => (await box(saveAndLeave)).y - (await box(discard)).y)
+    .toBeGreaterThan(0)
   const saved = eventsSaved(page, id)
   await saveAndLeave.click()
   expect((await saved).status()).toBe(200)
