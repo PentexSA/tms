@@ -426,7 +426,7 @@ describe('rascunho guardado no aparelho', () => {
       async (): Promise<PostOutcome> => ({ status: 200, body: null })
     )
     await editThree(drafts, { outbox, post })
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     // O lote ainda não está no outbox: o registro fica
     await act(async () => {
@@ -449,7 +449,7 @@ describe('rascunho guardado no aparelho', () => {
       async (): Promise<PostOutcome> => ({ status: 0, body: null })
     )
     const first = await editThree(drafts, { outbox, post: offline })
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     await waitFor(async () => expect(await saved(drafts)).toBe(0))
     expect(await outbox.characters()).toEqual([ID])
@@ -557,7 +557,7 @@ describe('rascunho guardado no aparelho', () => {
       })
     )
     await editThree(drafts, { post })
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
     expect(
       await screen.findByLabelText(/^Sincronização: (Salvando…|Salvo)$/)

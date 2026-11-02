@@ -788,7 +788,7 @@ describe('a barra de modos não remonta a ficha quando a política muda', () => 
     fireEvent.press(screen.getByRole('button', { name: 'Conceito' }))
     fireEvent.changeText(textInput('Conceito'), 'Arquivista')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    fireEvent.press(screen.getByRole('button', { name: 'Concluir' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(screen.getByText('Salvar 1 alteração?')).toBeTruthy()
 
     const refetch = async (lockedAt: string | null) => {

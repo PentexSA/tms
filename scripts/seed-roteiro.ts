@@ -21,12 +21,26 @@
 // entra: recebe um convite para usar no V5-22. J1 e J2 não ganham ficha,
 // porque o roteiro começa com eles criando as deles.
 //
+// --fichas-criacao (opcional, onda 3: doc/planos-pacotes/onda-3.md §4.9):
+// cria pela API as fichas de J1 que os roteiros manuais da onda 3 montariam
+// pela tela, com as sessões que o seed já abre, sem convite nem crônica nova
+// (o limite de aceites não muda). Só dados fictícios:
+//   - P03-D: "Isadora Web/Android/iOS" em "Vampiro v4", com as prioridades e
+//     todos os pontos básicos menos 1 de Vigor, e "Otto Web/Android/iOS" em
+//     "Vampiro v3/v5", só com nome e clã;
+//   - P04-D: "Ficha Livre R" ("Vampiro v3/v5") e "Ficha Pontos R" ("Vampiro
+//     v4"), só com o nome; a aprovação ligada em "Mago v4" e a "Ficha
+//     Aprovação R" lá, com a conta fechada (não enviada);
+//   - P09-C: "Ficha XP R" em "Vampiro v3/v5", concluída pelo N, com 10 de XP
+//     e um pedido de XP pendente (Força).
+//
 // S-04: por padrão o seed não precisa da API no ar nem de TRUST_PROXY. Ele
 // monta a API em processo (createApp, a mesma dos testes), uma instância por
 // conta: cada uma tem o próprio rate limiter em memória com os limites
 // padrão, então nenhum limite muda e o seed não depende do IP do cliente.
 // Precisa só do banco migrado (as migrations já gravam os templates do
 // produto).
+import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { checkDevEnv } from './check-dev-env.mjs'
@@ -62,11 +76,90 @@ export interface SeedOptions {
   keep?: boolean
   /** Hora local usada no nome das crônicas. */
   now?: () => Date
+  /** --fichas-criacao: as fichas de J1 dos roteiros manuais da onda 3. */
+  creationSheets?: boolean
 }
 
 export interface SeedResult {
   accounts: { key: Key; role: string; email: string }[]
   chronicles: { name: string; use: string; n2Invite?: string }[]
+  /** As fichas do --fichas-criacao (vazio sem a opção). */
+  sheets: { name: string; chronicle: string; state: string }[]
+}
+
+// As prioridades da criação por pontos (V20 e M20 usam os mesmos grupos)
+const PRIORITIES = {
+  attributes: ['physical', 'social', 'mental'],
+  abilities: ['talents', 'skills', 'knowledges'],
+}
+
+// V20: todos os pontos básicos menos 1 de Vigor (o ALMOST do Jest e do E2E)
+const V20_ALMOST: Record<string, unknown> = {
+  strength: 4,
+  dexterity: 3,
+  stamina: 2,
+  charisma: 3,
+  manipulation: 3,
+  appearance: 2,
+  perception: 2,
+  intelligence: 2,
+  wits: 2,
+  alertness: 3,
+  athletics: 3,
+  awareness: 3,
+  brawl: 3,
+  empathy: 1,
+  animalKen: 3,
+  crafts: 3,
+  drive: 3,
+  academics: 3,
+  computer: 2,
+  disciplines: [
+    { id: 'd1', name: 'Taumaturgia', value: 2 },
+    { id: 'd2', name: 'Auspícios', value: 1 },
+  ],
+  backgrounds: [
+    { id: 'b1', name: 'Recursos', value: 3 },
+    { id: 'b2', name: 'Mentor', value: 2 },
+  ],
+  conscience: 4,
+  selfControl: 3,
+  courage: 3,
+}
+
+// M20: a conta fechada (Atributos 7/5/3, Habilidades 13/9/5 até 3,
+// Antecedentes 7, Esferas 6 até a Arete), com os 15 de bônus livres
+const M20_CLOSED: Record<string, unknown> = {
+  strength: 3,
+  dexterity: 3,
+  stamina: 4,
+  charisma: 3,
+  manipulation: 2,
+  appearance: 3,
+  perception: 2,
+  intelligence: 2,
+  wits: 2,
+  alertness: 3,
+  athletics: 3,
+  awareness: 3,
+  brawl: 2,
+  empathy: 2,
+  crafts: 3,
+  drive: 3,
+  meditation: 3,
+  academics: 2,
+  occult: 3,
+  backgrounds: [
+    { id: 'b1', name: 'Avatar', value: 3 },
+    { id: 'b2', name: 'Recursos', value: 2 },
+    { id: 'b3', name: 'Mentor', value: 2 },
+  ],
+  correspondence: 1,
+  entropy: 1,
+  forces: 1,
+  life: 1,
+  matter: 1,
+  mind: 1,
 }
 
 interface Session {
@@ -219,6 +312,125 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
   const join = (user: Session, code: string) =>
     must(user, 'POST', '/invites/accept', { code })
 
+  const newSheet = (
+    user: Session,
+    chronicleId: string,
+    values: Record<string, unknown>
+  ) =>
+    must<{ id: string }>(
+      user,
+      'POST',
+      `/chronicles/${chronicleId}/characters`,
+      {
+        values,
+      }
+    )
+
+  /** Prioridades e pontos pela API, como o app gravaria (o servidor confere). */
+  async function prepare(
+    user: Session,
+    id: string,
+    values: Record<string, unknown>
+  ) {
+    await must(user, 'PATCH', `/characters/${id}/creation`, {
+      revision: 0,
+      choices: { priorities: PRIORITIES },
+    })
+    await must(user, 'POST', `/characters/${id}/events`, {
+      clientBatchId: randomUUID(),
+      events: Object.entries(values).map(([k, to]) => ({
+        path: `values.${k}`,
+        from: null,
+        to,
+      })),
+    })
+  }
+
+  // --fichas-criacao: as fichas de J1 dos roteiros manuais da onda 3
+  async function creationSheets(
+    N: Session,
+    J1: Session,
+    chronicle: (
+      label: string,
+      use: 'v3/v5' | 'v4'
+    ) => { id: string; name: string }
+  ): Promise<SeedResult['sheets']> {
+    const sheets: SeedResult['sheets'] = []
+    const vampFree = chronicle('Vampiro', 'v3/v5')
+    const vampPoints = chronicle('Vampiro', 'v4')
+    const mage = chronicle('Mago', 'v4')
+    // P03-D: uma ficha por plataforma
+    for (const platform of ['Web', 'Android', 'iOS']) {
+      const isadora = await newSheet(J1, vampPoints.id, {
+        name: `Isadora ${platform}`,
+        clan: 'tremere',
+      })
+      await prepare(J1, isadora.id, V20_ALMOST)
+      sheets.push({
+        name: `Isadora ${platform}`,
+        chronicle: vampPoints.name,
+        state: 'criação por pontos, falta 1 de Vigor',
+      })
+      await newSheet(J1, vampFree.id, {
+        name: `Otto ${platform}`,
+        clan: 'brujah',
+      })
+      sheets.push({
+        name: `Otto ${platform}`,
+        chronicle: vampFree.name,
+        state: 'criação livre, só nome e clã',
+      })
+    }
+    // P04-D
+    await newSheet(J1, vampFree.id, { name: 'Ficha Livre R' })
+    sheets.push({
+      name: 'Ficha Livre R',
+      chronicle: vampFree.name,
+      state: 'criação livre, só o nome',
+    })
+    await newSheet(J1, vampPoints.id, { name: 'Ficha Pontos R' })
+    sheets.push({
+      name: 'Ficha Pontos R',
+      chronicle: vampPoints.name,
+      state: 'criação por pontos, só o nome',
+    })
+    await must(N, 'PATCH', `/chronicles/${mage.id}/creation-settings`, {
+      revision: 0,
+      approval: true,
+    })
+    const approval = await newSheet(J1, mage.id, { name: 'Ficha Aprovação R' })
+    await prepare(J1, approval.id, M20_CLOSED)
+    sheets.push({
+      name: 'Ficha Aprovação R',
+      chronicle: `${mage.name} (aprovação ligada)`,
+      state: 'conta fechada, não enviada',
+    })
+    // P09-C: concluída pelo N (criação livre), com 10 de XP e um pedido
+    const xp = await newSheet(J1, vampFree.id, {
+      name: 'Ficha XP R',
+      clan: 'tremere',
+    })
+    await must(N, 'POST', `/characters/${xp.id}/creation/complete`, {
+      clientCommandId: randomUUID(),
+    })
+    await must(N, 'POST', `/chronicles/${vampFree.id}/xp`, {
+      clientOperationId: randomUUID(),
+      amount: 10,
+      reason: 'Sessão do roteiro',
+      targets: [{ characterId: xp.id }],
+    })
+    await must(J1, 'POST', `/characters/${xp.id}/xp-requests`, {
+      clientRequestId: randomUUID(),
+      field: 'strength',
+    })
+    sheets.push({
+      name: 'Ficha XP R',
+      chronicle: vampFree.name,
+      state: 'concluída, 10 de XP, pedido de Força pendente',
+    })
+    return sheets
+  }
+
   // As crônicas completas desta rodada: com um 429 no meio, o seed diz
   // quantas ficaram prontas
   const rows: SeedResult['chronicles'] = []
@@ -246,9 +458,11 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
       .toLocaleString('sv-SE')
       .slice(5, 16)
 
+    const created = new Map<string, { id: string; name: string }>()
     for (const s of SYSTEMS) {
       for (const use of ['v3/v5', 'v4'] as const) {
         const c = await createChronicle(N, `${s.label} ${use} · ${tag}`, s.code)
+        created.set(`${s.label} ${use}`, c)
         // A v3 e a v5 não tratam da conta por pontos: criação livre, e o
         // narrador conclui. A v4 fica no padrão do template, por pontos
         if (use === 'v3/v5') await freeCreation(N, c.id)
@@ -280,6 +494,14 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
     }
     rows.push({ name: crowd.name, use: 'V3-10 (21 fichas)' })
 
+    const sheets = o.creationSheets
+      ? await creationSheets(N, by('J1'), (label, use) => {
+          const c = created.get(`${label} ${use}`)
+          if (!c) throw new Error(`crônica ${label} ${use} não criada`)
+          return c
+        })
+      : []
+
     return {
       accounts: ACCOUNTS.map(a => ({
         key: a.key,
@@ -287,6 +509,7 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
         email: by(a.key).email,
       })),
       chronicles: rows,
+      sheets,
     }
   } catch (e) {
     if (!(e instanceof RateLimited)) throw e
@@ -365,6 +588,7 @@ async function main() {
       base,
       remote: Boolean(remote),
       keep: process.argv.includes('--keep'),
+      creationSheets: process.argv.includes('--fichas-criacao'),
     })
     console.log(
       `\nAPI: ${remote ?? 'em processo'}\nSenha de todas as contas: ${PASSWORD}\n`
@@ -377,6 +601,11 @@ async function main() {
       console.log(
         `- ${r.name}  [${r.use}]${r.n2Invite ? `  convite N2: ${r.n2Invite}` : ''}`
       )
+    if (result.sheets.length) {
+      console.log('\nFichas de J1 (--fichas-criacao):')
+      for (const f of result.sheets)
+        console.log(`- ${f.name}  [${f.chronicle}]  ${f.state}`)
+    }
     console.log()
   } finally {
     await close()
