@@ -39,6 +39,7 @@ async function pointsChronicle(browser: Browser, player: BrowserContext) {
     'POST',
     `/chronicles/${chronicle.id}/invites`
   )
+  await desk.close()
   const user = await signUp(player, 'joga_conta')
   await apiAs(player, user, 'POST', '/invites/accept', { code })
   return { chronicleId: chronicle.id, user }
