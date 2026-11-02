@@ -319,8 +319,12 @@ describe('T-11: o cabeçalho da ficha cabe na tela', () => {
     resize(DESKTOP)
     await openSheet(['owner'], 'active')
     expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Histórico' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Experiência' })).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Histórico' }))
+    expect(
+      screen.getByRole('header', { name: 'Histórico de alterações' })
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Experiência' }))
+    expect(screen.getByRole('header', { name: 'Experiência' })).toBeTruthy()
   })
 
   it('a ficha revelada (viewer) não ganha o menu', async () => {
