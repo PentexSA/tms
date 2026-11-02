@@ -168,6 +168,18 @@ export class Session {
    * chamada com rede renova a sessão ou, se o servidor recusar, sai.
    */
   async restore(): Promise<void> {
+    try {
+      await this.#restore()
+    } catch {
+      // Falha segura: sem ler o armazenamento seguro (Keychain ou Keystore
+      // indisponível), a sessão não volta e o app pede login, em vez de ficar
+      // preso em "carregando" para sempre
+      if (this.#state.status === 'loading')
+        this.#set({ status: 'signedOut', user: null })
+    }
+  }
+
+  async #restore(): Promise<void> {
     // Logout que não chegou ao servidor: revoga antes de tudo e nunca renova
     if (await this.#activeSessionIsPending()) {
       await this.#clearLocal()
