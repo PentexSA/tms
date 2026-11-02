@@ -42,19 +42,20 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
   // O jogador monta um rascunho de 7 alterações, com o Senhor
   await page.goto(`/characters/${character.id}?mode=evolve`)
   await expect(page.getByText('Editando · 0 alterações')).toBeVisible()
-  for (const trait of [
-    'Força',
-    'Destreza',
-    'Vigor',
-    'Carisma',
-    'Manipulação',
-    'Raciocínio',
-  ])
-    await page
-      .getByRole('button', { name: `Aumentar ${trait}`, exact: true })
-      .click()
+  // A 390 px, cada grupo de Atributos fica numa aba
+  for (const [group, traits] of [
+    ['Físicos', ['Força', 'Destreza', 'Vigor']],
+    ['Sociais', ['Carisma', 'Manipulação']],
+    ['Mentais', ['Raciocínio']],
+  ] as const) {
+    await page.getByRole('tab', { name: group, exact: true }).click()
+    for (const trait of traits)
+      await page
+        .getByRole('button', { name: `Aumentar ${trait}`, exact: true })
+        .click()
+  }
   await page.getByRole('button', { name: /^Senhor: / }).click()
-  await page.getByLabel('Senhor').fill('Meerlinda')
+  await page.getByRole('textbox', { name: 'Senhor' }).fill('Meerlinda')
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
@@ -84,14 +85,17 @@ test('conflito no Senhor: só ele fica marcado, com os dois valores; as outras 6
   await expect(page.getByRole('button', { name: 'Reaplicar' })).toHaveCount(0)
   await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
-  // T-12: a 390 px, o texto fica legível e o botão desce para baixo dele
+  // T-12: a 390 px, o texto fica legível (pelo menos 200 px) e a ação não o
+  // espreme: fica ao lado, quando cabe (só "Revisar", depois do T-31), ou
+  // desce para baixo dele. Antes, a coluna do texto tinha ~25 px
   const text = await message.boundingBox()
   const review = page.getByRole('button', { name: 'Revisar' })
   const button = await review.boundingBox()
-  expect(text?.width ?? 0).toBeGreaterThanOrEqual(200)
-  expect(button?.y ?? 0).toBeGreaterThanOrEqual(
-    (text?.y ?? 0) + (text?.height ?? 0) - 1
-  )
+  if (!text || !button) throw new Error('faixa de conflito sem caixa')
+  expect(text.width).toBeGreaterThanOrEqual(200)
+  const beside = button.x >= text.x + text.width - 1
+  const below = button.y >= text.y + text.height - 1
+  expect(beside || below).toBe(true)
 
   // "Revisar": os dois valores, e a escolha na mesma linha
   await review.click()
