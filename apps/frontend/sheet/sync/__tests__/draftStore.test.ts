@@ -190,11 +190,30 @@ describe('o que vem do disco é hostil: descartado e apagado', () => {
     ).not.toBeNull()
   })
 
-  it('o registro inválido nem é gravado; o anterior fica', async () => {
+  // Achado do /code-review: o disco ficava com um retrato velho
+  it('o registro que não cabe não é gravado, e o anterior sai (sem retrato velho)', async () => {
     const { drafts } = setup()
-    await drafts.write(record())
-    await drafts.write(record({ savedAt: NOW + 1 }))
-    expect(await drafts.read(C1)).toEqual(record())
+    expect(await drafts.write(record())).toBe(true)
+    const big = record({
+      edits: Array.from({ length: 51 }, (_, i) => ({
+        path: `values.f${i}`,
+        from: 0,
+        to: 1,
+      })),
+    })
+    expect(await drafts.write(big)).toBe(false)
+    expect(await drafts.read(C1)).toBeNull()
+    expect(drafts.count.getSnapshot()).toBe(0)
+  })
+
+  it('um lote no limite de bytes da API cabe no registro, com os metadados', async () => {
+    const { drafts } = setup()
+    // Um evento de texto que deixa o lote perto dos 64 KiB
+    const atLimit = record({
+      edits: [{ path: 'values.notes', from: null, to: 'x'.repeat(65_400) }],
+    })
+    expect(await drafts.write(atLimit)).toBe(true)
+    expect((await drafts.read(C1))?.edits).toHaveLength(1)
   })
 
   it('sweep apaga o que venceu e o que está quebrado', async () => {

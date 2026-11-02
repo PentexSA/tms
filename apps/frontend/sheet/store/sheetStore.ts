@@ -11,6 +11,7 @@ import {
   type Issue,
   invert,
   jsonEqual,
+  MAX_EVENTS_PER_BATCH,
   parsePath,
   parseSheet,
   type ResolvedField,
@@ -25,7 +26,13 @@ import {
 import { randomUUID } from 'expo-crypto'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { type CreationPhase, draftRefusal } from '../creation/creation'
-import { checkLimits, OutboxLimitError, type QueuedBatch } from '../sync/outbox'
+import {
+  batchBytes,
+  checkLimits,
+  MAX_BATCH_BYTES,
+  OutboxLimitError,
+  type QueuedBatch,
+} from '../sync/outbox'
 import type { RestorePlan } from './draftRestore'
 
 // Um store por ficha aberta (doc/arquitetura §6.5):
@@ -310,6 +317,22 @@ function issuesByField(
 
 const NO_ISSUES: ReadonlyMap<FieldId, string> = new Map()
 
+const NO_BATCH = '00000000-0000-4000-8000-000000000000'
+
+/** Por que o rascunho não cabe num lote (50 eventos, 64 KiB), ou null. */
+export function draftLimit(draft: Draft): string | null {
+  if (draft.size > MAX_EVENTS_PER_BATCH)
+    return `Até ${MAX_EVENTS_PER_BATCH} alterações por vez: salve antes de continuar.`
+  const events = [...draft].map(([path, e]) => ({
+    path,
+    from: e.from,
+    to: e.to,
+  }))
+  if (batchBytes({ clientBatchId: NO_BATCH, events }) > MAX_BATCH_BYTES)
+    return 'As alterações ficaram grandes demais para um envio: salve antes de continuar.'
+  return null
+}
+
 export const valueAt = (sheet: SheetData, path: string): unknown => {
   const p = parsePath(path)
   if (!p) return null
@@ -474,6 +497,10 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         if (jsonEqual(from, e.to)) draft.delete(e.path)
         else draft.set(e.path, { from, to: e.to })
       }
+      // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
+      // o que não cabe num "Salvar" também não caberia no aparelho
+      const tooBig = draftLimit(draft)
+      if (tooBig) return failure('limit', tooBig, events[0]?.path ?? '')
       // Mexeu no campo: a recusa anterior do servidor deixa de valer
       let fieldIssues = s.fieldIssues
       for (const e of events) {

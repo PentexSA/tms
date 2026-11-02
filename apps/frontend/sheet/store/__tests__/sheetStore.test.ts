@@ -3,7 +3,12 @@ import { clone, example, modelOf, sheetFor } from '../../../test/fixtures'
 import type { DraftRecord } from '../../sync/draftStore'
 import { MAX_PENDING_PER_CHARACTER } from '../../sync/outbox'
 import { planDraftRestore } from '../draftRestore'
-import { createSheetStore, fieldOfIssuePath, MAX_UNDO } from '../sheetStore'
+import {
+  createSheetStore,
+  draftLimit,
+  fieldOfIssuePath,
+  MAX_UNDO,
+} from '../sheetStore'
 
 // Etapa 16: o SheetStore (doc/arquitetura §6.5): otimista, confirmação,
 // rejeição, conflito, Desfazer e o rascunho de Evoluir.
@@ -894,5 +899,65 @@ describe('a política manda no que volta para a edição', () => {
       draft: true,
       draftMeta: { templateVersion: model.version, mode: 'evolve' },
     })
+  })
+})
+
+// Achado do /code-review: o rascunho não passa do lote que a API aceita
+describe('limite do rascunho', () => {
+  it('a 51ª alteração é recusada com o motivo; as 50 continuam', () => {
+    const { s } = setup(['owner', 'storyteller'])
+    s().setMode('evolve')
+    s().startDraft()
+    // Traços e as especializações deles: mais de 50 caminhos
+    const ratings = [...model.fields.values()].filter(
+      f => f.def.type === 'rating' && !f.readOnly
+    )
+    const edits: [string, (before: unknown) => unknown][] = [
+      ...ratings.map(
+        f =>
+          [
+            `values.${f.id}`,
+            (before: unknown) =>
+              typeof before === 'number' && before > 1 ? before - 1 : 2,
+          ] as [string, (before: unknown) => unknown]
+      ),
+      ...ratings
+        .filter(f => (f.def as { specialty?: boolean }).specialty)
+        .map(
+          f =>
+            [`specialties.${f.id}`, () => 'Treino'] as [
+              string,
+              (before: unknown) => unknown,
+            ]
+        ),
+    ]
+    expect(edits.length).toBeGreaterThan(50)
+    let refused: ReturnType<ReturnType<typeof s>['setDraftValue']> = null
+    for (const [path, next] of edits) {
+      const [scope, id] = path.split('.') as ['values' | 'specialties', string]
+      const bucket = (s().values[scope] ?? {}) as Record<string, unknown>
+      const r = s().setDraftValue(path, next(bucket[id]))
+      if (r && !r.ok && r.kind === 'limit') {
+        refused = r
+        break
+      }
+    }
+    expect(s().draft?.size).toBe(50)
+    expect(refused).toMatchObject({
+      ok: false,
+      kind: 'limit',
+      issues: [{ message: expect.stringContaining('50 alterações') }],
+    })
+  })
+
+  it('draftLimit mede também os bytes do lote', () => {
+    expect(
+      draftLimit(
+        new Map([['values.notes', { from: null, to: 'x'.repeat(70_000) }]])
+      )
+    ).toMatch(/grandes demais/)
+    expect(
+      draftLimit(new Map([['values.strength', { from: 2, to: 3 }]]))
+    ).toBeNull()
   })
 })

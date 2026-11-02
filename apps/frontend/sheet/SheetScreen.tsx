@@ -16,6 +16,7 @@ import {
   Text,
   TextField,
   tokens,
+  useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
@@ -282,6 +283,7 @@ function LiveSheet({
   readonly onUnsaved?: (count: number) => void
 }) {
   const sync = useSync()
+  const toast = useToast()
   const { id, sheet, sheetVersion, status, lockedAt, member } = state.character
   const lifecycle = useMemo<SheetLifecycle>(
     () => ({ status, locked: lockedAt !== null, member }),
@@ -350,6 +352,11 @@ function LiveSheet({
     characterId: id,
     templateVersion: state.model.version,
     idleMode: forced ?? defaultMode(state.roles),
+    onLost: () =>
+      toast.show({
+        message:
+          'O rascunho ficou grande demais para guardar neste aparelho e não poderá ser recuperado. Salve para não perder.',
+      }),
   })
   useEffect(() => {
     const s = store.getState()

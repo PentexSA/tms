@@ -21,6 +21,13 @@ const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/
 /** O mesmo prazo do cache e do último usuário: 7 dias. */
 export const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
+/**
+ * O registro guarda um lote (até 50 eventos e 64 KiB, os limites da API e do
+ * core) mais os metadados: a folga cobre a versão, o modo e as datas. O
+ * store não deixa o rascunho passar do lote (draftLimit).
+ */
+export const MAX_DRAFT_BYTES = MAX_BATCH_BYTES + 1024
+
 export interface DraftEditRecord {
   readonly path: string
   readonly from: unknown
@@ -49,8 +56,9 @@ export interface DraftCount {
 export interface DraftStore {
   read(characterId: string): Promise<DraftRecord | null>
   /**
-   * Grava; sem alterações, apaga. Registro inválido não é gravado: devolve
-   * false.
+   * Grava; sem alterações, apaga. Registro inválido ou grande demais não é
+   * gravado e o anterior sai (nunca fica um retrato velho): devolve false,
+   * e quem chamou avisa que o rascunho não será recuperável.
    */
   write(record: DraftRecord): Promise<boolean>
   /**
@@ -127,7 +135,7 @@ export function parseDraftRecord(
     savedAt,
     edits: clean,
   }
-  return bytes(JSON.stringify(record)) > MAX_BATCH_BYTES ? null : record
+  return bytes(JSON.stringify(record)) > MAX_DRAFT_BYTES ? null : record
 }
 
 export function createPersistedDraftStore(
@@ -205,8 +213,13 @@ export function createPersistedDraftStore(
       return true
     }
     const clean = parseDraftRecord(record, clock())
-    // Fora dos limites: o registro anterior fica (nunca grava o inválido)
-    if (!clean) return false
+    // Fora dos limites: nada é gravado, e o registro anterior sai, porque
+    // recuperar um retrato velho desfaria alterações em silêncio
+    if (!clean) {
+      await drop(record.characterId)
+      changed()
+      return false
+    }
     await storage.setItem(KEY + clean.characterId, JSON.stringify(clean))
     known.add(clean.characterId)
     changed()

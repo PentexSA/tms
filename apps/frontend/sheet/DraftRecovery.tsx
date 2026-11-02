@@ -68,6 +68,7 @@ export function useDraftPersistence({
   characterId,
   templateVersion,
   idleMode,
+  onLost,
 }: {
   readonly store: SheetStore
   readonly drafts: DraftStore
@@ -75,6 +76,8 @@ export function useDraftPersistence({
   readonly templateVersion: string
   // O modo de "decidir depois" (o da política, ou o padrão do papel)
   readonly idleMode: SheetMode
+  // O rascunho não coube no aparelho: não será recuperável
+  readonly onLost?: () => void
 }): DraftPersistence {
   const [offer, setOffer] = useState<DraftRecord | null>(null)
   const phase = useRef<Phase>('loading')
@@ -82,6 +85,8 @@ export function useDraftPersistence({
   const run = useRef(createRunner()).current
   const idle = useRef(idleMode)
   idle.current = idleMode
+  const lost = useRef(onLost)
+  lost.current = onLost
 
   const persist = useRef((s: SheetState & SheetActions) => {
     if (s.draft?.size) {
@@ -95,7 +100,7 @@ export function useDraftPersistence({
         edits: s.draftEvents(),
       }
       run(async () => {
-        await drafts.write(next)
+        if (!(await drafts.write(next))) lost.current?.()
       })
       return
     }
