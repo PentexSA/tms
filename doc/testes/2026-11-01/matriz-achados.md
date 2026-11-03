@@ -1,9 +1,9 @@
 # Matriz de achados: teste com personas (01/11/2026)
 
 - Junta o que foi achado no [relatório técnico](relatorio-tecnico.md) e no [relatório de usabilidade](relatorio-usabilidade.md), organizado em **ondas → pacotes → linhas**, para criar as tarefas e correções. Versão `main`, v1.1.0 (`1db3db9`). A mesma matriz está em [`matriz-achados.csv`](matriz-achados.csv) (UTF-8, separada por vírgula, com as colunas "Onda", "Pacote", "Tipo do pacote" e "Decisão"), para importar no Azure DevOps ou abrir numa planilha.
-- **113 linhas:** 86 achados técnicos (T), 4 de setup do ambiente de desenvolvimento (S), 12 recomendações de usabilidade sem achado técnico equivalente (R), 3 observações latentes do relatório técnico, vistas só com o ambiente quebrado (L), e 8 achados do relatório de usabilidade sem recomendação nem achado técnico (U). **Fonte:** 61 Ambos, 32 QA, 20 Usabilidade. **Severidade:** 1 crítica, 21 altas, 48 médias, 43 baixas; 64 atrapalham a criação.
-- **Ondas e pacotes:** 5 ondas e 20 pacotes (onda 1: 4, onda 2: 4, onda 3: 4, onda 4: 4, onda 5: 4). **Cada pacote é um PR**, e os PRs de uma onda rodam em paralelo. Uma onda começa quando os pacotes de que ela depende estão mergeados (campo "Pré-requisito"). Cada linha está em um pacote só.
-- **Tipo do pacote:** 13 de **correção** (sem sufixo, ou **-C**), que podem começar quando a onda chega, e 7 de **decisão de produto** (**-D**), que implementam o que o PO decidiu. **Todas as decisões foram tomadas em 01/11/2026** (tabela "Decisões de produto"); não há decisão pendente. Uma linha é de decisão quando muda um comportamento definido por projeto ou plano, cria estado, ação ou fluxo novo, ou depende de regra do jogo, de licença ou de conteúdo do sistema. Os pacotes que misturavam os dois foram divididos (P01, P03, P04, P05, P07, P09 e P10).
+- **116 linhas:** 86 achados técnicos (T), 4 de setup do ambiente de desenvolvimento (S), 12 recomendações de usabilidade sem achado técnico equivalente (R), 3 observações latentes do relatório técnico, vistas só com o ambiente quebrado (L), e 11 achados do relatório de usabilidade sem recomendação nem achado técnico (U; o U-09, o U-10 e o U-11 vieram de feedback do narrador em 03/11/2026, depois dos relatórios). **Fonte:** 61 Ambos, 32 QA, 23 Usabilidade. **Severidade:** 1 crítica, 21 altas, 50 médias, 44 baixas; 64 atrapalham a criação.
+- **Ondas e pacotes:** 5 ondas e 23 pacotes (onda 1: 4, onda 2: 4, onda 3: 4, onda 4: 6, onda 5: 5). **Cada pacote é um PR**, e os PRs de uma onda rodam em paralelo. Uma onda começa quando os pacotes de que ela depende estão mergeados (campo "Pré-requisito"). Cada linha está em um pacote só.
+- **Tipo do pacote:** 13 de **correção** (sem sufixo, ou **-C**), que podem começar quando a onda chega, e 10 de **decisão de produto** (**-D**), que implementam o que o PO decidiu. **Todas as decisões foram tomadas em 01/11/2026** (tabela "Decisões de produto"); não há decisão pendente. Uma linha é de decisão quando muda um comportamento definido por projeto ou plano, cria estado, ação ou fluxo novo, ou depende de regra do jogo, de licença ou de conteúdo do sistema. Os pacotes que misturavam os dois foram divididos (P01, P03, P04, P05, P07, P09 e P10).
 - **Uma linha por achado técnico.** Quando uma recomendação de usabilidade resolve o achado, ela vem na mesma linha, e se repete quando resolve vários (R-20, R-23, R-24, R-27, R-29 e R-30). "ver R-xx" na coluna # aponta uma recomendação que trata só parte do problema e está em outra linha (às vezes em outro pacote).
 - **Fonte:** QA = só no relatório técnico; Usabilidade = só no de usabilidade; Ambos = o mesmo problema nos dois, pelos IDs das notas ou pelo texto.
 - **"(estimado)"** marca o que não está nos relatórios e foi preenchido nesta consolidação: nos achados só de QA, recomendação (quando o §7 do técnico não tem), causa, quem sofre, tipo, impacto × esforço e escopo; nas linhas R, L, U e S, severidade, passos, esperado × obtido e arquivo provável; e os arquivos achados pela busca do texto da tela no código. As ondas, os pacotes, as decisões e as dependências também são sugestão desta consolidação. O resto é cópia dos relatórios.
@@ -31,14 +31,20 @@
 | 4 | [P07-D · Vantagens: regras, catálogo e interação](#p07-d) | decisão de produto | 4 | 1 alta, 3 médias | 4 | 4 M | P07-C | D-06, D-07, D-08, D-09 | T-08, T-24, R-25, R-26 |
 | 4 | [P10-C · Template: derivados, ordem e textos](#p10-c) | correção | 5 | 1 média, 4 baixas | 3 | 5 P | — | — | T-22, T-60, U-05, T-66, T-85 |
 | 4 | [P10-D · Template: ajuda contextual e campos do Mago](#p10-d) | decisão de produto | 2 | 1 média, 1 baixa | 2 | 1 P, 1 M | — | D-11, D-12 | R-19, U-06 |
+| 4 | [P14-D · Apresentação da crônica para leitura](#p14-d) | decisão de produto | 1 | 1 média | 0 | 1 P | — | D-15 | U-09 |
+| D-16 | História do personagem | U-10 | P15-D | 4 | A ficha ganha o campo "História / Prelúdio" no template dos três sistemas, lido por narrador e jogador e separado das Notas do Narrador, que continuam privadas. | Revelar a Nota do Narrador ao jogador (fica para o U-11); campo lido só pelo narrador; manter só as Notas. |
+| D-17 | Revelar nota do narrador | U-11 | P16-D | 5 | Fica para depois da onda 4: o narrador revelar uma nota privada ao jogador, ficha a ficha, só entra quando houver a necessidade (o prelúdio já está coberto pelo D-16). | Fazer na onda 4 em vez do campo próprio. |
+| 4 | [P15-D · História do personagem na ficha](#p15-d) | decisão de produto | 1 | 1 média | 0 | 1 P | — | D-16 | U-10 |
 | 5 | [P09-D · Narrador: progresso da criação e painel de regras](#p09-d) | decisão de produto | 2 | 2 médias | 2 | 1 P, 1 M | P04-D, P09-C | D-10 | T-36, R-15 |
 | 5 | [P12 · Convite, entrada e navegação](#p12) | correção | 7 | 5 médias, 2 baixas | 1 | 4 P, 3 M | P06 | D-14 | T-30, T-43, T-44, T-45, T-51, T-73, T-82 |
+| D-15 | Descrição da crônica | U-09 | P14-D | 4 | O jogador lê a Descrição da crônica inteira, como o narrador, em uma tela de leitura (com "Ler tudo"), sem resumo. O editor do narrador avisa que os jogadores leem o texto, e a Descrição só chega a quem é membro da crônica (AuthZ no servidor). | Só um resumo ao jogador; manter só no formulário do narrador. |
 | 5 | [P13 · Ficha em uso: XP, evolução e Jogo](#p13) | correção | 7 | 2 médias, 5 baixas | 0 | 6 P, 1 M | P04-D | — | T-50, T-53, T-77, T-79, T-84, U-01, U-02 |
 | 5 | [P01-D · Planos alinhados com a tela](#p01-d) | decisão de produto | 1 | 1 baixa | 0 | 1 P | — | D-13 | U-08 |
+| 5 | [P16-D · Revelar a nota do narrador ao jogador](#p16-d) | decisão de produto | 1 | 1 baixa | 0 | 1 M | P15-D | D-17 | U-11 |
 
 ## Decisões de produto
 
-**Todas tomadas pelo PO em 01/11/2026; não há decisão pendente.** A coluna "Decisão" é o que o PR do pacote implementa; "Descartadas" fica como histórico. Nenhuma decisão remove campo, muda regra do jogo ou afrouxa limite.
+**Todas tomadas pelo PO em 01/11/2026 (a D-15 a D-17, em 03/11/2026); não há decisão pendente.** A coluna "Decisão" é o que o PR do pacote implementa; "Descartadas" fica como histórico. Nenhuma decisão remove campo, muda regra do jogo ou afrouxa limite.
 
 | ID | Sobre | Linhas | Pacote | Onda | Decisão (01/11/2026) | Descartadas |
 |---|---|---|---|---|---|---|
@@ -68,7 +74,7 @@
 1. Plano do pacote aprovado: arquivos confirmados lendo o código (na matriz, vários estão como "estimado") e as decisões da tabela acima aplicadas.
 2. Typecheck, lint e testes dos pacotes do monorepo afetados.
 3. Um teste de regressão para cada bug da matriz que o pacote corrige.
-4. `/code-review` no diff do pacote; `/security-review` também em P02, P03-C e P04-D (sessão e cache, rascunho no armazenamento cifrado, estado novo na API com AuthZ do narrador).
+4. `/code-review` no diff do pacote; `/security-review` também em P02, P03-C, P04-D e P16-D (sessão e cache, rascunho no armazenamento cifrado, estado novo na API com AuthZ do narrador).
 5. O cenário da persona que achou o problema, repetido sem o defeito.
 6. Um resumo (o que mudou, como foi testado, achados da revisão), que vira a seção do pacote na descrição do PR da onda.
 
@@ -363,13 +369,13 @@
 | T-81 | Ambos | baixa | Não | iOS | — | NPC revelado (identidade), jogador | O "‹" volta para Crônicas, pulando a crônica de onde o jogador veio. | Crônica → NPC revelado → ‹. | Crônica de origem × lista de crônicas. | `img/po-app/128-jogador-abre-npc-identidade-ios.webp`. | Navegação do NPC revelado em `apps/frontend/sheet/SheetScreen.tsx` (estimado) | POA-38. Visto. | — | "‹" volta para a tela de origem (a crônica) (estimado). | — (estimado) | Jogador; PO-A (estimado) | bug (estimado) | baixo × P (estimado) | Genérica (estimado). | POA-38 · `img/po-app/128-jogador-abre-npc-identidade-ios.webp` |
 | U-04 | Usabilidade | baixa (estimado) | Não | web 1280 | todos | Lista de crônicas | A "última sessão" prevista no plano v5 (P2) não aparece na lista. | Registrar uma sessão → voltar à lista de crônicas (estimado) | "Última sessão: dd/mm" no cartão × nada (estimado) | `img/po-web/104-bastidores-sessao-auditoria-1280.webp` | A API já devolve `lastSession` (`apps/api/src/chronicles/routes.ts` l.311–336); falta exibir no cliente (estimado) | POW-30. Usabilidade §8 (plano-v5 P2); sem recomendação no relatório. | — | Mostrar "Última sessão: dd/mm" no cartão da crônica com o dado que a API já devolve (formatado como data civil, ver T-16) (estimado). | — (estimado) | Narrador e jogador; PO-W (estimado) | clareza (estimado) | baixo × P (estimado) | Genérica (estimado). | POW-30 · `img/po-web/104-bastidores-sessao-auditoria-1280.webp` |
 
-## Onda 4 · Conteúdo do sistema e guia da criação (4 PRs)
+## Onda 4 · Conteúdo do sistema e guia da criação (6 PRs)
 
 - **Objetivo:** Vantagens, template e o guia "O que falta" aplicam as decisões de regra, de licença e de desenho.
-- **Pré-requisito:** P07-C mergeado; aplica D-05 a D-09, D-11 e D-12. Os três PRs de template (P07-D, P10-C, P10-D) combinam a ordem de merge.
+- **Pré-requisito:** P07-C mergeado; aplica D-05 a D-09, D-11, D-12, D-15 e D-16. Os três PRs de template (P07-D, P10-C, P10-D) combinam a ordem de merge.
 - **Em paralelo:** —
 - **Critério de saída:** A criação por pontos de Vampiro, Mago e Lobisomem repetida pelo Experiente e pelo Iniciante; E2E verdes.
-- **PRs:** [P05-D](#p05-d), [P07-D](#p07-d), [P10-C](#p10-c), [P10-D](#p10-d)
+- **PRs:** [P05-D](#p05-d), [P07-D](#p07-d), [P10-C](#p10-c), [P10-D](#p10-d), [P14-D](#p14-d), [P15-D](#p15-d)
 
 <a id="p05-d"></a>
 
@@ -450,13 +456,47 @@
 | R-19 | Usabilidade | média (estimado) | Sim | iOS, web 390 | todos | Nova ficha; Ficha › Criação; listas de escolha | Nenhum termo do jogo tem explicação, nem nas listas de escolha (Natureza, Clã, Disciplinas, "Prioridade", "pontos de bônus"): os iniciantes escolheram clã, Natureza e Disciplinas "pelo som do nome". | Iniciante → Nova ficha → Escolher da lista (Natureza) → procurar o significado (estimado) | "?" com uma frase curta × só o nome (estimado) | `img/iniciante-app/19-lista-natureza-ios.webp`, `img/iniciante-web/33-criacao-atributos-390.webp` | Textos no template (`trait_templates`); componentes de campo em `apps/frontend/sheet/` (estimado) | IW-06, IA-06, IW-09. Usabilidade §1 (C3) e §4.1 passo 6. Conhecido: C-18 da `avaliacao-ui-ux.md` (licença: o template traz os nomes, a mesa escreve a descrição). | R-19 | Ajuda contextual: um "?" por campo, traço e opção de lista, com uma frase curta vinda do template (por exemplo, "Senhor: quem transformou seu personagem"), sem copiar texto protegido; na primeira vez, explicar "Prioridade" ("quantos pontos este grupo recebe; cada valor vale para um grupo") e "pontos de bônus" | C3 | I-W, I-A | clareza | alto × M (mecanismo P; textos M por sistema) | **Genérica** no mecanismo; **de template** nos textos. Cada sistema traz o próprio glossário, respeitando a licença | IW-06, IA-06, IW-09 · `img/iniciante-app/19-lista-natureza-ios.webp`, `img/iniciante-web/33-criacao-atributos-390.webp` |
 | U-06 | Usabilidade | baixa (estimado) | Sim (Mago) | web 1280 | M20 | Nova ficha (Mago) | A Nova ficha do Mago pede "Casa" para qualquer Tradição; o relatório marca isso como inconsistência do TMS, não da regra. | Mago → Nova ficha → escolher uma Tradição que não seja a Ordem de Hermes (estimado) | Casa só onde a regra pede × para qualquer Tradição (estimado) | `img/experiente-web/63-nova-ficha-mago-1280.webp` | Template do Mago (`trait_templates`) (estimado) | EW-21, PO-A. Usabilidade §7 ("Campos da identidade"); sem recomendação no relatório (a R-29 trata só da lista de Natureza no Mago). | — | Conferir com o livro e, se a Casa for só da Ordem de Hermes, exibi-la condicionada à Tradição no template; o campo continua existindo (estimado). | C3 (estimado) | Jogador de Mago; E-W, PO-A (estimado) | clareza (estimado) | baixo × P (estimado) | De template (campo condicionado a uma escolha); o mecanismo de campo condicional é genérico (estimado). | EW-21 · `img/experiente-web/63-nova-ficha-mago-1280.webp` |
 
-## Onda 5 · Narrador, entrada, uso e documentação (4 PRs)
+<a id="p14-d"></a>
+
+### P14-D · Apresentação da crônica para leitura (decisão de produto)
+
+- **Objetivo:** A Descrição e a Imagem da crônica podem ser lidas inteiras, por narrador e jogadores, e não só editadas.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-15 (U-09): O jogador lê a Descrição inteira.
+- **Itens:** 1 (1 média); 0 atrapalham a criação. **Fonte:** 1 Usabilidade (feedback do narrador, 03/11/2026).
+- **Esforço das linhas:** 1 P (coluna Impacto × esforço).
+- **Pré-requisito:** nenhum (P11, dos Bastidores, já está mergeado); aplica D-15.
+- **Onde mexe (arquivos mais citados):** `apps/frontend/components/chronicles/CampaignBackstage.tsx`, `apps/frontend/app/(app)/chronicles/[id]/index.tsx`, `apps/frontend/lib/queries/backstage.ts`.
+- **Conversa com:** R-09 (Notas do Narrador privadas, onda 3): a tela nova é onde o prelúdio e a história da crônica devem ir, e o aviso de privado × público precisa ficar claro nos dois editores. T-67 (margem do título "Apresentação", onda 2). U-10 (P15-D): o jogador lê a história da crônica (D-15) e a História do personagem (D-16, P15-D).
+
+| ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| U-09 | Usabilidade | média (estimado) | Não | Android (captura do narrador); as demais não conferidas | todos (visto no M20) | Crônica › Apresentação (Descrição e Imagem) | A Descrição da crônica (até 4000 caracteres) só aparece dentro do formulário de edição "Apresentação", numa caixa pequena com rolagem, e só para o narrador. Nenhuma tela mostra o texto para leitura, e o jogador não o vê em lugar nenhum: o `SettingsForm` fica dentro de `narrating ? …`. O narrador escreveu a história da crônica (956 caracteres, salva no banco) e o prelúdio da ficha, e não achou onde lê-los. O prelúdio estava nas Notas do Narrador, que são privadas (R-09), então o jogador também não o recebe. | Narrador → crônica → Apresentação → escrever uma Descrição longa → Salvar apresentação → procurar onde lê-la; repetir com a conta de um jogador (estimado) | Descrição lida inteira, por narrador e jogador, numa tela de leitura × só a caixa de edição, e nada para o jogador | Captura do narrador (WhatsApp, 03/11/2026), não anexada; `chronicles.description` salva no banco da produção (956 caracteres). | `apps/frontend/components/chronicles/CampaignBackstage.tsx` (`SettingsForm`, l.286–396) e `apps/frontend/app/(app)/chronicles/[id]/index.tsx` l.277 (`narrating`); `apps/frontend/lib/queries/backstage.ts` l.80 (a API entregar a descrição ao jogador não foi conferida) (estimado) | Feedback do narrador em 03/11/2026, depois da v1.2.0; fora dos relatórios e da matriz de 01/11. Parente do R-09 (Notas do Narrador privadas) e do T-67 (título "Apresentação" sem margem). | — | Mostrar a Descrição e a Imagem da crônica em leitura, para o narrador e para os jogadores (bloco "Apresentação" no topo da crônica ou na aba Bastidores, com "Ler tudo" para o texto completo, e o editor só atrás de "Editar"); campo de edição maior no celular. Decisão D-15 (03/11/2026): o jogador lê a Descrição inteira, sem resumo. Segurança: a Descrição passa a ser lida pelos membros da crônica, e isso precisa de aviso no editor ("os jogadores leem isto"), como o R-09 pede para as notas privadas; não pode vazar para quem não é membro (AuthZ no servidor) (estimado). | C1 (estimado) | Narrador (escreve e não confere) e jogadores (não leem) (estimado) | orientação (estimado) | alto × P (estimado) | Genérica (estimado): a Descrição é de `chronicles`, sem dado de sistema. | — |
+
+<a id="p15-d"></a>
+
+### P15-D · História do personagem na ficha (decisão de produto)
+
+- **Objetivo:** A ficha tem um lugar para a história do personagem (prelúdio) que narrador e jogador leem, separado das Notas do Narrador privadas.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-16 (U-10): Campo "História / Prelúdio" no template, lido por narrador e jogador.
+- **Itens:** 1 (1 média); 0 atrapalham a criação. **Fonte:** 1 Usabilidade (feedback do narrador, 03/11/2026).
+- **Esforço das linhas:** 1 P (coluna Impacto × esforço).
+- **Pré-requisito:** nenhum; aplica D-16.
+- **Onde mexe (arquivos mais citados):** os templates de produto (`vtm-v20`, `wod-w20`, `mta-m20`) e `apps/frontend/sheet/layouts/TextLayout.tsx`.
+- **Conversa com:** Revisão de template sem migration (os dados ficam em `trait_templates`; republicar com `pnpm templates:publish`). R-09 (rótulo "privadas") e U-09 (P14-D).
+
+| ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| U-10 | Usabilidade | média (estimado) | Não | Android (captura do narrador); as demais não conferidas | todos (visto no M20) | Ficha › Notas do Narrador; Sobre (identidade) | O narrador escreveu o prelúdio da ficha do Magnus (cerca de 3.700 caracteres) nas Notas do Narrador, que o jogador não recebe (R-09), porque a ficha não tem outro lugar para a história do personagem. Ele queria que o jogador lesse. O texto fica escrito e sem leitor, e se o narrador o move para outro campo, mistura com os segredos que guarda nas Notas. | Narrador → ficha do jogador → procurar onde escrever a história do personagem → só há as Notas do Narrador → abrir a ficha como jogador (estimado) | Campo "História / Prelúdio" que narrador e jogador leem e a nota privada separada × um só campo, privado | Feedback do narrador (WhatsApp, 03/11/2026), não anexado; o texto está em `characters.sheet_data.values.storytellerNotes` (cerca de 3.700 caracteres) na produção. | Templates de produto (`vtm-v20`, `wod-w20`, `mta-m20`, publicados por `pnpm templates:publish`) e `apps/frontend/sheet/layouts/TextLayout.tsx` (estimado) | Feedback do narrador em 03/11/2026, depois da v1.2.0; fora dos relatórios. Complementa o R-09 (rótulo "privadas") e o U-09 (Descrição da crônica). A revelação de uma nota privada, no momento certo, é o U-11. | R-09 | Campo de texto "História / Prelúdio" no template dos três sistemas, lido por narrador e jogador (o jogador edita ou só lê: fechar no plano do pacote), separado das Notas do Narrador, que seguem privadas. Sem migration: a estrutura vem de `trait_templates`. *Segurança:* o campo é visível para o dono e para o narrador pela permissão do template (`canRead`/`canWrite`); a ficha oculta de NPC continua oculta (estimado). | C1 (estimado) | Narrador (sem onde escrever) e jogador (não lê) (estimado) | orientação (estimado) | alto × P (estimado) | **De template** (o campo) e **genérica** (leitura e permissão). Cada sistema novo traz o seu campo no template (estimado). | — |
+
+## Onda 5 · Narrador, entrada, uso e documentação (5 PRs)
 
 - **Objetivo:** O narrador acompanha a criação pela Mesa; convite, XP e Jogo sem atrito; planos alinhados com o que foi decidido.
-- **Pré-requisito:** P04-D mergeado (estado da ficha); aplica D-10, D-13 e D-14.
+- **Pré-requisito:** P04-D mergeado (estado da ficha); aplica D-10, D-13, D-14 e D-17.
 - **Em paralelo:** —
 - **Critério de saída:** A fase 2 do Narrador (acompanhar, ajudar, devolver, concluir) repetida no app e no web; E2E verdes.
-- **PRs:** [P09-D](#p09-d), [P12](#p12), [P13](#p13), [P01-D](#p01-d)
+- **PRs:** [P09-D](#p09-d), [P12](#p12), [P13](#p13), [P01-D](#p01-d), [P16-D](#p16-d)
 
 <a id="p09-d"></a>
 
@@ -536,3 +576,20 @@
 | ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | U-08 | Usabilidade | baixa (estimado) | Não | — | todos | Documentação (planos v0 a v5) | A tela difere dos planos sem que eles registrem: o modo se chama "Editar"/"Criação", não "Evoluir" (v0 §1.5); a identidade do W20 pede Posto, que o plano diz que não entra (v2 §1.2); concluir com grupo incompleto é prevenido, não recusado (v4 §1.4); Esfera acima do Arete é bloqueada na criação, e o plano fala do Editar (v1). E o que ajuda e não está em plano: "Escolher da lista", a folha de bônus e o "O que falta". | Comparar as jornadas dos planos com a tela (§8 da usabilidade) (estimado) | Planos que descrevem a tela × planos desatualizados (estimado) | Usabilidade §8 (tabelas de aderência, com screenshots por jornada) | `doc/plano-v0.md`, `doc/plano-v1.md`, `doc/plano-v2.md`, `doc/plano-v4.md` | PO-W, PO-A. Usabilidade §8; sem recomendação no relatório. | — | Atualizar os planos com o comportamento atual, ou abrir tarefa para o que deve mudar na tela, para a próxima validação comparar com o certo (estimado). | — (estimado) | Time (PO e desenvolvimento) (estimado) | clareza (documentação) (estimado) | baixo × P (estimado) | Genérica (estimado). | — |
+
+<a id="p16-d"></a>
+
+### P16-D · Revelar a nota do narrador ao jogador (decisão de produto)
+
+- **Objetivo:** O narrador pode mostrar uma Nota do Narrador ao jogador no momento certo, sem expor as notas por padrão.
+- **Decisões aplicadas** (detalhes na tabela "Decisões de produto"):
+  - D-17 (U-11): Fica para depois da onda 4, quando houver a necessidade.
+- **Itens:** 1 (1 baixa); 0 atrapalham a criação. **Fonte:** 1 Usabilidade.
+- **Esforço das linhas:** 1 M (coluna Impacto × esforço).
+- **Pré-requisito:** P15-D mergeado; aplica D-17.
+- **Onde mexe (arquivos mais citados):** `packages/sheet-core/src`, `apps/api/src/sheets/routes.ts`, `apps/frontend/sheet/storyteller/StorytellerBar.tsx`.
+- **Conversa com:** R-09 e R-14. Passa pelo `/security-review` (estado novo e AuthZ do narrador).
+
+| ID | Fonte | Sev. | Atrapalha a criação? | Plataforma | Sistema | Tela | Descrição | Passos para reproduzir | Esperado × obtido | Evidência | Arquivo provável | Origem e histórico | # | Recomendação | Causa | Quem sofre | Tipo | Impacto × esforço | Escopo e como generaliza | IDs e evidência |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| U-11 | Usabilidade | baixa (estimado) | Não | — | todos | Ficha › Notas do Narrador | Hoje o narrador não consegue mostrar uma Nota do Narrador ao jogador no momento certo (uma revelação no meio da campanha): a nota é sempre privada, e o R-09 só ajusta o rótulo. O pedido do narrador (03/11/2026) era o prelúdio, que o U-10 cobre com um campo próprio; este item fica para quando houver a necessidade de revelar uma nota privada. | Narrador → Notas do Narrador → procurar como mostrar uma nota ao jogador (estimado) | "Revelar ao jogador" por nota × nota sempre privada (estimado) | — | `packages/sheet-core/src` (`canRead` por papel); `apps/api/src/sheets/routes.ts`; `apps/frontend/sheet/storyteller/StorytellerBar.tsx` (estimado) | Surgiu na conversa de 03/11/2026, ao decidir o U-10 (opção C). Adiado por decisão (D-17). Parente do R-09 e do R-14. | R-09, R-14 | Ação "Revelar ao jogador" nas Notas do Narrador, decidida pelo narrador, por ficha: o dono passa a ler a nota inteira, em leitura. A nota continua privada até a revelação. Detalhes (revelar o texto de agora ou o futuro, ocultar de novo) no plano do pacote. *Segurança:* ação só do narrador da crônica, validada no servidor; antes da revelação o servidor não entrega o campo ao dono; o estado novo entra no `/security-review` (estimado). | C1 (estimado) | Narrador (estimado) | orientação (estimado) | médio × M (estimado) | Genérica (estimado): as Notas do Narrador existem em toda ficha, de qualquer sistema. | — |
