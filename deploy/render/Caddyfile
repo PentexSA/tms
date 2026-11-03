@@ -18,9 +18,13 @@
 	# Navegação do navegador numa rota da SPA: o index.html. A URL é a mesma
 	# da rota da API (/chronicles/:id): sem o Vary e com o cache heurístico
 	# do Last-Modified, o fetch do app recebia este HTML do cache do navegador.
+	# /health fica de fora: o monitor de disponibilidade (UptimeRobot) manda
+	# Accept com text/html e receberia o index.html com 200, sem nunca chegar
+	# na API. O path é exato: só /health vai para a API desse jeito.
 	@page {
 		method GET HEAD
 		header Accept *text/html*
+		not path /health
 	}
 	handle @page {
 		import headers.caddy
