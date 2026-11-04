@@ -1,3 +1,5 @@
+import { close } from '@sentry/react'
+
 import { captureError, initTelemetry } from '../telemetry.web'
 
 // A Fase 3 no web: o que o Sentry recebe. O transporte falso guarda o envelope
@@ -39,6 +41,8 @@ beforeAll(() => {
     transport,
   })
 })
+// O cliente guarda timers (envio de client reports): sem fechar, o Jest não sai
+afterAll(() => close())
 beforeEach(() => {
   sent.length = 0
 })

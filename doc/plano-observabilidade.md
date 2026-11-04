@@ -189,58 +189,117 @@ resposta encontra a linha do log, que também mostra a versão do cliente.
 logs e 5 GB de métricas por mês, histórico de 30 dias, **1 usuário**. O mesmo
 produto cobre as Fases 4, 6 e 7. Acima da cota, os eventos são recusados.
 
-**Conta:** escolher a região na criação (sugestão: UE, a mesma do PostHog).
+**Conta:** escolher a região na criação (sugestão: UE, a mesma do PostHog). Dois
+projetos (sugestão): um para a API (`SENTRY_DSN`) e um para o web (`EXPO_PUBLIC_SENTRY_DSN`).
+
+**Versões:** a regra de idade mínima de 14 dias do pnpm fixa `@sentry/bun` e
+`@sentry/react` em 11.8.0 e `@sentry/cli` em 3.8.0. Subir só depois de 14 dias da
+publicação.
+
+**Validação feita antes (etapa 0)**
+
+- **`@sentry/elysia` não foi usado.** A documentação o marca como alpha, e o plano
+  já previa o `@sentry/bun` com `captureException` no `default` do `onError` como
+  saída. Como o SDK só captura o que a API manda, não há instrumentação do Elysia a
+  validar.
+- **Saída do processo:** o `start.sh` depende de o processo sair para o Render
+  reiniciar. Com `onUncaughtExceptionIntegration` e
+  `onUnhandledRejectionIntegration({ mode: 'strict' })`, uma exceção não tratada e
+  uma rejeição não tratada saem com código 1, igual ao Bun sem o Sentry. O modo
+  padrão (`warn`) da rejeição manteria o processo vivo, por isso `strict`.
+- **Memória:** o bundle com o SDK inicializado usa cerca de 4 a 5 MB a mais de RSS
+  (36 para 41 MB) num processo vazio, medido localmente com o Bun 1.4.3. A medida
+  no container do Render ainda falta.
+- **`ca-certificates`:** o `sentry-cli` usa os certificados do sistema, e o Node não
+  prova que existem. O Dockerfile confere `/etc/ssl/certs/ca-certificates.crt` e só
+  instala o pacote se faltar. Não foi possível construir a imagem onde isto foi
+  escrito (sem daemon do Docker): a primeira build no Render confirma.
+- O SDK 11 trocou `sendDefaultPii` por `dataCollection`; os dois lados o desligam
+  por inteiro.
 
 **API**
 
-1. **Começar com uma validação de meio dia.** O `@sentry/elysia` atende à versão
-   do projeto (Elysia 1.4.30), mas a documentação o marca como **alpha**. Validar
-   o build com `bun build` no Docker e o consumo de memória.
-2. **Se falhar**, usar `@sentry/bun` e `captureException` no `default` do `onError`.
-   O `pinoIntegration` da Fase 4 é documentado nesse SDK; os spans por rota da
-   Fase 6 passariam a ser manuais.
-3. Chamar `Sentry.init` só em `apps/api/src/server.ts`: `createApp` é usado nos
-   testes e não pode enviar nada.
-4. **Saída filtrada:** `sendDefaultPii: false`, `beforeSend` com `safeError`, sem
-   corpo, headers ou cookies. Capturar só 5xx, nunca `ApiError` de 4xx (é o padrão
-   do `shouldHandleError`).
-5. Adicionar `SENTRY_DSN` ao `env.ts`, ao `.env.example` e ao `render.yaml`.
-6. Marcar cada erro com a tag `client.version`, vinda do valor validado na Fase 2,
-   para ver se um erro da API atinge só uma versão do app.
+1. `apps/api/src/telemetry.ts` com `@sentry/bun`: `initTelemetry()`,
+   `captureServerError()` e `scrubEvent()` (pura). `Sentry.init` só em
+   `apps/api/src/server.ts`: `createApp` é usado nos testes e não envia nada, e
+   `captureServerError` não faz nada sem init. Release vem de `TMS_RELEASE`.
+2. **Saída filtrada, por lista de campos permitidos.** Sem integração além das duas
+   de erro não tratado (nada de requisição, variáveis locais, linhas de código nem
+   console), `serverName` fixo, `dataCollection` desligado e breadcrumbs zerados. O
+   `beforeSend` descarta o evento do SDK e o remonta: tipo, mensagem e cadeia de
+   `cause` vêm de `safeError(hint.originalException)` (erro do Postgres só com o
+   SQLSTATE, `SyntaxError` sem mensagem, e-mail, JWT e `Bearer` redigidos); os
+   frames levam só arquivo, função, linha, coluna e `in_app`; as tags, só as três
+   abaixo.
+3. **Captura só no `default` do `onError`** (`http/on-error.ts`), com as tags
+   `client.version` (de `parseClientVersion`), `route` (o template) e `request_id`.
+   O `ApiError` nunca passa por ali (hoje nenhum usa 5xx), e 4xx, validação, corpo
+   inválido e 404 também não.
+4. `SENTRY_DSN` e `SENTRY_SMOKE` (um erro de teste ao subir) em `env.ts`, com
+   string vazia tratada como ausente, e em `.env.example` e `render.yaml`.
+5. **Teste canário** (`apps/api/src/__tests__/telemetry.test.ts`): transporte falso
+   que guarda o **envelope serializado**, não só o objeto do evento. Cobre e-mail,
+   JWT e `Bearer` na mensagem, `Key (email)=(...)` com SQLSTATE, `JSON.parse`
+   repetindo a entrada, `cause` encadeado, cookie, header, query e corpo; e que 4xx
+   e 404 não geram evento.
 
 **Web** (o nativo fica para a Fase 8)
 
-1. `lib/telemetry.web.ts` com `@sentry/react`, e `telemetry.native.ts` sem efeito
-   por enquanto. Assim o build nativo não muda agora.
-2. **Pontos de captura:**
-   - `ErrorBoundary` no `_layout.tsx` raiz;
-   - `QueryCache` e `MutationCache` em `createQueryClient`, ignorando 4xx e falha
-     de rede (o app funciona offline, e isso gastaria a cota rápido);
-   - falhas definitivas da fila em `sheet/sync/sender.ts`, onde o usuário pode
-     perder edição.
-3. **Breadcrumbs:** desligar os de console e de clique, que podem carregar texto
-   da tela. Manter navegação com template e HTTP sem query string.
-4. **CSP:** acrescentar o host exato do DSN em `connect-src`, em
-   `scripts/web-headers.mjs`. O `headers.spec.ts` continua passando, porque só
-   confere o trecho inicial da diretiva.
+1. `lib/telemetry.ts` sem efeito (nativo, Jest e `tsc` resolvem este, então o bundle
+   nativo não muda) e `lib/telemetry.web.ts` com `@sentry/react`, o único arquivo que
+   importa o SDK. O `telemetry.native.ts` só entra na Fase 8. Um teste confere que
+   `telemetry.ts` não importa `@sentry`.
+2. **Filtro em `lib/telemetryFilter.ts`**, sem importar o SDK: o mesmo evento
+   remontado por lista de campos; `redact` copiado de `safe-error.ts` (10 linhas,
+   sem pacote novo); URL sem query nem hash e UUID trocado por `:id` (o que também
+   protege o código de convite); breadcrumbs só de navegação e HTTP (sem console nem
+   clique); no máximo 20 eventos por aba, para um erro em loop não gastar a cota.
+3. **Classificador em `lib/errors.ts`** (`classifyError`): ignora 4xx, falha de
+   fetch, `AbortError` e 5xx sem `requestId` válido (o 502 do proxy); 5xx com id é
+   `http`; o resto é `bug`.
+4. **O erro do Eden nunca vai cru**, porque carrega o corpo da resposta: vira
+   `Error('HTTP 500')`, com fingerprint por status e primeira parte da `queryKey` e o
+   `requestId` como tag.
+5. **Pontos de captura:** `QueryCache` e `MutationCache` em `createQueryClient`; o
+   `ErrorBoundary` do `_layout.tsx` raiz, com fallback que funciona fora do
+   `ThemeProvider`; o boundary de `characters/[id].tsx`, que engoliria o erro antes
+   da raiz; e `sheet/sync/sync.ts`, para `rejected` com 400, 413, 422 e 403 sem
+   código de política, e para a falha do `enqueue`. O 409, o 404 e o 403 de política
+   são fluxo normal. Sai só o status e a quantidade de eventos, sem caminho nem
+   corpo. (A falha definitiva da fila está em `sync.ts`, e não em `sender.ts`: é lá
+   que o lote recusado volta ao usuário.)
+6. **CSP:** `scripts/web-headers.mjs` lê a origem de `EXPO_PUBLIC_SENTRY_DSN` e a
+   acrescenta ao `connect-src` depois da origem da API. DSN inválido gera aviso, sem
+   derrubar o build. O `headers.spec.ts` continua passando, porque só confere o
+   trecho inicial da diretiva.
+7. **Testes:** canário com transporte falso (`telemetryWeb.test.ts`), com os mesmos
+   valores marcados. O Jest transforma o `@sentry/*` (`transformIgnorePatterns` do
+   `apps/frontend/jest.config.js`), que sai em ESM.
 
-**Source maps** (`deploy/render/Dockerfile`)
+**Source maps** (`scripts/sentry-sourcemaps.mjs`, chamado em `deploy/render/Dockerfile`)
 
-1. Entre o `expo export` e o `find -delete`, rodar `sentry-cli sourcemaps inject`
-   e `upload`. Eles já são gerados e apagados nesse trecho; os maps continuam fora
-   da imagem final.
-2. O token entra como secret file no build do Render (`--mount=type=secret`;
-   confirmar na documentação). Sem token, o build segue sem upload, para o deploy
-   não depender do Sentry.
-3. **Risco a conferir:** o `start.sh` troca `tms-origin.invalid` pela URL pública
+1. Depois do `web-headers.mjs` e antes do `find -delete`: os maps existem só nesse
+   trecho e continuam fora da imagem final.
+2. Sem token, registra no log e sai com 0. Com token, remove os `debugId` que o
+   Metro já gravou, roda `sourcemaps inject` e `upload` **sem `--release`** (o
+   casamento é pelo debug id, então um nome de release diferente não quebra o
+   upload). Falha no inject ou no upload é registrada e o build segue.
+3. **O token é secret file** (`--mount=type=secret,id=sentry_auth_token,required=false`),
+   nunca `ARG`: um `ARG` fica no histórico da imagem. O Render copia os secret files
+   para a raiz do contexto, então o `.dockerignore` barra `sentry_auth_token`, senão
+   o `COPY . .` o levaria para uma camada. `EXPO_PUBLIC_SENTRY_DSN`,
+   `EXPO_PUBLIC_SENTRY_SMOKE`, `SENTRY_ORG` e `SENTRY_PROJECT` entram como `ARG`
+   (variáveis do serviço, em `render.yaml`).
+4. **Risco a conferir:** o `start.sh` troca `tms-origin.invalid` pela URL pública
    com `sed` depois do build, o que muda o tamanho da linha e pode deslocar as
    colunas do mapa nos módulos com a URL. Se o stack sair errado ali, o web pode
    usar `window.location.origin`, já que API e app têm a mesma origem nesse deploy.
 
 **Alertas:** e-mail para issue nova e para regressão.
 
-**Pronto quando:** um erro forçado na API e outro no web chegam com stack legível
-e a versão certa, e o teste canário passa.
+**Pronto quando:** um erro forçado na API (`SENTRY_SMOKE=true`) e outro no web
+(`EXPO_PUBLIC_SENTRY_SMOKE=true` no build) chegam com stack legível e a versão
+certa, e o teste canário passa.
 
 ### Fase 4. Logs centralizados
 
