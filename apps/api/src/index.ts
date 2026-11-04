@@ -52,11 +52,14 @@ export const createApp = (
             'content-type',
             'authorization',
             'x-tms-client',
+            'x-tms-client-version',
             // Nunca o x-forwarded-for: quem o acrescenta é o proxy, não o
             // navegador. No E2E, o navegador representa clientes distintos
             // pelo header de teste, que o config recusa em produção (T-86)
             ...(options.testClientIp ? [TEST_CLIENT_IP_HEADER] : []),
           ],
+          // O web em outra origem só lê o que estiver listado aqui
+          exposeHeaders: ['x-request-id'],
           maxAge: 600,
         })
       )

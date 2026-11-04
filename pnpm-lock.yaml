@@ -159,9 +159,6 @@ importers:
       jose:
         specifier: 6.2.12
         version: 6.2.12
-      serialize-error:
-        specifier: 12.0.0
-        version: 12.0.0
     devDependencies:
       '@tms/bun-test-config':
         specifier: workspace:*
@@ -5215,10 +5212,6 @@ packages:
   send@0.19.1:
     resolution: {integrity: sha512-p4rRk4f23ynFEfcD9LA0xRYngj+IyGiEYyqqOak8kaN0TvNmuxC2dcVeBn62GpCeR2CpWqyHCNScTP91QbAVFg==}
     engines: {node: '>= 0.8.0'}
-
-  serialize-error@12.0.0:
-    resolution: {integrity: sha512-ZYkZLAvKTKQXWuh5XpBw7CdbSzagarX39WyZ2H07CDLC5/KfsRGlIXV8d4+tfqX1M7916mRqR1QfNHSij+c9Pw==}
-    engines: {node: '>=18'}
 
   serialize-error@2.1.0:
     resolution: {integrity: sha512-ghgmKt5o4Tly5yEG/UJp8qTd0AN7Xalw4XBtDEKP655B699qMEtra1WlXeE6WIvdEG481JvRxULKsInq/iNysw==}
@@ -11320,10 +11313,6 @@ snapshots:
       statuses: 2.0.1
     transitivePeerDependencies:
       - supports-color
-
-  serialize-error@12.0.0:
-    dependencies:
-      type-fest: 4.41.0
 
   serialize-error@2.1.0: {}
 
