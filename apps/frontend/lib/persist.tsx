@@ -17,7 +17,6 @@ import {
   type SheetModel,
   UnsupportedTemplateError,
 } from '@tms/sheet-core'
-import Constants from 'expo-constants'
 import {
   createContext,
   type ReactNode,
@@ -32,6 +31,9 @@ import {
   type UserStorage,
 } from '../sheet/sync/kv'
 import { useSession } from './session/SessionProvider'
+import { APP_VERSION } from './version'
+
+export { APP_VERSION }
 
 // Cache de leitura persistido (doc/arquitetura §7.1 e §7.2): só templates e
 // fichas, por usuário, apagado no logout. O que vem do disco é input hostil:
@@ -40,8 +42,6 @@ import { useSession } from './session/SessionProvider'
 
 export const CACHE_KEY = 'query-cache'
 export const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
-// Outra versão do app descarta o cache inteiro
-export const APP_VERSION = Constants.expoConfig?.version ?? '0'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ROLES = new Set(['owner', 'storyteller'])
@@ -229,6 +229,8 @@ export const useUserStorage = (): UserStorage | null =>
 export function OfflineProvider({
   storage,
   children,
+  // Outra versão do app descarta este cache de leitura inteiro (cada release, uma
+  // vez). O outbox e os rascunhos ficam em outras chaves e não saem com ele
   buster = APP_VERSION,
   maxAge = CACHE_MAX_AGE_MS,
 }: {

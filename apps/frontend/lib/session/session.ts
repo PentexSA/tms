@@ -1,3 +1,4 @@
+import { withErrorCode } from '../errors'
 import { NO_STORE_HEADERS } from '../noStore'
 import type {
   SessionChannel,
@@ -446,7 +447,9 @@ export class Session {
       const data = (await res.json().catch(() => ({}))) as { error?: unknown }
       throw new AuthError(
         res.status,
-        typeof data.error === 'string' ? data.error : OFFLINE
+        typeof data.error === 'string'
+          ? withErrorCode(data.error, res.status, data)
+          : OFFLINE
       )
     }
     const data = (await res.json()) as TokenResponse

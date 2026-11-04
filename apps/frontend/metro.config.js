@@ -42,4 +42,10 @@ config.resolver.resolveRequest = (context, name, platform) =>
     ? { type: 'sourceFile', filePath: SOURCE[name] }
     : (upstream ?? context.resolveRequest)(context, name, platform)
 
+// Constants.expoConfig vem do manifesto que o Babel inlina no transform, e a
+// chave do cache do Metro não olha o app.json: sem isto, o bundle sai com a versão
+// anterior (no x-tms-client-version e no buster do cache persistido) em toda
+// máquina com cache, a cada release.
+config.cacheVersion = require('./app.json').expo.version
+
 module.exports = withNativeWind(config, { input: './global.css' })

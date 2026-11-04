@@ -378,6 +378,30 @@ describe('OfflineProvider', () => {
     second.view.unmount()
   })
 
+  it('cache de outra versão sai sozinho: fila e rascunhos ficam', async () => {
+    const storage = createMemoryStorage()
+    const prefix = userPrefix(A.id)
+    const key = `${prefix}${CACHE_KEY}`
+    const outbox = `${prefix}outbox:ficha-1`
+    const draft = `${prefix}draft:ficha-1`
+    await storage.setItem(
+      key,
+      JSON.stringify(
+        client([query(CHARACTER_KEY, character())], { buster: '0.0.0' })
+      )
+    )
+    await storage.setItem(outbox, '[{"clientBatchId":"edicao-offline"}]')
+    await storage.setItem(draft, '{"v":1}')
+
+    const view = app(storage, sessionFor(A))
+    await view.view.findByText('signedIn')
+    await waitFor(() => expect(storage.data.has(key)).toBe(false))
+
+    expect(storage.data.get(outbox)).toContain('edicao-offline')
+    expect(storage.data.get(draft)).toBe('{"v":1}')
+    view.view.unmount()
+  })
+
   it('sem sessão não há storage de usuário', async () => {
     const storage = createMemoryStorage()
     const session = new Session({

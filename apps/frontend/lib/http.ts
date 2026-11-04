@@ -1,10 +1,29 @@
 import { NO_STORE_HEADERS } from './noStore'
+import { APP_VERSION } from './version'
 
 export const REQUEST_TIMEOUT_MS = 10_000
 
+// Só para observar qual versão gerou cada log. Não é o x-tms-client, cujo valor
+// `native` decide o transporte do refresh token.
+const CLIENT_VERSION_HEADER = 'x-tms-client-version'
+
+const withClientVersion = (
+  input: RequestInfo | URL,
+  init: RequestInit
+): Headers => {
+  // O `headers` do init substitui os do Request: sem ele, os do Request valem
+  const isRequest = typeof Request !== 'undefined' && input instanceof Request
+  const headers = new Headers(
+    init.headers ?? (isRequest ? input.headers : undefined)
+  )
+  headers.set(CLIENT_VERSION_HEADER, APP_VERSION)
+  return headers
+}
+
 /**
  * fetch com timeout: aborta a requisição após REQUEST_TIMEOUT_MS
- * ou quando o signal recebido (ex: do TanStack Query) for abortado
+ * ou quando o signal recebido (ex: do TanStack Query) for abortado. Todo pedido
+ * do app à API passa por aqui (Eden e POST de sessão) e leva a versão do app.
  */
 export const fetchWithTimeout = (
   input: RequestInfo | URL,
@@ -17,9 +36,11 @@ export const fetchWithTimeout = (
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', () => controller.abort(), { once: true })
 
-  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
-    clearTimeout(timeout)
-  )
+  return fetch(input, {
+    ...init,
+    headers: withClientVersion(input, init),
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout))
 }
 
 export interface AuthFetchSession {
