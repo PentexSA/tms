@@ -12,3 +12,7 @@
 e2e/test-results
 e2e/playwright-report
 *.log
+# O Render copia os secret files para a raiz do contexto: sem isto, o COPY . .
+# levaria o token do Sentry para uma camada da imagem
+sentry_auth_token
+**/sentry_auth_token
