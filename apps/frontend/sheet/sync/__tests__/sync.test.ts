@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
+import { captureError } from '../../../lib/telemetry'
 import { sheetFor } from '../../../test/fixtures'
 import { sheetKeys } from '../../data'
 import { createSheetStore } from '../../store/sheetStore'
@@ -13,6 +14,9 @@ import {
 } from '../sync'
 
 // Etapa 16: fila + envio + store + cache, sem tela.
+
+jest.mock('../../../lib/telemetry', () => ({ captureError: jest.fn() }))
+beforeEach(() => jest.mocked(captureError).mockClear())
 
 const ID = '00000000-0000-4000-8000-00000000c001'
 const { model, sheet } = sheetFor('helena', ['owner'])
@@ -585,5 +589,65 @@ describe('o "Salvar" recusado com a ficha fechada volta ao rascunho guardado', (
       { path: 'values.strength', from: 2, to: 4 },
       { path: 'values.dexterity', from: 2, to: 3 },
     ])
+  })
+})
+
+// Fase 3: o que vai ao error tracking é perda de edição do usuário; o fluxo
+// normal (conflito, ficha sumida, política) não
+describe('error tracking', () => {
+  const rejectWith = async (status: number, body: unknown = null) => {
+    const { store } = setup(() => ({ status, body }))
+    await flush()
+    store.getState().commit([blood(9, 8)], 'Sangue −1')
+    await flush()
+  }
+
+  it.each([400, 413, 422, 403])(
+    '%s sem código de política: só o status e a quantidade de eventos',
+    async status => {
+      await rejectWith(status, { error: 'Helena Varga', issues: [] })
+      expect(captureError).toHaveBeenCalledTimes(1)
+      const [error, context] = jest.mocked(captureError).mock.calls[0] ?? []
+      expect(String(error)).toBe(`Error: sync recusado: ${status}`)
+      expect(context).toEqual({
+        source: 'sync',
+        tags: { status: String(status), events: '1' },
+        fingerprint: ['sync', 'rejected', String(status)],
+      })
+      expect(JSON.stringify(jest.mocked(captureError).mock.calls)).not.toMatch(
+        /Helena|values\.blood/
+      )
+    }
+  )
+
+  it.each([
+    ['409', 409, null],
+    ['404', 404, null],
+    ['403 de política', 403, { code: 'SHEET_LOCKED' }],
+  ])('%s é fluxo normal: nada enviado', async (_, status, body) => {
+    await rejectWith(status, body)
+    expect(captureError).not.toHaveBeenCalled()
+  })
+
+  it('falha do enqueue: sem a mensagem do armazenamento', async () => {
+    const outbox: Outbox = {
+      ...createMemoryOutbox(),
+      enqueue: async () => {
+        throw new Error('disco cheio: Helena Varga')
+      },
+    }
+    const { store } = setup(() => ({ status: 200, body: null }), outbox)
+    await flush()
+    store.getState().commit([blood(9, 8)], 'Sangue −1')
+    await flush()
+    expect(captureError).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(jest.mocked(captureError).mock.calls)).not.toContain(
+      'Helena'
+    )
+    expect(jest.mocked(captureError).mock.calls[0]?.[1]).toEqual({
+      source: 'sync',
+      tags: { events: '1' },
+      fingerprint: ['sync', 'enqueue'],
+    })
   })
 })

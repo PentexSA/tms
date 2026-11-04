@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { type Issue, MAX_EVENTS_PER_BATCH, parsePath } from '@tms/sheet-core'
 import { chronicleKeys } from '../../lib/queries/chronicles'
+import { captureError } from '../../lib/telemetry'
 import { sheetKeys } from '../data'
 import { refusalCodeOf, refusalReason } from '../policy'
 import type {
@@ -298,6 +299,23 @@ export function createSync(deps: SyncDeps): Sync {
       },
       rejected(characterId, batch, status, body) {
         answered()
+        // Perda de edição do usuário. O 409 (conflito), o 404 e o 403 de
+        // política (travada, concluída) são fluxo normal. Sai só o status e a
+        // quantidade de eventos: nunca caminho, valor nem corpo
+        if (
+          status === 400 ||
+          status === 413 ||
+          status === 422 ||
+          (status === 403 && !refusalCodeOf(body))
+        )
+          captureError(new Error(`sync recusado: ${status}`), {
+            source: 'sync',
+            tags: {
+              status: String(status),
+              events: String(batch.events.length),
+            },
+            fingerprint: ['sync', 'rejected', String(status)],
+          })
         const store = stores.get(characterId)?.getState()
         store?.rejected(
           batch.clientBatchId,
@@ -342,6 +360,12 @@ export function createSync(deps: SyncDeps): Sync {
           void sender.kick(characterId)
         },
         error => {
+          // O erro do armazenamento não vai junto: a mensagem dele não é nossa
+          captureError(new Error('sync: lote não coube no aparelho'), {
+            source: 'sync',
+            tags: { events: String(batch.events.length) },
+            fingerprint: ['sync', 'enqueue'],
+          })
           stores.get(characterId)?.getState().rejected(batch.clientBatchId)
           notify(`Não foi possível guardar “${batch.label}” no aparelho.`)
           throw error

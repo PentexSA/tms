@@ -2,7 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Try } from 'expo-router/build/views/Try'
 
+import { captureError } from '../../lib/telemetry'
 import CharacterRoute, { ErrorBoundary } from '../(app)/characters/[id]'
+
+jest.mock('../../lib/telemetry', () => ({ captureError: jest.fn() }))
 
 // O ?mode=evolve da criação vale só na chegada: recarregar ou voltar para a
 // ficha abre no modo padrão do papel (dono em Jogo), não num Evoluir vazio.
@@ -72,6 +75,12 @@ describe('ErrorBoundary da ficha', () => {
     expect(screen.queryByRole('button', { name: 'Recarregar' })).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(retry).toHaveBeenCalled()
+  })
+
+  it('avisa o error tracking: este boundary engole o erro antes da raiz', () => {
+    const error = new Error('x')
+    render(<ErrorBoundary error={error} retry={() => Promise.resolve()} />)
+    expect(captureError).toHaveBeenCalledWith(error, { source: 'boundary' })
   })
 
   it('voltar sem histórico vai para as crônicas', () => {
