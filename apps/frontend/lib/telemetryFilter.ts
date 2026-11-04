@@ -64,6 +64,9 @@ export interface EventLike {
     }[]
   }
   breadcrumbs?: BreadcrumbLike[]
+  debug_meta?: {
+    images?: { type?: string; code_file?: string; debug_id?: string }[]
+  }
 }
 export interface BreadcrumbLike {
   type?: string
@@ -78,6 +81,30 @@ const MAX_FRAMES = 50
 const MAX_BREADCRUMBS = 20
 const SAFE_NAME = /^[A-Za-z_$][\w$.]{0,63}$/
 const SAFE_TAG = /^[\w.:-]{1,64}$/
+
+const DEBUG_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Os debug ids dos bundles (type `sourcemap`): é por eles que o Sentry casa o
+ * stack com os source maps enviados no build. Sem isto o stack chega minificado.
+ */
+function debugImages(event: EventLike) {
+  const images = (event.debug_meta?.images ?? [])
+    .filter(
+      i =>
+        i.type === 'sourcemap' &&
+        typeof i.debug_id === 'string' &&
+        DEBUG_ID.test(i.debug_id) &&
+        scrubUrl(i.code_file)
+    )
+    .map(i => ({
+      type: 'sourcemap',
+      code_file: scrubUrl(i.code_file),
+      debug_id: i.debug_id,
+    }))
+  return images.length ? { debug_meta: { images } } : {}
+}
 
 const TAGS = ['source', 'request_id', 'status', 'events'] as const
 
@@ -190,6 +217,7 @@ export function scrubWebEvent<T extends EventLike>(event: T): EventLike {
       }),
     },
     ...(breadcrumbs.length ? { breadcrumbs } : {}),
+    ...debugImages(event),
   }
 }
 

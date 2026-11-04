@@ -144,6 +144,31 @@ describe('scrubWebEvent', () => {
     })
   })
 
+  it('mantém só os debug ids de source map, com a URL limpa', () => {
+    const out = scrubWebEvent({
+      debug_meta: {
+        images: [
+          {
+            type: 'sourcemap',
+            code_file: `https://app.test/a.js?x=${NOTE}`,
+            debug_id: UUID,
+          },
+          { type: 'sourcemap', code_file: '/b.js', debug_id: NOTE },
+          { type: 'macho', code_file: '/c', debug_id: UUID },
+        ],
+      },
+    })
+    expect(out.debug_meta).toEqual({
+      images: [
+        {
+          type: 'sourcemap',
+          code_file: 'https://app.test/a.js',
+          debug_id: UUID,
+        },
+      ],
+    })
+  })
+
   it('SyntaxError perde a mensagem, que repete a entrada do JSON.parse', () => {
     const out = scrubWebEvent({
       exception: { values: [{ type: 'SyntaxError', value: NOTE }] },
