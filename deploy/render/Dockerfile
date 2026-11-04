@@ -21,9 +21,12 @@ RUN pnpm turbo run build --filter "@tms/api..." --filter "frontend..."
 
 # Os dois bundles saem com o layout do repo (apps/api/src, packages/db/src):
 # o productTemplate da migration 0020 lê ../../../design/templates a partir
-# deles, então os JSON vão para o mesmo lugar relativo
-RUN bun build apps/api/src/server.ts packages/db/src/migrate.ts \
+# deles, então os JSON vão para o mesmo lugar relativo. A imagem final não tem
+# package.json: o release dos logs (@tms/logger) entra aqui, como constante
+RUN RELEASE=$(node -p "require('./package.json').version") \
+ && bun build apps/api/src/server.ts packages/db/src/migrate.ts \
       --outdir /out --target bun \
+      --define "process.env.TMS_RELEASE=\"$RELEASE\"" \
  && mkdir -p /out/design/templates \
  && cp design/templates/*.json /out/design/templates/
 

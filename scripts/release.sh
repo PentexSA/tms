@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Corte de release: sobe o "version" do package.json da raiz (semver) num
-# commit em cima da origin/main, marca com a tag vX.Y.Z e leva a branch
+# Corte de release: sobe o "version" do package.json da raiz (semver) e o do
+# apps/frontend/app.json, o mesmo número, num commit em cima da origin/main,
+# marca com a tag vX.Y.Z e leva a branch
 # `release`, a que o Render publica, até esse commit. Só avança
 # (fast-forward): o que está no ar sempre veio da main.
 #
@@ -64,12 +65,15 @@ read -r -p "Publicar? [s/N] " ok
 WT=$(mktemp -d)
 trap 'git worktree remove --force "$WT" >/dev/null 2>&1 || true; rm -rf "$WT"' EXIT
 git worktree add --quiet --detach "$WT" origin/main
-node -e '
-  const fs = require("fs")
-  const [file, version] = process.argv.slice(1)
-  const text = fs.readFileSync(file, "utf8")
-  fs.writeFileSync(file, text.replace(/"version": "[^"]*"/, `"version": "${version}"`))
-' "$WT/package.json" "$NEXT"
+# Só o primeiro "version" de cada arquivo: no app.json, é o do app
+for FILE in package.json apps/frontend/app.json; do
+  node -e '
+    const fs = require("fs")
+    const [file, version] = process.argv.slice(1)
+    const text = fs.readFileSync(file, "utf8")
+    fs.writeFileSync(file, text.replace(/"version": "[^"]*"/, `"version": "${version}"`))
+  ' "$WT/$FILE" "$NEXT"
+done
 # Sem os hooks: o worktree não tem node_modules, e o commit só muda a versão
 git -C "$WT" commit --quiet --no-verify -am "chore(release): $TAG"
 git -C "$WT" tag -a "$TAG" -m "Release $TAG"

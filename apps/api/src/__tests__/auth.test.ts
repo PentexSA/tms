@@ -783,7 +783,10 @@ describe('CORS, cabeçalhos e erros', () => {
       )
       expect(res.status).toBe(500)
       const text = await res.text()
-      expect(JSON.parse(text)).toEqual({ error: 'erro interno' })
+      expect(JSON.parse(text)).toEqual({
+        error: 'erro interno',
+        requestId: res.headers.get('x-request-id'),
+      })
       expect(text).not.toContain('at ')
       expectNoStore(res)
     } finally {

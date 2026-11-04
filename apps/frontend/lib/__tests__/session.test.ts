@@ -35,6 +35,30 @@ describe('Session (nativo: refresh no corpo, secure store)', () => {
     )
   })
 
+  it('500 no login mostra o código do erro', async () => {
+    const { session } = testSession(() =>
+      json(500, {
+        error: 'erro interno',
+        requestId: '3f2a9c1e-7b4d-4a10-9e2f-0123456789ab',
+      })
+    )
+    await expect(session.login('a@b.test', 'senha')).rejects.toEqual(
+      new AuthError(500, 'erro interno (código do erro: 3f2a9c1e)')
+    )
+  })
+
+  it('502 do proxy, sem corpo da API: a mensagem de conexão, sem código', async () => {
+    const { session } = testSession(
+      () => new Response('<html>bad gateway</html>', { status: 502 })
+    )
+    await expect(session.login('a@b.test', 'senha')).rejects.toEqual(
+      new AuthError(
+        502,
+        'Não foi possível falar com o servidor. Verifique a conexão.'
+      )
+    )
+  })
+
   it('erro da API vira AuthError com a mensagem genérica dela', async () => {
     const { session } = testSession(() =>
       json(401, { error: 'e-mail ou senha incorretos' })

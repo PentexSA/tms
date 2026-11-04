@@ -14,16 +14,39 @@ export function isNetworkError(error: unknown): boolean {
   return status === undefined || status === 0 || value instanceof Error
 }
 
+const REQUEST_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Num 5xx da API, acrescenta o código que a pessoa cita ao relatar o erro: os
+ * 8 primeiros caracteres do `requestId`, que bastam para achar a linha com
+ * busca por substring no log. Sem id válido (502 do proxy), a mensagem fica como está.
+ */
+export function withErrorCode(
+  message: string,
+  status: unknown,
+  body: unknown
+): string {
+  if (typeof status !== 'number' || status < 500) return message
+  const id =
+    body && typeof body === 'object'
+      ? (body as { requestId?: unknown }).requestId
+      : undefined
+  if (typeof id !== 'string' || !REQUEST_ID.test(id)) return message
+  return `${message} (código do erro: ${id.slice(0, 8)})`
+}
+
 export function messageOf(
   error: unknown,
   fallback = 'Algo deu errado'
 ): string {
   if (error && typeof error === 'object') {
     if (isNetworkError(error)) return OFFLINE
-    const value = (error as { value?: unknown }).value
+    const { status, value } = error as { status?: unknown; value?: unknown }
     if (value && typeof value === 'object') {
       const message = (value as { error?: unknown }).error
-      if (typeof message === 'string' && message) return message
+      if (typeof message === 'string' && message)
+        return withErrorCode(message, status, value)
     }
   }
   return fallback

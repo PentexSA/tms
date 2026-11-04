@@ -238,7 +238,9 @@ pnpm release minor        # 1.0.0 -> 1.1.0
 pnpm release major        # 1.0.0 -> 2.0.0
 ```
 
-O corte sobe o `version` do `package.json` da raiz num commit
+O corte sobe o `version` do `package.json` da raiz e o do
+`apps/frontend/app.json` (a versão que o app manda à API e o `buster` do cache de
+leitura, descartado uma vez a cada release) num commit
 `chore(release): vX.Y.Z` em cima da `origin/main`, cria a tag `vX.Y.Z` e leva a
 `release` até ele, num push atômico (main, release e tag, ou nada). Só avança
 (fast-forward), pede confirmação e não mexe na sua árvore. Para voltar atrás,

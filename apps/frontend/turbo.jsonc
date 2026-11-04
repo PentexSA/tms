@@ -3,12 +3,21 @@
   "extends": ["//"],
   "tasks": {
     // Os testes montam as fichas a partir de design/templates: mudar um
-    // template invalida o cache dos testes.
+    // template invalida o cache dos testes. O package.json da raiz é o outro lado
+    // de lib/__tests__/version.test.ts.
     "test": {
-      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/design/templates/**",
+        "$TURBO_ROOT$/package.json"
+      ]
     },
     "test:coverage": {
-      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/design/templates/**"]
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/design/templates/**",
+        "$TURBO_ROOT$/package.json"
+      ]
     }
   }
 }

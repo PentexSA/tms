@@ -1,5 +1,8 @@
-import { expect, test } from '@playwright/test'
-import { API_URL } from '../env'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { expect, type Page, test } from '@playwright/test'
+import { API_URL, WEB_URL } from '../env'
+import { signUp } from '../support/users'
 
 // Etapa 22: os cabeçalhos de segurança da hospedagem do web, gerados por
 // scripts/web-headers.mjs em dist/_headers. Os outros specs já rodam sob
@@ -59,4 +62,76 @@ test('a API de verdade responde com no-store', async ({ request }) => {
       'cache-control': 'no-store',
       pragma: 'no-cache',
     })
+})
+
+// Fase 2 de observabilidade: no export web, Constants.expoConfig precisa trazer
+// a versão do app.json (sem cair no '0' nem na do cache do Metro), e o preflight
+// aceitar o header. Um teste por caminho, cada um com o seu navegador: um refresh
+// recusado marca a sessão como encerrada, e o app não tenta de novo (T-74).
+const ROOT_VERSION = (
+  JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as {
+    version: string
+  }
+).version
+
+const watchVersions = (page: Page) => {
+  const sent = new Map<string, string | undefined>()
+  page.on('request', async request => {
+    if (!request.url().startsWith(API_URL)) return
+    const { pathname } = new URL(request.url())
+    const headers = await request.allHeaders()
+    sent.set(`${request.method()} ${pathname}`, headers['x-tms-client-version'])
+  })
+  return sent
+}
+
+test('o POST de sessão manda a versão da raiz', async ({ page }) => {
+  const sent = watchVersions(page)
+  await page.goto('/login')
+  await page.getByLabel('E-mail').fill('ninguem@example.test')
+  await page.getByLabel('Senha').fill('qualquer senha errada')
+  await page.getByRole('button', { name: 'Entrar' }).click()
+  await expect(page.getByRole('alert')).toContainText(
+    'e-mail ou senha incorretos'
+  )
+  await expect.poll(() => sent.get('POST /auth/login')).toBe(ROOT_VERSION)
+})
+
+test('o Eden manda a versão da raiz, com a sessão pelo refresh', async ({
+  page,
+  context,
+}) => {
+  const sent = watchVersions(page)
+  await signUp(context, 'versao')
+  await page.goto('/')
+  await expect.poll(() => sent.get('GET /chronicles')).toBe(ROOT_VERSION)
+  await expect.poll(() => sent.get('POST /auth/refresh')).toBe(ROOT_VERSION)
+  for (const [call, value] of sent)
+    if (!call.startsWith('OPTIONS')) expect(value, call).toBe(ROOT_VERSION)
+})
+
+test('o preflight aceita o header e o navegador lê o x-request-id', async ({
+  page,
+  request,
+}) => {
+  const preflight = await request.fetch(`${API_URL}/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: WEB_URL,
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'x-tms-client-version',
+    },
+  })
+  expect(preflight.status()).toBe(204)
+  expect(preflight.headers()['access-control-allow-headers']).toContain(
+    'x-tms-client-version'
+  )
+
+  // De outra origem, o fetch só enxerga o header exposto pelo CORS
+  await page.goto('/login')
+  const id = await page.evaluate(
+    async url => (await fetch(`${url}/nao-existe`)).headers.get('x-request-id'),
+    API_URL
+  )
+  expect(id).toMatch(/^[0-9a-f-]{36}$/)
 })
