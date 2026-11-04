@@ -15,7 +15,7 @@ As estimativas de esforço são aproximadas.
 | 1 | Aviso quando o site cai | UptimeRobot | 30 min, sem código |
 | 2 | Logs que explicam um erro 500 | Pino (já instalado) | meio dia |
 | 3 | Error tracking da API e do web | Sentry | 1–2 dias |
-| 4 | Logs centralizados e pesquisáveis | Sentry Logs | 1–2 h |
+| 4 | Logs centralizados e pesquisáveis | Sentry Logs | meio dia |
 | 5 | Analytics de produto e funis | PostHog | 1–2 dias |
 | 6 | Traces do app até o banco | Sentry Tracing | 1 dia |
 | 7 | Métricas, painéis e alertas | Sentry Metrics | 1–2 dias |
@@ -303,19 +303,192 @@ certa, e o teste canário passa.
 
 ### Fase 4. Logs centralizados
 
-**Ferramenta:** `pinoIntegration` do Sentry. O logger não muda, os logs passam a
-ser pesquisáveis por 30 dias e ficam ligados aos erros.
+**Ferramenta:** `pinoIntegration` do Sentry, no mesmo projeto e SDK da Fase 3
+(`@sentry/bun` 11.8.0). O logger não muda: o stdout do Render continua igual, e os
+logs passam a ser pesquisáveis por 30 dias, com `requestId`, `route` e
+`clientVersion` como filtros. Só a API entra nesta fase. O web não manda log, porque
+o erro do web já vai pela Fase 3 e `console.log` de navegador não é trilha de negócio.
 
-1. Ativar a integração com níveis `info` para cima. O projeto usa Pino 10.4, dentro
-   da faixa suportada (`>=8 <11`).
-2. **Validar no bundle do `bun build`**, porque a documentação cobre o SDK do Bun
-   mas não fala do Elysia nem de bundling.
-3. Acompanhar o volume na primeira semana (cota de 5 GB).
+**Validação feita antes (etapa 0)**
 
-**Plano B:** Render Log Stream para o Better Stack, sem código: 3 GB com 3 dias de
-retenção, "free for personal projects".
+Em 04/11/2026, com Bun 1.4.3 (o do deploy), `@sentry/bun` 11.8.0 e Pino 10.4.0, num
+`bun build --target bun` como o do Dockerfile e com transporte falso. Falta só o que
+depende de conta real (ver "Verificação no deploy").
 
-**Pronto quando:** dá para achar um `requestId` no Sentry.
+- **Funciona no bundle.** A integração não faz monkey-patch: ela assina o canal de
+  diagnóstico `pino_asJson`, que o próprio Pino publica. Chegaram linhas dos loggers
+  `api` e `db`, sem o `--external` e o `node_modules` que o §2 descarta. O stdout saiu
+  idêntico com e sem a integração, e `debug` não saiu.
+- **`enableLogs` não existe mais no SDK 11.** Não está nos tipos nem no código, e o
+  envio de logs depende só da integração. Passar a opção quebraria o `tsc`.
+- **O que a integração copia:** todos os campos do log, menos `level`, `time`, `pid` e
+  `hostname`. Isso inclui `path` e **`msg`**, os dois com o caminho cru, que pode trazer
+  UUID e código de convite. O corpo do log também traz esse caminho. O SDK acrescenta
+  `sentry.*`, `server.address` e `pino.logger.level`.
+- **Tipos não simples viram texto.** `null` chega como a string `"null"`, e um objeto
+  vira JSON: o `error` do `onError` iria inteiro, com a mensagem, o stack e o `cause`.
+- **Envio em lote:** a cada 5 s, 100 linhas ou 800 KB. Um `SIGTERM` pode perder até 5 s
+  de logs, que continuam no stdout.
+- **Custo:** cerca de 33 µs por linha, contra 5 µs sem a integração, e 7 MB a mais de
+  RSS depois de 20 mil linhas (de 53 para 60 MB, após o GC). Não pesa no caminho da
+  requisição. A medida no container do Render ainda falta.
+- **Filtro que lança não derruba nada:** o SDK descarta a linha e segue.
+- **Sem ligação automática entre log e issue.** Sem traces, todas as linhas do processo
+  saíram com o mesmo `trace_id`, e o `scrubEvent` não manda `contexts` no evento. Até a
+  Fase 6, o que liga os dois é o `requestId`.
+
+**Implementação**
+
+1. **`scrubLog()` em `apps/api/src/telemetry.ts`**, pura, ao lado do `scrubEvent`. Como
+   na Fase 3, o log do SDK é descartado e remontado com `level`, `message` e os
+   atributos abaixo. O tipo vem de `Sentry.BunOptions['beforeSendLog']`, porque o
+   `@sentry/bun` não reexporta `Log`.
+
+   | Atributo | Regra |
+   |---|---|
+   | `name`, `requestId`, `route`, `clientVersion`, `event` | texto de até 100 caracteres, com `text()` |
+   | `method` | só `^[A-Z]{1,10}$` |
+   | `status`, `responseTime`, `duration`, `chronicles`, `characters` | só número finito |
+   | `query` | texto de até 500 caracteres (SQL com placeholders) |
+   | `error` | só o tipo curto (`^[\w$.]{1,64}$`); de objeto, `code` ou `name`. **Nunca mensagem nem stack** |
+   | `sentry.origin`, `sentry.release`, `sentry.environment`, `sentry.sdk.name`, `sentry.sdk.version`, `server.address` | copiados: é o que o Sentry usa para filtrar por release |
+
+   - **Não saem:** `path`, `msg`, `pino.logger.level` e qualquer campo fora da tabela.
+     Saem também `service` e `release`, repetidos em `server.address` e `sentry.release`,
+     e `userId` do `account.deleted`, que fica só no stdout: não serve para investigar
+     erro e não precisa ir a um terceiro.
+   - **`null` e `undefined` são omitidos**, para não virarem `"null"`.
+   - **Sem texto de erro no log:** a mensagem filtrada já está no issue, e a redação por
+     padrão não pega texto de nota. Assim, o log não abre um segundo caminho para ela.
+   - **Mensagem:** qualquer linha com `method` ou `path` é refeita como
+     `GET /chronicles/:id - 200`, ou `GET rota desconhecida - 404` sem template. Vale também
+     sem status (`status desconhecido`), porque o texto original traz o caminho. Nas demais,
+     passa por `redact` e limite de 300 caracteres. Com o campo `err` (`logger.error(erro)`,
+     em que o Pino usa a mensagem do erro como corpo), vira `erro sem filtro`. Nenhum código
+     da API faz isso hoje; o `migrate.ts` faz, em outro processo.
+   - **Depois do filtro**, o SDK só acrescenta `sentry.timestamp.sequence`, um número.
+2. **`initTelemetry`:** `Sentry.pinoIntegration({ log: { levels: ['info', 'warn', 'error',
+   'fatal'] }, error: { levels: [] } })` na lista explícita, ao lado das duas de erro não
+   tratado, e `beforeSendLog: scrubLog`. O `error.levels` já é vazio por padrão, mas fica
+   escrito: um `error` do Pino não pode virar issue, porque o `onError` já captura o 500 com
+   o filtro certo. Nenhuma variável nova: `SENTRY_DSN` já liga tudo.
+3. **Smoke:** `sendSmokeError` gera um `requestId`, grava `logger.error({ requestId },
+   'sentry smoke')` e captura o erro com o mesmo id, antes do `flush`. Em produção não há
+   rota que force um 500, então é isto que prova a ligação entre log e issue no deploy.
+
+**Testes**
+
+`apps/api/src/__tests__/telemetry-logs.test.ts`. Os valores marcados e o transporte saíram
+de `telemetry.test.ts` para `src/test/telemetry-canary.ts`, com um transporte por arquivo:
+
+- **`scrubLog`:** campo fora da lista descartado, `null` omitido, `error` em objeto vira
+  só o tipo, `query` limitada, mensagem refeita sem o caminho e `err` sem o texto do erro.
+- **Canário na app real**, sobre o **envelope serializado** das linhas de log: e-mail, JWT,
+  `Bearer` e texto de nota no caminho (também codificados, como o Elysia os entrega), na
+  query, em header, em cookie e no corpo, numa rota que responde 200, num 404 e num 500 que
+  lança esses valores. Nenhum aparece.
+- **Campos por origem**, com a lista exata de chaves: log de acesso, 404 (com `error:
+  NOT_FOUND`), `erro interno`, `account.deleted` (sem `userId`) e `query lenta`. Um campo
+  novo num log não aparece até entrar na tabela: falha para o lado seguro.
+- **Ligação:** num 500, o `requestId` do log é igual à tag `request_id` do evento e ao id
+  da resposta. O smoke faz o mesmo, e um `error` do Pino não gera evento.
+- **O que não sai:** `/health` não gera log, `debug` não sai mesmo com o Pino nesse nível
+  e, sem init, nada é enviado.
+- **Barreiras no código**, lendo os arquivos: só o `server.ts` chama `initTelemetry`,
+  `packages/db/src` não importa `@sentry` (o `migrate.ts` loga o erro cru) e `apps/api/src`
+  não usa `sql.lit` nem `sql.raw`, que levariam valores para o campo `query`.
+
+Três armadilhas confirmadas ao validar, que este arquivo trata:
+
+1. **O nível `silent` deixa o canário sempre verde.** Com `NODE_ENV=test`, o Pino não gera
+   a linha, o canal não dispara e o envelope fica vazio. O arquivo põe `level = 'info'` nos
+   loggers `api` e `db` no `beforeAll`, volta a `silent` no `afterAll` e **cada teste confere
+   primeiro que a linha esperada chegou**. O preço é ver algumas linhas de log na saída do
+   teste.
+2. **Cada `Sentry.init` soma um assinante ao canal**, que nunca sai: com dois inits, a
+   linha chega duas vezes. Só acontece em teste, mas o `bun test` compartilha o processo
+   entre arquivos e o `telemetry.test.ts` faz vários inits. Por isso: um init por arquivo,
+   e nunca contar linhas.
+3. **O lote só sai em 5 s:** `Sentry.flush` antes de ler o transporte.
+
+`apps/api/src/__tests__/telemetry-bundle.test.ts`: o canal é a suposição mais frágil, e a
+falha é silenciosa, porque os logs apenas param de chegar. O teste roda `bun build --target
+bun` em `src/test/telemetry-bundle-entry.ts`, que usa `createLogger` e `initTelemetry` com
+transporte falso, executa o bundle fora do repo com `NODE_ENV=production` e confere o
+envelope, o release do `--define` e que o stdout é igual com e sem DSN. É o que pega uma
+atualização do SDK, do Pino ou do Bun que quebre o canal.
+
+**Conferência dos testes e do bundle real**
+
+- **Os testes falham quando deveriam:** sem `beforeSendLog`, sem a integração, com `path` na
+  lista e com `error.levels: ['error']`, cada caso derruba testes. O último passou batido na
+  primeira versão, porque o `scrubEvent` tira o texto que o teste procurava, e agora o teste
+  compara a quantidade de eventos.
+- **`server.ts` real**, no bundle do Dockerfile, com `SENTRY_SMOKE=true` e o transporte HTTP
+  do SDK apontando para um coletor local: o issue e o log do smoke chegaram com o mesmo
+  `requestId`, o release do build e `server.address: tms-api`. Uma requisição com e-mail no
+  caminho e valor marcado na query saiu como `GET rota desconhecida - 404`, sem nenhum dos
+  dois, e continuou inteira no stdout. Falta o que depende de conta real, abaixo.
+
+**Verificação local**
+
+```bash
+cd apps/api && bun test src/__tests__/telemetry
+cd ../.. && npx pnpm typecheck && npx pnpm lint && npx pnpm test:api
+```
+
+**Verificação no deploy**
+
+1. Publicar com `SENTRY_SMOKE=true`. Em **Logs**, buscar `sentry smoke` e conferir o
+   `requestId`, o `sentry.release` e o `server.address`.
+2. Abrir o issue `sentry smoke` e conferir que a tag `request_id` é o mesmo id.
+3. Fazer uma requisição com um caminho marcado e conferir que ele não aparece nos Logs.
+4. Voltar `SENTRY_SMOKE` para `false` e anotar o RSS do serviço no painel do Render.
+
+**Volume**
+
+1. Cota de 5 GB de logs por mês. A linha filtrada do log de acesso, como vai no envelope,
+   tem cerca de **900 bytes**: 5 GB cabem em uns 5,5 milhões de linhas, ou cerca de 2
+   requisições por segundo o mês inteiro. Sobra folga para o tráfego atual, mas a forma
+   como o Sentry conta os bytes pode ser outra: confirmar em **Stats**.
+2. Se passar de 50% da cota na primeira semana: `scrubLog` devolve `null` para o log de
+   acesso com `status < 400`. Fica `warn`, `error` e as linhas de ciclo de vida. Não
+   implementar isso antes de precisar.
+3. Sem orçamento pay-as-you-go, como no §6: acima da cota, o Sentry recusa.
+
+**Como pesquisar**
+
+- Um relato de bug traz "código do erro: abc123" (Fase 2). Em **Logs**, a busca
+  `requestId:abc123` mostra o acesso e o erro; `request_id:abc123` em **Issues** leva ao
+  mesmo pedido. Os nomes diferem, e os valores são iguais.
+- Salvar três consultas: 5xx por `route` (`status:>=500`), rate limit (`status:429`) e
+  queries lentas (`message:"query lenta"`). O campo `msg` não sai. Conferir a sintaxe na
+  tela ao salvar, porque ela não pôde ser testada sem conta.
+
+**Plano B**
+
+- **Uma atualização quebra o canal** (o teste de bundle acusa): um destino do Pino próprio
+  em `packages/logger`, que repassa cada linha a `Sentry.logger.<nível>` com o mesmo
+  `scrubLog`. É mais código, mas independe do canal.
+- **Cota estoura ou o Sentry não serve:** Render Log Stream para o Better Stack, sem
+  código: 3 GB com 3 dias de retenção, "free for personal projects". Perde o filtro por
+  lista, que teria de ir para o stdout, e a retenção cai de 30 para 3 dias.
+
+**Riscos**
+
+- **Vazamento por campo novo:** coberto pela lista fechada.
+- **Vazamento pela mensagem:** o corpo do log é o único texto livre que sai. O log de
+  acesso é refeito, e o caso do `err` é tratado; uma mensagem escrita com valor de usuário
+  (`` logger.info(`nota ${texto}`) ``) só teria o `redact`. Na revisão, mensagem de log é
+  texto fixo.
+- **Duplicar o erro:** coberto por `error.levels: []`.
+- **Logs de `fatal` na queda do processo** podem não sair antes de o Render reiniciar.
+  Aceitável: o erro não tratado já sai pela Fase 3, com `Sentry.flush`.
+
+**Pronto quando:** o smoke mostra o log e o issue com o mesmo `requestId`, um caminho
+marcado não aparece nos Logs, os testes passam e o volume da primeira semana está abaixo
+de 50% da cota. O código e os testes estão feitos; a verificação no deploy e o volume
+dependem da conta do Sentry.
 
 ### Fase 5. Analytics de produto
 

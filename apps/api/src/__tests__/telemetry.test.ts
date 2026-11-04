@@ -11,6 +11,20 @@ import {
 } from '../telemetry'
 import { createUser } from '../test/factories'
 import { createTestContext, useTestDb } from '../test/helpers'
+import {
+  BEARER_TOKEN,
+  BODY_VALUE,
+  CANARIES,
+  COOKIE,
+  DB_PASSWORD,
+  DSN,
+  EMAIL,
+  fakeTransport,
+  HEADER_VALUE,
+  JWT,
+  NOTE,
+  QUERY_VALUE,
+} from '../test/telemetry-canary'
 
 // A Fase 3 na app real: o que o Sentry recebe. O transporte falso guarda o
 // envelope serializado (o que iria pela rede), e o canário prova que o texto
@@ -18,40 +32,7 @@ import { createTestContext, useTestDb } from '../test/helpers'
 
 useTestDb()
 
-const EMAIL = 'pessoa.canario@example.test'
-const JWT =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYW5hcmlvIn0.c2VncmVkby1kby1jYW5hcmlv'
-const BEARER_TOKEN = 'tokencanario123'
-const DB_PASSWORD = 'senha-canario'
-const NOTE = 'o vampiro esconde a carta da Camarilla'
-const COOKIE = 'refresh=cookiecanario999'
-const HEADER_VALUE = 'headercanario888'
-const QUERY_VALUE = 'querycanario777'
-const BODY_VALUE = 'corpocanario666'
-const CANARIES = [
-  EMAIL,
-  JWT,
-  BEARER_TOKEN,
-  DB_PASSWORD,
-  NOTE,
-  'vampiro',
-  'cookiecanario999',
-  HEADER_VALUE,
-  QUERY_VALUE,
-  BODY_VALUE,
-]
-
-const sent: string[] = []
-
-const transport = () => ({
-  send: async (envelope: unknown) => {
-    sent.push(JSON.stringify(envelope))
-    return {}
-  },
-  flush: async () => true,
-})
-
-const DSN = 'https://chave@o0.ingest.sentry.test/1'
+const { sent, transport } = fakeTransport()
 
 const start = () => {
   sent.length = 0
