@@ -185,6 +185,23 @@ describe('@tms/config - Environment Configuration', () => {
       expect(config.TRUST_PROXY).toBe(false)
     })
 
+    // Fase 3: variável em branco (.env.example, painel) é variável ausente
+    it('should treat blank SENTRY_DSN and SENTRY_SMOKE as unset', async () => {
+      process.env.SENTRY_DSN = ''
+      process.env.SENTRY_SMOKE = ''
+      const { config } = await import('../env')
+      expect(config.SENTRY_DSN).toBeUndefined()
+      expect(config.SENTRY_SMOKE).toBe(false)
+    })
+
+    it('should parse SENTRY_DSN and SENTRY_SMOKE', async () => {
+      process.env.SENTRY_DSN = 'https://chave@o0.ingest.sentry.io/1'
+      process.env.SENTRY_SMOKE = 'true'
+      const { config } = await import('../env')
+      expect(config.SENTRY_DSN).toBe('https://chave@o0.ingest.sentry.io/1')
+      expect(config.SENTRY_SMOKE).toBe(true)
+    })
+
     it('should parse TRUST_PROXY', async () => {
       process.env.TRUST_PROXY = 'true'
       const { config } = await import('../env')

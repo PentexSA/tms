@@ -7,6 +7,10 @@ const csv = z.string().transform(s =>
     .filter(Boolean)
 )
 
+// Variável em branco (`SENTRY_DSN=` do .env.example, valor vazio no painel) é
+// variável ausente
+const blankIsUnset = (v: unknown) => (v === '' ? undefined : v)
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -29,6 +33,14 @@ const configSchema = z
     TRUST_PROXY: z
       .enum(['true', 'false'])
       .default('false')
+      .transform(v => v === 'true'),
+    // Error tracking (Sentry, doc/plano-observabilidade.md Fase 3). Sem DSN a
+    // API não envia nada.
+    SENTRY_DSN: z.preprocess(blankIsUnset, z.url().optional()),
+    // true: no start, a API envia um erro de teste, para conferir o caminho
+    // até o Sentry. Sem DSN não faz nada.
+    SENTRY_SMOKE: z
+      .preprocess(blankIsUnset, z.enum(['true', 'false']).default('false'))
       .transform(v => v === 'true'),
     // Só no E2E: o navegador simula clientes distintos pelo header
     // x-tms-test-client-ip. Vale só com NODE_ENV=test (allowlist: um deploy

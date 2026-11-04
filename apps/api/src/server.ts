@@ -1,6 +1,13 @@
 import { config } from '@tms/config/env'
 import { createApp } from './index'
 import { logger } from './logger'
+import { initTelemetry, sendSmokeError } from './telemetry'
+
+// Error tracking só aqui: o index.ts (createApp) não envia nada nos testes
+if (initTelemetry()) {
+  logger.info('Error tracking ligado (Sentry)')
+  if (config.SENTRY_SMOKE) void sendSmokeError()
+}
 
 // Ponto de entrada do servidor; o index.ts só monta a app (testes e Eden)
 const app = createApp().listen(config.API_PORT)
