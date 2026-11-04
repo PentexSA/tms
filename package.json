@@ -1,6 +1,6 @@
 {
   "name": "tms",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "",
   "scripts": {
     "bootstrap": "pnpm install --frozen-lockfile && turbo run build --filter='@tms/api^...' --output-logs=errors-only",
