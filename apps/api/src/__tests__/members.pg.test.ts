@@ -21,8 +21,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 // real: o PGLite serializa tudo. Quem depende do vínculo trava primeiro a
 // linha de chronicle_members e depois as fichas, em ordem de id; quem trava
 // uma ficha nunca espera pelo vínculo. Nenhum cenário termina em deadlock
-// (o Postgres o reportaria como erro, e a rota daria 500). Roda no job
-// "postgres" do CI com PG_TEST_URL; só aceita banco *_test.
+// (o Postgres o reportaria como erro, e a rota daria 500). Roda com PG_TEST_URL; só aceita banco *_test.
 const URL_ = process.env.PG_TEST_URL
 
 const ROUNDS = 8

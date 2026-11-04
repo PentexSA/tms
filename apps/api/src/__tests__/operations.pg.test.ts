@@ -18,8 +18,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 // Operações em grupo concorrentes num Postgres real (doc/plano-v3.md, Etapa
 // 11): o PGLite serializa tudo. As fichas são travadas em ordem de id e a
 // idempotência é conferida depois das travas. Nenhum cenário termina em
-// deadlock (o Postgres o reportaria, e a rota daria 500). Roda no job
-// "postgres" do CI com PG_TEST_URL; só aceita banco *_test.
+// deadlock (o Postgres o reportaria, e a rota daria 500). Roda com PG_TEST_URL; só aceita banco *_test.
 const URL_ = process.env.PG_TEST_URL
 
 describe.skipIf(!URL_)('operações num Postgres real', () => {

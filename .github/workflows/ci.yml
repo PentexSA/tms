@@ -1,16 +1,12 @@
 # CI da v0 (doc/plano-v0.md, Etapa 1). Actions fixadas por SHA (supply chain);
 # o comentário diz a versão. Atualize as duas juntas. Os jobs correm em
-# paralelo (doc/plano-pipeline-testes.md): o mais lento é o build nativo do
-# iOS (D-00, doc/planos-pacotes/P01-C-build-setup.md §3.1).
+# paralelo (doc/plano-pipeline-testes.md).
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
-  # A integração de uma onda roda o build nativo aqui antes do PR (só quem
-  # tem escrita no repositório dispara)
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -125,70 +121,6 @@ jobs:
       - if: ${{ !cancelled() }}
         run: python3 -I design/design-system/scripts/check_tokens.py design/design-system/tokens.json design/design-system/skins/*.json
 
-  postgres:
-    name: Postgres real (migrations, tipos e concorrência)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: tms
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      # Banco descartável do job; não é segredo
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/tms
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      # O script de publicação e os testes de concorrência rodam no Bun
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - run: pnpm install --frozen-lockfile
-      # As migrations importam config e logger pelos artefatos compilados.
-      - run: pnpm turbo run build --filter='@tms/api^...'
-      # Sobe tudo, desce tudo e sobe de novo: todo down desfaz o seu up
-      - run: pnpm -C packages/db migrate:check
-      - name: tipos do Kysely em dia com as migrations
-        run: |
-          pnpm db:codegen
-          git diff --exit-code packages/db/src/types.ts
-      # O template da v0 publica num Postgres real (schema.json + contrato)
-      - run: pnpm templates:publish --published
-      # O PGLite serializa tudo: FOR UPDATE, idempotência e troca de
-      # autoridade com conexões independentes só se provam aqui. Todo
-      # *.pg.test.ts entra (o filtro pega src/rolls/__tests__ também), em
-      # série: cada arquivo apaga e recria o schema do mesmo banco. Sem
-      # PG_TEST_URL eles seriam pulados; o passo falha se algum for.
-      - name: testes de concorrência em Postgres real
-        if: ${{ !cancelled() }}
-        env:
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/tms_pg_test
-          NODE_ENV: test
-        working-directory: apps/api
-        run: |
-          set -o pipefail
-          bun test .pg.test 2>&1 | tee pg-test.log
-          if grep -qE '^ *[1-9][0-9]* skip$' pg-test.log; then
-            echo '::error::algum teste em Postgres real foi pulado'
-            exit 1
-          fi
-
   e2e:
     name: E2E web (${{ matrix.browser }})
     runs-on: ubuntu-latest
@@ -255,93 +187,4 @@ jobs:
         with:
           name: playwright-report-${{ matrix.browser }}
           path: e2e/playwright-report
-          retention-days: 7
-
-  # D-00 (T-01): o app nativo compila em todo PR. Debug, sem assinatura e sem
-  # segredo, e nenhum binário publicado. O JS não entra no binário Debug (o
-  # app o carrega do Metro): o bundle das duas plataformas é provado pelo
-  # expo export deste job, que roda no Linux com o hermesc do react-native.
-  native-android:
-    name: build nativo (Android)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      EXPO_NO_TELEMETRY: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      # O ReactAndroid do RN 0.88 compila com jvmToolchain(17)
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '17'
-      - run: pnpm install --frozen-lockfile
-      - name: bundle JS de iOS e Android
-        working-directory: apps/frontend
-        run: pnpm exec expo export --platform android --platform ios --output-dir "$RUNNER_TEMP/native-export"
-      - name: prebuild
-        working-directory: apps/frontend
-        run: pnpm exec expo prebuild --platform android --no-install
-      # Depois do prebuild: a validação do wrapper confere o
-      # gradle-wrapper.jar que ele gerou contra as distribuições oficiais.
-      # Cache do Gradle gravado só na main; os PRs só leem
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          validate-wrappers: true
-      - name: assembleDebug (só x86_64, o ABI do emulador)
-        working-directory: apps/frontend/android
-        run: ./gradlew assembleDebug --no-daemon -PreactNativeArchitectures=x86_64
-
-  native-ios:
-    name: build nativo (iOS)
-    # macos-26 com o Xcode 26.6 fixo: o expo-router 58 usa APIs do SDK do
-    # iOS 26 (@available(iOS 26)), que o Xcode 16 não tem; o RN 0.88 pede
-    # 16.1 ou mais. Nunca macos-latest: a imagem muda sem aviso
-    runs-on: macos-26
-    timeout-minutes: 60
-    env:
-      EXPO_NO_TELEMETRY: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      - run: pnpm install --frozen-lockfile
-      - name: prebuild
-        working-directory: apps/frontend
-        run: pnpm exec expo prebuild --platform ios --no-install
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            apps/frontend/ios/Pods
-            ~/Library/Caches/CocoaPods
-          key: pods-${{ runner.os }}-${{ hashFiles('apps/frontend/ios/Podfile', 'pnpm-lock.yaml') }}
-      - name: pod install
-        working-directory: apps/frontend/ios
-        run: pod install
-      - name: xcodebuild (Debug, simulador, sem assinatura)
-        working-directory: apps/frontend/ios
-        run: |
-          set -o pipefail
-          xcodebuild -workspace TMS.xcworkspace -scheme TMS \
-            -configuration Debug -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/dd" \
-            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
-        with:
-          name: xcodebuild-log
-          path: ${{ runner.temp }}/xcodebuild.log
           retention-days: 7

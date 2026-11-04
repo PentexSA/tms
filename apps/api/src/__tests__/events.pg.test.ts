@@ -17,7 +17,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 
 // Concorrência de verdade (doc/plano-v0.md, Etapa 15): o PGLite tem uma
 // conexão só e serializa tudo, então o SELECT ... FOR UPDATE só é posto à
-// prova num Postgres real. Roda no job "postgres" do CI com PG_TEST_URL.
+// prova num Postgres real. Roda com PG_TEST_URL.
 // O teste apaga o schema: só aceita banco cujo nome termina em _test.
 const URL_ = process.env.PG_TEST_URL
 
