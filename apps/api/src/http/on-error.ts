@@ -1,5 +1,9 @@
 import { logger } from '../logger'
-import { requestIdOf } from '../middlewares/loggerMiddleware'
+import {
+  parseClientVersion,
+  requestIdOf,
+} from '../middlewares/loggerMiddleware'
+import { captureServerError } from '../telemetry'
 import { ApiError } from './errors'
 import { safeError } from './safe-error'
 
@@ -15,6 +19,8 @@ interface ErrorContext {
   readonly code: string | number
   readonly error: unknown
   readonly request: Request
+  /** O template da rota (`/chronicles/:id`); vazio em rota inexistente. */
+  readonly route?: string
   readonly set: { status?: number | string; headers: Record<string, unknown> }
 }
 
@@ -28,7 +34,7 @@ const fieldsOf = (error: unknown): string[] => {
   ]
 }
 
-export function onError({ code, error, request, set }: ErrorContext) {
+export function onError({ code, error, request, route, set }: ErrorContext) {
   if (error instanceof ApiError) {
     set.status = error.status
     return { error: error.message, ...(error.details ?? {}) }
@@ -49,6 +55,15 @@ export function onError({ code, error, request, set }: ErrorContext) {
       // Nunca o erro cru, nem na chave `err`: o serializer do Pino incluiria a
       // mensagem e o stack originais
       logger.error({ requestId, error: safeError(error) }, 'erro interno')
+      // Único ponto de captura: o ApiError (4xx) e os demais casos já
+      // retornaram acima
+      captureServerError(error, {
+        clientVersion: parseClientVersion(
+          request.headers.get('x-tms-client-version')
+        ),
+        route: route || null,
+        requestId,
+      })
       return { error: 'erro interno', requestId }
     }
   }

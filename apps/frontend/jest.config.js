@@ -5,6 +5,11 @@ module.exports = {
   displayName: '@tms/frontend',
   rootDir: '.',
 
+  // O @sentry/react (telemetry.web.ts) sai em ESM: o Babel o transforma
+  transformIgnorePatterns: reactNative.transformIgnorePatterns.map(p =>
+    p.replace('|@electric-sql)', '|@electric-sql|@sentry/.*)')
+  ),
+
   // Setup file for test utilities and mocks
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
 

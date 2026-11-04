@@ -7,6 +7,7 @@ import {
 } from 'expo-router'
 import { useEffect, useState } from 'react'
 
+import { captureError } from '../../../lib/telemetry'
 import { SheetScreen } from '../../../sheet/SheetScreen'
 import { ReloadButton } from '../../../sheet/UnsupportedTemplate'
 
@@ -31,8 +32,12 @@ export default function CharacterRoute() {
  * nem a pilha do erro: elas podem repetir valores da ficha. Não afirma que a
  * ficha foi criada: a rota também abre por link, com qualquer id.
  */
-export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter()
+  // Este boundary engole o erro antes da raiz: quem avisa o error tracking é ele
+  useEffect(() => {
+    captureError(error, { source: 'boundary' })
+  }, [error])
   return (
     <Screen>
       <AppBar

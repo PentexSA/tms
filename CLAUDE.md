@@ -45,7 +45,7 @@ packages/
 
 **Database Layer**: Kysely provides type-safe SQL queries. The DB schema is defined in migrations (`packages/db/src/migrations/*.ts`). After schema changes, run `npx pnpm db:codegen` to regenerate TypeScript types in `packages/db/src/types.ts`.
 
-**Environment Variables**: Centralized in `@tms/config` package (`packages/config/src/env.ts`). Provides defaults for DATABASE_URL, API_PORT, and EXPO_PUBLIC_API_URL.
+**Environment Variables**: Centralized in `@tms/config` package (`packages/config/src/env.ts`). Provides defaults for DATABASE_URL, API_PORT, and EXPO_PUBLIC_API_URL. `SENTRY_DSN` and `SENTRY_SMOKE` are optional (blank counts as unset; without a DSN nothing is sent). Error tracking is described in `doc/plano-observabilidade.md` (Fase 3): the API sends only 5xx from `http/on-error.ts`, the web only through `lib/telemetry.web.ts`, and both rebuild the event from an allowlist of fields.
 
 **API Routes**: Defined in `apps/api/src/index.ts` (`createApp`, no `.listen`) using Elysia with Swagger docs at `/swagger`. `apps/api/src/server.ts` is the server entry point.
 
@@ -123,10 +123,10 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 #### Key Features
 
 - **@tms/sheet-core**: 981 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
-- **@tms/api**: 1873 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
+- **@tms/api**: 1901 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
 - **@tms/db**: 35 tests (Bun): migrations sobem e descem, banco de teste restaurável
 - **@tms/ui**: 197 tests (Jest)
-- **frontend**: 1318 tests (Jest + React Native Testing Library)
+- **frontend**: 1387 tests (Jest + React Native Testing Library)
 - Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
 #### E2E (Playwright, Chromium e WebKit)

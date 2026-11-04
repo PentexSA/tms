@@ -7,6 +7,8 @@
 //
 // Uso: node scripts/web-headers.mjs <dist> [url da API]
 // Sem o segundo argumento, usa EXPO_PUBLIC_API_URL (a mesma do bundle).
+// Com EXPO_PUBLIC_SENTRY_DSN (o do bundle), a origem do DSN entra no
+// connect-src, depois da origem da API, para o app enviar os erros.
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -26,6 +28,22 @@ try {
   process.exit(2)
 }
 
+// A origem do DSN (https://chave@o1.ingest.de.sentry.io/2 → https://o1.ingest.de.sentry.io).
+// DSN inválido avisa e segue sem ela: o build não depende do Sentry.
+let sentryOrigin
+const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN
+if (dsn) {
+  try {
+    const url = new URL(dsn)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error()
+    sentryOrigin = url.origin
+  } catch {
+    console.warn(
+      'EXPO_PUBLIC_SENTRY_DSN inválido: o connect-src segue sem a origem do Sentry'
+    )
+  }
+}
+
 const csp = [
   "default-src 'self'",
   "script-src 'self'",
@@ -33,7 +51,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
-  `connect-src 'self' ${origin}`,
+  `connect-src 'self' ${origin}${sentryOrigin ? ` ${sentryOrigin}` : ''}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -56,4 +74,6 @@ const body = [
   '',
 ].join('\n')
 writeFileSync(join(dist, '_headers'), body)
-console.log(`_headers ok: connect-src ${origin}`)
+console.log(
+  `_headers ok: connect-src ${origin}${sentryOrigin ? ` ${sentryOrigin}` : ''}`
+)

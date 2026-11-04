@@ -20,3 +20,17 @@ services:
         generateValue: true
       - key: TRUST_PROXY
         value: 'true'
+      # Error tracking (Sentry, doc/plano-observabilidade.md Fase 3). Sem DSN,
+      # nada é enviado e o build não sobe source maps. O DSN do web e os dois
+      # nomes abaixo entram no build como ARG (deploy/render/Dockerfile). O
+      # token de upload dos source maps é um secret file `sentry_auth_token`
+      # (painel do Render), nunca uma variável: variável vira ARG e fica no
+      # histórico da imagem.
+      - key: SENTRY_DSN
+        sync: false
+      - key: EXPO_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_ORG
+        sync: false
+      - key: SENTRY_PROJECT
+        sync: false

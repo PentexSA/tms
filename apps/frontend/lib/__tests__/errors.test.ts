@@ -1,4 +1,11 @@
-import { isNetworkError, messageOf, statusOf, withErrorCode } from '../errors'
+import {
+  classifyError,
+  isNetworkError,
+  messageOf,
+  requestIdOf,
+  statusOf,
+  withErrorCode,
+} from '../errors'
 
 // O Eden não lança em erro de rede: devolve status 503 com o erro do fetch em
 // `value` (e `response` indefinido). Um 503 de verdade traz o corpo da API.
@@ -75,5 +82,65 @@ describe('código do erro', () => {
   it('withErrorCode sem status numérico não muda nada', () => {
     expect(withErrorCode('m', undefined, { requestId: ID })).toBe('m')
     expect(withErrorCode('m', 500, null)).toBe('m')
+  })
+})
+
+// Fase 3: o que vale enviar ao error tracking
+describe('classifyError', () => {
+  const ID = '123e4567-e89b-42d3-a456-426614174000'
+
+  it.each([
+    ['4xx', { status: 404, value: { error: 'x' } }],
+    ['401', { status: 401, value: { error: 'x' } }],
+    ['falha de rede do Eden', network],
+    ['status 0', { status: 0, value: null }],
+    [
+      '5xx sem requestId (o 502 do proxy)',
+      { status: 502, value: 'Bad Gateway' },
+    ],
+    [
+      '5xx com requestId que não é UUID',
+      { status: 500, value: { requestId: 'abc' } },
+    ],
+    ['5xx com value nulo', { status: 500, value: null }],
+    ['AbortError', Object.assign(new Error('x'), { name: 'AbortError' })],
+    ['DOMException de abort', { name: 'AbortError', message: 'x' }],
+    ['fetch fora do Eden (Chrome)', new TypeError('Failed to fetch')],
+    ['fetch fora do Eden (Safari)', new TypeError('Load failed')],
+    [
+      'fetch fora do Eden (Firefox)',
+      new TypeError('NetworkError when attempting to fetch resource.'),
+    ],
+  ])('%s: ignore', (_, error) => {
+    expect(classifyError(error)).toBe('ignore')
+  })
+
+  it('5xx com requestId válido é http', () => {
+    expect(classifyError({ status: 500, value: { requestId: ID } })).toBe(
+      'http'
+    )
+    expect(classifyError({ status: 503, value: { requestId: ID } })).toBe(
+      'http'
+    )
+  })
+
+  it.each([
+    ['Error comum', new Error('x')],
+    [
+      'TypeError de código',
+      new TypeError('Cannot read properties of undefined'),
+    ],
+    ['valor lançado que não é erro', 'texto'],
+    ['null', null],
+    ['undefined', undefined],
+  ])('%s: bug', (_, error) => {
+    expect(classifyError(error)).toBe('bug')
+  })
+
+  it('requestIdOf só aceita UUID', () => {
+    expect(requestIdOf({ requestId: ID })).toBe(ID)
+    expect(requestIdOf({ requestId: 'x' })).toBeUndefined()
+    expect(requestIdOf(null)).toBeUndefined()
+    expect(requestIdOf('texto')).toBeUndefined()
   })
 })
