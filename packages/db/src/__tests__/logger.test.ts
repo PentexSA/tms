@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, it, spyOn } from 'bun:test'
 import type { LogEvent } from 'kysely'
-import { errorCode, kyselyLogger, logger } from '../logger'
+import { errorCode, kyselyLogger, logger, SLOW_QUERY_MS } from '../logger'
 
 const query = {
   sql: 'insert into "users" ("email", "hashed_password") values ($1, $2)',
@@ -19,6 +19,45 @@ describe('kyselyLogger', () => {
       expect(logged).not.toContain('pessoa@example.test')
       expect(logged).not.toContain('segredo')
     } finally {
+      debug.mockRestore()
+    }
+  })
+
+  it('query lenta: warn, com placeholders e sem parâmetros', () => {
+    const warn = spyOn(logger, 'warn')
+    const debug = spyOn(logger, 'debug')
+    try {
+      kyselyLogger({
+        level: 'query',
+        query,
+        queryDurationMillis: SLOW_QUERY_MS + 1,
+      })
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(debug).not.toHaveBeenCalled()
+      const logged = JSON.stringify(warn.mock.calls)
+      expect(logged).toContain('values ($1, $2)')
+      expect(logged).toContain('"duration":501')
+      expect(logged).not.toContain('pessoa@example.test')
+      expect(logged).not.toContain('segredo')
+    } finally {
+      warn.mockRestore()
+      debug.mockRestore()
+    }
+  })
+
+  it('no limite ainda é debug', () => {
+    const warn = spyOn(logger, 'warn')
+    const debug = spyOn(logger, 'debug')
+    try {
+      kyselyLogger({
+        level: 'query',
+        query,
+        queryDurationMillis: SLOW_QUERY_MS,
+      })
+      expect(warn).not.toHaveBeenCalled()
+      expect(debug).toHaveBeenCalledTimes(1)
+    } finally {
+      warn.mockRestore()
       debug.mockRestore()
     }
   })
