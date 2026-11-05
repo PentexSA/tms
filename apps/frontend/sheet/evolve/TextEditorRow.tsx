@@ -83,57 +83,58 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
         testID={`editor-${resolved.id}`}
       >
         {wrapped => (
-          <Pressable
-            testID={`editor-${resolved.id}`}
-            accessibilityRole="button"
-            {...fieldA11y(def.label, value || 'vazio')}
-            accessibilityHint="Abre o editor de texto"
-            onPress={() => {
-              setText(value)
-              setError(null)
-              setConfirming(false)
-              setOpen(true)
-            }}
+          <View
             style={
               wrapped
-                ? helpRowInner
+                ? styles.column
                 : [
-                    styles.row,
+                    styles.box,
+                    styles.column,
                     compact && styles.compact,
                     { borderBottomColor: colors.borderSubtle },
                   ]
             }
           >
-            <View style={styles.text}>
-              <Text variant="fieldLabel">{def.label}</Text>
-              <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
-                {value || '—'}
-              </Text>
-              {resolved.defaulted && initial ? (
-                <Text
-                  variant="caption"
-                  color="inkMuted"
-                  testID={`default-${resolved.id}`}
-                >
-                  {`Resumo de ${initial.option}; edite para trocar.`}
+            <Pressable
+              testID={`editor-${resolved.id}`}
+              accessibilityRole="button"
+              {...fieldA11y(def.label, value || 'vazio')}
+              accessibilityHint="Abre o editor de texto"
+              onPress={() => {
+                setText(value)
+                setError(null)
+                setConfirming(false)
+                setOpen(true)
+              }}
+              style={helpRowInner}
+            >
+              <View style={styles.text}>
+                <Text variant="fieldLabel">{def.label}</Text>
+                <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
+                  {value || '—'}
                 </Text>
-              ) : null}
-              {issue ? (
-                <Text
-                  variant="caption"
-                  color="danger"
-                  accessibilityRole="alert"
-                >
-                  {issue}
+              </View>
+              {compact ? null : (
+                <Text variant="caption" color="action">
+                  Editar
                 </Text>
-              ) : null}
-            </View>
-            {compact ? null : (
-              <Text variant="caption" color="action">
-                Editar
+              )}
+            </Pressable>
+            {resolved.defaulted && initial ? (
+              <Text
+                variant="caption"
+                color="inkMuted"
+                testID={`default-${resolved.id}`}
+              >
+                {`Resumo de ${initial.option}; edite para trocar.`}
               </Text>
-            )}
-          </Pressable>
+            ) : null}
+            {issue ? (
+              <Text variant="caption" color="danger" accessibilityRole="alert">
+                {issue}
+              </Text>
+            ) : null}
+          </View>
         )}
       </HelpRow>
       <BottomSheet
@@ -208,16 +209,16 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
 }
 
 const styles = StyleSheet.create({
-  row: {
+  // A caixa da linha sem o "?": a borda e o respiro (com o "?", são do
+  // HelpRow). O botão fica só com o rótulo e o valor; o aviso e o erro vêm
+  // depois, como texto à parte, para o leitor de tela lê-los (A4)
+  box: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.space[3],
-    minHeight: tokens.size.rowMin,
     paddingVertical: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
   },
+  column: { flex: 1, gap: tokens.space['0.5'] },
   compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
   suggestions: { paddingTop: tokens.space[3] },

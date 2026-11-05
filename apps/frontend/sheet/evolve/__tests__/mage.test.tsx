@@ -129,6 +129,17 @@ describe('R-26: a Esfera de afinidade pela Tradição', () => {
     )
   })
 
+  it('A4: o aviso é texto à parte, fora do botão, e o leitor de tela o lê', async () => {
+    await open({ tradition: 'verbena', affinity: 'time' })
+    const text = 'fora da Tradição: confirme com o narrador'
+    // O botão tem nome próprio (rótulo e valor): o que fica dentro dele não
+    // é lido; o aviso é um irmão do botão, como nas Disciplinas
+    const button = screen.getByTestId('editor-affinity')
+    expect(button.props.accessibilityRole).toBe('button')
+    expect(within(button).queryByText(text)).toBeNull()
+    expect(screen.getByText(text)).toBeTruthy()
+  })
+
   it('trocar a Tradição com a Esfera na tela atualiza o aviso (code review)', async () => {
     await open({ tradition: 'verbena', affinity: 'time' })
     expect(screen.getByTestId('identity-affinity')).toBeTruthy()

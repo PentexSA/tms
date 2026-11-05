@@ -754,6 +754,12 @@ A integração entrou em commits próprios, depois do merge:
 - **Quando aparece:** só com a ficha em criação, e nada bloqueia.
 - **Teste:** o Jest sobe o Posto na folha e vê o aviso; ao voltar para 1, o aviso some.
 
+**A4 do roteiro iOS: o "fora da Tradição" não era lido.** No merge do P10-D, a linha da Esfera de afinidade virou `[Pressable][?]`, e o aviso ficou dentro do botão. Como o botão tem nome próprio (`fieldA11y`: rótulo e valor), o VoiceOver lia só "Esfera de afinidade, Mente".
+
+- **A correção (depois do merge da ponta `ffb1253`):** no `ChoiceEditorRow` e no `TextEditorRow`, o botão fica só com o rótulo, o valor e "Trocar"/"Editar". O aviso "fora", o "Resumo de …" da Fraqueza e o erro do servidor (`issue`, que já estava dentro do botão antes do P07-D) passam a ser textos à parte, logo abaixo, como nas Disciplinas.
+- **O que não muda:** o "?" do P10-D continua fora do botão. A borda e o respiro passam para uma caixa em volta, ou para o contorno do `HelpRow` quando há "?".
+- **Teste:** o aviso não está dentro do botão e é achado como texto da linha.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
