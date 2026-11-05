@@ -424,6 +424,16 @@ O achado 1 do onda-3.md §11 (a folha "busy" esperando as rebuscas) não toca ne
 - **A ajuda pode entrar parcial.** Campo sem frase não mostra "?". A prioridade 1 do P10-D §3.8 tem cerca de 20 termos por sistema: os que as personas não entenderam, mais os 6 grupos. Ela cobre o critério de saída do Iniciante. O resto entra por template, sem código, nesta versão ou numa seguinte.
 - **O PR que traz texto** diz, no resumo, quem escreveu e quem revisou. É risco legal, não técnico, mas bloqueia o merge.
 
+**Atualização (05/11/2026): o conteúdo entrou.** Decisão do usuário: "não precisa de licença, pois tudo que envolve ficha é free to use". A conferência de licença dos nomes (D-07) e das frases de poderes deixa de bloquear.
+
+- **O que entrou** (`7f817c5`), de uma fonte só, [`onda-4-conteudo.json`](onda-4-conteudo.json) e o [`.md`](onda-4-conteudo.md):
+  - o catálogo de Dons do W20: 48 nomes de nível 1, com Posto 1, recomendados por Raça, Augúrio e Tribo, e uma frase por Dom;
+  - os 14 resumos da Fraqueza do V20, um por clã, com o Caitiff;
+  - as frases das 17 Disciplinas e das 9 Esferas (no campo e na opção da Esfera de afinidade).
+- **A regra continua:** nenhum texto do livro. O template traz nomes de traços, regras numéricas e frases curtas do time, escritas com palavras próprias. O `license` dos três templates e o README dos templates (§2, §3 e §12) dizem isso.
+- **Continua rascunho do time, para revisão.** O catálogo de Dons foi compilado de memória e traduzido pelo time: os nomes e os grupos precisam ser conferidos contra o livro antes da `main`. O livro tem mais Dons por grupo.
+- **Fora desta rodada:** os Ritos (o W20 não tem catálogo de Ritos) e os Dons de Posto 2 a 5.
+
 ### 4.10 Segurança e revisão
 
 - **`/security-review` obrigatório:**
@@ -855,7 +865,7 @@ As correções da integração foram feitas na branch do pacote e entraram na on
 5. **O foco depois de "ir ao grupo"** ficou não conferido nos leitores de tela. O `describe-all` não expõe o foco, e o AVD não tem TalkBack. Os saltos para outra aba (B1, abaixo) foram conferidos no AVD e no iOS.
 6. **O contador que volta a zero** vale para todo campo inteiro de `values`. Nenhum teste nem E2E mostrou caso indesejado.
 7. **O seed não ganhou `--fichas-onda4`.** As fichas foram criadas pela tela, com o `--fichas-criacao` da onda 3.
-8. **Só o nível 1 dos Dons:** o catálogo de Dons não entrou (seção 4.9).
+8. **Só o nível 1 dos Dons:** o catálogo de Dons entrou depois da integração só com o nível 1 (48 nomes, Posto 1; seção 4.9).
 9. **Paradas de Tab:** cada "?" é uma parada; no `Choice`, as setas continuam só nos rádios.
 10. **A ordem usa o `fold` com ponto de código.**
 11. **O "?" só aparece na criação, no Editar e na Nova ficha.**
@@ -867,12 +877,13 @@ As correções da integração foram feitas na branch do pacote e entraram na on
   - as Disciplinas por clã (V20), copiadas do `itemIn` do XP;
   - as Esferas por Tradição (M20);
   - o aviso do Dom acima do Posto 1 (W20, `creation.advice`);
-  - as frases do `P10-D-frases.json`, como rascunho do time.
+  - as frases do `P10-D-frases.json`, como rascunho do time;
+  - **depois da integração (05/11, `7f817c5`), com a decisão do usuário (§4.9):** o catálogo de Dons do W20 (48 nomes de nível 1, Posto 1, recomendados por Raça, Augúrio e Tribo), os 14 resumos da Fraqueza do V20 e as frases das Disciplinas, dos Dons e das Esferas, do [`onda-4-conteudo.json`](onda-4-conteudo.json).
 - **Ficaram de fora:**
-  - o catálogo de Dons, que espera a lista do time e a licença;
-  - os resumos da Fraqueza, que o time escreve. O mecanismo dos dois entrou, testado com dados fictícios.
+  - os Ritos (o W20 não tem catálogo de Ritos) e os Dons de Posto 2 a 5.
 - **Precisam de revisão antes da `main`:**
-  - as frases, por quem conhece cada sistema;
+  - as frases e os resumos da Fraqueza, por quem conhece cada sistema;
+  - **o catálogo de Dons, conferido contra o livro:** foi compilado de memória, e os nomes foram traduzidos pelo time;
   - o mapa Tradição → Esferas, montado a partir de uma fonte só (P07-D §10).
 
 **Achados da integração (commits na onda):**
@@ -933,8 +944,8 @@ As correções da integração foram feitas na branch do pacote e entraram na on
 
 **O que ficou não conferido, e por quê:**
 
-- **O catálogo de Dons e a Fraqueza com o resumo** (T-24a, T-24f, R-26c, os blocos do T-24e): o conteúdo não entrou.
-- **O "?" da Disciplina:** o template não tem frase por Disciplina. O "?" de opção foi conferido nos Antecedentes.
+- **O catálogo de Dons e a Fraqueza com o resumo** (T-24a, T-24f, R-26c, os blocos do T-24e): o conteúdo entrou depois do roteiro (`7f817c5`). Ficam para a próxima conferência manual; o Jest e o E2E (`journey-werewolf`) cobrem os blocos e o Posto 1.
+- **O "?" da Disciplina:** o template não tinha frase por Disciplina no roteiro. O "?" de opção foi conferido nos Antecedentes.
 - **Os anúncios do VoiceOver e do TalkBack e o foco no título** (R-18g e a 10.10): o AVD não tem TalkBack, e o `describe-all` não expõe o foco.
 - **O3-T-26 e O3-T-04-gesto:** limites do idb.
 - **No Android, por tempo, com o AVD lento:**
@@ -950,9 +961,8 @@ As correções da integração foram feitas na branch do pacote e entraram na on
 - os pontos para o PO da seção 6 e das ondas 1 a 3, que continuam sem decisão;
 - **a validação dentro da `0023`** (pergunta 3, acima);
 - **o conteúdo:**
-  - a revisão das frases e do mapa Tradição → Esferas;
-  - a lista de Dons, com a licença;
-  - os resumos da Fraqueza;
+  - a revisão das frases, dos resumos da Fraqueza e do mapa Tradição → Esferas;
+  - a conferência do catálogo de Dons contra o livro (a licença não bloqueia mais: §4.9);
 - o anúncio pelo VoiceOver e pelo TalkBack, para ouvir no aparelho;
 - push da onda e PR para a `main`, com uma seção por pacote.
 
@@ -996,7 +1006,12 @@ O que a onda entrega, do ponto de vista de quem usa. A ponta é a `onda/4-conteu
   - na linha e na folha do Dom;
   - em "Para confirmar com o narrador", na aba Pontos;
   - na confirmação de concluir.
-- **Fraqueza com o resumo do clã.** É o mecanismo de padrão mostrado, com "Usar o resumo do clã". Os resumos do time ainda não entraram.
+- **Catálogo de Dons no W20.** A "Adicionar Dom" abre com os Dons de nível 1 da Raça, do Augúrio e da Tribo escolhidos, em três blocos ("Da Raça · Hominídeo", "Do Augúrio · Galliard", "Da Tribo · Fianna"). São 48 nomes, e o resto vem pela busca.
+  - O Dom do catálogo nasce com Posto 1, e um Dom de duas fontes mostra os dois selos.
+  - O nome livre continua: "Adicionar “…”".
+  - Um Dom fora dos três mostra "fora da Raça, do Augúrio e da Tribo: confirme com o narrador" e não bloqueia.
+  - O catálogo foi compilado de memória e precisa ser conferido contra o livro antes da `main`.
+- **Fraqueza com o resumo do clã.** Com o Clã escolhido e a Fraqueza vazia, o campo mostra o resumo do time para o clã (os 14 clãs, com o Caitiff), com "Usar o resumo do clã". O texto do jogador vence, e nada é gravado sozinho.
 - **Folha "Adicionar":**
   - a prévia do custo do item novo;
   - o aviso de nome repetido ("Já há “Ambidestro” na ficha"), com "Adicionar outro";
@@ -1024,6 +1039,12 @@ O que a onda entrega, do ponto de vista de quem usa. A ponta é a `onda/4-conteu
 - **Item fixo com frase:** a Ressonância do M20 mostra a frase no topo da folha.
 - **"Casa ou subgrupo" no Mago,** com o `placeholder` "Opcional", em todas as Tradições. A ficha abre sem a Casa.
 - **Frases:** são 141 (2 do app, 43 do V20, 48 do W20 e 48 do M20), vindas do [`P10-D-frases.json`](P10-D-frases.json). São rascunho do time e esperam revisão antes da `main`.
+- **Frases de poderes** (do [`onda-4-conteudo.json`](onda-4-conteudo.json), com a decisão do usuário de 05/11, §4.9):
+  - as 17 Disciplinas, no "?" da "Adicionar Disciplina" e no topo da folha do item;
+  - os 48 Dons do catálogo, no mesmo lugar;
+  - as 9 Esferas do Mago, no "?" de cada campo de Esfera e de cada opção da Esfera de afinidade.
+
+  São rascunho do time, para revisão. Os Ritos ficam sem frase.
 
 ### 12.5 Para quem mantém templates e componentes
 
@@ -1054,9 +1075,9 @@ O que a onda entrega, do ponto de vista de quem usa. A ponta é a `onda/4-conteu
 
 | Template | Versão | O que muda no conteúdo |
 |---|---|---|
-| `vtm-v20` | 1.8.0 → **1.9.0** | Disciplinas por clã (`recommend`), frases de campos, grupos, Clãs e Antecedentes, e a revisão dos `help` de hoje |
-| `wta-w20` | 1.6.0 → **1.7.0** | aviso do Posto acima de 1 (`creation.advice`), frases de campos, grupos, Raças, Augúrios, Tribos e Antecedentes |
-| `mta-m20` | 1.6.0 → **1.7.0** | Esferas por Tradição (`recommend`), "Casa ou subgrupo" opcional, frases de campos, grupos, Tradições, Essências e Antecedentes |
+| `vtm-v20` | 1.8.0 → **1.9.0** | Disciplinas por clã (`recommend`), o resumo da Fraqueza por clã (`weakness.default`), frases de campos, grupos, Clãs, Antecedentes e Disciplinas, e a revisão dos `help` de hoje |
+| `wta-w20` | 1.6.0 → **1.7.0** | catálogo de Dons de nível 1 (`catalog`, `catalogDefaults`, `recommend` e `catalogHelp`), aviso do Posto acima de 1 (`creation.advice`), frases de campos, grupos, Raças, Augúrios, Tribos e Antecedentes |
+| `mta-m20` | 1.6.0 → **1.7.0** | Esferas por Tradição (`recommend`), "Casa ou subgrupo" opcional, frases de campos, grupos, Tradições, Essências, Antecedentes e Esferas |
 
 - **Fichas criadas antes** continuam na versão em que nasceram e abrem no app novo. Elas ganham tudo o que é código:
   - o −/+ na linha;
@@ -1068,8 +1089,7 @@ O que a onda entrega, do ponto de vista de quem usa. A ponta é a `onda/4-conteu
 
 ### 12.7 O que não entrou
 
-- **O catálogo de Dons do W20,** que espera a lista do time e a licença. O W20 continua com o texto livre.
-- **Os resumos da Fraqueza,** que o time escreve.
-- **As frases de poderes** (Disciplinas, Dons, Esferas e Ritos), que esperam o PO e a licença.
+- **O catálogo de Dons, os resumos da Fraqueza e as frases de poderes entraram** depois da integração (`7f817c5`), com a decisão do usuário de 05/11 ("não precisa de licença, pois tudo que envolve ficha é free to use"; §4.9). Continuam rascunho do time, para revisão, e **o catálogo de Dons precisa ser conferido contra o livro antes da `main`**: foi compilado de memória, e os nomes foram traduzidos pelo time.
+- **Os Ritos** (sem catálogo nem frase) e **os Dons de Posto 2 a 5.**
 - **A validação dentro da migration `0023`,** que fica para decisão (seção 11, pergunta 3).
 - **O P14-D e o P15-D,** que a matriz acrescentou à onda em 03/11 (seção 6, ponto 1).

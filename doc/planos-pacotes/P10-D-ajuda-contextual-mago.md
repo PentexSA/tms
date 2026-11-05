@@ -656,6 +656,13 @@ O "Jest did not exit" não vem dos testes novos. Com `--detectOpenHandles`, eles
 
 As frases são rascunho do time, para revisão. O merge na `main` espera a revisão de quem conhece cada sistema.
 
+**As frases de poderes entraram (05/11/2026, `7f817c5`).** Com a decisão do usuário ("não precisa de licença, pois tudo que envolve ficha é free to use"), as Disciplinas, os Dons e as Esferas ganharam frase, do [`onda-4-conteudo.json`](onda-4-conteudo.json):
+
+- `catalogHelp` nas 17 Disciplinas do V20 e nos 48 Dons do W20 (o catálogo de Dons entrou junto, pelo P07-D);
+- o `help` de cada campo de Esfera do M20 e de cada opção da Esfera de afinidade.
+
+Nenhuma chave nova: é o contrato do commit 7 e do `help` de opção. O `onda-4-content.test.ts` confere cada frase contra o template, como o `help-phrases.test.ts`. Os Ritos continuam sem frase. As frases são rascunho do time, para revisão.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.

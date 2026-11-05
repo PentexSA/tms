@@ -760,6 +760,14 @@ A integração entrou em commits próprios, depois do merge:
 - **O que não muda:** o "?" do P10-D continua fora do botão. A borda e o respiro passam para uma caixa em volta, ou para o contorno do `HelpRow` quando há "?".
 - **Teste:** o aviso não está dentro do botão e é achado como texto da linha.
 
+**O conteúdo entrou (05/11/2026, `7f817c5` e `b1f4c74`).** Com a decisão do usuário ("não precisa de licença, pois tudo que envolve ficha é free to use"), os desvios 1 e 3 ficam resolvidos:
+
+- **W20:** `catalog` com 48 Dons de nível 1, `catalogDefaults` (Posto 1), `recommend` por Raça, Augúrio e Tribo e `catalogHelp`, do [`onda-4-conteudo.json`](onda-4-conteudo.json). O schema e os validadores aceitaram tudo: o `outside` tem 35 caracteres (limite 60), e o `by` tem 3 fontes (limite 4).
+- **V20:** `weakness.default` com os 14 clãs (o Caitiff também) e a `weakness.help` nova ("Começa com um resumo do time…").
+- **O `journey-werewolf.spec.ts`** ganhou o passo do catálogo (§4.3): "Persuasão, Posto 1, da Raça, da Tribo" pelo bloco, e "Faro do Asfalto", fictício, pelo texto livre.
+- **Testes:** os do mecanismo continuam com Dons e resumos fictícios (tirando o `catalogHelp` do produto), e os do produto são novos: `onda-4-content.test.ts` no core, o servidor com o catálogo em `creation.test.ts` e a "Adicionar Dom" do produto em `ListEditor.test.tsx`.
+- **Pendência antes da `main`:** o catálogo foi compilado de memória e traduzido pelo time. Os nomes e os grupos precisam ser conferidos contra o livro. Os resumos são rascunho do time, para revisão.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
