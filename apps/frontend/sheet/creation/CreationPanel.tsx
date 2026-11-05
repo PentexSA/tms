@@ -2,6 +2,7 @@ import {
   Banner,
   BottomSheet,
   Button,
+  Pressable,
   SectionHeader,
   Stepper,
   Text,
@@ -13,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
+import { useUserStorage } from '../../lib/persist'
 import {
   useApproveCreation,
   useCompleteCreation,
@@ -20,8 +22,11 @@ import {
   useSaveCreation,
 } from '../../lib/queries/creation'
 import { useSheet, useSheetSelector } from '../context'
+import { AnchorHeader } from '../layouts/AnchorHeader'
+import { useAnchor } from '../layouts/anchor'
+import { bonusSeenNow, markBonusSeen, readBonusSeen } from './bonusSeen'
 import { CompletionMessage } from './CompletionMessage'
-import { useCreation } from './CreationContext'
+import { useCreation, useGuideNav } from './CreationContext'
 import {
   completionBy,
   completionCopy,
@@ -29,6 +34,7 @@ import {
   STALE_COMPLETION,
 } from './completion'
 import {
+  basicsClosed,
   basicsDone,
   type CreationPhase,
   completeLabel,
@@ -38,28 +44,21 @@ import {
   freebieLedger,
   freebiesBalance,
   freebiesNotes,
-  problemText,
   REFUSAL_TEXT,
   restam,
 } from './creation'
-import { RadioChips } from './RadioChips'
+import { useGuideItems } from './GuideRow'
+import { confirmNote, type GuideItem, useCreationNotices } from './guide'
+import { CLOSED_COPY } from './nextStep'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
 // a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
-// Orçamento (CreationPanel), e a barra (ModeBar) tem "Salvar" sempre e, com
+// Pontos (CreationPanel), e a barra (ModeBar) tem "Salvar" sempre e, com
 // a conta fechada, a conclusão ao lado (D-01). As prioridades ficam no
 // cabeçalho de cada grupo (CreationCounter). Concluir exige rede, rascunho
 // salvo e a fila confirmada: a conclusão nunca confirma escolhas ainda locais.
 
-const PHASES: readonly {
-  readonly id: CreationPhase
-  readonly label: string
-}[] = [
-  { id: 'basics', label: 'Pontos básicos' },
-  { id: 'freebies', label: 'Pontos de bônus' },
-]
-
-/** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
+/** A criação por pontos em `creating`: a aba Pontos e o botão concluir. */
 export function useCreating(): boolean {
   const creation = useCreation()
   return Boolean(
@@ -80,7 +79,12 @@ export function useFreebiesText(): string | null {
  */
 export function useFreebiesNotes(): readonly string[] {
   const left = useSheetSelector(s => completionFreebies(s.check))
-  return useMemo(() => freebiesNotes(left), [left])
+  // Os avisos que não bloqueiam (P05-D §3.9): uma linha, como a sobra
+  const confirm = useCreationNotices().length
+  return useMemo(() => {
+    const note = confirmNote(confirm)
+    return note ? [...freebiesNotes(left), note] : freebiesNotes(left)
+  }, [left, confirm])
 }
 
 /**
@@ -179,14 +183,15 @@ export function CreationAlerts() {
   )
 }
 
-/** A aba Orçamento: o que os pontos gastam, o saldo e o que falta. */
+/** A aba Pontos: o que os pontos gastam, o saldo e o que falta. */
 export function CreationPanel() {
   const creation = useCreation()
-  const { model, roles, store, mode } = useSheet()
+  const { roles, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
-  const phase = useSheetSelector(s => s.creationPhase)
-  // A origem do valor inicial ("vem de Augúrio: Ahroun", T-85)
-  const resolved = useSheetSelector(s => s.resolved)
+  const missing = useGuideItems()
+  const notices = useCreationNotices()
+  // O "ir ao grupo" (P05-D): o painel e os blocos dele são âncoras
+  const panel = useAnchor('creation-panel', { focusable: false })
   if (
     !creation?.active ||
     creation.status !== 'creating' ||
@@ -195,28 +200,15 @@ export function CreationPanel() {
   )
     return null
   const storyteller = roles.has('storyteller')
-  const { problems, freebies } = check
+  const { freebies } = check
 
   return (
-    <View style={styles.panel} testID="creation-panel">
-      {freebies ? (
-        <View style={styles.block}>
-          <RadioChips
-            label="O que os pontos gastam"
-            options={PHASES}
-            value={phase}
-            onChange={id =>
-              store.getState().setCreationPhase(id as CreationPhase)
-            }
-            testID="creation-phase"
-          />
-          <Text variant="caption" color="inkMuted">
-            {phase === 'basics'
-              ? 'Cada grupo trava quando os pontos básicos acabam. Depois, passe para os pontos de bônus.'
-              : 'Passar do orçamento de um grupo usa os pontos de bônus, até o saldo acabar.'}
-          </Text>
-        </View>
-      ) : null}
+    <View
+      style={styles.panel}
+      testID="creation-panel"
+      onLayout={panel.onLayout}
+    >
+      {freebies ? <PhaseBlock /> : null}
       {freebies ? (
         <Text
           testID="creation-freebies"
@@ -228,23 +220,14 @@ export function CreationPanel() {
         </Text>
       ) : null}
       <Ledger />
-      {problems.length ? (
-        <View
-          style={styles.block}
-          accessibilityLabel="O que falta na criação"
+      {missing.length ? (
+        <GuideList
+          anchor="creation-missing"
+          title="O que falta"
+          label="O que falta na criação"
+          items={missing}
           testID="creation-problems"
-        >
-          <SectionHeader title="O que falta" level="group" />
-          {problems.slice(0, 12).map(p => (
-            <Text
-              key={`${p.code}:${p.budget ?? ''}:${p.group ?? ''}:${p.paths.join(',')}`}
-              variant="caption"
-              color={p.severity === 'blocking' ? 'danger' : 'inkMuted'}
-            >
-              {problemText(model, check, p, resolved)}
-            </Text>
-          ))}
-        </View>
+        />
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
           {freebies && freebies.remaining > 0
@@ -252,8 +235,109 @@ export function CreationPanel() {
             : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
+      {notices.length ? (
+        <GuideList
+          anchor="creation-confirm"
+          title="Para confirmar com o narrador"
+          label="Para confirmar com o narrador"
+          items={notices}
+          testID="creation-notices"
+        />
+      ) : null}
       {/* As "Regras da casa" gravam: só na Criação, nunca na Leitura (T-33) */}
       {storyteller && mode === 'create' ? <BudgetControls /> : null}
+    </View>
+  )
+}
+
+/**
+ * Uma lista do guia na aba Pontos: cada item é um botão que leva ao grupo
+ * (P05-D, R-18). O que impede salvar fica em perigo, e o texto diz
+ * "acima"; o "confirme com o narrador" (`confirm`) não impede nada.
+ */
+function GuideList({
+  anchor,
+  title,
+  label,
+  items,
+  testID,
+}: {
+  readonly anchor: string
+  readonly title: string
+  readonly label: string
+  readonly items: readonly GuideItem[]
+  readonly testID: string
+}) {
+  const goTo = useGuideNav()
+  const { onLayout, target } = useAnchor(anchor, { parent: 'creation-panel' })
+  return (
+    <View
+      style={styles.block}
+      accessibilityLabel={label}
+      testID={testID}
+      onLayout={onLayout}
+    >
+      <AnchorHeader title={title} level="group" target={target} />
+      {items.map(item => (
+        <Pressable
+          key={item.key}
+          accessibilityRole="button"
+          accessibilityHint={goTo ? 'Vai ao grupo na ficha' : undefined}
+          disabled={!goTo}
+          onPress={() => goTo?.(item.target)}
+          style={styles.item}
+        >
+          <Text
+            variant="caption"
+            color={item.kind === 'blocking' ? 'danger' : 'inkMuted'}
+          >
+            {item.text}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  )
+}
+
+/**
+ * A fase da conta em texto (U-07): o que os pontos gastam agora, com a troca
+ * manual como ação secundária. A fase é só do app (o servidor confere o
+ * saldo de bônus a cada lote, em qualquer fase) e passa sozinha para os
+ * bônus quando os básicos fecham. Rascunho do time, para revisão.
+ */
+function PhaseBlock() {
+  const { store } = useSheet()
+  const phase = useSheetSelector(s => s.creationPhase)
+  // Todos os grupos com prioridade e sem básico sobrando
+  // Sem o saldo do `basicsDone`: com os básicos fechados, voltar a eles não
+  // muda nada, mesmo com os bônus já gastos
+  const closed = useSheetSelector(s => basicsClosed(s.check))
+  const set = (next: CreationPhase) => store.getState().setCreationPhase(next)
+  const basics = phase === 'basics'
+  return (
+    <View style={styles.block}>
+      <Text testID="creation-phase">
+        {basics ? 'Fase: pontos básicos' : 'Fase: pontos de bônus'}
+      </Text>
+      <Text variant="caption" color="inkMuted">
+        {basics
+          ? 'Cada grupo trava quando os pontos básicos acabam. Quando todos fecharem, a fase passa sozinha para os pontos de bônus.'
+          : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
+      </Text>
+      {basics || !closed ? (
+        <View style={styles.phaseAction}>
+          <Button
+            title={
+              basics
+                ? 'Usar pontos de bônus agora'
+                : 'Voltar aos pontos básicos'
+            }
+            variant="ghost"
+            testID="creation-phase-switch"
+            onPress={() => set(basics ? 'freebies' : 'basics')}
+          />
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -263,14 +347,19 @@ function Ledger() {
   const { model } = useSheet()
   const check = useSheetSelector(s => s.check)
   const ledger = freebieLedger(model, check)
+  // Sem extrato, sem âncora: o id nulo tira a posição velha do mapa
+  const { onLayout, target } = useAnchor(ledger ? 'creation-ledger' : null, {
+    parent: 'creation-panel',
+  })
   if (!ledger) return null
   return (
     <View
       style={styles.block}
       accessibilityLabel="Onde foram os bônus"
       testID="creation-ledger"
+      onLayout={onLayout}
     >
-      <SectionHeader title="Onde foram os bônus" level="group" />
+      <AnchorHeader title="Onde foram os bônus" level="group" target={target} />
       {ledger.entries.map(e => (
         <View key={e.key} style={styles.entry}>
           <Text variant="caption">{e.text}</Text>
@@ -291,47 +380,92 @@ function Ledger() {
 /**
  * O aviso de que os pontos básicos acabaram: a distribuição passa a gastar
  * os pontos de bônus. Só na passagem (a ficha que já abre assim muda de fase
- * sem aviso) e uma vez por tela.
+ * sem aviso) e só na primeira passagem de cada ficha (U-07): com a fase
+ * ainda nos básicos, nenhum bônus gasto e a ficha sem a marca deste
+ * aparelho (bonusSeen.ts).
  */
 export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
-  const { store } = useSheet()
+  const { store, roles } = useSheet()
+  const creation = useCreation()
+  // Com a aprovação, o jogador envia ao narrador (o mesmo do botão)
+  const sends = creation?.info?.approval === true && !roles.has('storyteller')
+  const storage = useUserStorage()
+  const characterId = creation?.characterId ?? ''
   const creating = useCreating()
   const done = useSheetSelector(s => basicsDone(s.check))
+  const closed = useSheetSelector(s => s.check?.complete === true)
   const remaining = useSheetSelector(s => s.check?.freebies?.remaining ?? 0)
+  const spent = useSheetSelector(s => s.check?.freebies?.spent ?? 0)
   const [open, setOpen] = useState(false)
   const was = useRef<boolean | null>(null)
-  const shown = useRef(false)
+  const wasClosed = useRef<boolean | null>(null)
+  // A marca do aparelho, lida uma vez por ficha (a memória da sessão evita
+  // ler de novo a cada troca de modo)
+  const seen = useRef(false)
+  // "Ver Pontos" troca de aba depois que a folha sai (onClosed)
+  const toPoints = useRef(false)
+
+  useEffect(() => {
+    seen.current = bonusSeenNow(storage, characterId)
+    let alive = true
+    void readBonusSeen(storage, characterId).then(value => {
+      if (alive && value) seen.current = true
+    })
+    return () => {
+      alive = false
+    }
+  }, [storage, characterId])
 
   useEffect(() => {
     if (!creating) return
     const before = was.current
     was.current = done
-    if (!done || before === true) return
-    const s = store.getState()
-    if (s.creationPhase === 'basics') s.setCreationPhase('freebies')
-    // Já abriu com tudo distribuído: sem aviso
-    if (before === null || shown.current) return
-    shown.current = true
-    setOpen(true)
-    AccessibilityInfo.announceForAccessibility(
-      'Pontos básicos distribuídos. Agora os pontos gastam bônus.'
-    )
-  }, [creating, done, store])
+    const closedBefore = wasClosed.current
+    wasClosed.current = closed
+    let opened = false
+    if (done && before !== true) {
+      const s = store.getState()
+      const basics = s.creationPhase === 'basics'
+      if (basics) s.setCreationPhase('freebies')
+      // Já abriu com tudo distribuído: sem aviso. Quem trocou a fase à mão
+      // ou já gastou bônus já passou por ela; a marca vale entre telas
+      if (before !== null && basics && spent === 0 && !seen.current) {
+        seen.current = true
+        markBonusSeen(storage, characterId)
+        opened = true
+        setOpen(true)
+        AccessibilityInfo.announceForAccessibility(
+          'Pontos básicos distribuídos. Agora os pontos gastam bônus.'
+        )
+      }
+    }
+    // A conta fechou na tela (P05-D): um anúncio só, e nenhum quando a folha
+    // abriu na mesma passagem, porque ela já anuncia
+    if (closedBefore === false && closed && !opened)
+      AccessibilityInfo.announceForAccessibility(
+        sends ? CLOSED_COPY.announceSend : CLOSED_COPY.announce
+      )
+  }, [creating, done, closed, spent, sends, store, storage, characterId])
 
   return (
     <BottomSheet
       visible={open}
       title="Começaram os pontos de bônus"
       onClose={() => setOpen(false)}
+      onClosed={() => {
+        if (!toPoints.current) return
+        toPoints.current = false
+        onBudget()
+      }}
       testID="bonus-notice"
       footer={
         <>
           <Button
-            title="Ver orçamento"
+            title="Ver Pontos"
             variant="ghost"
             onPress={() => {
+              toPoints.current = true
               setOpen(false)
-              onBudget()
             }}
           />
           <Button title="Entendi" onPress={() => setOpen(false)} />
@@ -574,6 +708,8 @@ const styles = StyleSheet.create({
   },
   block: { gap: tokens.space[2] },
   entry: { gap: tokens.space['0.5'] },
+  item: { justifyContent: 'center', alignItems: 'flex-start' },
+  phaseAction: { alignItems: 'flex-start' },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

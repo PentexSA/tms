@@ -350,12 +350,12 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     return screen.findByRole('button', { name: 'Editar como narrador' })
   }
 
-  it('em criação por pontos, abre em Leitura com o Orçamento, sem editar', async () => {
+  it('em criação por pontos, abre em Leitura com a aba Pontos, sem editar', async () => {
     const post = jest.fn(async () => ({ status: 200, body: null }))
     pointsSheet()
     await render(post as never)
     expect(screen.queryByLabelText('Modo da ficha')).toBeNull()
-    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Pontos' }))
     // A conta: o saldo e o que falta, sem as "Regras da casa" (que gravam)
     expect(screen.getByTestId('creation-panel')).toBeTruthy()
     expect(screen.getByTestId('creation-freebies')).toBeTruthy()
@@ -375,7 +375,7 @@ describe('Leitura do narrador com a conta (T-33)', () => {
       screen.getByLabelText('Editando como narrador', { exact: true })
     ).toBeTruthy()
     // As "Regras da casa" voltam na Criação
-    fireEvent.press(screen.getByRole('tab', { name: 'Orçamento' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Pontos' }))
     expect(screen.getByTestId('creation-budget')).toBeTruthy()
     fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
     fireEvent(
@@ -424,8 +424,8 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     )
     fireEvent.press(await render())
     expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
-    // Sem conta, sem Orçamento, em qualquer modo
-    expect(screen.queryByRole('tab', { name: 'Orçamento' })).toBeNull()
+    // Sem conta, sem a aba Pontos, em qualquer modo
+    expect(screen.queryByRole('tab', { name: 'Pontos' })).toBeNull()
   })
 
   it('narratorTarget: Criação, Editar ou Jogo', () => {

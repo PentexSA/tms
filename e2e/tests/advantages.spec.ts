@@ -25,7 +25,9 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
   await page.getByLabel('Nome (obrigatório)').fill('Isadora Vex')
   await page.getByRole('radio', { name: 'Tremere' }).click()
   await page.getByRole('button', { name: 'Criar ficha' }).click()
-  await expect(page.getByRole('tab', { name: 'Orçamento' })).toBeVisible()
+  await expect(
+    page.getByRole('tab', { name: 'Pontos', exact: true })
+  ).toBeVisible()
   await page.getByRole('tab', { name: 'Vantagens' }).click()
 
   // T-58: um título e um contador por bloco
@@ -90,7 +92,7 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
   ).toBeVisible()
 
   // O crédito do Defeito entra no saldo: 15 + 1, menos 1 da Qualidade
-  await page.getByRole('tab', { name: 'Orçamento' }).click()
+  await page.getByRole('tab', { name: 'Pontos', exact: true }).click()
   await expect(page.getByTestId('creation-freebies')).toContainText(
     /\b15 de 16\b/
   )
