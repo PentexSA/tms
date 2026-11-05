@@ -8,7 +8,7 @@
   ],
   "app": {
     "priority": {
-      "help": "Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Atributos e Habilidades têm cada um a sua ordem.",
+      "help": "Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Cada conjunto de grupos tem a sua própria ordem.",
       "onde": "texto do app (sheet/creation/help.ts, P10-D §3.7)"
     },
     "freebies": {

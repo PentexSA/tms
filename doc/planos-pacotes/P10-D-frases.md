@@ -32,7 +32,7 @@ Uma frase igual em dois sistemas conta nos dois: Natureza, Comportamento, Concei
 
 | Termo | Frase | Car. |
 |---|---|---|
-| Prioridade | Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Atributos e Habilidades têm cada um a sua ordem. | 136 |
+| Prioridade | Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Cada conjunto de grupos tem a sua própria ordem. | 136 |
 | Pontos de bônus | Pontos extras, gastos depois dos básicos. Cada característica cobra um preço diferente por ponto; a aba Pontos mostra quanto sobra. | 131 |
 
 ## Vampiro (V20) · `vtm-v20` 1.8.0

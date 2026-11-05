@@ -6,7 +6,7 @@
 export const CREATION_HELP = {
   priority: {
     subject: 'Prioridade',
-    text: 'Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Atributos e Habilidades têm cada um a sua ordem.',
+    text: 'Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Cada conjunto de grupos tem a sua própria ordem.',
   },
   freebies: {
     subject: 'pontos de bônus',
