@@ -505,8 +505,8 @@ O que a implementação fez diferente deste plano, e por quê. Nenhum desvio mud
 
 1. **A dica do "−" sem o rótulo do campo.** A seção 3.3 escrevia a dica como "Fúria: na criação, não fica abaixo de 5 (…)". As previsões do "+" não repetem o rótulo (o controle já tem o nome), então a do "−" também não: "Na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun)." O aviso do toque (`notice-<campo>`) e o `problemText` continuam com o rótulo, como os outros avisos. Na dica junta do app, fica "Aumentar: +1 = 1 bônus. Diminuir: Na criação, …".
 2. **O `problemText` ganhou um 4º parâmetro opcional, `resolved`,** para dizer a opção ("vem de Augúrio: Ahroun"). Sem ele, diz só o campo da fonte ("vem de Augúrio"); sem a conta, o texto de antes ("abaixo do valor inicial"). O `CreationPanel` passa o `resolved`. **No rebase do P05-D**, o `guide.ts` pode passar o `s.resolved` do store para ter a opção no "Faltam".
-3. **O `draftRefusal` ganhou um 6º parâmetro opcional, `paths`** (os caminhos do toque; padrão `[]`, que desliga a recusa nova). O store passa `events.map(e => e.path)`. Um caminho de lista (`values.<lista>`) casa os itens dele (`values.<lista>#<item>`).
-4. **`components.md`:** a seção do Stepper ganhou o `increase`, o `decrease` e o `StepperIncrease`. A seção 8.5 não listava o arquivo; a seção 4.5 do onda-4.md pedia a entrada.
+3. **O `draftRefusal` ganhou um 6º parâmetro opcional, `touch: DraftTouch`** (`{ paths, resolved? }`: os caminhos do toque e, se quem chama já tem, a ficha resolvida depois dele; sem `paths`, a recusa nova não vale). O store passa `{ paths: events.map(e => e.path), resolved: next.resolved }`. Um caminho de lista (`values.<lista>`) casa os itens dele (`values.<lista>#<item>`). Era `paths` posicional até a revisão (achado 7).
+4. **`components.md`:** a seção do Stepper ganhou o `increase`, o `decrease`, o `StepperAdvice` (com `stop`) e o alias `StepperIncrease`. A seção 8.5 não listava o arquivo; a seção 4.5 do onda-4.md pedia a entrada.
 5. **Os testes de tela do T-22 e da U-05 usam o `Live` dos testes com um `CreationContext`** (prop nova `creation` em `apps/frontend/test/live.tsx`), em vez de montar o `SheetScreen`.
 6. **O E2E do W20 cria a própria crônica `wta-w20`** pela API (o `pointsChronicle` do ajudante é só V20), e confere o atual que acompanha pela linha do "Em jogo", sem a Mesa nem o dock: a gravação 4/4 é conferida pela API no teste do V20, e o dock a 390, no Jest (`sheet.layout.test.tsx`). O `journey.spec.ts` (l.111) não muda: o "Aumentar" do permanente continua sendo 1 evento em `values.willpower`.
 7. **Nenhum `.test.ts` novo em `components/`**: os testes puros ficaram em `sheet/` e `packages/`.
@@ -515,21 +515,23 @@ O que a implementação fez diferente deste plano, e por quê. Nenhum desvio mud
 
 ```ts
 // @tms/ui
-interface StepperProps { /* … */ increase?: StepperIncrease; decrease?: StepperIncrease }
-interface StepperIncrease { blocked?: boolean; hint?: string | null; hintID?: string | null }
+interface StepperProps { /* … */ increase?: StepperAdvice; decrease?: StepperAdvice }
+interface StepperAdvice { blocked?: boolean; hint?: string | null; hintID?: string | null; stop?: number }
+type StepperIncrease = StepperAdvice   // alias, o nome de antes
 function joinHints(up?: string | null, down?: string | null): string | null
 
 // apps/frontend/sheet/evolve/text.ts
 function byLabel<T>(items: readonly T[], key?: (item: T) => string): T[]  // cópia ordenada
 
 // apps/frontend/sheet/evolve/useRowFeedback.tsx
-useRowFeedback(path, field): { notice; note; increase?: StepperIncrease; decrease?: StepperIncrease }
+useRowFeedback(path, field): { notice; note; increase?: StepperAdvice; decrease?: StepperAdvice }  // decrease.stop = o inicial
 
 // apps/frontend/sheet/creation
 useStepAdvice(path, direction?: 'up' | 'down')
 stepAdvice(model, check, phase, path, resolved?, direction?: StepDirection)
-type RefusalCause = … | 'initial'
-draftRefusal(model, sheets, checks, input, phase, paths?: readonly string[])
+type RefusalCause = … | 'initial'   // e 'locked' também vem do "−" no baseline travado
+interface StepAdvice { blocked; text; cost; inline; floor?: number }  // floor: o inicial, com o "−" acima dele
+draftRefusal(model, sheets, checks, input, phase, touch?: DraftTouch)  // DraftTouch = { paths, resolved? }
 problemText(model, check, problem, resolved?)
 
 // @tms/sheet-core
@@ -539,7 +541,24 @@ defaultStored(model, sheet, id): unknown   // undefined fora do modelo
 
 O −/+ da linha do P07-D passa `increase` e `decrease` do `useRowFeedback('values.<lista>#<item>', …)`: o `downAdvice` já aceita caminho de item, com o mínimo do `item.value.min` da lista.
 
-**Fica para a integração:** o E2E (Chromium e WebKit), o `/code-review` do pacote e o `/security-review` recomendado no commit 2 (`05c05a5`), o roteiro manual da seção 11 e a conferência do "−" no VoiceOver e no TalkBack (a dica junta, pergunta 9).
+**`/code-review` (high) do pacote, 04/11/2026:** 10 achados, conferidos no código. 8 corrigidos, em commits `fix` com teste de regressão; 2 recusados.
+
+| # | Achado | Resultado |
+|---|---|---|
+| 1 | O derivado do rascunho igual ao valor de partida, depois de a fonte mudar, devia sair do rascunho | **Recusado.** Contradiz a regra "até ser marcado": a ajuda do template ("Começa igual à Coragem até ser marcado") e o teste `evolve.test.tsx` ("O jogador marca a Humanidade: ela deixa de acompanhar as Virtudes"), que falhou com a correção. O caso não gasta bônus: com a Coragem 4 e a FdV 4, o investido é 0. Com a Coragem 5, a FdV marcada fica abaixo do inicial, como antes do P10-C e como o servidor conta. A regra do commit 4 só desfaz a marca quando o próprio jogador volta o campo ao valor de partida. Se o time quiser que a marca caia quando a fonte alcança o valor, é decisão de produto |
+| 2 | O `downAdvice` ignorava o baseline travado, e a recusa valia | Corrigido (`575ad6d`): uma regra só. A causa é `'locked'`, e o texto, "Fica em N na criação (Clã: …)." |
+| 3 | Segurar o "−" acima do inicial descia até o mínimo, e o lote era recusado | Corrigido (`46b0d0e`, `b354276`): `StepperAdvice.stop`, e o `floor` da previsão. A repetição para no inicial |
+| 4 | O "(vem de …)" citava a fórmula com o inicial de um baseline ou de um point-buy | Corrigido (`575ad6d`): o `initialSource` segue o `initialOf` do core. O baseline cita a escolha dele; o point-buy e o baseline sem condição não citam nada |
+| 5 | O `isStart` faz um `resolve` por evento com `from: null` | **Recusado, com a medida.** No Bun, o `resolve` do V20 leva ~0,02 ms e o `checkCreation` que o mesmo toque já roda, ~1,2 ms: ~2%. Reaproveitar a conta não serve fora da Criação (o Editar livre não tem conta), e o `initial` da conta é um número, não o valor gravado do recurso |
+| 6 | O `hintID` do "−" apontava o aviso do "+" | Corrigido (`b354276`): cada botão aponta o aviso só quando a causa é a dele. Sem aviso, o "−" bloqueado no web tem a própria descrição (`advice-down-<campo>`, fora da tela, `aria-hidden`) |
+| 7 | O `belowInitial` resolvia a ficha de novo | Corrigido (`575ad6d`): `DraftTouch.resolved`, que o store passa |
+| 8 | O `defaultStored` repetia o cálculo do fail-secure do `checkCreation` | Corrigido (`a704b0e`): uma função interna, `startOf`. O core (995) e a API (1901) passaram, e o `dist` foi reconstruído |
+| 9 | "Cão", "Falcão" e "Pisão" saíam no feminino | Corrigido (`4c71e81`): "-ção" e "-são" são conferidos com a cedilha e o acento. "pisão" e "tesão" entram nos masculinos |
+| 10 | `StepperIncrease` também no `decrease` | Corrigido (`72aaf92`): `StepperAdvice`, com `StepperIncrease` como alias |
+
+**Achado ao lado, sem correção:** segurar o "−" até o mínimo do controle desabilita o botão no meio da repetição, e no Jest o `pressOut` do botão desabilitado não chega (o valor não é gravado). Isso vem de antes do P10-C. Fica para conferir no aparelho.
+
+**Fica para a integração:** o E2E (Chromium e WebKit), o `/security-review` recomendado no commit 2 (`05c05a5`) e no `a704b0e`, o roteiro manual da seção 11 e a conferência do "−" no VoiceOver e no TalkBack (a dica junta, pergunta 9, e a descrição do "−" no web).
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
