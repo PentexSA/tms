@@ -112,7 +112,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('tab', { name: 'Vantagens' }).click()
   await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
   await page.getByLabel('Buscar Disciplina').fill('tauma')
-  await page.getByRole('button', { name: 'Taumaturgia', exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Taumaturgia, do clã', exact: true })
+    .click()
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('rebanho')
   await page.getByRole('button', { name: 'Rebanho', exact: true }).click()
