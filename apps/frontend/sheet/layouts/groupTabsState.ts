@@ -49,7 +49,46 @@ export interface GroupTabsStore {
   readonly panelTop: () => number
   /** A posição da rolagem. */
   readonly scrollY: () => number
+  /**
+   * Uma âncora do "ir ao grupo" (P05-D, R-18): o `y` dela dentro de `parent`
+   * (outra âncora; sem ela, o painel da zona; `SCROLL_ROOT`, a própria
+   * rolagem) e, se ela recebe o foco, a função que o põe nela.
+   */
+  readonly anchorAt: (
+    id: string,
+    y: number,
+    focus?: (() => void) | null,
+    parent?: string
+  ) => void
+  /** A âncora saiu da tela (a seção desmontou). */
+  readonly dropAnchor: (id: string) => void
+  /**
+   * Ir à primeira âncora conhecida da lista (a do grupo, depois a da seção).
+   * Se nenhuma foi medida ainda (a aba acabou de trocar), o pedido espera o
+   * próximo `anchorAt`, sem timer; um pedido novo troca o velho.
+   */
+  readonly jumpTo: (ids: readonly string[]) => void
+  /** Quem rola: recebe a rolagem de destino e o foco da âncora. */
+  readonly onJump: (
+    listener: (y: number, focus: (() => void) | null) => void
+  ) => () => void
 }
+
+/** O `parent` das âncoras medidas direto na rolagem (o "Em jogo"). */
+export const SCROLL_ROOT = '@scroll'
+
+interface AnchorNode {
+  readonly y: number
+  readonly focus: (() => void) | null
+  readonly parent: string | undefined
+}
+
+// Um quadro depois da primeira âncora medida: as âncoras irmãs (o grupo
+// dentro da seção) chegam no mesmo layout
+const nextFrame = (run: () => void) =>
+  typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame(() => run())
+    : setTimeout(run, 0)
 
 export interface GroupTabsShared {
   /** A faixa fixa desenha as sub-abas: o corpo não desenha a barra. */
@@ -91,6 +130,40 @@ export function createGroupTabsStore(): GroupTabsStore {
   let nav = 0
   let scroll = 0
   let currentId: string | null = null
+  const anchors = new Map<string, AnchorNode>()
+  const jumpListeners = new Set<
+    (y: number, focus: (() => void) | null) => void
+  >()
+  let pending: readonly string[] | null = null
+  let scheduled = false
+  // O `y` da âncora: relativo ao painel (`panel`) ou à rolagem (`scroll`)
+  const place = (
+    id: string,
+    depth = 0
+  ): { readonly y: number; readonly root: 'panel' | 'scroll' } | null => {
+    const node = anchors.get(id)
+    if (!node || depth > 8) return null
+    if (node.parent === SCROLL_ROOT) return { y: node.y, root: 'scroll' }
+    if (node.parent === undefined) return { y: node.y, root: 'panel' }
+    const up = place(node.parent, depth + 1)
+    return up ? { y: up.y + node.y, root: up.root } : null
+  }
+  const resolve = () => {
+    if (!pending || scheduled) return
+    if (!pending.some(id => place(id) !== null)) return
+    scheduled = true
+    nextFrame(() => {
+      scheduled = false
+      const ids = pending
+      const id = ids?.find(x => place(x) !== null)
+      const at = id ? place(id) : null
+      if (!id || !at) return
+      pending = null
+      const y = Math.max(0, at.root === 'panel' ? panel + at.y - nav : at.y)
+      const focus = anchors.get(id)?.focus ?? null
+      for (const listener of jumpListeners) listener(y, focus)
+    })
+  }
   const notify = () => {
     for (const listener of listeners) listener()
   }
@@ -145,6 +218,21 @@ export function createGroupTabsStore(): GroupTabsStore {
     current: () => (currentId ? (sections.get(currentId) ?? null) : null),
     panelTop: () => Math.max(0, panel - nav),
     scrollY: () => scroll,
+    anchorAt(id, y, focus = null, parent) {
+      anchors.set(id, { y, focus, parent })
+      resolve()
+    },
+    dropAnchor(id) {
+      anchors.delete(id)
+    },
+    jumpTo(ids) {
+      pending = ids.length ? ids : null
+      resolve()
+    },
+    onJump(listener) {
+      jumpListeners.add(listener)
+      return () => jumpListeners.delete(listener)
+    },
   }
 }
 

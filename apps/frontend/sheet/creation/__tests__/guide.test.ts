@@ -13,6 +13,7 @@ import {
   type GuideItem,
   guideItems,
   guidePrefix,
+  LEDGER_TARGET,
   moreText,
 } from '../guide'
 
@@ -133,7 +134,7 @@ describe('guideItems', () => {
     })
     expect(items[1]).toMatchObject({
       text: 'Bônus: 3 acima do saldo.',
-      target: null,
+      target: LEDGER_TARGET,
     })
   })
 

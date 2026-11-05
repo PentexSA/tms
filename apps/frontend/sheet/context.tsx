@@ -9,7 +9,8 @@ import type {
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { OpenBudgetContext } from './creation/CreationContext'
+import { GuideNavContext, OpenBudgetContext } from './creation/CreationContext'
+import type { GuideTarget } from './creation/guide'
 import type {
   FieldEntry,
   SheetActions,
@@ -32,11 +33,14 @@ const SheetContext = createContext<SheetContextValue | null>(null)
 export function SheetProvider({
   store,
   openBudget = null,
+  goTo = null,
   children,
 }: {
   readonly store: SheetStore
   // "Ver orçamento" dos avisos da recusa (T-07), quando a aba existe
   readonly openBudget?: (() => void) | null
+  // O "ir ao grupo" do "O que falta" (P05-D), quando a ficha tem as abas
+  readonly goTo?: ((target: GuideTarget | null) => void) | null
   readonly children: ReactNode
 }) {
   const value = useMemo(() => {
@@ -46,7 +50,9 @@ export function SheetProvider({
   return (
     <SheetContext.Provider value={value}>
       <OpenBudgetContext.Provider value={openBudget}>
-        {children}
+        <GuideNavContext.Provider value={goTo}>
+          {children}
+        </GuideNavContext.Provider>
       </OpenBudgetContext.Provider>
     </SheetContext.Provider>
   )

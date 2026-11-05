@@ -42,8 +42,27 @@ export interface GuideItem {
   readonly short: string
   // A frase inteira: "Virtudes: faltam 7 pontos básicos."
   readonly text: string
-  // null: leva à aba Pontos
+  // null (seção que o papel não lê): leva à lista, na aba Pontos
   readonly target: GuideTarget | null
+}
+
+/** A aba de pontos da criação (o id de sempre: `creation`). */
+export const POINTS_TAB = 'creation'
+
+/** A lista inteira, na aba Pontos ("e mais N", "Faltam N itens"). */
+export const MISSING_TARGET: GuideTarget = {
+  tab: POINTS_TAB,
+  section: 'creation-missing',
+  group: null,
+  path: null,
+}
+
+/** "Onde foram os bônus", na aba Pontos (o bônus acima do saldo). */
+export const LEDGER_TARGET: GuideTarget = {
+  tab: POINTS_TAB,
+  section: 'creation-ledger',
+  group: null,
+  path: null,
 }
 
 const KIND_ORDER: Readonly<Record<GuideKind, number>> = {
@@ -155,7 +174,7 @@ export function guideItems(
           kind,
           short: n ? `Bônus: ${n} acima` : 'Bônus acima',
           text,
-          target: null,
+          target: LEDGER_TARGET,
         },
       })
       continue

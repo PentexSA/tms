@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { CreationInfo } from './creation'
+import type { GuideTarget } from './guide'
 
 // O que a tela da ficha sabe da criação: os metadados que a API mandou, o
 // estado da ficha e se a conta vale agora. Sem provedor (prévias, Mesa,
@@ -33,3 +34,15 @@ export const OpenBudgetContext = createContext<(() => void) | null>(null)
 
 export const useOpenBudget = (): (() => void) | null =>
   useContext(OpenBudgetContext)
+
+/**
+ * O "ir ao grupo" (P05-D, R-18): leva à aba, à sub-aba e ao começo da seção
+ * ou do grupo, com o foco no título. Null (sem alvo) leva à lista inteira,
+ * na aba Pontos. Sem provedor (prévias, Mesa), não há para onde ir.
+ */
+export const GuideNavContext = createContext<
+  ((target: GuideTarget | null) => void) | null
+>(null)
+
+export const useGuideNav = (): ((target: GuideTarget | null) => void) | null =>
+  useContext(GuideNavContext)

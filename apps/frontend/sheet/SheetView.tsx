@@ -23,6 +23,7 @@ import {
   type ReactElement,
   type ReactNode,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -34,6 +35,7 @@ import {
   type ScrollViewInstance,
   StyleSheet,
   View,
+  type ViewInstance,
 } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -47,6 +49,7 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
+import { type GuideTarget, POINTS_TAB } from './creation/guide'
 import {
   CompletedWhileEditingBanner,
   ReturnedBanner,
@@ -55,8 +58,10 @@ import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
+import { anchorDomId, focusView } from './layouts/anchor'
 import {
   GroupTabsContext,
+  SCROLL_ROOT,
   StripScope,
   useGroupTabsState,
 } from './layouts/groupTabsState'
@@ -109,7 +114,7 @@ export type SheetViewProps =
     }
 
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
-const BUDGET_TAB = 'creation'
+const BUDGET_TAB = POINTS_TAB
 
 function readableZones(model: SheetModel, roles: readonly RoleName[]) {
   return model.zones.filter(
@@ -273,6 +278,48 @@ function SheetBody({
     () => (budget ? () => showTab(BUDGET_TAB) : null),
     [budget, showTab]
   )
+  // O "ir ao grupo" do "O que falta" (P05-D, R-18): a aba, a sub-aba e a
+  // âncora da seção (ou do grupo); a rolagem e o foco vêm quando a âncora é
+  // medida (a aba nova ainda não foi desenhada). Fica na mesma tela: nada
+  // vai para a URL nem para o histórico
+  const tabIds = tabs.map(t => t.id).join(' ')
+  const playRef = useRef<ViewInstance>(null)
+  const goTo = useCallback(
+    (target: GuideTarget | null) => {
+      const t = target ?? {
+        tab: BUDGET_TAB,
+        section: 'creation-missing',
+        group: null,
+        path: null,
+      }
+      const anchors = groupTabs.store
+      if (t.tab === 'play') {
+        setPlayOpen(true)
+        anchors.jumpTo([PLAY_ANCHOR])
+        return
+      }
+      if (tabIds.split(' ').includes(t.tab)) showTab(t.tab)
+      const section = t.section ? model.sections.get(t.section) : undefined
+      if (section?.def.groupTabs && t.group) anchors.select(section.id, t.group)
+      anchors.jumpTo(
+        [
+          t.section && t.group ? `${t.section}/${t.group}` : null,
+          t.section,
+          t.tab === BUDGET_TAB ? 'creation-panel' : null,
+        ].filter((id): id is string => Boolean(id))
+      )
+    },
+    [groupTabs.store, model, showTab, tabIds]
+  )
+  const { reduceMotion } = useTheme()
+  useEffect(
+    () =>
+      groupTabs.store.onJump((y, focus) => {
+        scrollRef.current?.scrollTo({ y, animated: !reduceMotion })
+        focus?.()
+      }),
+    [groupTabs.store, reduceMotion]
+  )
   // O header (painel do NPC e barra do narrador) é do app, não da ficha:
   // fica com o tema de fora (a skin do app e o accent neutro), mesmo quando
   // rola dentro da ficha, que usa a skin e o accent do personagem
@@ -313,14 +360,29 @@ function SheetBody({
       ) : null,
       <IdentityBlock key="identity" />,
       play.length && !docked ? (
-        <View key="play">
-          {collapsible ? (
-            <PlayToggle open={playOpen} onToggle={() => setPlayOpen(v => !v)} />
-          ) : (
-            <View style={styles.title}>
-              <SectionHeader title="Em jogo" level="group" />
-            </View>
-          )}
+        <View
+          key="play"
+          onLayout={e =>
+            groupTabs.store.anchorAt(
+              PLAY_ANCHOR,
+              e.nativeEvent.layout.y,
+              () => focusView(playRef.current),
+              SCROLL_ROOT
+            )
+          }
+        >
+          <View ref={playRef} nativeID={anchorDomId(PLAY_ANCHOR)} tabIndex={-1}>
+            {collapsible ? (
+              <PlayToggle
+                open={playOpen}
+                onToggle={() => setPlayOpen(v => !v)}
+              />
+            ) : (
+              <View style={styles.title}>
+                <SectionHeader title="Em jogo" level="group" />
+              </View>
+            )}
+          </View>
           {!collapsible || playOpen ? (
             <View nativeID={PLAY_ID}>
               {play.map(s => (
@@ -410,7 +472,7 @@ function SheetBody({
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider store={store} openBudget={openBudget}>
+      <SheetProvider store={store} openBudget={openBudget} goTo={goTo}>
         <FieldSheetProvider>
           <GroupTabsContext.Provider value={groupTabs}>
             {/* A barra de modos é da ficha viva (editable não muda numa ficha
@@ -431,6 +493,7 @@ function SheetBody({
 }
 
 const PLAY_ID = 'sheet-play'
+const PLAY_ANCHOR = 'play'
 
 /** O título "Em jogo" que abre e recolhe o bloco (T-59). */
 function PlayToggle({
