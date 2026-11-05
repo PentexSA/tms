@@ -370,6 +370,75 @@ describe('rascunho da edição', () => {
     expect(enqueue).not.toHaveBeenCalled()
   })
 
+  // T-85: sem valor guardado, o "de antes" é o valor de partida; subir e
+  // baixar de volta deixa 0 alterações, e o campo volta a seguir a fonte
+  it.each([
+    [
+      'wta-w20',
+      { name: 'A', breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' },
+      'rage',
+      { permanent: 6, current: 6 },
+      { permanent: 5, current: 5 },
+    ],
+    [
+      'vtm-v20',
+      { name: 'B', clan: 'brujah', courage: 3 },
+      'willpower',
+      { permanent: 4, current: 4 },
+      { permanent: 3, current: 3 },
+    ],
+    [
+      'vtm-v20',
+      { name: 'B', clan: 'brujah', conscience: 2, selfControl: 3 },
+      'humanity',
+      6,
+      5,
+    ],
+    ['vtm-v20', { name: 'B', clan: 'brujah' }, 'alertness', 1, 0],
+  ] as const)(
+    '%s %s: sem valor guardado, subir e voltar zera o contador',
+    (system, values, id, up, back) => {
+      const store = createSheetStore({
+        characterId: ID,
+        model: modelOf(system),
+        sheet: { values: { ...values }, specialties: {} },
+        sheetVersion: 1,
+        roles: ['owner'],
+        sync: { enqueue: jest.fn() },
+      })
+      const s = () => store.getState()
+      s().startDraft()
+      s().setDraftValue(`values.${id}`, up)
+      expect(s().draftEvents()).toHaveLength(1)
+      s().setDraftValue(`values.${id}`, back)
+      expect(s().draftEvents()).toEqual([])
+    }
+  )
+
+  it('o valor de partida acompanha o rascunho: Coragem 3 → 4 e FdV 4', () => {
+    const store = createSheetStore({
+      characterId: ID,
+      model,
+      sheet: {
+        values: { name: 'B', clan: 'brujah', courage: 3 },
+        specialties: {},
+      },
+      sheetVersion: 1,
+      roles: ['owner'],
+      sync: { enqueue: jest.fn() },
+    })
+    const s = () => store.getState()
+    s().startDraft()
+    s().setDraftValue('values.courage', 4)
+    // a FdV 4/4 é o que ela já vale com a Coragem 4: nenhuma alteração nela
+    s().setDraftValue('values.willpower', { permanent: 4, current: 4 })
+    expect(
+      s()
+        .draftEvents()
+        .map(e => e.path)
+    ).toEqual(['values.courage'])
+  })
+
   it('rascunho inválido não aceita a alteração', () => {
     const { s } = setup()
     expect(s().editDraft([strength(2, 3)])).toBeNull()
