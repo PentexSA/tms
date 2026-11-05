@@ -804,6 +804,45 @@ describe('"Faltam" na barra (R-18)', () => {
     ])
   })
 
+  // /code-review 3: com a aprovação, o anúncio diz enviar, como o botão
+  it('com a aprovação, o anúncio da conta fechada diz enviar ao narrador', async () => {
+    const c = character(PRIORITIES, {
+      ...ALMOST,
+      stamina: 3,
+      conscience: 3,
+    }) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...c.data, creation: { ...c.data.creation, approval: true } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Pontos' })
+    tab('Vantagens')
+    step('Consciência')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Consciência' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    const announce = jest.mocked(AccessibilityInfo.announceForAccessibility)
+    announce.mockClear()
+    step('Consciência')
+    expect(announce.mock.calls).toEqual([
+      ['A conta fechou. Você pode enviar ao narrador pela barra.'],
+    ])
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'A conta fechou: envie ao narrador.'
+    )
+  })
+
   it('na criação livre (Editar), nada de "Faltam"', async () => {
     const free = character(PRIORITIES) as {
       data: Record<string, unknown> & { creation: Record<string, unknown> }

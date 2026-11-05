@@ -60,8 +60,10 @@ export function nextStepCopy({
 export const CLOSED_COPY = {
   conclude: 'A conta fechou: você conclui.',
   send: 'A conta fechou: envie ao narrador.',
-  // O anúncio, uma vez, quando a conta fecha na tela
+  // O anúncio, uma vez, quando a conta fecha na tela; com a aprovação, o
+  // jogador envia ao narrador em vez de concluir
   announce: 'A conta fechou. Você pode concluir pela barra.',
+  announceSend: 'A conta fechou. Você pode enviar ao narrador pela barra.',
 } as const
 
 /** O marcador que vale, na precedência do selo (D-02). */

@@ -388,8 +388,10 @@ function Ledger() {
  * aparelho (bonusSeen.ts).
  */
 export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
-  const { store } = useSheet()
+  const { store, roles } = useSheet()
   const creation = useCreation()
+  // Com a aprovação, o jogador envia ao narrador (o mesmo do botão)
+  const sends = creation?.info?.approval === true && !roles.has('storyteller')
   const storage = useUserStorage()
   const characterId = creation?.characterId ?? ''
   const creating = useCreating()
@@ -443,8 +445,10 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
     // A conta fechou na tela (P05-D): um anúncio só, e nenhum quando a folha
     // abriu na mesma passagem, porque ela já anuncia
     if (closedBefore === false && closed && !opened)
-      AccessibilityInfo.announceForAccessibility(CLOSED_COPY.announce)
-  }, [creating, done, closed, spent, store, storage, characterId])
+      AccessibilityInfo.announceForAccessibility(
+        sends ? CLOSED_COPY.announceSend : CLOSED_COPY.announce
+      )
+  }, [creating, done, closed, spent, sends, store, storage, characterId])
 
   return (
     <BottomSheet
