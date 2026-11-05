@@ -99,10 +99,14 @@ interface AnchorNode {
 // que monta muito depois, sem ação da pessoa, não rola a ficha nem move o
 // foco. A medida da aba nova chega em poucos quadros
 export const JUMP_TTL_MS = 1500
-// Depois do salto, a faixa fixa pode crescer (as sub-abas da seção nova):
-// o destino é corrigido com a altura nova, sem mover o foco de novo
-const SETTLE_MS = 1000
-const SETTLE_FIXES = 2
+// B1: a aba recém-montada mede as vistas mais de uma vez (no Android, a
+// primeira medida da âncora é provisória). O salto espera um quadro sem
+// medida nova, até MAX_WAIT_FRAMES; depois dele, dentro da janela do pedido,
+// uma posição nova do destino (ou uma faixa mais alta, com as sub-abas da
+// seção nova) corrige a rolagem, sem mover o foco de novo
+const MAX_WAIT_FRAMES = 6
+const SETTLE_MS = JUMP_TTL_MS
+const SETTLE_FIXES = 6
 
 const nextFrame = (run: () => void) =>
   typeof requestAnimationFrame === 'function'
@@ -157,6 +161,8 @@ export function createGroupTabsStore(): GroupTabsStore {
   let pending: readonly string[] | null = null
   let requestedAt = 0
   let scheduled = false
+  // Houve medida desde o último quadro do salto que espera
+  let moved = false
   // O último salto, para corrigir quando a faixa muda de altura logo depois
   let landed: {
     readonly id: string
@@ -190,7 +196,16 @@ export function createGroupTabsStore(): GroupTabsStore {
     }
     if (!pending.some(id => place(id) !== null)) return
     scheduled = true
-    nextFrame(() => {
+    moved = false
+    let waits = 0
+    const step = () => {
+      // Uma medida nova no último quadro: espera mais um, até o limite
+      if (moved && waits < MAX_WAIT_FRAMES) {
+        moved = false
+        waits += 1
+        nextFrame(step)
+        return
+      }
       scheduled = false
       const ids = pending
       const id = ids?.find(x => place(x) !== null)
@@ -200,10 +215,17 @@ export function createGroupTabsStore(): GroupTabsStore {
       landed = { id, at: Date.now(), y, fixes: 0 }
       const focus = anchors.get(id)?.focus ?? null
       for (const listener of jumpListeners) listener(y, focus)
-    })
+    }
+    nextFrame(step)
   }
-  // A faixa mudou de altura logo depois do salto: o começo do destino volta
-  // a ficar logo abaixo dela
+  // Uma medida chegou: o salto que espera aguarda mais um quadro, e o que
+  // já rolou confere o destino
+  const measured = () => {
+    if (scheduled) moved = true
+    settle()
+  }
+  // O destino mudou logo depois do salto (a medida final da aba nova, a
+  // faixa mais alta): o começo dele volta a ficar logo abaixo da faixa
   const settle = () => {
     if (!landed || landed.fixes >= SETTLE_FIXES) return
     if (Date.now() - landed.at > SETTLE_MS) {
@@ -253,12 +275,13 @@ export function createGroupTabsStore(): GroupTabsStore {
     panelAt(y) {
       panel = y
       if (recompute()) notify()
+      measured()
     },
     navHeight(height) {
       if (height === nav) return
       nav = height
       if (recompute()) notify()
-      settle()
+      measured()
     },
     scrolled(y) {
       scroll = y
@@ -274,6 +297,7 @@ export function createGroupTabsStore(): GroupTabsStore {
     scrollY: () => scroll,
     anchorAt(id, y, focus = null, parent) {
       anchors.set(id, { y, focus, parent })
+      measured()
       resolve()
     },
     dropAnchor(id) {

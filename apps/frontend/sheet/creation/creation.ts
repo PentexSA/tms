@@ -193,7 +193,7 @@ export function counterSpoken(g: CreationGroup, phase?: CreationPhase): string {
     price === null
       ? ''
       : `, cada ${items ? 'item' : 'ponto'} a mais custa ${price} de bônus`
-  return `${g.label}: ${g.basic} de ${g.budget} ${items ? 'itens' : 'pontos'} básicos${extra}${next}`
+  return `${g.label}: ${g.basic} de ${basicUnits(g.budget, items)}${extra}${next}`
 }
 
 // As frases-base do plano (§3.6)
@@ -272,6 +272,15 @@ function missingPriceText(
   return `${field}: ${items} sem ${meta.label} válido. Abra ${which} e informe o ${meta.label}.`
 }
 
+/**
+ * "1 ponto básico", "3 pontos básicos" (B2: o adjetivo concorda com o
+ * número); "itens" nos grupos que contam itens (os Dons).
+ */
+export function basicUnits(n: number, items = false): string {
+  if (n === 1) return items ? '1 item básico' : '1 ponto básico'
+  return `${n} ${items ? 'itens' : 'pontos'} básicos`
+}
+
 /** Uma frase por problema, com os rótulos do template; nunca texto da ficha. */
 export function problemText(
   model: SheetModel,
@@ -281,17 +290,18 @@ export function problemText(
   // ou com preço inválido (P07-D)
   resolved?: ResolvedSheet
 ): string {
-  const group =
-    check?.budgets
-      .find(b => b.id === p.budget)
-      ?.groups.find(g => g.id === p.group)?.label ?? 'Um grupo'
+  const found = check?.budgets
+    .find(b => b.id === p.budget)
+    ?.groups.find(g => g.id === p.group)
+  const group = found?.label ?? 'Um grupo'
+  const groupItems = found?.measure === 'items'
   const field = p.paths[0] ? fieldLabel(model, p.paths[0]) : 'Um campo'
   const n = p.amount ?? 0
   switch (p.code) {
     case 'CREATION_PRIORITIES_REQUIRED':
       return `${group}: escolha a prioridade.`
     case 'CREATION_BASICS_UNSPENT':
-      return `${group}: ${n === 1 ? 'falta 1 ponto' : `faltam ${n} pontos`} básicos.`
+      return `${group}: ${n === 1 ? 'falta' : 'faltam'} ${basicUnits(n, groupItems)}.`
     case 'CREATION_FREEBIES_EXCEEDED':
       return n
         ? `Bônus: ${n} acima do saldo.`
@@ -984,7 +994,7 @@ export function addAdvice(
     if (g.budget === null)
       return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
     if (g.missing > 0)
-      return `Entra com os pontos básicos (faltam ${g.missing} de ${g.budget}).`
+      return `Entra com os pontos básicos (${g.missing === 1 ? 'falta' : 'faltam'} ${g.missing} de ${g.budget}).`
     if (phase === 'basics') return basicsSpentText(g, freebies !== null)
     if (g.price === null || !freebies)
       return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
@@ -1285,7 +1295,10 @@ export function basicsClosed(check: CreationCheck | null): boolean {
 /** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
 export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
   const items = g.measure === 'items'
-  const spent = `${g.label}: os ${g.budget} ${items ? 'itens' : 'pontos'} básicos já foram usados.`
+  const spent =
+    g.budget === 1
+      ? `${g.label}: o ${basicUnits(1, items)} já foi usado.`
+      : `${g.label}: os ${basicUnits(g.budget ?? 0, items)} já foram usados.`
   return freebies && g.price !== null
     ? `${spent} Para passar disso, use os pontos de bônus (${g.price} por ${items ? 'item' : 'ponto'}).`
     : spent

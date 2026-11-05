@@ -738,6 +738,16 @@ O que a implementação fez diferente deste plano, e por quê. Nenhum desvio mud
     O Jest não reproduz o RN-web, porque o `onLayout` é disparado à mão. O teste do store prova a troca de seção com a remedida. O passo "A3 a 390" do `layout.spec.ts` abre e fecha o "Em jogo" e confere a faixa nos Atributos e nas Habilidades; ele é rodado na integração.
 22. **A1: o narrador em Leitura via e acionava "Usar pontos de bônus agora".** A mudança era só local, mas contrariava o R-18e. A troca manual da fase agora só aparece na Criação (`mode === 'create'`), e em Leitura a fase fica só como texto.
 
+**Depois do roteiro do Android (a branch recebeu a onda em `1458f76`):**
+
+23. **B1: o salto para um grupo de outra aba parava no topo da aba.** No AVD a 393, no V20 e no W20, "Habilidades: escolha a prioridade." ficava nos Atributos, e "Dons 3" caía no Renome. A causa é que o salto saía no primeiro quadro em que a âncora existia, com a aba recém-montada ainda sem a medida final; o `settle` só olhava a altura da faixa. A correção:
+    - o salto espera um quadro sem medida nova (até 6 quadros);
+    - dentro da janela do pedido (1,5 s, que também passa a ser a da correção), toda medida nova da âncora, do painel ou da faixa que mude o destino corrige a rolagem, sem mover o foco de novo, até 6 vezes;
+    - no web, onde o destino já vinha certo, a correção não dispara, porque o destino não muda.
+
+    Isso revê o desvio 13 e o teste antigo "medir de novo não rola de novo". O teste do store reproduz a medida provisória seguida da final. A conferência no AVD fica para o roteiro.
+24. **B2: "falta 1 ponto básicos."** O `basicUnits` dá o singular e o plural ("1 ponto básico", "3 pontos básicos") e, nos grupos que contam itens (os Dons), "itens básicos". A mesma junção foi corrigida no contador falado ("1 de 1 ponto básico"), na recusa com orçamento 1 ("o 1 ponto básico já foi usado") e na dica "falta 1 de 3". Nenhum teste nem spec esperava o texto antigo.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
