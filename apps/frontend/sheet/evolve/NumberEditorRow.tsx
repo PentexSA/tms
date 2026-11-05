@@ -3,7 +3,7 @@ import { hitTarget, Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
-import { EditorShell } from './EditorShell'
+import { EditorShell, fieldHelp } from './EditorShell'
 import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
 import { SpecialtyEditor } from './SpecialtyEditor'
 import { parseTyped, typingStore, useTyping } from './typing'
@@ -156,6 +156,7 @@ export function NumberEditorRow(props: FieldViewProps) {
   return (
     <EditorShell
       label={def.label}
+      help={fieldHelp(def)}
       sub={blocked}
       note={feedback.note}
       error={error ?? feedback.notice ?? issue}

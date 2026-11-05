@@ -17,6 +17,8 @@ import { SuggestionChips } from '../editors/Suggestions'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
+import { fieldHelp } from './EditorShell'
+import { HelpRow, helpRowInner } from './HelpRow'
 import { useFieldIssue, useSetDraft } from './hooks'
 
 // text e longText em Evoluir: a linha mostra o começo do texto e abre um
@@ -51,39 +53,55 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
   const value = resolved.value
   return (
     <>
-      <Pressable
+      <HelpRow
+        help={fieldHelp(def)}
+        compact={compact}
         testID={`editor-${resolved.id}`}
-        accessibilityRole="button"
-        {...fieldA11y(def.label, value || 'vazio')}
-        accessibilityHint="Abre o editor de texto"
-        onPress={() => {
-          setText(value)
-          setError(null)
-          setOpen(true)
-        }}
-        style={[
-          styles.row,
-          compact && styles.compact,
-          { borderBottomColor: colors.borderSubtle },
-        ]}
       >
-        <View style={styles.text}>
-          <Text variant="fieldLabel">{def.label}</Text>
-          <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
-            {value || '—'}
-          </Text>
-          {issue ? (
-            <Text variant="caption" color="danger" accessibilityRole="alert">
-              {issue}
-            </Text>
-          ) : null}
-        </View>
-        {compact ? null : (
-          <Text variant="caption" color="action">
-            Editar
-          </Text>
+        {wrapped => (
+          <Pressable
+            testID={`editor-${resolved.id}`}
+            accessibilityRole="button"
+            {...fieldA11y(def.label, value || 'vazio')}
+            accessibilityHint="Abre o editor de texto"
+            onPress={() => {
+              setText(value)
+              setError(null)
+              setOpen(true)
+            }}
+            style={
+              wrapped
+                ? helpRowInner
+                : [
+                    styles.row,
+                    compact && styles.compact,
+                    { borderBottomColor: colors.borderSubtle },
+                  ]
+            }
+          >
+            <View style={styles.text}>
+              <Text variant="fieldLabel">{def.label}</Text>
+              <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
+                {value || '—'}
+              </Text>
+              {issue ? (
+                <Text
+                  variant="caption"
+                  color="danger"
+                  accessibilityRole="alert"
+                >
+                  {issue}
+                </Text>
+              ) : null}
+            </View>
+            {compact ? null : (
+              <Text variant="caption" color="action">
+                Editar
+              </Text>
+            )}
+          </Pressable>
         )}
-      </Pressable>
+      </HelpRow>
       <BottomSheet
         visible={open}
         title={def.label}

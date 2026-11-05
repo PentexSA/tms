@@ -2,7 +2,7 @@ import { stored } from '@tms/sheet-core'
 import { Stepper, type StepperIncrease, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
-import { EditorShell } from './EditorShell'
+import { EditorShell, fieldHelp } from './EditorShell'
 import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
 import { useRowFeedback } from './useRowFeedback'
 
@@ -81,6 +81,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   return (
     <EditorShell
       label={def.label}
+      help={fieldHelp(def)}
       sub={note}
       note={feedback.note}
       error={feedback.notice ?? issue}

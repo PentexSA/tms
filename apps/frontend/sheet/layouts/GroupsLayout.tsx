@@ -8,7 +8,6 @@ import {
   Button,
   hitTarget,
   Pressable,
-  SectionHeader,
   Text,
   textStyle,
   tokens,
@@ -28,6 +27,7 @@ import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
 import { ChipFlow } from './ChipFlow'
+import { GroupHelpLine, GroupTitle, groupHelpOf } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
@@ -127,6 +127,11 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             g.fieldIds,
             header ? g.title : echo ? section.def.title : null
           )
+          // A frase do grupo ou, no bloco que o título nomeia (T-58), a da lista
+          const listDef = headed ? model.fields.get(headed)?.def : undefined
+          const listHelp =
+            listDef?.help && isDraftMode(mode) ? listDef.help : null
+          const help = groupHelpOf(section, g.id, mode) ?? listHelp
           return (
             <GroupBlock
               key={g.id}
@@ -135,14 +140,29 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             >
               {header ? (
                 <View style={styles.title}>
-                  <SectionHeader
+                  <GroupTitle
                     title={g.title}
-                    level="group"
+                    help={help}
+                    testID={`group-help-${g.id}`}
                     right={
                       <CreationCounter fieldIds={g.fieldIds} items={headed} />
                     }
                   />
                 </View>
+              ) : g.title && !echo ? (
+                // Com abas, o "?" vai no topo do conteúdo da aba
+                <GroupHelpLine
+                  title={g.title}
+                  help={help}
+                  testID={`group-help-${g.id}`}
+                />
+              ) : echo && listDef ? (
+                // O título da seção nomeia a lista: o "?" da lista vem logo abaixo
+                <GroupHelpLine
+                  title={listDef.label}
+                  help={listHelp}
+                  testID={`group-help-${g.id}`}
+                />
               ) : null}
               {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
               {titled || tabs.inStrip ? null : (

@@ -2,6 +2,8 @@ import { type ListItem, type ResolvedList, stored } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
+  HelpButton,
+  HelpText,
   Pressable,
   Stepper,
   type StepperIncrease,
@@ -9,6 +11,7 @@ import {
   TextArea,
   TextField,
   tokens,
+  useHelp,
   useTheme,
 } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
@@ -25,6 +28,7 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
+import { fieldHelp } from './EditorShell'
 import { useDraftNotice, useFieldIssue, useSetDraft } from './hooks'
 import { withItemDefaults } from './listItem'
 import { fold, nextItemId, noneOf } from './text'
@@ -113,7 +117,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const border = { borderBottomColor: colors.borderSubtle }
   return (
     <View testID={`editor-${list.id}`} style={styles.wrap}>
-      {headed ? null : <ListHeader resolved={list} sheet={sheet} />}
+      {headed ? null : <EditorListHeader list={list} sheet={sheet} />}
       {list.items.map(item => (
         <Pressable
           key={item.id}
@@ -178,6 +182,42 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
             return refused
           }}
         />
+      ) : null}
+    </View>
+  )
+}
+
+// O cabeçalho da lista no Editar e na criação, com o "?" da frase do campo
+// (R-19) ao lado. Quando o título do bloco já nomeia a lista (T-58), o "?" vai
+// nele (layouts/groupHelp.tsx).
+function EditorListHeader({
+  list,
+  sheet,
+}: {
+  readonly list: ResolvedList
+  readonly sheet: FieldViewProps['sheet']
+}) {
+  const state = useHelp()
+  const help = fieldHelp(list.field.def)
+  if (!help) return <ListHeader resolved={list} sheet={sheet} />
+  return (
+    <View>
+      <View style={styles.headerRow}>
+        <View style={styles.flex}>
+          <ListHeader resolved={list} sheet={sheet} />
+        </View>
+        <HelpButton
+          subject={help.subject}
+          expanded={state.expanded}
+          onToggle={state.toggle}
+          controls={state.textId}
+          testID={`editor-${list.id}-help`}
+        />
+      </View>
+      {state.expanded ? (
+        <View style={styles.headerHelp}>
+          <HelpText id={state.textId} text={help.text} />
+        </View>
       ) : null}
     </View>
   )
@@ -512,6 +552,12 @@ function ItemSheet({
 
 const styles = StyleSheet.create({
   wrap: { width: '100%' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: tokens.layout.gutter,
+  },
+  headerHelp: { paddingHorizontal: tokens.layout.gutter },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

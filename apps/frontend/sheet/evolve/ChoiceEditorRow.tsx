@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
+import { fieldHelp } from './EditorShell'
+import { HelpRow, helpRowInner } from './HelpRow'
 import { useFieldIssue, useSetDraft } from './hooks'
 
 // choice e state em Evoluir: a linha abre um radiogroup no sheet. Trocar o
@@ -23,41 +25,67 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
   const label = current?.label ?? '—'
   return (
     <>
-      <Pressable
+      <HelpRow
+        help={fieldHelp(def)}
+        compact={compact}
         testID={`editor-${resolved.id}`}
-        accessibilityRole="button"
-        {...fieldA11y(def.label, label)}
-        accessibilityHint="Abre as opções"
-        onPress={() => {
-          setError(null)
-          setOpen(true)
-        }}
-        style={[
-          styles.row,
-          compact && styles.compact,
-          { borderBottomColor: colors.borderSubtle },
-        ]}
       >
-        <View style={styles.text}>
-          <Text variant="fieldLabel">{def.label}</Text>
-          <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
-          {issue ? (
-            <Text variant="caption" color="danger" accessibilityRole="alert">
-              {issue}
-            </Text>
-          ) : null}
-        </View>
-        {compact ? null : (
-          <Text variant="caption" color="action">
-            Trocar
-          </Text>
+        {wrapped => (
+          <Pressable
+            testID={`editor-${resolved.id}`}
+            accessibilityRole="button"
+            {...fieldA11y(def.label, label)}
+            accessibilityHint="Abre as opções"
+            onPress={() => {
+              setError(null)
+              setOpen(true)
+            }}
+            style={
+              wrapped
+                ? helpRowInner
+                : [
+                    styles.row,
+                    compact && styles.compact,
+                    { borderBottomColor: colors.borderSubtle },
+                  ]
+            }
+          >
+            <View style={styles.text}>
+              <Text variant="fieldLabel">{def.label}</Text>
+              <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
+              {issue ? (
+                <Text
+                  variant="caption"
+                  color="danger"
+                  accessibilityRole="alert"
+                >
+                  {issue}
+                </Text>
+              ) : null}
+            </View>
+            {compact ? null : (
+              <Text variant="caption" color="action">
+                Trocar
+              </Text>
+            )}
+          </Pressable>
         )}
-      </Pressable>
+      </HelpRow>
       <BottomSheet
         visible={open}
         title={def.label}
         onClose={() => setOpen(false)}
       >
+        {/* Quem abriu a folha já pediu este campo: a frase vai como texto, sem "?" */}
+        {def.help ? (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            testID={`help-${resolved.id}`}
+          >
+            {def.help}
+          </Text>
+        ) : null}
         {error ? (
           <Text variant="caption" color="danger" accessibilityRole="alert">
             {error}
@@ -71,6 +99,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
             id: o.id,
             label: o.label,
             meta: 'meta' in o ? o.meta : 'hint' in o ? o.hint : undefined,
+            help: o.help,
           }))}
           onChange={id => {
             const err = set(`values.${resolved.id}`, id)

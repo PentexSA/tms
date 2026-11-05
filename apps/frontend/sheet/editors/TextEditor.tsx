@@ -47,7 +47,8 @@ export function TextEditor({
       onChangeText={onChange}
       maxLength={max}
       error={error}
-      hint={def.help}
+      // A frase do template é ajuda (o "?", R-19), não dica sempre visível
+      help={def.help ? { subject: def.label, text: def.help } : undefined}
       placeholder={
         def.type === 'text' || def.type === 'longText'
           ? def.placeholder
