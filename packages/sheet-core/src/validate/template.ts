@@ -116,7 +116,14 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    text: [
+      'maxLength',
+      'aspect',
+      'placeholder',
+      'suggestions',
+      'suggestionHelp',
+      'default',
+    ],
     longText: ['maxLength', 'placeholder', 'default'],
     choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
@@ -125,6 +132,7 @@ const KEYS = {
       'item',
       'catalog',
       'catalogDefaults',
+      'catalogHelp',
       'recommend',
       'searchable',
       'density',
@@ -266,6 +274,23 @@ function check(
   // limite de cada nó. O "sem link" e a linha única valem só na publicação
   // (publication.ts): aqui roda também a leitura de versões já publicadas.
   const help = (path: string, v: unknown, max: number) => text(path, v, max)
+  // A frase por nome (catálogo, sugestões), ao lado da lista: só nomes que a
+  // lista tem, cada frase como a do nó
+  const helpMap = (
+    path: string,
+    v: unknown,
+    names: readonly unknown[],
+    max: number
+  ) => {
+    if (!isObj(v)) return err(path, 'precisa ser objeto')
+    const entries = Object.entries(v)
+    if (!entries.length || entries.length > max)
+      err(path, `de 1 a ${max} nomes`)
+    for (const [name, phrase] of entries) {
+      if (!names.includes(name)) err(path, `'${name}' não está na lista`)
+      help(`${path}.${name}`, phrase, 200)
+    }
+  }
   const oneOf = (
     path: string,
     v: unknown,
@@ -478,6 +503,13 @@ function check(
           err(`${p}.suggestions`, 'sugestão repetida')
       }
     }
+    if (f.type === 'text' && f.suggestionHelp != null)
+      helpMap(
+        `${p}.suggestionHelp`,
+        f.suggestionHelp,
+        asArray(f.suggestions),
+        100
+      )
     if (f.type === 'rating')
       formula(`${p}.default`, f.default, numOr(f.min, 0), numOr(f.max, 10))
     else if (f.type === 'text' || f.type === 'longText') {
@@ -702,6 +734,8 @@ function check(
         text(`${p}.catalog`, c, 80)
       for (const x of objs(`${p}.fixed`, f.fixed))
         if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
+      if (f.catalogHelp != null)
+        helpMap(`${p}.catalogHelp`, f.catalogHelp, asArray(f.catalog), 200)
       const item = rec(f.item)
       for (const m of objs(`${p}.item.meta`, item?.meta))
         text(`${p}.item.meta.${m.id}.label`, m.label)

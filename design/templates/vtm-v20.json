@@ -574,6 +574,18 @@
         "Lacaios",
         "Status"
       ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+        "Geração": "Cada ponto deixa o vampiro uma geração mais perto dos primeiros. Muda a Geração da identidade e o máximo de sangue.",
+        "Rebanho": "Pessoas de quem o vampiro se alimenta com segurança. Mais pontos: mais gente e menos tempo caçando.",
+        "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Lacaios": "Servos leais ao vampiro. Mais pontos: mais servos ou servos mais capazes.",
+        "Status": "A posição do vampiro na sociedade dos vampiros da cidade."
+      },
       "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
     "conscience": {

@@ -1,6 +1,7 @@
-import { BottomSheet, Button, Chip, tokens } from '@tms/ui'
+import { BottomSheet, Button, Chip, tokens, WithHelp } from '@tms/ui'
 import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { nameHelp } from '../evolve/EditorShell'
 import { byLabel } from '../evolve/text'
 
 // As sugestões de um campo de texto (`suggestions` do template, como os
@@ -22,11 +23,14 @@ export function SuggestionChips({
   options,
   value,
   onPick,
+  help,
   testID,
 }: {
   readonly options: readonly string[]
   readonly value: string
   readonly onPick: (option: string) => void
+  // A frase por sugestão (R-19): com alguma, as sugestões viram linhas
+  readonly help?: Readonly<Record<string, string>>
   readonly testID?: string
 }) {
   const query = fold(value)
@@ -36,6 +40,22 @@ export function SuggestionChips({
   const shown =
     query && !exact ? sorted.filter(o => fold(o).includes(query)) : sorted
   if (!shown.length) return null
+  // Um "?" por chip não cabe: com frase, uma linha por sugestão, [nome][?],
+  // com o mesmo botão (nome e estado) do chip
+  if (shown.some(o => nameHelp(help, o)))
+    return (
+      <View style={styles.rows} testID={testID}>
+        {shown.map(o => (
+          <WithHelp key={o} help={nameHelp(help, o)}>
+            <Chip
+              label={o}
+              selected={fold(o) === query}
+              onPress={() => onPick(o)}
+            />
+          </WithHelp>
+        ))}
+      </View>
+    )
   return (
     <View style={styles.chips} testID={testID}>
       {shown.map(o => (
@@ -56,12 +76,14 @@ export function SuggestionPicker({
   options,
   value,
   onPick,
+  help,
   testID,
 }: {
   readonly label: string
   readonly options: readonly string[]
   readonly value: string
   readonly onPick: (option: string) => void
+  readonly help?: Readonly<Record<string, string>>
   readonly testID?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -83,6 +105,7 @@ export function SuggestionPicker({
           options={options}
           // A lista inteira, com a escolha atual marcada
           value={options.some(o => fold(o) === fold(value)) ? value : ''}
+          help={help}
           onPick={o => {
             onPick(o)
             setOpen(false)
@@ -96,5 +119,6 @@ export function SuggestionPicker({
 
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
+  rows: { gap: tokens.space[1] },
   open: { alignItems: 'flex-start' },
 })

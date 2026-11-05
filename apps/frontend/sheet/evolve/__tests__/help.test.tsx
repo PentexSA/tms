@@ -1,8 +1,16 @@
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native'
 import { compileTemplate, type SheetData } from '@tms/sheet-core'
+import { ThemeProvider } from '@tms/ui'
 import { modelOf, templateJson } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { SuggestionChips } from '../../editors/Suggestions'
 import { blockHelp } from '../../layouts/groupHelp'
+import { nameHelp } from '../EditorShell'
 
 // R-19 (P10-D): o "?" da ajuda do template nas linhas do Editar (e da
 // criação, que usa os mesmos editores). Só nesses modos: em Jogo e Leitura,
@@ -201,5 +209,88 @@ describe('Editar: o bloco com frase do grupo e da lista (R-19)', () => {
     fireEvent.press(screen.getByTestId('group-help-backgrounds'))
     const list = m.fields.get('backgrounds')?.def.help ?? '-'
     expect(screen.getByText(`Frase do grupo, do teste. ${list}`)).toBeTruthy()
+  })
+})
+
+// Commit 7: a frase por nome do catálogo (catalogHelp) e das sugestões
+// (suggestionHelp), no mapa ao lado da lista
+describe('Editar: o "?" no catálogo e nas sugestões (R-19)', () => {
+  const backgrounds = model.fields.get('backgrounds')?.def as {
+    catalogHelp?: Record<string, string>
+  }
+
+  it('a opção do catálogo tem "?" à direita, fora do botão da opção', async () => {
+    await editing()
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Antecedente' })
+    )
+    const sheet = within(screen.getByTestId('add-sheet-backgrounds'))
+    const option = sheet.getByRole('button', { name: 'Aliados' })
+    expect(within(option).queryByRole('button', { name: /^Ajuda:/ })).toBeNull()
+    fireEvent.press(sheet.getByRole('button', { name: 'Ajuda: Aliados' }))
+    expect(
+      sheet.getByText(backgrounds.catalogHelp?.Aliados ?? '-')
+    ).toBeTruthy()
+  })
+
+  it('o item já na ficha: a linha sem "?", e a frase no topo da folha', async () => {
+    const sheet: SheetData = {
+      values: {
+        ...nova.values,
+        backgrounds: [{ id: 'b1', name: 'Aliados', value: 1 }],
+      },
+      specialties: {},
+    }
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const list = within(screen.getByTestId('editor-backgrounds'))
+    expect(list.queryByRole('button', { name: 'Ajuda: Aliados' })).toBeNull()
+    fireEvent.press(list.getByRole('button', { name: /^Aliados/ }))
+    expect(screen.getByTestId('item-help')).toHaveTextContent(
+      backgrounds.catalogHelp?.Aliados ?? '-'
+    )
+  })
+
+  it('sugestões com frase viram linhas com "?"; sem frase, os chips', () => {
+    const pick = jest.fn()
+    const { rerender } = render(
+      <ThemeProvider>
+        <SuggestionChips
+          options={['Arquiteto', 'Bon Vivant']}
+          value=""
+          onPick={pick}
+          help={{ Arquiteto: 'Frase do Arquiteto, do teste.' }}
+        />
+      </ThemeProvider>
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Arquiteto' }))
+    expect(screen.getByText('Frase do Arquiteto, do teste.')).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Ajuda: Bon Vivant' })
+    ).toBeNull()
+    fireEvent.press(screen.getByText('Bon Vivant'))
+    expect(pick).toHaveBeenCalledWith('Bon Vivant')
+    rerender(
+      <ThemeProvider>
+        <SuggestionChips
+          options={['Arquiteto', 'Bon Vivant']}
+          value=""
+          onPick={pick}
+        />
+      </ThemeProvider>
+    )
+    expect(screen.queryAllByRole('button', { name: /^Ajuda:/ })).toEqual([])
+  })
+
+  it('o nome do item não lê propriedade herdada do mapa', () => {
+    expect(nameHelp({ Aliados: 'x' }, 'toString')).toBeNull()
+    expect(nameHelp({ Aliados: 'x' }, 'Aliados')).toEqual({
+      subject: 'Aliados',
+      text: 'x',
+    })
   })
 })

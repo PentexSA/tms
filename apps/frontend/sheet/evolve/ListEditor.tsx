@@ -32,7 +32,7 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
-import { fieldHelp } from './EditorShell'
+import { fieldHelp, nameHelp } from './EditorShell'
 import {
   useClassNote,
   useDraftNotice,
@@ -471,29 +471,33 @@ function AddItemSheet({
     const labels = identity.recommended.get(name) ?? []
     const secondary = [...metasOf(name), ...labels]
     const spoken = [name, ...secondary, ...(taken ? ['já na ficha'] : [])]
+    // O "?" da opção à direita do selo (R-19; onda-4.md §4.4): irmão do
+    // botão, que não muda de nome
     return (
       <View key={name}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={spoken.join(', ')}
-          disabled={taken}
-          onPress={() => pick(name, `option:${name}`)}
-          style={styles.option}
-        >
-          <View style={styles.flex}>
-            <Text>{name}</Text>
-            {secondary.length ? (
+        <WithHelp help={nameHelp(def.catalogHelp, name)} fill>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={spoken.join(', ')}
+            disabled={taken}
+            onPress={() => pick(name, `option:${name}`)}
+            style={styles.option}
+          >
+            <View style={styles.flex}>
+              <Text>{name}</Text>
+              {secondary.length ? (
+                <Text variant="caption" color="inkMuted">
+                  {secondary.join(' · ')}
+                </Text>
+              ) : null}
+            </View>
+            {taken ? (
               <Text variant="caption" color="inkMuted">
-                {secondary.join(' · ')}
+                já na ficha
               </Text>
             ) : null}
-          </View>
-          {taken ? (
-            <Text variant="caption" color="inkMuted">
-              já na ficha
-            </Text>
-          ) : null}
-        </Pressable>
+          </Pressable>
+        </WithHelp>
         {noticeAt(`option:${name}`)}
       </View>
     )
@@ -738,7 +742,10 @@ function ItemSheet({
   // até o próximo ajuste (T-19)
   const notice = useListNotice(list)
   const title = itemTitle(list, item) || def.itemLabel
-  const fixedHelp = def.fixed?.find(x => x.id === item.id)?.help
+  // A frase do item: a do item fixo ou a do nome no catálogo (R-19)
+  const fixedHelp =
+    def.fixed?.find(x => x.id === item.id)?.help ??
+    nameHelp(def.catalogHelp, item.name)?.text
   const patch = (p: Partial<Mutable<ListItem>>) => {
     notice.clear()
     setDraft(d => ({ ...d, ...p }))

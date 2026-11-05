@@ -197,6 +197,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
               options={def.suggestions}
               value={text}
               onPick={setText}
+              help={def.type === 'text' ? def.suggestionHelp : undefined}
               testID={`suggest-${resolved.id}`}
             />
           </View>

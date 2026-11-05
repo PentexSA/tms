@@ -232,6 +232,26 @@ const NODES: [string, () => Json, (t: Json, v: string) => string][] = [
     },
   ],
   [
+    'field-list.catalogHelp/additionalProperties',
+    mta,
+    (t, v) => {
+      const f = fieldsOf(t).backgrounds as Json
+      const [name] = f.catalog as string[]
+      f.catalogHelp = { [name as string]: v }
+      return `fields.backgrounds.catalogHelp.${name}`
+    },
+  ],
+  [
+    'field-text.suggestionHelp/additionalProperties',
+    vtm,
+    (t, v) => {
+      const f = fieldsOf(t).nature as Json
+      const [name] = f.suggestions as string[]
+      f.suggestionHelp = { [name as string]: v }
+      return `fields.nature.suggestionHelp.${name}`
+    },
+  ],
+  [
     'resourceAction.help',
     vtm,
     (t, v) => {
@@ -311,5 +331,78 @@ describe('publicationIssues: só na publicação, nos nós do schema', () => {
     o.help = 'segredo-de-teste https://exemplo.test'
     for (const i of publicationIssues(t))
       expect(`${i.path} ${i.message}`).not.toContain('segredo-de-teste')
+  })
+})
+
+// Commit 7: a frase por nome, num mapa ao lado da lista (catalogHelp e
+// suggestionHelp), como o catalogDefaults do P07-D
+describe('catalogHelp e suggestionHelp', () => {
+  const background = (t: Json) => fieldsOf(t).backgrounds as Json
+  const nature = (t: Json) => fieldsOf(t).nature as Json
+
+  it('aceitam nomes da lista, com frase curta, nos dois validadores', () => {
+    const t = vtm()
+    const [b] = background(t).catalog as string[]
+    const [s] = nature(t).suggestions as string[]
+    background(t).catalogHelp = { [b as string]: 'Frase do time.' }
+    nature(t).suggestionHelp = { [s as string]: 'Frase do time.' }
+    expect(validateTemplate(t, palette)).toEqual([])
+    expect(reference.validateTemplate(t, palette)).toEqual([])
+  })
+
+  it.each([
+    [
+      'nome fora do catálogo',
+      (t: Json) => {
+        background(t).catalogHelp = { 'Nome Inventado': 'Frase.' }
+      },
+      'fields.backgrounds.catalogHelp',
+    ],
+    [
+      'nome fora das sugestões',
+      (t: Json) => {
+        nature(t).suggestionHelp = { 'Nome Inventado': 'Frase.' }
+      },
+      'fields.nature.suggestionHelp',
+    ],
+    [
+      'frase acima de 200',
+      (t: Json) => {
+        const [b] = background(t).catalog as string[]
+        background(t).catalogHelp = { [b as string]: 'a'.repeat(201) }
+      },
+      'fields.backgrounds.catalogHelp.',
+    ],
+    [
+      'mapa que não é objeto',
+      (t: Json) => {
+        background(t).catalogHelp = ['Aliados']
+      },
+      'fields.backgrounds.catalogHelp',
+    ],
+    [
+      'mapa vazio',
+      (t: Json) => {
+        background(t).catalogHelp = {}
+      },
+      'fields.backgrounds.catalogHelp',
+    ],
+  ] as [string, (t: Json) => void, string][])(
+    'recusam %s, iguais à referência',
+    (_, mutate, path) => {
+      const t = vtm()
+      mutate(t)
+      const issues = validateTemplate(t, palette)
+      expect(issues.some(i => i.path.startsWith(path))).toBe(true)
+      expect(fmt('vtm-v20', issues)).toEqual(
+        reference.validateTemplate(t, palette)
+      )
+    }
+  )
+
+  it('a chave proibida no nome continua barrada', () => {
+    const t = vtm()
+    background(t).catalogHelp = JSON.parse('{"__proto__": "x"}')
+    expect(validateTemplate(t, palette).length).toBeGreaterThan(0)
   })
 })

@@ -1266,6 +1266,14 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/label" }
         },
+        "suggestionHelp": {
+          "description": "Frase curta de ajuda por sugestão (R-19), num mapa pelo texto da sugestão, ao lado da lista: { \"Arquiteto\": \"...\" }. Só textos de suggestions; escrita pelo time.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/label" },
+          "additionalProperties": { "$ref": "#/$defs/helpShort" },
+          "minProperties": 1,
+          "maxProperties": 100
+        },
         "default": { "$ref": "#/$defs/textChoiceMap" }
       },
       "unevaluatedProperties": false
@@ -1397,6 +1405,14 @@
             },
             "additionalProperties": false
           }
+        },
+        "catalogHelp": {
+          "description": "Frase curta de ajuda por nome do catalog (R-19), num mapa pelo nome, ao lado da lista (como o catalogDefaults): { \"Aliados\": \"...\" }. Só nomes do catalog; escrita pelo time, nunca a descrição do livro (§12).",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/safeText", "maxLength": 80 },
+          "additionalProperties": { "$ref": "#/$defs/helpShort" },
+          "minProperties": 1,
+          "maxProperties": 200
         },
         "recommend": { "$ref": "#/$defs/recommend" },
         "fixed": {

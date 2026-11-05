@@ -19,6 +19,9 @@ const values = (v: unknown): [string, Obj][] =>
     ? Object.entries(v).filter((e): e is [string, Obj] => isObj(e[1]))
     : []
 
+const entries = (v: unknown): [string, unknown][] =>
+  isObj(v) ? Object.entries(v) : []
+
 const LINK = /:\/\/|www\./i
 const LINE_BREAK = /[\t\n\r]/
 
@@ -44,8 +47,14 @@ export function publicationIssues(t: unknown): Issue[] {
       if (f.type === 'state' || f.type === 'choice')
         check(`${p}.options.${o.id}.help`, o.help)
     }
-    if (f.type === 'list')
+    if (f.type === 'list') {
       for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+      for (const [name, v] of entries(f.catalogHelp))
+        check(`${p}.catalogHelp.${name}`, v)
+    }
+    if (f.type === 'text')
+      for (const [name, v] of entries(f.suggestionHelp))
+        check(`${p}.suggestionHelp.${name}`, v)
     if (f.type === 'resource')
       for (const a of objs(f.actions))
         check(`${p}.actions.${a.id}.help`, a.help)

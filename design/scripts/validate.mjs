@@ -63,11 +63,11 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'suggestionHelp', 'default'],
     longText: ['maxLength', 'placeholder', 'default'],
     choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
-    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
+    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'catalogHelp', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
   },
   section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'groupTabs', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
   roll: ['model', 'label', 'die', 'dice', 'slots', 'difficulty', 'penalty', 'specialty', 'boosts', 'presets', 'advantage', 'target', 'conditions', 'bonusDice', 'ladder'],
@@ -579,7 +579,11 @@ export function publicationIssues(t) {
       if (f.type === 'state') check(`${p}.options.${o.id}.note`, o.note)
       if (f.type === 'state' || f.type === 'choice') check(`${p}.options.${o.id}.help`, o.help)
     }
-    if (f.type === 'list') for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+    if (f.type === 'list') {
+      for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+      for (const [name, v] of Object.entries(isObjL(f.catalogHelp) ? f.catalogHelp : {})) check(`${p}.catalogHelp.${name}`, v)
+    }
+    if (f.type === 'text') for (const [name, v] of Object.entries(isObjL(f.suggestionHelp) ? f.suggestionHelp : {})) check(`${p}.suggestionHelp.${name}`, v)
     if (f.type === 'resource') for (const a of objs(f.actions)) check(`${p}.actions.${a.id}.help`, a.help)
   }
   for (const s of objs(t.sections)) for (const g of objs(s.groups)) check(`sections.${s.id}.groups.${g.id}.help`, g.help)
@@ -602,6 +606,16 @@ export function validateTemplate(t, palette) {
   // Ajuda (campo, opção, grupo, item fixo): texto puro, com o limite do nó. O "sem link" e a
   // linha única ficam em publicationIssues, como no core.
   const help = (path, v, max) => text(path, v, max)
+  // A frase por nome (catálogo, sugestões): só nomes que a lista tem (o mesmo helpMap do core)
+  const helpMap = (path, v, names, max) => {
+    if (!isObj(v)) return err(path, 'precisa ser objeto')
+    const entries = Object.entries(v)
+    if (!entries.length || entries.length > max) err(path, `de 1 a ${max} nomes`)
+    for (const [name, phrase] of entries) {
+      if (!names.includes(name)) err(path, `'${name}' não está na lista`)
+      help(`${path}.${name}`, phrase, 200)
+    }
+  }
   const oneOf = (path, v, list, what) => {
     if (!list.includes(v)) err(path, `${what} '${v}' fora da lista fechada`)
   }
@@ -724,6 +738,7 @@ export function validateTemplate(t, palette) {
           err(`${p}.suggestions`, 'sugestão repetida')
       }
     }
+    if (f.type === 'text' && f.suggestionHelp != null) helpMap(`${p}.suggestionHelp`, f.suggestionHelp, Array.isArray(f.suggestions) ? f.suggestions : [], 100)
     if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
     else if (f.type === 'text' || f.type === 'longText') {
       // Texto por opção de um choice (a Fraqueza pelo Clã), uma linha cada
@@ -836,6 +851,7 @@ export function validateTemplate(t, palette) {
     if (f.type === 'list') {
       for (const c of f.catalog ?? []) text(`${p}.catalog`, c, 80)
       for (const x of f.fixed ?? []) if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
+      if (f.catalogHelp != null) helpMap(`${p}.catalogHelp`, f.catalogHelp, Array.isArray(f.catalog) ? f.catalog : [], 200)
       for (const m of f.item?.meta ?? []) text(`${p}.item.meta.${m.id}.label`, m.label)
       if (f.item?.value) { num(`${p}.item.value.min`, f.item.value.min, 0, 10); num(`${p}.item.value.max`, f.item.value.max, 1, 10) }
       // O meta inicial de nomes do catálogo (o Posto de cada Dom)

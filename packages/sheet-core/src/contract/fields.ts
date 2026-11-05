@@ -267,6 +267,8 @@ export interface TextField extends FieldBase<'text'> {
   // Sugestões para escolher com um toque (os Arquétipos do livro). O texto
   // continua livre: a sugestão só preenche o campo.
   readonly suggestions?: readonly string[]
+  // Frase curta de ajuda por sugestão (R-19), ao lado da lista
+  readonly suggestionHelp?: Readonly<Record<string, string>>
   readonly default?: TextChoiceDefault
 }
 
@@ -335,6 +337,8 @@ export interface ListField extends FieldBase<'list'> {
   // Só nomes: descrições protegidas não entram no template (§12).
   readonly catalog?: readonly string[]
   readonly catalogDefaults?: readonly CatalogDefault[]
+  // Frase curta de ajuda por nome do catálogo (R-19), ao lado da lista
+  readonly catalogHelp?: Readonly<Record<string, string>>
   readonly recommend?: Recommend
   readonly fixed?: readonly ListFixedItem[]
   readonly searchable?: boolean

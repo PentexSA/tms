@@ -363,6 +363,11 @@ const attributesGroup: Help = (t, help) => {
   const [g] = (s?.groups ?? []) as Json[]
   if (g) g.help = help
 }
+// Commit 7: a frase de um nome do catálogo, no mapa ao lado da lista
+const catalogHelp: Help = (t, help) => {
+  const f = fieldsOf(t).backgrounds as Json
+  f.catalogHelp = { ...(f.catalogHelp as Json), Aliados: help }
+}
 const humanityHelp: Help = (t, help) => {
   const f = fieldsOf(t).humanity
   if (f) f.help = help
@@ -392,6 +397,8 @@ describe('ajuda no template (R-19)', () => {
     ['marcação no grupo', attributesGroup, `<b>${ADDED}</b>`],
     ['quebra de linha no grupo', attributesGroup, `${ADDED}\nmais`],
     ['link no help do campo', humanityHelp, `${ADDED} www.exemplo.test`],
+    ['link no catálogo', catalogHelp, `${ADDED} https://exemplo.test`],
+    ['catálogo acima de 200', catalogHelp, ADDED + 'a'.repeat(200)],
   ] as [string, Help, string][])(
     'recusa %s, sem gravar e sem ecoar a frase',
     async (_, put, help) => {

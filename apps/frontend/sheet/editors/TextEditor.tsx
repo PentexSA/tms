@@ -78,6 +78,7 @@ export function TextEditor({
         options={suggestions}
         value={text}
         onPick={onChange}
+        help={def.type === 'text' ? def.suggestionHelp : undefined}
         testID={`suggest-${id}`}
       />
     </View>

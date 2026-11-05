@@ -115,6 +115,19 @@ const styles = StyleSheet.create({
 /** A frase de ajuda de uma linha: o nome do "?" e o texto do template. */
 export type FieldHelp = Help
 
+/**
+ * A frase de um nome no mapa ao lado da lista (`catalogHelp`, `suggestionHelp`):
+ * só propriedade própria, porque o nome vem do texto da ficha.
+ */
+export function nameHelp(
+  map: Readonly<Record<string, string>> | undefined,
+  name: string | undefined
+): Help | null {
+  if (!map || !name || !Object.hasOwn(map, name)) return null
+  const text = map[name]
+  return typeof text === 'string' && text ? { subject: name, text } : null
+}
+
 /** A ajuda do campo, se o template tiver frase (campo sem frase não mostra "?"). */
 export function fieldHelp(def: {
   readonly label: string

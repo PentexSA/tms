@@ -86,6 +86,7 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 - nas opções de `choice` e `state`;
 - nos itens `fixed` de `list`;
 - nos grupos de seção (`sections[].groups[].help`).
+- nos nomes do `catalog` de `list` e nas `suggestions` de `text`, num mapa pelo nome ao lado da lista, como o `catalogDefaults`: `catalogHelp: { "Aliados": "..." }` e `suggestionHelp: { "Arquiteto": "..." }`. Só nomes que a lista tem; o mapa tem até 200 (catálogo) ou 100 (sugestões) nomes. O app mostra o "?" na opção da folha de adicionar e na lista de sugestões, e a frase no topo da folha do item já na ficha.
 
 As duas são texto puro de uma linha e **sem link**. Na publicação, `://` e `www.` (sem diferença de caixa) e a quebra de linha são recusados em todos os nós de `$defs/helpText` e `$defs/helpShort`: no schema (pelo `not` e pelo `safeText`) e, com as mesmas mensagens, no `publicationIssues` do core e no do `validate.mjs`. O `validateTemplate`, que o app roda ao ler uma versão já publicada, não repete essa regra: a leitura é tolerante. O app sempre desenha a frase como texto. Nó sem `help` não mostra "?", então a ajuda pode entrar aos poucos, sem código. Quem escreve a frase: §12.
 

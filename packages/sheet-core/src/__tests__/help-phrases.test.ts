@@ -8,8 +8,8 @@ import { type Json, templates } from './fixtures'
 // R-19 (P10-D, commit 8): as frases do time em
 // doc/planos-pacotes/P10-D-frases.json, conferidas contra os templates. Cada
 // frase está no caminho que a lista diz, com o mesmo texto, até 200
-// caracteres, sem link e sem marcação. As do catálogo entram com o commit 7
-// (sobre a forma do catálogo do P07-D): aqui só se confere que o nome existe.
+// caracteres, sem link e sem marcação. As do catálogo vão no catalogHelp, o
+// mapa por nome ao lado da lista (commit 7, no padrão do P07-D).
 
 interface Phrase {
   readonly label?: string
@@ -113,12 +113,16 @@ for (const [system, data] of Object.entries(PHRASES.templates)) {
       }
     })
 
-    it('catálogo: os nomes existem (a frase entra com o commit 7)', () => {
+    it('catálogo: cada nome tem a frase da lista no catalogHelp', () => {
       for (const [id, names] of Object.entries(data.catalog)) {
         const catalog = (fields[id]?.catalog ?? []) as string[]
         expect(Object.keys(names).sort()).toEqual([...catalog].sort())
-        for (const text of Object.values(names))
+        const map = (fields[id]?.catalogHelp ?? {}) as Record<string, string>
+        expect(Object.keys(map).sort()).toEqual([...catalog].sort())
+        for (const [name, text] of Object.entries(names)) {
+          expect({ name, help: map[name] }).toEqual({ name, help: text })
           expect(shortOk(text)).toBe(true)
+        }
       }
     })
 

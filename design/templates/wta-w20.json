@@ -734,6 +734,18 @@
         "Totem",
         "Raça Pura"
       ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Ancestrais": "A memória dos antepassados, que o personagem pode chamar para pedir conselho ou habilidade.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Fetiche": "Um objeto com um espírito dentro, que o personagem já tem no começo. O nível é o do fetiche.",
+        "Parentes": "Humanos e lobos da família que sabem do segredo e ajudam o personagem.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Ritos": "Ritos que o personagem já conhece no começo. Cada ponto vale um nível de rito.",
+        "Totem": "O espírito protetor da matilha. Os pontos dos membros se somam para o totem.",
+        "Raça Pura": "Sangue de linhagem antiga e reconhecida. Os outros da espécie reagem com mais respeito."
+      },
       "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
     "battleScars": {

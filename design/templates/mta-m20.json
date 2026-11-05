@@ -541,6 +541,22 @@
         "Recursos",
         "Sonho"
       ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Avatar": "A força do Avatar, a parte mágica do personagem. Define a Quintessência inicial.",
+        "Biblioteca": "Livros, arquivos e fontes de estudo à mão do mago.",
+        "Capela": "Um refúgio dividido com outros magos, com recursos e proteção.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Destino": "Um grande propósito ligado ao personagem, que às vezes o ajuda no último momento.",
+        "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+        "Familiar": "Um espírito num corpo de animal, ligado ao mago.",
+        "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+        "Maravilha": "Um objeto mágico que o mago já tem no começo.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Nodo": "Um lugar de poder que gera Quintessência para o mago.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Sonho": "Acesso a saberes que o mago nunca estudou, vindos do Avatar."
+      },
       "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
 
