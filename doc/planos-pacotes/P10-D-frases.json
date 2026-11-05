@@ -1,0 +1,579 @@
+{
+  "status": "rascunho do time, para revisão",
+  "regras": [
+    "Palavras próprias, sem trecho de livro (C-18; README dos templates §12). Quem escreve e quem revisa vão no resumo do PR.",
+    "Texto puro, uma linha, até 200 caracteres, sem link nem marcação ($defs/helpShort do P10-D).",
+    "Fora desta lista: frases de poderes (Disciplinas, Dons, Esferas e Ritos, item a item), que esperam o PO e a licença; os 13 resumos da Fraqueza (P07-D); as opções da Esfera de afinidade.",
+    "Entram no commit 8 do P10-D. Opções, grupos e catálogo dependem do contrato dos commits 1 e 7. O aumento de versão é o da onda (onda-4.md §4.7)."
+  ],
+  "app": {
+    "priority": {
+      "help": "Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Atributos e Habilidades têm cada um a sua ordem.",
+      "onde": "texto do app (sheet/creation/help.ts, P10-D §3.7)"
+    },
+    "freebies": {
+      "help": "Pontos extras, gastos depois dos básicos. Cada característica cobra um preço diferente por ponto; a aba Pontos mostra quanto sobra.",
+      "onde": "texto do app (sheet/creation/help.ts, P10-D §3.7)"
+    }
+  },
+  "templates": {
+    "vtm-v20": {
+      "templateVersion": "1.8.0",
+      "fields": {
+        "concept": {
+          "label": "Conceito",
+          "acao": "novo",
+          "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+        },
+        "nature": {
+          "label": "Natureza",
+          "acao": "novo",
+          "help": "Quem o personagem é por dentro. Agir de acordo com ela, na mesa, pode devolver Força de Vontade."
+        },
+        "demeanor": {
+          "label": "Comportamento",
+          "acao": "novo",
+          "help": "A máscara que o personagem mostra aos outros. Pode ser diferente da Natureza."
+        },
+        "backgrounds": {
+          "label": "Antecedentes",
+          "acao": "novo",
+          "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
+        },
+        "clan": {
+          "label": "Clã",
+          "acao": "novo",
+          "help": "A linhagem do vampiro. Define três Disciplinas mais fáceis de aprender e uma fraqueza própria."
+        },
+        "sire": {
+          "label": "Senhor",
+          "acao": "novo",
+          "help": "O vampiro que criou o personagem. Pode ficar em branco se ninguém sabe quem foi."
+        },
+        "generation": {
+          "label": "Geração",
+          "acao": "novo",
+          "help": "Distância até os primeiros vampiros. Número menor: mais sangue no corpo e mais gasto por turno. Muda com o Antecedente Geração."
+        },
+        "disciplines": {
+          "label": "Disciplinas",
+          "acao": "novo",
+          "help": "Poderes do sangue. As três do clã aparecem primeiro; na criação, as outras pedem a confirmação do narrador."
+        },
+        "blood": {
+          "label": "Pontos de Sangue",
+          "acao": "novo",
+          "help": "A reserva de sangue no corpo. Paga Disciplinas, cura e esforço físico. A Geração define o máximo."
+        },
+        "humanity": {
+          "label": "Humanidade",
+          "acao": "junta",
+          "help": "O quanto o vampiro ainda age como gente. Começa em Consciência + Autocontrole e acompanha as Virtudes até você marcar outro valor.",
+          "atual": "Começa em Consciência + Autocontrole e acompanha as Virtudes até você marcar outro valor."
+        },
+        "willpower": {
+          "label": "Força de Vontade",
+          "acao": "junta",
+          "help": "Determinação: gastar um ponto garante um sucesso ou ajuda a resistir a um impulso. Começa igual à Coragem; o permanente limita o temporário.",
+          "atual": "Permanente limita o temporário e só muda em Evoluir. Começa igual à Coragem até ser marcado."
+        },
+        "weakness": {
+          "label": "Fraqueza do clã",
+          "acao": "substitui (P07-D)",
+          "help": "Começa com um resumo do time para o clã escolhido. Reescreva como a mesa preferir; apagar tudo volta ao resumo.",
+          "atual": "Escreva a fraqueza com as suas palavras."
+        }
+      },
+      "groups": {
+        "sections.attributes.groups.physical": {
+          "label": "Físicos",
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
+        },
+        "sections.attributes.groups.social": {
+          "label": "Sociais",
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
+        },
+        "sections.attributes.groups.mental": {
+          "label": "Mentais",
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
+        },
+        "sections.abilities.groups.talents": {
+          "label": "Talentos",
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
+        },
+        "sections.abilities.groups.skills": {
+          "label": "Perícias",
+          "help": "Habilidades aprendidas com treino ou com um ofício."
+        },
+        "sections.abilities.groups.knowledges": {
+          "label": "Conhecimentos",
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
+        },
+        "sections.advantages.groups.virtues": {
+          "label": "Virtudes",
+          "help": "Consciência, Autocontrole e Coragem. Elas definem a Humanidade e a Força de Vontade com que o vampiro começa."
+        }
+      },
+      "options": {
+        "clan": {
+          "assamitas": {
+            "label": "Assamitas",
+            "help": "Clã de assassinos e estudiosos, com uma tradição de disciplina e de honra própria."
+          },
+          "brujah": {
+            "label": "Brujah",
+            "help": "Clã de rebeldes e idealistas, de temperamento quente e rápido para a briga."
+          },
+          "gangrel": {
+            "label": "Gangrel",
+            "help": "Clã de andarilhos próximos dos animais, que vivem longe das cidades com facilidade."
+          },
+          "giovanni": {
+            "label": "Giovanni",
+            "help": "Clã de família e de negócios, ligado aos mortos e fechado aos de fora."
+          },
+          "lasombra": {
+            "label": "Lasombra",
+            "help": "Clã de líderes ambiciosos, ligados às sombras. A maioria está no Sabá."
+          },
+          "malkavianos": {
+            "label": "Malkavianos",
+            "help": "Clã marcado por algum tipo de loucura, que às vezes vê o que os outros não veem."
+          },
+          "nosferatu": {
+            "label": "Nosferatu",
+            "help": "Clã de aparência monstruosa, que vive escondido e negocia segredos."
+          },
+          "ravnos": {
+            "label": "Ravnos",
+            "help": "Clã de viajantes e trapaceiros, mestres da ilusão."
+          },
+          "seguidores-de-set": {
+            "label": "Seguidores de Set",
+            "help": "Clã de cultistas de um deus antigo, que corrompem pela tentação."
+          },
+          "toreador": {
+            "label": "Toreador",
+            "help": "Clã de artistas e amantes da beleza, influentes na alta sociedade."
+          },
+          "tremere": {
+            "label": "Tremere",
+            "help": "Clã de feiticeiros do sangue, organizado numa hierarquia rígida."
+          },
+          "tzimisce": {
+            "label": "Tzimisce",
+            "help": "Clã de senhores antigos que moldam carne e osso. A maioria está no Sabá."
+          },
+          "ventrue": {
+            "label": "Ventrue",
+            "help": "Clã de aristocratas e líderes, exigentes até com a presa."
+          },
+          "caitiff": {
+            "label": "Caitiff",
+            "help": "Vampiro sem clã conhecido. Não tem Disciplinas de clã nem fraqueza de clã."
+          }
+        }
+      },
+      "catalog": {
+        "backgrounds": {
+          "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+          "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+          "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+          "Geração": "Cada ponto deixa o vampiro uma geração mais perto dos primeiros. Muda a Geração da identidade e o máximo de sangue.",
+          "Rebanho": "Pessoas de quem o vampiro se alimenta com segurança. Mais pontos: mais gente e menos tempo caçando.",
+          "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+          "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+          "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+          "Lacaios": "Servos leais ao vampiro. Mais pontos: mais servos ou servos mais capazes.",
+          "Status": "A posição do vampiro na sociedade dos vampiros da cidade."
+        }
+      }
+    },
+    "wta-w20": {
+      "templateVersion": "1.6.0",
+      "fields": {
+        "concept": {
+          "label": "Conceito",
+          "acao": "novo",
+          "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+        },
+        "backgrounds": {
+          "label": "Antecedentes",
+          "acao": "novo",
+          "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
+        },
+        "willpower": {
+          "label": "Força de Vontade",
+          "acao": "novo",
+          "help": "Determinação. Gastar um ponto garante um sucesso numa rolagem ou ajuda a resistir a um impulso. Começa pela Tribo."
+        },
+        "breed": {
+          "label": "Raça",
+          "acao": "novo",
+          "help": "A forma em que o personagem nasceu: humana, lobo ou mestiça. Muda a Gnose inicial e os Dons à mão."
+        },
+        "auspice": {
+          "label": "Augúrio",
+          "acao": "novo",
+          "help": "A fase da lua no nascimento, que define o papel no grupo. Muda a Fúria inicial e os Dons à mão."
+        },
+        "tribe": {
+          "label": "Tribo",
+          "acao": "novo",
+          "help": "A sociedade a que o personagem pertence. Muda a Força de Vontade inicial e os Dons à mão."
+        },
+        "rank": {
+          "label": "Posto",
+          "acao": "novo",
+          "help": "A posição na sociedade. Começa em 1 e sobe com o Renome. Dom acima do Posto pede a confirmação do narrador."
+        },
+        "rage": {
+          "label": "Fúria",
+          "acao": "novo",
+          "help": "A raiva do lobo. Dá ações extras e ajuda a mudar de forma. Começa no valor do Augúrio e, na criação, não fica abaixo dele."
+        },
+        "gnosis": {
+          "label": "Gnose",
+          "acao": "substitui",
+          "help": "A ligação com o mundo espiritual. Usada em Dons, em fetiches e para atravessar ao outro lado. Começa pela Raça.",
+          "atual": "Recurso par da Fúria: cor quase neutra e preenchimento hachurado, para nunca depender só da cor."
+        },
+        "gifts": {
+          "label": "Dons",
+          "acao": "novo",
+          "help": "Poderes ensinados pelos espíritos. Os da Raça, do Augúrio e da Tribo aparecem primeiro; o Posto mostra o nível."
+        }
+      },
+      "groups": {
+        "sections.attributes.groups.physical": {
+          "label": "Físicos",
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
+        },
+        "sections.attributes.groups.social": {
+          "label": "Sociais",
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
+        },
+        "sections.attributes.groups.mental": {
+          "label": "Mentais",
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
+        },
+        "sections.abilities.groups.talents": {
+          "label": "Talentos",
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
+        },
+        "sections.abilities.groups.skills": {
+          "label": "Perícias",
+          "help": "Habilidades aprendidas com treino ou com um ofício."
+        },
+        "sections.abilities.groups.knowledges": {
+          "label": "Conhecimentos",
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
+        },
+        "sections.renown.groups.renown": {
+          "label": "Renome",
+          "help": "Glória, Honra e Sabedoria: a fama que o personagem ganha. O permanente começa pelo Augúrio."
+        }
+      },
+      "options": {
+        "breed": {
+          "hominideo": {
+            "label": "Hominídeo",
+            "help": "Nasceu humano e cresceu entre pessoas. Entende a cidade melhor que o mato."
+          },
+          "impuro": {
+            "label": "Impuro",
+            "help": "Filho de dois pais da mesma espécie. Carrega uma deformidade desde o nascimento."
+          },
+          "lupino": {
+            "label": "Lupino",
+            "help": "Nasceu lobo e aprendeu a forma humana depois. Entende o mato melhor que a cidade."
+          }
+        },
+        "auspice": {
+          "ragabash": {
+            "label": "Ragabash",
+            "help": "Nasceu na lua nova: o questionador e trapaceiro, que testa as regras do grupo."
+          },
+          "theurge": {
+            "label": "Theurge",
+            "help": "Nasceu na lua crescente: o místico, que lida com os espíritos."
+          },
+          "philodox": {
+            "label": "Philodox",
+            "help": "Nasceu na meia-lua: o juiz, que busca o equilíbrio e guarda a tradição."
+          },
+          "galliard": {
+            "label": "Galliard",
+            "help": "Nasceu na lua gibosa: o contador de histórias, que guarda a memória do grupo."
+          },
+          "ahroun": {
+            "label": "Ahroun",
+            "help": "Nasceu na lua cheia: o guerreiro, que vai à frente na luta."
+          }
+        },
+        "tribe": {
+          "furias-negras": {
+            "label": "Fúrias Negras",
+            "help": "Tribo quase só de mulheres, protetoras dos lugares selvagens."
+          },
+          "roedores-de-ossos": {
+            "label": "Roedores de Ossos",
+            "help": "Tribo dos que vivem à margem, entre os pobres e esquecidos das cidades."
+          },
+          "filhos-de-gaia": {
+            "label": "Filhos de Gaia",
+            "help": "Tribo de curandeiros e pacificadores, que busca a união entre as tribos."
+          },
+          "fianna": {
+            "label": "Fianna",
+            "help": "Tribo de bardos e guerreiros de origem celta, amantes de festas e histórias."
+          },
+          "crias-de-fenris": {
+            "label": "Crias de Fenris",
+            "help": "Tribo de guerreiros de origem nórdica, que valoriza a força e a batalha."
+          },
+          "andarilhos-do-asfalto": {
+            "label": "Andarilhos do Asfalto",
+            "help": "Tribo adaptada à cidade e à tecnologia."
+          },
+          "garras-vermelhas": {
+            "label": "Garras Vermelhas",
+            "help": "Tribo de lupinos que rejeita a humanidade e defende a natureza."
+          },
+          "senhores-das-sombras": {
+            "label": "Senhores das Sombras",
+            "help": "Tribo ambiciosa e disciplinada, que busca o poder e a liderança."
+          },
+          "peregrinos-silenciosos": {
+            "label": "Peregrinos Silenciosos",
+            "help": "Tribo de viajantes e mensageiros, sem um lar fixo."
+          },
+          "presas-de-prata": {
+            "label": "Presas de Prata",
+            "help": "Tribo nobre, de linhagens antigas, que por tradição lidera as outras."
+          },
+          "observadores-das-estrelas": {
+            "label": "Observadores das Estrelas",
+            "help": "Tribo de místicos e filósofos, voltada à meditação e ao equilíbrio."
+          },
+          "uktena": {
+            "label": "Uktena",
+            "help": "Tribo de místicos, ligada a segredos e a espíritos antigos."
+          },
+          "wendigo": {
+            "label": "Wendigo",
+            "help": "Tribo de guerreiros ligada aos povos originários da América do Norte."
+          }
+        }
+      },
+      "catalog": {
+        "backgrounds": {
+          "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+          "Ancestrais": "A memória dos antepassados, que o personagem pode chamar para pedir conselho ou habilidade.",
+          "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+          "Fetiche": "Um objeto com um espírito dentro, que o personagem já tem no começo. O nível é o do fetiche.",
+          "Parentes": "Humanos e lobos da família que sabem do segredo e ajudam o personagem.",
+          "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+          "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+          "Ritos": "Ritos que o personagem já conhece no começo. Cada ponto vale um nível de rito.",
+          "Totem": "O espírito protetor da matilha. Os pontos dos membros se somam para o totem.",
+          "Raça Pura": "Sangue de linhagem antiga e reconhecida. Os outros da espécie reagem com mais respeito."
+        }
+      }
+    },
+    "mta-m20": {
+      "templateVersion": "1.6.0",
+      "fields": {
+        "concept": {
+          "label": "Conceito",
+          "acao": "novo",
+          "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+        },
+        "nature": {
+          "label": "Natureza",
+          "acao": "novo",
+          "help": "Quem o personagem é por dentro. Agir de acordo com ela, na mesa, pode devolver Força de Vontade."
+        },
+        "demeanor": {
+          "label": "Comportamento",
+          "acao": "novo",
+          "help": "A máscara que o personagem mostra aos outros. Pode ser diferente da Natureza."
+        },
+        "backgrounds": {
+          "label": "Antecedentes",
+          "acao": "novo",
+          "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
+        },
+        "tradition": {
+          "label": "Tradição",
+          "acao": "novo",
+          "help": "O grupo de magos e a sua maneira de entender a magia. Sugere a Esfera de afinidade."
+        },
+        "essence": {
+          "label": "Essência",
+          "acao": "novo",
+          "help": "A natureza do Avatar, a parte mágica do personagem. Diz o que move a busca dele."
+        },
+        "house": {
+          "label": "Casa",
+          "acao": "novo",
+          "help": "Uma facção dentro da Tradição. É opcional: deixe em branco se a Tradição não tiver uma ou se o personagem não fizer parte."
+        },
+        "affinity": {
+          "label": "Esfera de afinidade",
+          "acao": "novo",
+          "help": "A Esfera mais natural para o personagem, em geral ligada à Tradição."
+        },
+        "paradigm": {
+          "label": "Paradigma",
+          "acao": "novo",
+          "help": "No que o mago acredita sobre como o mundo funciona. Escreva com as suas palavras."
+        },
+        "practice": {
+          "label": "Prática",
+          "acao": "novo",
+          "help": "O jeito como o mago faz magia: ritual, ciência, oração, arte."
+        },
+        "instruments": {
+          "label": "Instrumentos",
+          "acao": "novo",
+          "help": "Os objetos e gestos que o mago usa para fazer magia, de acordo com a Prática."
+        },
+        "arete": {
+          "label": "Arete",
+          "acao": "junta",
+          "help": "O domínio geral da magia: nenhuma Esfera passa do Arete, que vai até 3 na criação. Baixar o Arete deixa as Esferas acima inativas, sem apagar.",
+          "atual": "Limita todas as Esferas. Baixar o Arete não apaga as Esferas: as que ficarem acima ficam inativas e voltam quando o Arete sobe."
+        },
+        "willpower": {
+          "label": "Força de Vontade",
+          "acao": "junta",
+          "help": "Determinação: gastar um ponto garante um sucesso ou ajuda a resistir a um impulso. O permanente limita o temporário e só muda em Evoluir.",
+          "atual": "Permanente limita o temporário. O permanente só muda em Evoluir."
+        },
+        "wheel": {
+          "label": "Quintessência e Paradoxo",
+          "acao": "mantém",
+          "help": null,
+          "atual": "Quintessência e Paradoxo dividem as 20 casas da roda. Ganhar Paradoxo com a roda cheia consome 1 Quintessência. A Quintessência começa igual ao Avatar."
+        }
+      },
+      "groups": {
+        "sections.attributes.groups.physical": {
+          "label": "Físicos",
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
+        },
+        "sections.attributes.groups.social": {
+          "label": "Sociais",
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
+        },
+        "sections.attributes.groups.mental": {
+          "label": "Mentais",
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
+        },
+        "sections.abilities.groups.talents": {
+          "label": "Talentos",
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
+        },
+        "sections.abilities.groups.skills": {
+          "label": "Perícias",
+          "help": "Habilidades aprendidas com treino ou com um ofício."
+        },
+        "sections.abilities.groups.knowledges": {
+          "label": "Conhecimentos",
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
+        },
+        "sections.spheres.groups.spheres": {
+          "label": "Esferas",
+          "help": "Os campos da realidade que o mago sabe mudar. Cada Esfera vai de 0 a 5 e não passa do Arete."
+        }
+      },
+      "options": {
+        "tradition": {
+          "ordem-de-hermes": {
+            "label": "Ordem de Hermes",
+            "help": "Magos de fórmulas, rituais e hierarquia, organizados em Casas."
+          },
+          "coro-celestial": {
+            "label": "Coro Celestial",
+            "help": "Magos da fé, que veem a magia como expressão do divino."
+          },
+          "culto-do-extase": {
+            "label": "Culto do Êxtase",
+            "help": "Magos da experiência e dos sentidos, que buscam a magia no êxtase."
+          },
+          "eutanatos": {
+            "label": "Eutanatos",
+            "help": "Magos da vida e da morte, ligados ao ciclo e ao destino."
+          },
+          "irmandade-akashica": {
+            "label": "Irmandade Akáshica",
+            "help": "Magos da disciplina do corpo e da mente, das artes marciais e da meditação."
+          },
+          "sonhadores": {
+            "label": "Sonhadores (Kha'vadi)",
+            "help": "Magos dos espíritos e dos sonhos, ligados a tradições xamânicas."
+          },
+          "verbena": {
+            "label": "Verbena",
+            "help": "Magos da natureza, do sangue e da vida, herdeiros da bruxaria antiga."
+          },
+          "filhos-do-eter": {
+            "label": "Sociedade do Éter",
+            "help": "Magos da ciência estranha, de invenções e teorias que a ciência comum rejeita."
+          },
+          "virtualidade": {
+            "label": "Adeptos da Virtualidade",
+            "help": "Magos da informação e da tecnologia digital."
+          },
+          "orfao": {
+            "label": "Órfão",
+            "help": "Mago sem Tradição. Não tem Esfera da Tradição sugerida."
+          }
+        },
+        "essence": {
+          "dinamica": {
+            "label": "Essência Dinâmica",
+            "help": "Avatar que busca mudança, movimento e novidade."
+          },
+          "padrao": {
+            "label": "Essência Padrão",
+            "help": "Avatar que busca ordem, estabilidade e permanência."
+          },
+          "primordial": {
+            "label": "Essência Primordial",
+            "help": "Avatar ligado às origens, aos ciclos e ao que é antigo."
+          },
+          "questionadora": {
+            "label": "Essência Questionadora",
+            "help": "Avatar inquieto, que busca algo que nem sempre sabe nomear."
+          }
+        }
+      },
+      "catalog": {
+        "backgrounds": {
+          "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+          "Avatar": "A força do Avatar, a parte mágica do personagem. Define a Quintessência inicial.",
+          "Biblioteca": "Livros, arquivos e fontes de estudo à mão do mago.",
+          "Capela": "Um refúgio dividido com outros magos, com recursos e proteção.",
+          "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+          "Destino": "Um grande propósito ligado ao personagem, que às vezes o ajuda no último momento.",
+          "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+          "Familiar": "Um espírito num corpo de animal, ligado ao mago.",
+          "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+          "Maravilha": "Um objeto mágico que o mago já tem no começo.",
+          "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+          "Nodo": "Um lugar de poder que gera Quintessência para o mago.",
+          "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+          "Sonho": "Acesso a saberes que o mago nunca estudou, vindos do Avatar."
+        }
+      },
+      "label": {
+        "house": {
+          "label": "Casa ou subgrupo",
+          "placeholder": "Opcional"
+        }
+      }
+    }
+  }
+}
