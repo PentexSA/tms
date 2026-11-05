@@ -593,12 +593,43 @@ Implementação em 04/11/2026, na `pacote/p10-d-ajuda-contextual`, a partir da p
 
 O "Jest did not exit" não vem dos testes novos. Com `--detectOpenHandles`, eles não deixam nada aberto: `help.test.tsx` do app e do `@tms/ui`, `creation/__tests__/help.test.ts` e `new-character.test.tsx`. A origem não foi conferida na base.
 
+**Merge da onda, commit 7 e commit de versão** (05/11/2026, depois das correções da revisão):
+
+1. **Merge da `onda/4-conteudo-guia`** (P05-D, P10-C e P07-D, `1762d0d`): `18646f4`. Os conflitos foram resolvidos no próprio merge:
+   - **templates:** o `recommend` do P07-D convive com o `help` do P10-D no mesmo campo, e a `weakness.help` ficou a do P07-D;
+   - **README §12:** as duas regras de licença;
+   - **`ChoiceEditorRow` e `TextEditorRow`:** a linha [botão][?], com o "fora da Tradição" e o "Resumo de …" dentro do botão;
+   - **`ListEditor`:** a linha do item com −/+ do P07-D, sem "?" (§4.4), e o "?" no cabeçalho da lista;
+   - **`GroupsLayout`:** a âncora e o `AnchorHeader` do P05-D, com o "?" do bloco no título;
+   - **`CreationPanel`:** o "?" do saldo fica na aba "Pontos".
+2. **Commit 7** (`04ce3cf`), na forma da consolidação: um mapa por nome ao lado da lista, sem a forma de objeto.
+   - **Chaves:** `catalogHelp` (lista, até 200 nomes) e `suggestionHelp` (texto, até 100).
+   - **Paridade nos quatro:** o schema, o `validateTemplate`, o `validate.mjs` e o `publicationIssues`. Nome fora da lista é recusado, e cada frase tem até 200 caracteres, uma linha e nenhum link.
+   - **Onde o "?" aparece:** na opção da `AddItemSheet`, à direita do selo, e nas sugestões com frase, que viram linhas [chip][?]. Para o item já na ficha, a frase vai no topo da `ItemSheet`.
+   - **Conteúdo:** as 34 frases de Antecedentes, conferidas pelo `help-phrases.test.ts`.
+   - **Desvio:** a regra "mesma frase para o mesmo nome em duas listas do template" (§3.1) não entrou. Ela não tem uso hoje, porque nenhuma sugestão tem frase. Fica para quando os Arquétipos ganharem frase.
+3. **Commit de versão** (`chore(templates): vtm-v20 1.9.0, wta-w20 1.7.0, mta-m20 1.7.0`), o último da branch. Ele traz:
+   - os três `templateVersion` e a `0023_templates_onda4.ts`, só de dados, cópia da `0020`, com `down` vazio como o dela;
+   - os testes do `@tms/db` para ela;
+   - os testes que fixam versão. No `publish.test.ts`, o banco "sem os templates do produto" passa a tirar também a `0023`, e o caso "uma versão nova convive" monta a 1.10.0.
+
+   A `0023` roda no deploy da API. O app nativo da versão anterior mostra "Atualize o app" nas fichas novas até a loja ter o app novo (§6, ponto 3, da onda; sem decisão).
+
+**Verificação, na ponta da branch:** `npx pnpm build`, typecheck, lint, `build.mjs` e `validate.mjs` dos 6 templates, todos verdes.
+
+| Pacote | Testes |
+|---|---|
+| core | 1117 |
+| db | 39 |
+| config | 38 |
+| api | 1921 (65 pulados) |
+| ui | 226 |
+| frontend | 1577, com `--forceExit` |
+
 **Para a integração:**
 
-- o rebase sobre o P05-D (o "?" da Prioridade e do saldo continua; o texto da aba é do P05-D);
-- o rebase sobre o P07-D e o commit 7;
-- o commit de versão;
-- o E2E inteiro;
+- ~~o merge da onda, o commit 7 e o commit de versão~~: feitos (acima);
+- o E2E inteiro (com o `help.spec.ts`);
 - o roteiro manual da §11;
 - o `/code-review` e o `/security-review`.
 
