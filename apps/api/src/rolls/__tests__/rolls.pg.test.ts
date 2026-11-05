@@ -17,8 +17,7 @@ import { fakeClock, type TestContext } from '../../test/helpers'
 
 // Rolagens concorrentes num Postgres real (doc/plano-v0.md, Etapa 21): a FdV
 // é debitada uma vez só. O PGLite tem uma conexão e serializa tudo; o
-// SELECT ... FOR UPDATE só é posto à prova aqui. Roda no job "postgres" do
-// CI com PG_TEST_URL. Apaga o schema: só aceita banco cujo nome termina em
+// SELECT ... FOR UPDATE só é posto à prova aqui. Roda com PG_TEST_URL. Apaga o schema: só aceita banco cujo nome termina em
 // _test.
 const URL_ = process.env.PG_TEST_URL
 

@@ -20,8 +20,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 // §6.3): o PGLite serializa tudo. Concessões e ajustes travam as fichas em
 // ordem de id; decisões travam o pedido e depois a ficha. Nenhum cenário
 // pode terminar em deadlock ou 500, gastar mais que o saldo ou deixar a
-// projeção diferente do extrato. Roda no job "postgres" do CI com
-// PG_TEST_URL; só aceita banco *_test.
+// projeção diferente do extrato. Roda com PG_TEST_URL; só aceita banco *_test.
 const URL_ = process.env.PG_TEST_URL
 
 describe.skipIf(!URL_)('XP num Postgres real', () => {

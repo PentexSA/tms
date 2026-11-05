@@ -20,8 +20,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 // da API, a do processo (Brasília), numa coluna sem fuso. A ficha nova vinha
 // 3 h no futuro e passava à frente da editada depois dela. O processo fica em
 // America/Sao_Paulo (o Bun aplica o process.env.TZ em tempo de execução) e a
-// sessão do Postgres em UTC (-c TimeZone=UTC). Roda no job "postgres" do CI
-// com PG_TEST_URL; só aceita banco *_test.
+// sessão do Postgres em UTC (-c TimeZone=UTC). Roda com PG_TEST_URL; só aceita banco *_test.
 const URL_ = process.env.PG_TEST_URL
 const ZONE = 'America/Sao_Paulo'
 const MINUTE = 60_000

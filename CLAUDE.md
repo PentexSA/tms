@@ -140,9 +140,9 @@ E2E_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tms_e2e npx pnpm -C
 
 `journey.spec.ts` é a jornada inteira da v0 (doc/plano-v0.md §1), `journey-mage.spec.ts`, a da v1 (doc/plano-v1.md §1), `journey-werewolf.spec.ts`, a da v2 (doc/plano-v2.md §1), e `journey-storyteller.spec.ts`, a da v3 (doc/plano-v3.md §1): concluir, dano em grupo, Nova noite, desfazer, travar e remover, e `journey-backstage.spec.ts`, a da v5 (doc/plano-v5.md §1): NPC oculto, revelação, rolagem oculta, parada livre, sessão, auditoria e transferência. O seed publica os templates do produto (`pnpm templates:publish --published`). Portas fixas (API 3101, web 8181): não rode dois E2E ao mesmo tempo.
 
-#### Build nativo no CI (D-00)
+#### Versões nativas
 
-Os jobs `native-android` (Linux: `expo export` de iOS e Android, `expo prebuild` e `assembleDebug` x86_64) e `native-ios` (`macos-26`, Xcode 26.6: prebuild, `pod install` e `xcodebuild` Debug para simulador) rodam em todo PR, sem assinatura e sem segredo; `workflow_dispatch` roda o mesmo na integração de uma onda. O job `check` confere as versões nativas contra o SDK do Expo:
+O CI não compila o app nativo. O job `check` confere as versões nativas contra o SDK do Expo:
 
 ```bash
 npx pnpm check:native                                        # transitivos nativos (bundledNativeModules.json)
@@ -151,7 +151,7 @@ EXPO_OFFLINE=1 npx pnpm -C apps/frontend exec expo install --check   # dependên
 
 #### Concorrência em Postgres real
 
-O PGLite tem uma conexão só; o `FOR UPDATE` só se prova num Postgres de verdade (job `postgres` do CI). O banco precisa terminar em `_test` (cada arquivo apaga e recria o schema). Todos os `*.pg.test.ts` num comando, em série (o filtro `.pg.test` pega `src/rolls/__tests__` também; sem `PG_TEST_URL` eles são pulados):
+O PGLite tem uma conexão só; o `FOR UPDATE` só se prova num Postgres de verdade, e o CI não roda esses testes: rode à mão. O banco precisa terminar em `_test` (cada arquivo apaga e recria o schema). Todos os `*.pg.test.ts` num comando, em série (o filtro `.pg.test` pega `src/rolls/__tests__` também; sem `PG_TEST_URL` eles são pulados):
 
 ```bash
 cd apps/api

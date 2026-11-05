@@ -19,8 +19,7 @@ import { fakeClock, type TestContext } from '../test/helpers'
 // A política vale o estado de quando o lote chega (doc/plano-v3.md, Etapa 5),
 // provado num Postgres real: o PGLite serializa tudo. Concluir a criação e um
 // lote de Evoluir ao mesmo tempo: ou o lote entra antes e a conclusão vem
-// depois dele, ou é recusado; nunca entra depois. Roda no job "postgres" do
-// CI com PG_TEST_URL; o teste apaga o schema, só aceita banco *_test.
+// depois dele, ou é recusado; nunca entra depois. Roda com PG_TEST_URL; o teste apaga o schema, só aceita banco *_test.
 const URL_ = process.env.PG_TEST_URL
 
 const ROUNDS = 12
