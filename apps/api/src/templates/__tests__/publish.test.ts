@@ -350,25 +350,31 @@ describe('ajuda no template (R-19)', () => {
     }
   )
 
-  it('o contrato também recusa, se o schema deixasse passar', async () => {
-    const { db, destroy } = await createPGliteTestDb(beforeProductTemplates)
-    try {
-      const t = template('vtm-v20')
-      clanOption(t, `${ADDED} https://exemplo.test`)
-      const error = await rejection(publishTemplate(db, t))
-      expect(error.issues.length).toBeGreaterThan(0)
-      // A camada do core sozinha (a que o app e o servidor rodam).
-      const { validateTemplate } = await import('@tms/sheet-core')
-      const [option] = (fieldsOf(t).clan?.options ?? []) as Json[]
-      expect(validateTemplate(t, [])).toContainEqual(
-        expect.objectContaining({
-          path: `fields.clan.options.${option?.id}.help`,
-          message: 'ajuda com link (://, www.): a frase é texto puro',
-        })
-      )
-    } finally {
-      await destroy()
-    }
+  it('o core repete o "sem link" só na publicação; a leitura fica tolerante', async () => {
+    const t = template('vtm-v20')
+    clanOption(t, `${ADDED} https://exemplo.test`)
+    const { PALETTE, publicationIssues, validateTemplate } = await import(
+      '@tms/sheet-core'
+    )
+    const [option] = (fieldsOf(t).clan?.options ?? []) as Json[]
+    expect(publicationIssues(t)).toEqual([
+      {
+        path: `fields.clan.options.${option?.id}.help`,
+        message: 'ajuda com link (://, www.): a frase é texto puro',
+      },
+    ])
+    // O compileTemplate do app roda o validateTemplate em versões já
+    // publicadas: uma regra nova ali derrubaria uma ficha antiga
+    expect(validateTemplate(t, PALETTE)).toEqual([])
+  })
+
+  it('a opção de tags não aceita help (o app não a desenha)', () => {
+    const t = template('dnd5e-2014')
+    const tags = Object.values(fieldsOf(t)).find(f => f.type === 'tags')
+    const [option] = (tags?.options ?? []) as Json[]
+    if (option) option.help = 'Frase curta.'
+    expect(option).toBeDefined()
+    expect(schemaIssues(t).length).toBeGreaterThan(0)
   })
 
   it('o template com frases é publicado', async () => {

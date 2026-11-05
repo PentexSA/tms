@@ -256,7 +256,6 @@ export interface TagOption {
   readonly id: string
   readonly label: string
   readonly roll?: ConditionRoll
-  readonly help?: string
 }
 
 export interface TagsField extends FieldBase<'tags'> {

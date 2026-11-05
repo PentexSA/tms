@@ -1292,8 +1292,7 @@
               "roll": {
                 "description": "Efeito automático na rolagem sum-vs-target via roll.conditions.",
                 "$ref": "#/$defs/conditionRoll"
-              },
-              "help": { "$ref": "#/$defs/helpShort" }
+              }
             },
             "additionalProperties": false
           },

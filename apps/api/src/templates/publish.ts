@@ -5,6 +5,7 @@ import {
   compileTemplate,
   type Issue,
   PALETTE,
+  publicationIssues,
   UnsupportedTemplateError,
   validateTemplate,
 } from '@tms/sheet-core'
@@ -95,6 +96,11 @@ export async function publishTemplate(
   const contract = validateTemplate(json, PALETTE)
   if (contract.length)
     throw new PublishError(contract.map(i => ({ ...i, stage: 'contract' })))
+  // Só na publicação: a ajuda é de uma linha e sem link (o app lê versões já
+  // publicadas pelo validateTemplate, que fica tolerante)
+  const publication = publicationIssues(json)
+  if (publication.length)
+    throw new PublishError(publication.map(i => ({ ...i, stage: 'contract' })))
   try {
     compileTemplate(json)
   } catch (e) {

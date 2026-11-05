@@ -1,13 +1,14 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
-import { validateTemplate } from '../validate'
+import { compileTemplate } from '../compile'
+import { publicationIssues, validateTemplate } from '../validate'
 import {
   fmt,
   type Json,
   mta,
   palette,
-  paths,
   reference,
+  schema,
   vtm,
   wta,
 } from './fixtures'
@@ -80,26 +81,9 @@ describe('help nos nós novos do template', () => {
   })
 })
 
-// Recusas: a mesma mensagem nos dois validadores, com o caminho do nó.
+// Recusas do contrato (tamanho, marcação, vazio): a mesma mensagem nos dois
+// validadores, com o caminho do nó.
 const refusals: [string, string, (t: Json) => void, string][] = [
-  [
-    'frase com link (://)',
-    'fields.clan.options.brujah.help',
-    t => {
-      const o = optionsOf(fieldsOf(t).clan).find(x => x.id === 'brujah')
-      if (o) o.help = 'Veja https://exemplo.test'
-    },
-    'ajuda com link (://, www.): a frase é texto puro',
-  ],
-  [
-    'frase com www.',
-    'fields.clan.options.brujah.help',
-    t => {
-      const o = optionsOf(fieldsOf(t).clan).find(x => x.id === 'brujah')
-      if (o) o.help = 'Veja WWW.exemplo.test'
-    },
-    'ajuda com link (://, www.): a frase é texto puro',
-  ],
   [
     'frase acima de 200',
     'fields.clan.options.brujah.help',
@@ -119,15 +103,6 @@ const refusals: [string, string, (t: Json) => void, string][] = [
     'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML',
   ],
   [
-    'frase com quebra de linha no grupo',
-    'sections.attributes.groups.physical.help',
-    t => {
-      const g = groupOf(t, 'attributes', 'physical')
-      if (g) g.help = 'linha um\nlinha dois'
-    },
-    'ajuda em uma linha só',
-  ],
-  [
     'frase vazia no grupo',
     'sections.attributes.groups.physical.help',
     t => {
@@ -136,39 +111,15 @@ const refusals: [string, string, (t: Json) => void, string][] = [
     },
     'texto obrigatório',
   ],
-  [
-    'link no help do campo (400)',
-    'fields.humanity.help',
-    t => {
-      const f = fieldsOf(t).humanity
-      if (f) f.help = 'Mais em exemplo.test://x'
-    },
-    'ajuda com link (://, www.): a frase é texto puro',
-  ],
 ]
 
-describe('help: recusas, iguais nos dois validadores', () => {
+describe('help: recusas do contrato, iguais nos dois validadores', () => {
   it.each(refusals)('%s', (_, path, mutate, message) => {
     const t = vtm()
     mutate(t)
     const issues = validateTemplate(t, palette)
     expect(issues).toContainEqual({ path, message })
     expect(fmt('vtm-v20', issues)).toEqual(
-      reference.validateTemplate(t, palette)
-    )
-  })
-
-  it('opção de tags com link é recusada (D&D não entra: Condições do CoC)', () => {
-    const t = mta()
-    // Uma lista de tags mínima, para o teste não depender de outro template.
-    fieldsOf(t).probe = {
-      type: 'tags',
-      label: 'Sonda',
-      options: [{ id: 'a', label: 'A', help: 'www.exemplo.test' }],
-    }
-    const issues = validateTemplate(t, palette)
-    expect(paths(issues)).toContain('fields.probe.options.a.help')
-    expect(fmt('mta-m20', issues)).toEqual(
       reference.validateTemplate(t, palette)
     )
   })
@@ -182,12 +133,183 @@ describe('help: recusas, iguais nos dois validadores', () => {
       message: 'texto acima de 200 caracteres',
     })
   })
+})
 
-  it('a frase não é ecoada na mensagem de erro', () => {
+// O "sem link" e a linha única valem só na publicação, nos nós que usam
+// $defs/helpText e $defs/helpShort no schema.json (P10-D, revisão).
+const LINK = 'ajuda com link (://, www.): a frase é texto puro'
+const LINE = 'ajuda em uma linha só'
+const first = (v: unknown) => ((v ?? []) as Json[])[0]
+
+// Cada nó do schema, com um template que o tem e onde pôr a frase
+const NODES: [string, () => Json, (t: Json, v: string) => string][] = [
+  [
+    'fieldBase.help',
+    vtm,
+    (t, v) => {
+      ;(fieldsOf(t).humanity as Json).help = v
+      return 'fields.humanity.help'
+    },
+  ],
+  [
+    'field-state.options.note',
+    wta,
+    (t, v) => {
+      const o = first(fieldsOf(t).form?.options) as Json
+      o.note = v
+      return `fields.form.options.${o.id}.note`
+    },
+  ],
+  [
+    'field-state.options.help',
+    wta,
+    (t, v) => {
+      const o = first(fieldsOf(t).form?.options) as Json
+      o.help = v
+      return `fields.form.options.${o.id}.help`
+    },
+  ],
+  [
+    'field-choice.options.help',
+    vtm,
+    (t, v) => {
+      const o = first(fieldsOf(t).clan?.options) as Json
+      o.help = v
+      return `fields.clan.options.${o.id}.help`
+    },
+  ],
+  [
+    'field-list.fixed.help',
+    mta,
+    (t, v) => {
+      const x = first(fieldsOf(t).resonance?.fixed) as Json
+      x.help = v
+      return `fields.resonance.fixed.${x.id}.help`
+    },
+  ],
+  [
+    'section.groups.help',
+    vtm,
+    (t, v) => {
+      const g = groupOf(t, 'attributes', 'physical') as Json
+      g.help = v
+      return 'sections.attributes.groups.physical.help'
+    },
+  ],
+  [
+    'roll.presets.help',
+    wta,
+    (t, v) => {
+      const pr = first((t.roll as Json).presets) as Json
+      pr.help = v
+      return `roll.presets.${pr.id}.help`
+    },
+  ],
+  [
+    'templateAction.help',
+    vtm,
+    (t, v) => {
+      const a = first(t.actions) as Json
+      a.help = v
+      return `actions.${a.id}.help`
+    },
+  ],
+  [
+    'chronicleOption.help',
+    vtm,
+    (t, v) => {
+      t.options = [{ id: 'probe', label: 'Sonda', help: v }]
+      return 'options.probe.help'
+    },
+  ],
+  [
+    'recovery.help',
+    vtm,
+    (t, v) => {
+      const r = first(t.recoveries) as Json
+      r.help = v
+      return `recoveries.${r.id}.help`
+    },
+  ],
+  [
+    'resourceAction.help',
+    vtm,
+    (t, v) => {
+      const a = first(fieldsOf(t).blood?.actions) as Json
+      a.help = v
+      return `fields.blood.actions.${a.id}.help`
+    },
+  ],
+]
+
+// Os nós do schema.json que levam helpText ou helpShort
+function schemaHelpNodes(): string[] {
+  const out: string[] = []
+  const walk = (n: unknown, path: string[]) => {
+    if (Array.isArray(n)) return n.forEach((x, i) => walk(x, [...path, `${i}`]))
+    if (typeof n !== 'object' || n === null) return
+    const o = n as Json
+    if (o.$ref === '#/$defs/helpText' || o.$ref === '#/$defs/helpShort')
+      out.push(path.join('/'))
+    for (const [k, v] of Object.entries(o)) walk(v, [...path, k])
+  }
+  walk(schema, [])
+  return out
+    .map(p =>
+      p
+        .replace(/^\$defs\//, '')
+        .replace(/\/properties\//g, '.')
+        .replace(/\/items/g, '')
+    )
+    .sort()
+}
+
+describe('publicationIssues: só na publicação, nos nós do schema', () => {
+  it('os nós são exatamente os do schema.json', () => {
+    expect(NODES.map(([n]) => n).sort()).toEqual(schemaHelpNodes())
+  })
+
+  it.each(NODES)(
+    '%s: link e quebra de linha recusados, iguais à referência',
+    (_, base, put) => {
+      for (const [value, message] of [
+        ['Veja https://exemplo.test', LINK],
+        ['Veja WWW.exemplo.test', LINK],
+        ['linha um\nlinha dois', LINE],
+      ] as const) {
+        const t = base()
+        const path = put(t, value)
+        const issues = publicationIssues(t)
+        expect(issues).toEqual([{ path, message }])
+        expect(fmt(t.system as string, issues)).toEqual(
+          reference.publicationIssues(t)
+        )
+      }
+    }
+  )
+
+  it('os templates do produto passam', () => {
+    for (const t of [vtm(), wta(), mta()]) {
+      expect(publicationIssues(t)).toEqual([])
+      expect(reference.publicationIssues(t)).toEqual([])
+    }
+  })
+
+  it('a leitura fica tolerante: uma versão com link na ajuda ainda compila', () => {
     const t = vtm()
-    const o = optionsOf(fieldsOf(t).clan).find(x => x.id === 'brujah')
-    if (o) o.help = 'segredo-de-teste https://exemplo.test'
-    for (const i of validateTemplate(t, palette))
-      expect(i.message).not.toContain('segredo-de-teste')
+    ;(fieldsOf(t).humanity as Json).help = 'Veja www.exemplo.test'
+    const o = first(fieldsOf(t).clan?.options) as Json
+    o.help = 'Veja https://exemplo.test'
+    expect(validateTemplate(t, palette)).toEqual([])
+    expect(reference.validateTemplate(t, palette)).toEqual([])
+    expect(() => compileTemplate(t)).not.toThrow()
+  })
+
+  it('a frase não é ecoada na mensagem', () => {
+    const t = vtm()
+    const o = first(fieldsOf(t).clan?.options) as Json
+    o.help = 'segredo-de-teste https://exemplo.test'
+    for (const i of publicationIssues(t))
+      expect(`${i.path} ${i.message}`).not.toContain('segredo-de-teste')
   })
 })

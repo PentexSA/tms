@@ -539,6 +539,37 @@ function checkAccounting(t, c) {
     }
 }
 
+// Regras só da publicação (R-19): a ajuda é de uma linha e sem link, nos nós de $defs/helpText e
+// $defs/helpShort do schema.json. O mesmo publicationIssues do core (validate/publication.ts).
+function publicationIssues(t) {
+  const errors = []
+  const isObjL = v => typeof v === 'object' && v !== null && !Array.isArray(v)
+  const objs = v => (Array.isArray(v) ? v.filter(isObjL) : [])
+  const check = (path, v) => {
+    if (typeof v !== 'string') return
+    if (/[\t\n\r]/.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda em uma linha só`)
+    if (/:\/\/|www\./i.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda com link (://, www.): a frase é texto puro`)
+  }
+  if (!isObjL(t)) return errors
+  for (const [id, f] of Object.entries(isObjL(t.fields) ? t.fields : {})) {
+    if (!isObjL(f)) continue
+    const p = `fields.${id}`
+    check(`${p}.help`, f.help)
+    for (const o of objs(f.options)) {
+      if (f.type === 'state') check(`${p}.options.${o.id}.note`, o.note)
+      if (f.type === 'state' || f.type === 'choice') check(`${p}.options.${o.id}.help`, o.help)
+    }
+    if (f.type === 'list') for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+    if (f.type === 'resource') for (const a of objs(f.actions)) check(`${p}.actions.${a.id}.help`, a.help)
+  }
+  for (const s of objs(t.sections)) for (const g of objs(s.groups)) check(`sections.${s.id}.groups.${g.id}.help`, g.help)
+  for (const pr of objs(isObjL(t.roll) ? t.roll.presets : [])) check(`roll.presets.${pr.id}.help`, pr.help)
+  for (const a of objs(t.actions)) check(`actions.${a.id}.help`, a.help)
+  for (const o of objs(t.options)) check(`options.${o.id}.help`, o.help)
+  for (const r of objs(t.recoveries)) check(`recoveries.${r.id}.help`, r.help)
+  return errors
+}
+
 function validateTemplate(t, palette) {
   const errors = []
   const err = (path, msg) => errors.push(`${t?.system ?? '?'} ${path}: ${msg}`)
@@ -548,13 +579,9 @@ function validateTemplate(t, palette) {
     if (v.length > max) err(path, `texto acima de ${max} caracteres`)
     if (!isSafeText(v)) err(path, 'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML')
   }
-  // Ajuda (campo, opção, grupo, item fixo): texto puro e sem link (o mesmo validateTemplate do core).
-  const help = (path, v, max) => {
-    text(path, v, max)
-    if (typeof v !== 'string') return
-    if (/[\t\n\r]/.test(v)) err(path, 'ajuda em uma linha só')
-    if (/:\/\/|www\./i.test(v)) err(path, 'ajuda com link (://, www.): a frase é texto puro')
-  }
+  // Ajuda (campo, opção, grupo, item fixo): texto puro, com o limite do nó. O "sem link" e a
+  // linha única ficam em publicationIssues, como no core.
+  const help = (path, v, max) => text(path, v, max)
   const oneOf = (path, v, list, what) => {
     if (!list.includes(v)) err(path, `${what} '${v}' fora da lista fechada`)
   }
@@ -725,7 +752,7 @@ function validateTemplate(t, palette) {
       if (f.bonus) { oneOf(`${p}.bonus.derive`, f.bonus.derive, REGISTRY.derive, 'derive'); if (!has(f.bonus.ability)) err(`${p}.bonus.ability`, 'campo não existe') }
     }
     if (['choice', 'tags'].includes(f.type)) {
-      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label); if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200) }
+      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label); if (f.type === 'choice' && o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200) }
       for (const o of f.options ?? []) if (o.roll) oneOf(`${p}.options.${o.id}.roll`, o.roll, REGISTRY.conditionRoll, 'roll')
       if (f.glyph) oneOf(`${p}.glyph`, f.glyph, REGISTRY.glyphs, 'glyph')
     }

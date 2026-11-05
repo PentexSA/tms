@@ -83,11 +83,11 @@ Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLab
 
 **Ajuda (`help`).** O `help` do campo (até 400) aparece nas folhas de detalhe e num "?" na criação, no Editar e na Nova ficha. A frase curta (`$defs/helpShort`, até 200) também cabe:
 
-- nas opções de `choice`, `tags` e `state`;
+- nas opções de `choice` e `state`;
 - nos itens `fixed` de `list`;
 - nos grupos de seção (`sections[].groups[].help`).
 
-As duas são texto puro de uma linha e **sem link**: `://` e `www.` são recusados no schema, no `validateTemplate` e no `validate.mjs`. O app sempre desenha a frase como texto. Nó sem `help` não mostra "?", então a ajuda pode entrar aos poucos, sem código. Quem escreve a frase: §12.
+As duas são texto puro de uma linha e **sem link**. Na publicação, `://` e `www.` (sem diferença de caixa) e a quebra de linha são recusados em todos os nós de `$defs/helpText` e `$defs/helpShort`: no schema (pelo `not` e pelo `safeText`) e, com as mesmas mensagens, no `publicationIssues` do core e no do `validate.mjs`. O `validateTemplate`, que o app roda ao ler uma versão já publicada, não repete essa regra: a leitura é tolerante. O app sempre desenha a frase como texto. Nó sem `help` não mostra "?", então a ajuda pode entrar aos poucos, sem código. Quem escreve a frase: §12.
 
 `editableIn` diz em quais modos o campo muda: `play` (modo Jogo) e `edit` (modo Evoluir). Padrão: `text` e `longText` em ambos; os demais só em Evoluir. Recursos de jogo declaram `["play"]`. O modo é UX: o servidor valida cada escrita (§11).
 

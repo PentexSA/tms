@@ -207,8 +207,6 @@ const FORBIDDEN_KEYS: readonly string[] = [
   'constructor',
   'prototype',
 ]
-// Link na ajuda (o mesmo `not` do $defs/helpText e do helpShort no schema.json).
-const LINK = /:\/\/|www\./i
 const PLAYABLE: readonly unknown[] = [
   'resource',
   'track',
@@ -262,16 +260,10 @@ function check(
         'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML'
       )
   }
-  // Ajuda (do campo, da opção, do grupo, do item fixo): texto puro e sem link.
-  // A frase sai sempre num <Text>; o link é recusado para que nenhum template
-  // leve o jogador para fora do app.
-  const help = (path: string, v: unknown, max: number) => {
-    text(path, v, max)
-    if (typeof v !== 'string') return
-    if (/[\t\n\r]/.test(v)) err(path, 'ajuda em uma linha só')
-    if (LINK.test(v))
-      err(path, 'ajuda com link (://, www.): a frase é texto puro')
-  }
+  // Ajuda (do campo, da opção, do grupo, do item fixo): texto puro, com o
+  // limite de cada nó. O "sem link" e a linha única valem só na publicação
+  // (publication.ts): aqui roda também a leitura de versões já publicadas.
+  const help = (path: string, v: unknown, max: number) => text(path, v, max)
   const oneOf = (
     path: string,
     v: unknown,
@@ -610,7 +602,8 @@ function check(
       for (const o of options) {
         if (!isId(o.id)) err(`${p}.options`, `id '${o.id}' inválido`)
         text(`${p}.options.${o.id}.label`, o.label)
-        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
+        if (f.type === 'choice' && o.help != null)
+          help(`${p}.options.${o.id}.help`, o.help, 200)
       }
       for (const o of options)
         if (o.roll)
