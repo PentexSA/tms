@@ -3,9 +3,9 @@ import { createApp } from './index'
 import { logger } from './logger'
 import { initTelemetry, sendSmokeError } from './telemetry'
 
-// Error tracking só aqui: o index.ts (createApp) não envia nada nos testes
+// Só aqui: o index.ts (createApp) não envia nada nos testes
 if (initTelemetry()) {
-  logger.info('Error tracking ligado (Sentry)')
+  logger.info('Error tracking e logs ligados (Sentry)')
   if (config.SENTRY_SMOKE) void sendSmokeError()
 }
 
