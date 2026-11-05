@@ -2,7 +2,14 @@
 import { describe, expect, it } from 'bun:test'
 import { compileTemplate } from '../compile'
 import { checkCreation, effectiveCreationConfig } from '../creation'
-import { creationAdvice, recommendedFor, recommendOf } from '../recommend'
+import {
+  creationAdvice,
+  foldName,
+  labelsFor,
+  recommendedBySource,
+  recommendedFor,
+  recommendOf,
+} from '../recommend'
 import { type ResolvedText, resolve } from '../resolve'
 import { type Json, mta, vtm, wta } from './fixtures'
 
@@ -133,6 +140,7 @@ describe('creationAdvice', () => {
         field: 'gifts',
         paths: ['values.gifts#g2', 'values.gifts#g3'],
         amount: 2,
+        rule: 0,
       },
     ])
   })
@@ -223,6 +231,79 @@ describe('creationAdvice', () => {
     expect(checkCreation(model, { values }, input(model))).toEqual(
       checkCreation(plain, { values }, input(plain))
     )
+  })
+})
+
+describe('code review: fontes sem escolha, fold e duas regras na lista', () => {
+  it('recommendedBySource: a escolha e os nomes de cada fonte', () => {
+    const model = w20()
+    const sheet = resolve(model, { values: { tribe: 'fianna' } })
+    expect(
+      recommendedBySource(model, sheet, 'gifts').map(s => [
+        s.from,
+        s.option?.id ?? null,
+        s.names,
+      ])
+    ).toEqual([
+      ['breed', null, []],
+      ['tribe', 'fianna', ['Faro do Asfalto', 'Voz da Matilha']],
+    ])
+  })
+
+  it('com uma fonte sem escolha, nada fica "fora" (o Dom pode ser dela)', () => {
+    const model = w20()
+    const values = {
+      tribe: 'fianna',
+      gifts: [{ id: 'g1', name: 'Passo de Neblina', meta: { rank: 1 } }],
+    }
+    expect(creationAdvice(model, resolve(model, { values }))).toEqual([])
+    // Com as duas escolhidas, o mesmo Dom fica fora
+    const both = resolve(model, {
+      values: { ...values, breed: 'lupino' },
+    })
+    expect(creationAdvice(model, both).map(a => a.code)).toEqual([
+      'ADVICE_OUTSIDE',
+    ])
+  })
+
+  it('o nome do item compara sem acento e sem caixa, como a busca', () => {
+    const model = v20()
+    const values = {
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: ' potencia ', value: 1 }],
+    }
+    expect(creationAdvice(model, resolve(model, { values }))).toEqual([])
+    const recommended = recommendedFor(
+      model,
+      resolve(model, { values }),
+      'disciplines'
+    )
+    expect(labelsFor(recommended, 'POTÊNCIA')).toEqual(['do clã'])
+    expect(labelsFor(recommended, 'Dominação')).toBeUndefined()
+    expect(foldName(' Ação ')).toBe('acao')
+  })
+
+  it('duas regras na mesma lista: cada aviso leva o índice da sua regra', () => {
+    const t = wta()
+    const gifts = fieldsOf(t).gifts as Json & { item: { meta: Json[] } }
+    gifts.item.meta.push({
+      id: 'cost',
+      type: 'number',
+      label: 'Custo',
+      min: 0,
+      max: 5,
+    })
+    ;(t.creation as Json).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'cost', max: 2 },
+    ]
+    const model = compileTemplate(t)
+    const values = {
+      gifts: [{ id: 'g1', name: 'Um', meta: { rank: 3, cost: 4 } }],
+    }
+    expect(
+      creationAdvice(model, resolve(model, { values })).map(a => a.rule)
+    ).toEqual([0, 1])
   })
 })
 
