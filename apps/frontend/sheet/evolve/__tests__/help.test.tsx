@@ -6,11 +6,12 @@ import {
 } from '@testing-library/react-native'
 import { compileTemplate, type SheetData } from '@tms/sheet-core'
 import { ThemeProvider } from '@tms/ui'
+import { StyleSheet } from 'react-native'
 import { modelOf, templateJson } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { SuggestionChips } from '../../editors/Suggestions'
 import { blockHelp } from '../../layouts/groupHelp'
-import { nameHelp } from '../EditorShell'
+import { nameHelp } from '../help'
 
 // R-19 (P10-D): o "?" da ajuda do template nas linhas do Editar (e da
 // criação, que usa os mesmos editores). Só nesses modos: em Jogo e Leitura,
@@ -255,7 +256,7 @@ describe('Editar: o "?" no catálogo e nas sugestões (R-19)', () => {
     )
   })
 
-  it('sugestões com frase viram linhas com "?"; sem frase, os chips', () => {
+  it('sugestão com frase tem "?" junto do chip; sem frase, nenhum "?"', () => {
     const pick = jest.fn()
     const { rerender } = render(
       <ThemeProvider>
@@ -292,5 +293,89 @@ describe('Editar: o "?" no catálogo e nas sugestões (R-19)', () => {
       subject: 'Aliados',
       text: 'x',
     })
+  })
+})
+
+// Revisão do merge e do commit 7 (itens 1, 5, 6 e 7)
+describe('revisão: a frase do item, as sugestões e o título do grupo', () => {
+  const backgrounds = model.fields.get('backgrounds')?.def as {
+    catalogHelp?: Record<string, string>
+  }
+  const withItem = async (name: string) => {
+    const sheet: SheetData = {
+      values: { ...nova.values, backgrounds: [{ id: 'b1', name, value: 1 }] },
+      specialties: {},
+    }
+    await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(
+      within(screen.getByTestId('editor-backgrounds')).getByRole('button', {
+        name: new RegExp(`^${name}`),
+      })
+    )
+  }
+
+  it('item 1: o nome digitado sem acento nem caixa acha a frase', async () => {
+    await withItem('aliados')
+    expect(screen.getByTestId('item-help')).toHaveTextContent(
+      backgrounds.catalogHelp?.Aliados ?? '-'
+    )
+  })
+
+  it('item 1: a frase acompanha o nome editado na folha', async () => {
+    await withItem('Aliados')
+    const sheet = within(screen.getByTestId('item-sheet-backgrounds'))
+    fireEvent.changeText(sheet.getByLabelText('Nome'), 'Contatos')
+    expect(screen.getByTestId('item-help')).toHaveTextContent(
+      backgrounds.catalogHelp?.Contatos ?? '-'
+    )
+    fireEvent.changeText(sheet.getByLabelText('Nome'), 'Nome inventado')
+    expect(screen.queryByTestId('item-help')).toBeNull()
+  })
+
+  it('item 1: no aspecto (sem name), a busca usa o texto e não quebra', () => {
+    expect(nameHelp({ Aspecto: 'Frase.' }, undefined)).toBeNull()
+    expect(nameHelp({ Aspecto: 'Frase.' }, 'aspecto')).toEqual({
+      subject: 'Aspecto',
+      text: 'Frase.',
+    })
+    expect(nameHelp({ Aspecto: 'Frase.' }, '')).toBeNull()
+  })
+
+  it('item 5: 1 sugestão com frase em 30: os chips continuam, e só ela tem "?"', () => {
+    const options = Array.from({ length: 30 }, (_, i) => `Arquétipo ${i + 1}`)
+    render(
+      <ThemeProvider>
+        <SuggestionChips
+          options={options}
+          value=""
+          onPick={jest.fn()}
+          help={{ 'Arquétipo 7': 'Frase do sétimo, do teste.' }}
+          testID="chips"
+        />
+      </ThemeProvider>
+    )
+    const flow = StyleSheet.flatten(screen.getByTestId('chips').props.style)
+    expect(flow).toMatchObject({ flexDirection: 'row', flexWrap: 'wrap' })
+    expect(screen.getAllByRole('button', { name: /^Ajuda:/ })).toHaveLength(1)
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Arquétipo 7' }))
+    expect(screen.getByText('Frase do sétimo, do teste.')).toBeTruthy()
+    expect(screen.getByText('Arquétipo 30')).toBeTruthy()
+  })
+
+  it('item 7: o título do grupo com âncora e "?" é um componente só', async () => {
+    const m = withBlockHelp('vtm-v20', 'merits-flaws', 'merits')
+    await renderLive(
+      { model: m, sheet: nova, mode: 'evolve' },
+      fakeServer(m, nova).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const help = screen.getByTestId('group-help-merits')
+    expect(help.props.accessibilityLabel).toBe('Ajuda: Qualidades')
+    // O título continua cabeçalho (o alvo do foco do "ir ao grupo")
+    expect(screen.getByRole('header', { name: 'Qualidades' })).toBeTruthy()
   })
 })

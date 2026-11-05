@@ -1,6 +1,8 @@
 import { type Help, SectionHeader, tokens, WithHelp } from '@tms/ui'
 import type { ReactNode } from 'react'
 import { StyleSheet } from 'react-native'
+import { AnchorHeader } from './AnchorHeader'
+import type { AnchorTarget } from './anchor'
 
 // O "?" do grupo de seção (R-19): "Físicos", "Talentos", "Conhecimentos".
 // A frase vem do `help` do CompiledGroup e, no bloco que o título nomeia
@@ -21,21 +23,35 @@ export function blockHelp(
   return unique.length ? { subject, text: unique.join(' ') } : null
 }
 
-/** O título do grupo com o "?" ao fim da linha e, abaixo, a frase aberta. */
+/**
+ * O título do grupo com o "?" ao fim da linha e, abaixo, a frase aberta. Com
+ * `target`, o título é a âncora do "ir ao grupo" (P05-D), com o foco no texto.
+ */
 export function GroupTitle({
   title,
   help,
   right,
+  target,
   testID,
 }: {
   readonly title: string
   readonly help: Help | null
   readonly right?: ReactNode
+  readonly target?: AnchorTarget
   readonly testID?: string
 }) {
   return (
     <WithHelp help={help} fill testID={testID}>
-      <SectionHeader title={title} level="group" right={right} />
+      {target ? (
+        <AnchorHeader
+          title={title}
+          level="group"
+          right={right}
+          target={target}
+        />
+      ) : (
+        <SectionHeader title={title} level="group" right={right} />
+      )}
     </WithHelp>
   )
 }

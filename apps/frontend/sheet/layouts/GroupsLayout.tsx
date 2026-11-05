@@ -14,7 +14,6 @@ import {
   tokens,
   useLayout,
   useTheme,
-  WithHelp,
 } from '@tms/ui'
 import { type ReactNode, useContext, useState } from 'react'
 import {
@@ -28,10 +27,9 @@ import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
-import { AnchorHeader } from './AnchorHeader'
 import { useAnchor } from './anchor'
 import { ChipFlow } from './ChipFlow'
-import { blockHelp, GroupHelpLine } from './groupHelp'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import { StripScope } from './groupTabsState'
 import { echoesSection, HeadedList, titledList } from './headedList'
@@ -250,14 +248,13 @@ function GroupBlock({
       <View style={style} onLayout={onLayout}>
         {title ? (
           <View style={styles.title}>
-            <WithHelp help={help} fill testID={helpTestID}>
-              <AnchorHeader
-                title={title}
-                level="group"
-                right={right}
-                target={target}
-              />
-            </WithHelp>
+            <GroupTitle
+              title={title}
+              help={help}
+              right={right}
+              target={target}
+              testID={helpTestID}
+            />
           </View>
         ) : null}
         {children}

@@ -27,7 +27,7 @@ export function EditorShell({
   testID,
 }: {
   readonly label: string
-  readonly help?: FieldHelp | null
+  readonly help?: Help | null
   readonly sub?: string | null
   // Nota da linha sob o rótulo (o custo do próximo ponto na criação)
   readonly note?: ReactNode
@@ -111,27 +111,3 @@ const styles = StyleSheet.create({
   },
   labelText: { flexShrink: 1 },
 })
-
-/** A frase de ajuda de uma linha: o nome do "?" e o texto do template. */
-export type FieldHelp = Help
-
-/**
- * A frase de um nome no mapa ao lado da lista (`catalogHelp`, `suggestionHelp`):
- * só propriedade própria, porque o nome vem do texto da ficha.
- */
-export function nameHelp(
-  map: Readonly<Record<string, string>> | undefined,
-  name: string | undefined
-): Help | null {
-  if (!map || !name || !Object.hasOwn(map, name)) return null
-  const text = map[name]
-  return typeof text === 'string' && text ? { subject: name, text } : null
-}
-
-/** A ajuda do campo, se o template tiver frase (campo sem frase não mostra "?"). */
-export function fieldHelp(def: {
-  readonly label: string
-  readonly help?: string
-}): FieldHelp | null {
-  return def.help ? { subject: def.label, text: def.help } : null
-}

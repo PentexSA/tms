@@ -32,7 +32,7 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
-import { fieldHelp, nameHelp } from './EditorShell'
+import { fieldHelp, nameHelp } from './help'
 import {
   useClassNote,
   useDraftNotice,
@@ -742,10 +742,12 @@ function ItemSheet({
   // até o próximo ajuste (T-19)
   const notice = useListNotice(list)
   const title = itemTitle(list, item) || def.itemLabel
-  // A frase do item: a do item fixo ou a do nome no catálogo (R-19)
+  // A frase do item: a do item fixo ou a do nome no catálogo (R-19), pelo
+  // nome do rascunho (acompanha a edição) e sem acento nem caixa, como a busca
+  // e o selo; no aspecto, o título é o texto
   const fixedHelp =
     def.fixed?.find(x => x.id === item.id)?.help ??
-    nameHelp(def.catalogHelp, item.name)?.text
+    nameHelp(def.catalogHelp, itemTitle(list, draft))?.text
   const patch = (p: Partial<Mutable<ListItem>>) => {
     notice.clear()
     setDraft(d => ({ ...d, ...p }))

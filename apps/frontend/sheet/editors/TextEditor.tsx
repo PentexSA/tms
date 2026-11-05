@@ -1,7 +1,7 @@
 import { TextArea, TextField, tokens } from '@tms/ui'
 import { Platform, StyleSheet, View } from 'react-native'
 import { nextField } from '../../lib/keyboard'
-import { fieldHelp } from '../evolve/EditorShell'
+import { fieldHelp } from '../evolve/help'
 import { properNameInput } from './properName'
 import { SuggestionPicker } from './Suggestions'
 import type { EditorProps } from './types'
