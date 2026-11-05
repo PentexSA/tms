@@ -67,7 +67,9 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   await page.getByRole('button', { name: 'Nova ficha' }).click()
   await page.getByLabel('Nome (obrigatório)').fill('Iara Moreira')
   await page.getByLabel('Nome de feito').fill('Canta-Tempestade')
-  await page.getByLabel('Conceito').fill('Contadora de histórias')
+  await page
+    .getByLabel('Conceito', { exact: true })
+    .fill('Contadora de histórias')
   await page.getByRole('radio', { name: 'Hominídeo', exact: true }).click()
   await page.getByRole('radio', { name: /^Galliard/ }).click()
   await page.getByRole('radio', { name: 'Fianna', exact: true }).click()

@@ -83,9 +83,11 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   // 4. A ficha pelo formulário gerado do template
   await page.getByRole('button', { name: 'Nova ficha' }).click()
   await page.getByLabel('Nome (obrigatório)').fill('Helena Varga')
-  await page.getByLabel('Conceito').fill('Arquivista da Capela')
+  await page
+    .getByLabel('Conceito', { exact: true })
+    .fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
-  await page.getByLabel('Senhor').fill('Ana Bathory')
+  await page.getByLabel('Senhor', { exact: true }).fill('Ana Bathory')
   await page.getByLabel('Natureza', { exact: true }).fill('Arquiteta')
   await page.getByLabel('Comportamento', { exact: true }).fill('Conformista')
   await page.getByRole('button', { name: 'Criar ficha' }).click()

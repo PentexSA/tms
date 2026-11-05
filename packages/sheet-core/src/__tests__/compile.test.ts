@@ -39,8 +39,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.8.0')
-    expect(model.version).toBe('1.8.0')
+    expect(model.key).toBe('vtm-v20@1.9.0')
+    expect(model.version).toBe('1.9.0')
     expect(model.skin).toBe('wod')
   })
 
@@ -235,9 +235,9 @@ describe('compileTemplate: o Lobisomem (W20, v2)', () => {
 
 describe('os campos da ficha de papel nos três sistemas', () => {
   it.each([
-    ['vtm-v20', '1.8.0'],
-    ['mta-m20', '1.6.0'],
-    ['wta-w20', '1.6.0'],
+    ['vtm-v20', '1.9.0'],
+    ['mta-m20', '1.7.0'],
+    ['wta-w20', '1.7.0'],
   ])('%s %s: Qualidades e Defeitos com custo de 1 a 10', (system, version) => {
     const t = templates[system] as Json
     expect(t.templateVersion).toBe(version)
@@ -427,5 +427,45 @@ describe('compileTemplate: memo e imutabilidade', () => {
     expect(() => fields.delete('name')).toThrow('imutável')
     expect(() => fields.clear()).toThrow('imutável')
     expect(model.fields.size).toBeGreaterThan(0)
+  })
+})
+
+// U-06 (D-12): a Casa do Mago é "Casa ou subgrupo", opcional, em todas as
+// Tradições: o rótulo, o placeholder e a frase mudam; o campo, não.
+describe('compileTemplate: a Casa do Mago', () => {
+  const house = compileTemplate(mta()).fields.get('house')?.def
+
+  it('"Casa ou subgrupo", com "Opcional" e a frase de ajuda', () => {
+    expect(house).toMatchObject({
+      type: 'text',
+      label: 'Casa ou subgrupo',
+      maxLength: 60,
+      placeholder: 'Opcional',
+    })
+    expect(house?.help).toContain('opcional')
+  })
+
+  it('continua na identidade, ao lado da Tradição, para qualquer Tradição', () => {
+    const t = mta()
+    const columns = (t.identity as { columns?: string[][] }).columns ?? []
+    expect(columns.flat()).toContain('house')
+  })
+})
+
+// R-19 (P10-D): a frase do grupo vai ao modelo compilado
+describe('compileTemplate: a ajuda do grupo', () => {
+  it('o CompiledGroup leva o help; o grupo sem frase, não', () => {
+    const t = vtm()
+    const sections = t.sections as Json[]
+    const attributes = sections.find(s => s.id === 'attributes')
+    const [physical, social] = (attributes?.groups ?? []) as Json[]
+    if (physical) physical.help = 'Frase do grupo.'
+    if (social) delete social.help
+    const section = compileTemplate(t)
+      .zones.flatMap(z => z.sections)
+      .find(s => s.id === 'attributes')
+    const groups = section?.groups ?? []
+    expect(groups.find(g => g.id === 'physical')?.help).toBe('Frase do grupo.')
+    expect(groups.find(g => g.id === 'social')).not.toHaveProperty('help')
   })
 })

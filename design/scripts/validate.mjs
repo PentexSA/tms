@@ -63,11 +63,11 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'suggestionHelp', 'default'],
     longText: ['maxLength', 'placeholder', 'default'],
     choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
-    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
+    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'catalogHelp', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
   },
   section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'groupTabs', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
   roll: ['model', 'label', 'die', 'dice', 'slots', 'difficulty', 'penalty', 'specialty', 'boosts', 'presets', 'advantage', 'target', 'conditions', 'bonusDice', 'ladder'],
@@ -559,6 +559,41 @@ function checkAccounting(t, c) {
   }
 }
 
+// Regras só da publicação (R-19): a ajuda é de uma linha e sem link, nos nós de $defs/helpText e
+// $defs/helpShort do schema.json. O mesmo publicationIssues do core (validate/publication.ts).
+export function publicationIssues(t) {
+  const errors = []
+  const isObjL = v => typeof v === 'object' && v !== null && !Array.isArray(v)
+  const objs = v => (Array.isArray(v) ? v.filter(isObjL) : [])
+  const check = (path, v) => {
+    if (typeof v !== 'string') return
+    if (/[\t\n\r]/.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda em uma linha só`)
+    if (/:\/\/|www\./i.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda com link (://, www.): a frase é texto puro`)
+  }
+  if (!isObjL(t)) return errors
+  for (const [id, f] of Object.entries(isObjL(t.fields) ? t.fields : {})) {
+    if (!isObjL(f)) continue
+    const p = `fields.${id}`
+    check(`${p}.help`, f.help)
+    for (const o of objs(f.options)) {
+      if (f.type === 'state') check(`${p}.options.${o.id}.note`, o.note)
+      if (f.type === 'state' || f.type === 'choice') check(`${p}.options.${o.id}.help`, o.help)
+    }
+    if (f.type === 'list') {
+      for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+      for (const [name, v] of Object.entries(isObjL(f.catalogHelp) ? f.catalogHelp : {})) check(`${p}.catalogHelp.${name}`, v)
+    }
+    if (f.type === 'text') for (const [name, v] of Object.entries(isObjL(f.suggestionHelp) ? f.suggestionHelp : {})) check(`${p}.suggestionHelp.${name}`, v)
+    if (f.type === 'resource') for (const a of objs(f.actions)) check(`${p}.actions.${a.id}.help`, a.help)
+  }
+  for (const s of objs(t.sections)) for (const g of objs(s.groups)) check(`sections.${s.id}.groups.${g.id}.help`, g.help)
+  for (const pr of objs(isObjL(t.roll) ? t.roll.presets : [])) check(`roll.presets.${pr.id}.help`, pr.help)
+  for (const a of objs(t.actions)) check(`actions.${a.id}.help`, a.help)
+  for (const o of objs(t.options)) check(`options.${o.id}.help`, o.help)
+  for (const r of objs(t.recoveries)) check(`recoveries.${r.id}.help`, r.help)
+  return errors
+}
+
 export function validateTemplate(t, palette) {
   const errors = []
   const err = (path, msg) => errors.push(`${t?.system ?? '?'} ${path}: ${msg}`)
@@ -567,6 +602,20 @@ export function validateTemplate(t, palette) {
     if (typeof v !== 'string' || !v.length) return err(path, 'texto obrigatório')
     if (v.length > max) err(path, `texto acima de ${max} caracteres`)
     if (!isSafeText(v)) err(path, 'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML')
+  }
+  // Ajuda (campo, opção, grupo, item fixo): texto puro, com o limite do nó. O "sem link" e a
+  // linha única ficam em publicationIssues, como no core.
+  const help = (path, v, max) => text(path, v, max)
+  // A frase por nome (catálogo, sugestões): só nomes que a lista tem (o mesmo helpMap do core)
+  const helpMap = (path, v, names, max) => {
+    if (!isObj(v)) return err(path, 'precisa ser objeto')
+    const entries = Object.entries(v)
+    if (!entries.length || entries.length > max) err(path, `de 1 a ${max} nomes`)
+    const known = new Set(names)
+    for (const [name, phrase] of entries.slice(0, max)) {
+      if (!known.has(name)) err(path, `'${name}' não está na lista`)
+      help(`${path}.${name}`, phrase, 200)
+    }
   }
   const oneOf = (path, v, list, what) => {
     if (!list.includes(v)) err(path, `${what} '${v}' fora da lista fechada`)
@@ -672,7 +721,7 @@ export function validateTemplate(t, palette) {
     keys(p, f, [...KEYS.fieldCommon, ...(KEYS.field[f.type] ?? [])])
     text(`${p}.label`, f.label)
     if (f.shortLabel) text(`${p}.shortLabel`, f.shortLabel, 16)
-    if (f.help) text(`${p}.help`, f.help, 400)
+    if (f.help) help(`${p}.help`, f.help, 400)
     for (const m of f.editableIn ?? []) oneOf(`${p}.editableIn`, m, REGISTRY.modes, 'modo')
     if (f.colorRole) oneOf(`${p}.colorRole`, f.colorRole, REGISTRY.colorRoles, 'colorRole')
     if (f.defaultAction) oneOf(`${p}.defaultAction`, f.defaultAction, REGISTRY.defaultActions, 'defaultAction')
@@ -690,6 +739,7 @@ export function validateTemplate(t, palette) {
           err(`${p}.suggestions`, 'sugestão repetida')
       }
     }
+    if (f.type === 'text' && f.suggestionHelp != null) helpMap(`${p}.suggestionHelp`, f.suggestionHelp, Array.isArray(f.suggestions) ? f.suggestions : [], 100)
     if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
     else if (f.type === 'text' || f.type === 'longText') {
       // Texto por opção de um choice (a Fraqueza pelo Clã), uma linha cada
@@ -779,6 +829,7 @@ export function validateTemplate(t, palette) {
     if (f.type === 'state') {
       for (const o of f.options ?? []) {
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
         for (const m of o.modifiers ?? []) {
           if (!has(m.field)) err(`${p}.options.${o.id}.modifiers`, `campo '${m.field}' não existe`)
           oneOf(`${p}.options.${o.id}.modifiers.op`, m.op, REGISTRY.modifierOps, 'op')
@@ -794,12 +845,14 @@ export function validateTemplate(t, palette) {
     }
     if (f.type === 'choice' || f.type === 'list') recommend(p, f)
     if (['choice', 'tags'].includes(f.type)) {
-      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label) }
+      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label); if (f.type === 'choice' && o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200) }
       for (const o of f.options ?? []) if (o.roll) oneOf(`${p}.options.${o.id}.roll`, o.roll, REGISTRY.conditionRoll, 'roll')
       if (f.glyph) oneOf(`${p}.glyph`, f.glyph, REGISTRY.glyphs, 'glyph')
     }
     if (f.type === 'list') {
       for (const c of f.catalog ?? []) text(`${p}.catalog`, c, 80)
+      for (const x of f.fixed ?? []) if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
+      if (f.catalogHelp != null) helpMap(`${p}.catalogHelp`, f.catalogHelp, Array.isArray(f.catalog) ? f.catalog : [], 200)
       for (const m of f.item?.meta ?? []) text(`${p}.item.meta.${m.id}.label`, m.label)
       if (f.item?.value) { num(`${p}.item.value.min`, f.item.value.min, 0, 10); num(`${p}.item.value.max`, f.item.value.max, 1, 10) }
       // O meta inicial de nomes do catálogo (o Posto de cada Dom)
@@ -844,7 +897,7 @@ export function validateTemplate(t, palette) {
     num(`${p}.columns`, s.columns, 1, 6)
     num(`${p}.minColWidth`, s.minColWidth, 120, 600)
     const ids = [...(s.fields ?? []), ...(s.groups ?? []).flatMap(g => g.fields)]
-    for (const g of s.groups ?? []) text(`${p}.groups.${g.id}.title`, g.title)
+    for (const g of s.groups ?? []) { text(`${p}.groups.${g.id}.title`, g.title); if (g.help != null) help(`${p}.groups.${g.id}.help`, g.help, 200) }
     for (const id of ids) if (!has(id)) err(`${p}`, `campo '${id}' não existe`)
     if (s.filter) { oneOf(`${p}.filter.rule`, s.filter.rule, REGISTRY.filterRules, 'filtro'); text(`${p}.filter.label`, s.filter.label) }
     if (s.badge && !has(s.badge.field)) err(`${p}.badge`, `campo '${s.badge.field}' não existe`)

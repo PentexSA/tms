@@ -22,6 +22,8 @@ import type { ActionParams, FieldDef, FieldId } from './fields'
 export interface SectionGroup {
   readonly id: string
   readonly title: string
+  // Frase curta de ajuda do grupo (até 200, sem link).
+  readonly help?: string
   readonly fields: readonly FieldId[]
 }
 

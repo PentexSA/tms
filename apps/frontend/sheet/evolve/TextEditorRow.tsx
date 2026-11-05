@@ -17,6 +17,8 @@ import { SuggestionChips } from '../editors/Suggestions'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
+import { HelpRow, helpRowInner } from './HelpRow'
+import { fieldHelp } from './help'
 import { useFieldIssue, useSetDraft } from './hooks'
 import { useTextDefault } from './recommend'
 
@@ -75,49 +77,65 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
   const own = initial && !resolved.defaulted && value !== initial.text
   return (
     <>
-      <Pressable
+      <HelpRow
+        help={fieldHelp(def)}
+        compact={compact}
         testID={`editor-${resolved.id}`}
-        accessibilityRole="button"
-        {...fieldA11y(def.label, value || 'vazio')}
-        accessibilityHint="Abre o editor de texto"
-        onPress={() => {
-          setText(value)
-          setError(null)
-          setConfirming(false)
-          setOpen(true)
-        }}
-        style={[
-          styles.row,
-          compact && styles.compact,
-          { borderBottomColor: colors.borderSubtle },
-        ]}
       >
-        <View style={styles.text}>
-          <Text variant="fieldLabel">{def.label}</Text>
-          <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
-            {value || '—'}
-          </Text>
-          {resolved.defaulted && initial ? (
-            <Text
-              variant="caption"
-              color="inkMuted"
-              testID={`default-${resolved.id}`}
-            >
-              {`Resumo de ${initial.option}; edite para trocar.`}
-            </Text>
-          ) : null}
-          {issue ? (
-            <Text variant="caption" color="danger" accessibilityRole="alert">
-              {issue}
-            </Text>
-          ) : null}
-        </View>
-        {compact ? null : (
-          <Text variant="caption" color="action">
-            Editar
-          </Text>
+        {wrapped => (
+          <Pressable
+            testID={`editor-${resolved.id}`}
+            accessibilityRole="button"
+            {...fieldA11y(def.label, value || 'vazio')}
+            accessibilityHint="Abre o editor de texto"
+            onPress={() => {
+              setText(value)
+              setError(null)
+              setConfirming(false)
+              setOpen(true)
+            }}
+            style={
+              wrapped
+                ? helpRowInner
+                : [
+                    styles.row,
+                    compact && styles.compact,
+                    { borderBottomColor: colors.borderSubtle },
+                  ]
+            }
+          >
+            <View style={styles.text}>
+              <Text variant="fieldLabel">{def.label}</Text>
+              <Text color={value ? 'ink' : 'inkMuted'} numberOfLines={2}>
+                {value || '—'}
+              </Text>
+              {resolved.defaulted && initial ? (
+                <Text
+                  variant="caption"
+                  color="inkMuted"
+                  testID={`default-${resolved.id}`}
+                >
+                  {`Resumo de ${initial.option}; edite para trocar.`}
+                </Text>
+              ) : null}
+              {issue ? (
+                <Text
+                  variant="caption"
+                  color="danger"
+                  accessibilityRole="alert"
+                >
+                  {issue}
+                </Text>
+              ) : null}
+            </View>
+            {compact ? null : (
+              <Text variant="caption" color="action">
+                Editar
+              </Text>
+            )}
+          </Pressable>
         )}
-      </Pressable>
+      </HelpRow>
       <BottomSheet
         visible={open}
         title={def.label}
@@ -179,6 +197,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
               options={def.suggestions}
               value={text}
               onPick={setText}
+              help={def.type === 'text' ? def.suggestionHelp : undefined}
               testID={`suggest-${resolved.id}`}
             />
           </View>

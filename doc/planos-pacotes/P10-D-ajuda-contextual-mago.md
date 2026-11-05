@@ -519,7 +519,142 @@ Os pontos para o PO das ondas 1 a 3 ([onda-1.md](onda-1.md) §6, [onda-2.md](ond
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
-(Preenchido na implementação.)
+Implementação em 04/11/2026, na `pacote/p10-d-ajuda-contextual`, a partir da ponta da onda (`78de35c`), em paralelo com os outros três pacotes. Os commits:
+
+| # | Commit | Estado |
+|---|---|---|
+| 1 | `c31217d` feat(core): help nas opções, nos grupos e nos itens fixos do template | feito, sem as sugestões e o catálogo (desvio 1) |
+| 2 | `260c503` test(api): publicação recusa ajuda com link ou grande | feito |
+| 3 | `7660168` feat(ui): HelpButton e HelpText; help no Choice e no TextField | feito |
+| 4 | `7a3026c` feat(app): "?" nas linhas da criação e do Editar | feito |
+| 5 | `34fab93` feat(app): "?" em "Prioridade" e "pontos de bônus" | feito, no saldo (desvio 5) |
+| 6 | `0b0dae1` feat(templates): Casa ou subgrupo, opcional, no Mago | feito |
+| 7 | sugestões e catálogo com nome e ajuda | **adiado para o rebase** sobre o P07-D (desvio 1) |
+| 8 | `13d013a` content(templates): frases do time | feito, sem o catálogo (desvio 7) |
+| 9 | `4d67d86` test(e2e): ajuda contextual e Casa do Mago | escrito; roda na integração |
+
+**Perguntas técnicas: o que foi aplicado** (proposta do plano, sem resposta do time):
+
+- pergunta 1: a frase expande na linha (disclosure), sem folha nem tooltip;
+- pergunta 2: cada "?" é uma parada de Tab. No `Choice`, as setas continuam só nos rádios, e o "?" fica fora do foco itinerante;
+- pergunta 3: o `validateTemplate` do core continua sem conferir as chaves das opções. O Ajv da publicação confere;
+- pergunta 4: `help` em cada nó, sem glossário;
+- pergunta 8: o "?" só aparece na criação, no Editar e na Nova ficha. Em Jogo e Leitura, nada muda.
+
+**Pontos para o PO (§9):** nenhum decidido. O ponto 1 segue a proposta: as duas frases do app ficam em `sheet/creation/help.ts`. O ponto 3 também: "Opcional" vai como `placeholder` e frase, sem chave nova.
+
+**Desvios:**
+
+1. **O commit 7 não entrou.** Ele depende da forma do catálogo do P07-D, em desenvolvimento noutro worktree ao mesmo tempo. Por isso:
+   - o commit 1 não traz as sugestões nem o catálogo nas duas formas;
+   - `entryName` e `entryHelp` não existem ainda.
+
+   No rebase sobre o P07-D, o commit 7 segue a recomendação da consolidação (onda-4.md §4.3): a frase vai num mapa por nome, ao lado da lista. Ele traz as 34 frases do catálogo (Antecedentes: 10, 10 e 14).
+2. **O link é recusado sem diferença de caixa,** inclusive "WWW." (depois da revisão, só na publicação: ver abaixo). O `not` do schema passou a `(://|[wW]{3}\.)`. O core e o `validate.mjs` também recusam tab e quebra de linha na ajuda ("ajuda em uma linha só"). O `isSafeText` aceita os dois, e o schema já os proibia.
+3. **A regra "sem link" vale para todo `$defs/helpText`,** não só o `help` do campo. Isso inclui o `note` das opções de `state` e o `help` das ações e das recuperações. Nenhum template tem link (conferido pelo `build.mjs`).
+4. **O "?" do cabeçalho de lista fica no `ListEditor`,** num `EditorListHeader`, não no `ListHeader` da `views/`. O `ListHeader` é do modo Jogo e Leitura, que ficam sem "?" (pergunta 8).
+   - **No bloco que o título nomeia** (T-58), o "?" da lista vai no título do grupo.
+   - **Quando o título é o da seção,** a frase vem logo abaixo dele (W20 "Dons", M20 "Antecedentes").
+5. **O "?" dos pontos de bônus fica no saldo da aba da conta,** não no rótulo da aba. O rótulo é o "Orçamento", que o P05-D troca por "Pontos" ao mesmo tempo. Assim, o rebase sobre o P05-D é só textual.
+6. **Os grupos de seção liam a frase do `section.def.groups`,** sem mudar o `CompiledGroup`. A revisão (item 10) desfez isso: a frase vai no `CompiledGroup`.
+7. **Commit 8: as frases do `P10-D-frases.json`, menos o catálogo.** Elas entraram por um script de edição textual, que deixa o resto do arquivo como estava. Cada objeto que ganhou `help` passou para várias linhas.
+
+   | Template | Campos | Grupos | Opções |
+   |---|---|---|---|
+   | V20 | 11 | 7 | 14 |
+   | W20 | 10 | 7 | 21 |
+   | M20 | 12, mais a Casa do commit 6 | 7 | 14 |
+
+   - **Ações nos `help` de hoje:**
+     - "junta" usa a frase da lista, que já inclui o que a de hoje explicava;
+     - "substitui" troca a frase (Gnose);
+     - "mantém" não muda nada (roda);
+     - a Fraqueza ficou com o P07-D.
+   - **Os outros 15 `help` de hoje** ficaram como estão: Consciência (Talento e Virtude), Qualidades e Defeitos (nos três), Deformidade, Glória, Ritos, Fetiches, Rotinas, Ressonância e Maravilhas. A revisão 6 da §3.8 só passou pelos 7 que a lista cobre. O corpo do commit 8 cita "Prontidão" por engano: o Talento de que se trata é a Consciência.
+   - **Um teste Bun** (`help-phrases.test.ts`) confere a lista contra os templates.
+8. **Fora da §8.5:** `design/telas/validate.js` e `design/telas/dados.js`, que o `build.mjs` gera, e `sheet/views/__tests__/matrix.test.tsx`.
+   - No `matrix.test.tsx`, o teste de "rótulo começa pelo texto visível" pula o "?". O "?" é botão de ícone, com o nome "Ajuda: <campo>", como o `IconButton`.
+   - Arquivos novos: `evolve/HelpRow.tsx`, `layouts/groupHelp.tsx` e `creation/InlineHelp.tsx`.
+9. **O E2E** ganhou o `exact` em Conceito, Natureza, Comportamento e Senhor, e a Casa ganhou o `exact` no commit 6. Um script conferiu os outros seletores de botão e de rótulo, e nenhum fica ambíguo. O `help.spec.ts` usa a folha do Clã no Editar, em vez da folha da Força de Vontade, para provar o Esc dentro da folha. A Força de Vontade é uma linha com Stepper, sem folha.
+
+**Correções do `/code-review` (high) da integração:**
+
+| Item | Commit | O que mudou |
+|---|---|---|
+| 2 e 8 | `7357ec4` | O "sem link" e a linha única saem do `validateTemplate` e vão para o `publicationIssues` (core e `validate.mjs`), que o `publishTemplate` e o `build.mjs` rodam. A regra vale nos 11 nós de `$defs/helpText` e `helpShort` do schema, com as mesmas mensagens nas duas camadas que não são o Ajv. Um teste confere a lista de nós contra o `schema.json`. O `compileTemplate` do app fica tolerante com versões antigas, e a escrita (publicação) fica estrita. O `git log -p` dos templates não mostra `://` nem `www.` em nenhum `help` ou `note` publicado |
+| 3 | `7357ec4`, `e7dc167` | A opção de `tags` deixa de aceitar `help`, porque o app não a desenha (schema, tipo e validadores). O `help` do item `fixed` é desenhado como texto no topo da `ItemSheet` (a Ressonância do M20) |
+| 10 | `3e4b91d` | O `help` do grupo vai no `CompiledGroup` (o `dist` foi refeito). Os layouts leem `g.help`, e o `groupHelpOf` sai |
+| 1 | `d72b00e` | O `HelpText` é uma região viva sempre montada. Fechada, ela fica vazia e fora do fluxo, e só o conteúdo muda. O web e o Android anunciam a frase, e o `aria-controls` sempre aponta um elemento que existe |
+| 7 | `d72b00e` | No `Choice` com frase em 2 colunas, a célula tem `flexBasis` 240 e cresce. Não há mais medida com `onLayout` nem o salto de 1 para 2 colunas |
+| 9 | `d72b00e` | O `WithHelp` do `@tms/ui` é a composição única de [conteúdo][?] com a frase embaixo. Usam: `Choice`, `TextField`, `HelpRow`, o cabeçalho da lista, o título e a linha do grupo, a Prioridade e o saldo. O `InlineHelp` sai, e o `TextEditor` usa o `fieldHelp(def)`. O `EditorShell` continua com `useHelp`, porque a frase vai na largura da linha |
+| 6 | `d72b00e` | No bloco que o título nomeia, um "?" mostra a frase do grupo e a da lista juntas: a do grupo primeiro, e a repetida sai (`blockHelp`). No ramo echo, a frase do grupo não se perde. Os itens 1, 7, 9 e 6 ficaram num commit só porque mudam a mesma API (`HelpText`) e os mesmos arquivos |
+| 5 | `908c9b6` | A frase da Prioridade não cita mais "Atributos e Habilidades" e termina com "Cada conjunto de grupos tem a sua própria ordem.". O `P10-D-frases.json` e o `.md` têm a mesma frase. Um teste confere que as frases do app não citam nome de nenhum dos seis templates |
+| 4 | — | Fica como está. A frase dos pontos de bônus diz "a aba Pontos", e esse texto depende do P05-D, que entra antes no merge e renomeia a aba. Sem o P05-D, a aba ainda se chama "Orçamento" |
+
+O "Jest did not exit" não vem dos testes novos. Com `--detectOpenHandles`, eles não deixam nada aberto: `help.test.tsx` do app e do `@tms/ui`, `creation/__tests__/help.test.ts` e `new-character.test.tsx`. A origem não foi conferida na base.
+
+**Merge da onda, commit 7 e commit de versão** (05/11/2026, depois das correções da revisão):
+
+1. **Merge da `onda/4-conteudo-guia`** (P05-D, P10-C e P07-D, `1762d0d`): `18646f4`. Os conflitos foram resolvidos no próprio merge:
+   - **templates:** o `recommend` do P07-D convive com o `help` do P10-D no mesmo campo, e a `weakness.help` ficou a do P07-D;
+   - **README §12:** as duas regras de licença;
+   - **`ChoiceEditorRow` e `TextEditorRow`:** a linha [botão][?], com o "fora da Tradição" e o "Resumo de …" dentro do botão;
+   - **`ListEditor`:** a linha do item com −/+ do P07-D, sem "?" (§4.4), e o "?" no cabeçalho da lista;
+   - **`GroupsLayout`:** a âncora e o `AnchorHeader` do P05-D, com o "?" do bloco no título;
+   - **`CreationPanel`:** o "?" do saldo fica na aba "Pontos".
+2. **Commit 7** (`04ce3cf`), na forma da consolidação: um mapa por nome ao lado da lista, sem a forma de objeto.
+   - **Chaves:** `catalogHelp` (lista, até 200 nomes) e `suggestionHelp` (texto, até 100).
+   - **Paridade nos quatro:** o schema, o `validateTemplate`, o `validate.mjs` e o `publicationIssues`. Nome fora da lista é recusado, e cada frase tem até 200 caracteres, uma linha e nenhum link.
+   - **Onde o "?" aparece:** na opção da `AddItemSheet`, à direita do selo, e nas sugestões com frase, que viram linhas [chip][?]. Para o item já na ficha, a frase vai no topo da `ItemSheet`.
+   - **Conteúdo:** as 34 frases de Antecedentes, conferidas pelo `help-phrases.test.ts`.
+   - **Desvio:** a regra "mesma frase para o mesmo nome em duas listas do template" (§3.1) não entrou. Ela não tem uso hoje, porque nenhuma sugestão tem frase. Fica para quando os Arquétipos ganharem frase.
+3. **Commit de versão** (`chore(templates): vtm-v20 1.9.0, wta-w20 1.7.0, mta-m20 1.7.0`), o último da branch. Ele traz:
+   - os três `templateVersion` e a `0023_templates_onda4.ts`, só de dados, cópia da `0020`, com `down` vazio como o dela;
+   - os testes do `@tms/db` para ela;
+   - os testes que fixam versão. No `publish.test.ts`, o banco "sem os templates do produto" passa a tirar também a `0023`, e o caso "uma versão nova convive" monta a 1.10.0.
+
+   A `0023` roda no deploy da API. O app nativo da versão anterior mostra "Atualize o app" nas fichas novas até a loja ter o app novo (§6, ponto 3, da onda; sem decisão).
+
+**Verificação, na ponta da branch:** `npx pnpm build`, typecheck, lint, `build.mjs` e `validate.mjs` dos 6 templates, todos verdes.
+
+| Pacote | Testes |
+|---|---|
+| core | 1117 |
+| db | 39 |
+| config | 38 |
+| api | 1921 (65 pulados) |
+| ui | 226 |
+| frontend | 1577, com `--forceExit` |
+
+**Correções do `/code-review` (high) sobre o merge, o commit 7 e o commit de versão.** Os commits ficam depois do commit de versão, sem reescrever o histórico:
+
+| Item | Commit | O que mudou |
+|---|---|---|
+| 8 | `9f247b5` | O `helpMap` (core e `validate.mjs`), depois do erro de tamanho, confere só os primeiros `max` nomes, contra um `Set` |
+| 1, 5, 6, 7 | `a176955` | **6:** o `fieldHelp` e o `nameHelp` vão para um módulo puro, `evolve/help.ts`, e o `Suggestions` usa o `fold` de `evolve/text`. **1:** a frase da `ItemSheet` vem do nome do rascunho, comparado sem acento nem caixa, e o aspecto (sem `name`) não quebra. **5:** os chips continuam quebrando linha, e só a sugestão com frase leva o "?" junto do chip (teste com 1 em 30). **7:** o `GroupTitle` aceita a âncora (`AnchorHeader`) e é o único título com "?". Os quatro itens ficam num commit só porque o módulo novo do 6 é usado pelo 1 e pelo 5 |
+| 3, 4 | `e3a1583` | **3:** `publishProductTemplates(db)` em `packages/db/src/templates.ts`, usado pela `0023`. A `0020` já foi aplicada e fica com o próprio laço, igual: o código de uma migration aplicada não muda. **4:** o teste da `0023` deriva as versões dos arquivos. A "anterior" é a minor de antes, com o **conteúdo de hoje**: o teste prova que as versões convivem no banco, não o conteúdo da `main`, e assim não guarda uma cópia dos JSON antigos como fixture |
+| 2 | `e3a1583`, em parte | Um teste da API prova que cada arquivo que as migrations gravam passa no `schemaIssues`, no `validateTemplate`, no `publicationIssues` e no `compileTemplate`. **A validação dentro da migration não entrou:** o `@tms/db` não depende do `@tms/sheet-core` nem do Ajv, e incluí-los muda o `package.json` e o lockfile, o que o brief da onda proíbe sem aprovação. Fica para decisão: (a) o `@tms/db` passa a depender do core e do Ajv, e a `0023` valida antes de gravar; (b) a validação fica no CI, como hoje. A regra não foi duplicada |
+
+**Verificação depois das correções:** `npx pnpm build`, typecheck, lint e `build.mjs` (6 templates) passaram.
+
+| Pacote | Testes |
+|---|---|
+| core | 1118 |
+| db | 39 |
+| config | 38 |
+| api | 1924 (65 pulados) |
+| ui | 226 |
+| frontend | 1582, com `--forceExit` |
+
+**Para a integração:**
+
+- ~~o merge da onda, o commit 7 e o commit de versão~~: feitos (acima);
+- a decisão do item 2 da segunda revisão (validar dentro da migration, com a dependência nova no `@tms/db`);
+- o E2E inteiro (com o `help.spec.ts`);
+- o roteiro manual da §11;
+- o `/code-review` e o `/security-review`.
+
+As frases são rascunho do time, para revisão. O merge na `main` espera a revisão de quem conhece cada sistema.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 

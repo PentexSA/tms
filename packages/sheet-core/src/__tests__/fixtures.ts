@@ -45,6 +45,7 @@ interface Reference {
   REGISTRY: Record<string, unknown[]>
   validateTemplate(t: unknown, palette: string[]): string[]
   validateSheet(t: unknown, sheet: unknown, who?: string): string[]
+  publicationIssues(t: unknown): string[]
 }
 const referencePath = join(DESIGN, 'scripts/validate.mjs')
 export const reference = (await import(referencePath)) as Reference

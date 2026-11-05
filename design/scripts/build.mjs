@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { validateSheet, validateTemplate } from './validate.mjs'
+import { publicationIssues, validateSheet, validateTemplate } from './validate.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const readJson = p => JSON.parse(readFileSync(join(root, p), 'utf8'))
@@ -144,7 +144,7 @@ for (const f of readdirSync(join(root, 'templates')).filter(f => f.endsWith('.js
 const examples = readJson('templates/exemplos/personagens.json')
 
 const errors = []
-for (const t of Object.values(templates)) errors.push(...validateTemplate(t, palette))
+for (const t of Object.values(templates)) errors.push(...validateTemplate(t, palette), ...publicationIssues(t))
 for (const c of examples.characters) {
   const t = templates[c.system]
   if (!t) { errors.push(`${c.id}: sistema '${c.system}' sem template`); continue }

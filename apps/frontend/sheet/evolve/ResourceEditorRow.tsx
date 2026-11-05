@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native'
 import { useCreation } from '../creation/CreationContext'
 import type { FieldViewProps } from '../views/types'
 import { EditorShell } from './EditorShell'
+import { fieldHelp } from './help'
 import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
 import { useRowFeedback } from './useRowFeedback'
 
@@ -84,6 +85,7 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
   return (
     <EditorShell
       label={def.label}
+      help={fieldHelp(def)}
       sub={note}
       note={feedback.note}
       error={feedback.notice ?? issue}

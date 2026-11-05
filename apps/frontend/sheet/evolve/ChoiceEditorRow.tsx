@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
+import { HelpRow, helpRowInner } from './HelpRow'
+import { fieldHelp } from './help'
 import { useFieldIssue, useSetDraft } from './hooks'
 import { badgeText, outsideText, useIdentityAdvice } from './recommend'
 
@@ -38,6 +40,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
         id: o.id,
         label: o.label,
         meta: [own, badge].filter(Boolean).join(' · ') || undefined,
+        help: o.help,
       }
     })
     // Estável: as recomendadas na frente, cada parte na ordem do template
@@ -51,50 +54,76 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
       : null
   return (
     <>
-      <Pressable
+      <HelpRow
+        help={fieldHelp(def)}
+        compact={compact}
         testID={`editor-${resolved.id}`}
-        accessibilityRole="button"
-        {...fieldA11y(def.label, label)}
-        accessibilityHint="Abre as opções"
-        onPress={() => {
-          setError(null)
-          setOpen(true)
-        }}
-        style={[
-          styles.row,
-          compact && styles.compact,
-          { borderBottomColor: colors.borderSubtle },
-        ]}
       >
-        <View style={styles.text}>
-          <Text variant="fieldLabel">{def.label}</Text>
-          <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
-          {outside ? (
-            <Text
-              variant="caption"
-              color="inkMuted"
-              testID={`identity-${resolved.id}`}
-            >
-              {outside}
-            </Text>
-          ) : null}
-          {issue ? (
-            <Text variant="caption" color="danger" accessibilityRole="alert">
-              {issue}
-            </Text>
-          ) : null}
-        </View>
-        {compact ? null : (
-          <Text variant="caption" color="action">
-            Trocar
-          </Text>
+        {wrapped => (
+          <Pressable
+            testID={`editor-${resolved.id}`}
+            accessibilityRole="button"
+            {...fieldA11y(def.label, label)}
+            accessibilityHint="Abre as opções"
+            onPress={() => {
+              setError(null)
+              setOpen(true)
+            }}
+            style={
+              wrapped
+                ? helpRowInner
+                : [
+                    styles.row,
+                    compact && styles.compact,
+                    { borderBottomColor: colors.borderSubtle },
+                  ]
+            }
+          >
+            <View style={styles.text}>
+              <Text variant="fieldLabel">{def.label}</Text>
+              <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
+              {outside ? (
+                <Text
+                  variant="caption"
+                  color="inkMuted"
+                  testID={`identity-${resolved.id}`}
+                >
+                  {outside}
+                </Text>
+              ) : null}
+              {issue ? (
+                <Text
+                  variant="caption"
+                  color="danger"
+                  accessibilityRole="alert"
+                >
+                  {issue}
+                </Text>
+              ) : null}
+            </View>
+            {compact ? null : (
+              <Text variant="caption" color="action">
+                Trocar
+              </Text>
+            )}
+          </Pressable>
         )}
-      </Pressable>
+      </HelpRow>
       <BottomSheet
         visible={open}
         title={def.label}
         onClose={() => setOpen(false)}
       >
+        {/* Quem abriu a folha já pediu este campo: a frase vai como texto, sem "?" */}
+        {def.help ? (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            testID={`help-${resolved.id}`}
+          >
+            {def.help}
+          </Text>
+        ) : null}
         {error ? (
           <Text variant="caption" color="danger" accessibilityRole="alert">
             {error}

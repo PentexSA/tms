@@ -116,7 +116,14 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    text: [
+      'maxLength',
+      'aspect',
+      'placeholder',
+      'suggestions',
+      'suggestionHelp',
+      'default',
+    ],
     longText: ['maxLength', 'placeholder', 'default'],
     choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
@@ -125,6 +132,7 @@ const KEYS = {
       'item',
       'catalog',
       'catalogDefaults',
+      'catalogHelp',
       'recommend',
       'searchable',
       'density',
@@ -261,6 +269,30 @@ function check(
         path,
         'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML'
       )
+  }
+  // Ajuda (do campo, da opção, do grupo, do item fixo): texto puro, com o
+  // limite de cada nó. O "sem link" e a linha única valem só na publicação
+  // (publication.ts): aqui roda também a leitura de versões já publicadas.
+  const help = (path: string, v: unknown, max: number) => text(path, v, max)
+  // A frase por nome (catálogo, sugestões), ao lado da lista: só nomes que a
+  // lista tem, cada frase como a do nó
+  const helpMap = (
+    path: string,
+    v: unknown,
+    names: readonly unknown[],
+    max: number
+  ) => {
+    if (!isObj(v)) return err(path, 'precisa ser objeto')
+    const entries = Object.entries(v)
+    if (!entries.length || entries.length > max)
+      err(path, `de 1 a ${max} nomes`)
+    // Depois do erro de tamanho, só as primeiras: um mapa enorme não vira
+    // milhares de erros nem um laço quadrático
+    const known = new Set(names)
+    for (const [name, phrase] of entries.slice(0, max)) {
+      if (!known.has(name)) err(path, `'${name}' não está na lista`)
+      help(`${path}.${name}`, phrase, 200)
+    }
   }
   const oneOf = (
     path: string,
@@ -446,7 +478,7 @@ function check(
     keys(p, f, [...KEYS.fieldCommon, ...typeKeys])
     text(`${p}.label`, f.label)
     if (f.shortLabel) text(`${p}.shortLabel`, f.shortLabel, 16)
-    if (f.help) text(`${p}.help`, f.help, 400)
+    if (f.help) help(`${p}.help`, f.help, 400)
     for (const m of list(`${p}.editableIn`, f.editableIn))
       oneOf(`${p}.editableIn`, m, REGISTRY.modes, 'modo')
     if (f.colorRole)
@@ -474,6 +506,13 @@ function check(
           err(`${p}.suggestions`, 'sugestão repetida')
       }
     }
+    if (f.type === 'text' && f.suggestionHelp != null)
+      helpMap(
+        `${p}.suggestionHelp`,
+        f.suggestionHelp,
+        asArray(f.suggestions),
+        100
+      )
     if (f.type === 'rating')
       formula(`${p}.default`, f.default, numOr(f.min, 0), numOr(f.max, 10))
     else if (f.type === 'text' || f.type === 'longText') {
@@ -643,6 +682,7 @@ function check(
     if (f.type === 'state') {
       for (const o of objs(`${p}.options`, f.options)) {
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
         for (const m of objs(`${p}.options.${o.id}.modifiers`, o.modifiers)) {
           if (!has(m.field))
             err(
@@ -679,6 +719,8 @@ function check(
       for (const o of options) {
         if (!isId(o.id)) err(`${p}.options`, `id '${o.id}' inválido`)
         text(`${p}.options.${o.id}.label`, o.label)
+        if (f.type === 'choice' && o.help != null)
+          help(`${p}.options.${o.id}.help`, o.help, 200)
       }
       for (const o of options)
         if (o.roll)
@@ -693,6 +735,10 @@ function check(
     if (f.type === 'list') {
       for (const c of list(`${p}.catalog`, f.catalog))
         text(`${p}.catalog`, c, 80)
+      for (const x of objs(`${p}.fixed`, f.fixed))
+        if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
+      if (f.catalogHelp != null)
+        helpMap(`${p}.catalogHelp`, f.catalogHelp, asArray(f.catalog), 200)
       const item = rec(f.item)
       for (const m of objs(`${p}.item.meta`, item?.meta))
         text(`${p}.item.meta.${m.id}.label`, m.label)
@@ -767,7 +813,10 @@ function check(
         return list(`${p}.groups.${g.id}.fields`, g.fields)
       }),
     ]
-    for (const g of groups) text(`${p}.groups.${g.id}.title`, g.title)
+    for (const g of groups) {
+      text(`${p}.groups.${g.id}.title`, g.title)
+      if (g.help != null) help(`${p}.groups.${g.id}.help`, g.help, 200)
+    }
     for (const id of ids) if (!has(id)) err(`${p}`, `campo '${id}' não existe`)
     if (s.filter) {
       const filter = rec(s.filter)
