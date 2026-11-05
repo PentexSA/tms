@@ -385,6 +385,36 @@ describe('"+" com a previsão da conta', () => {
   })
 })
 
+// T-85: o "−" no valor inicial tem a cara de indisponível, continua
+// tocável, e o toque diz de onde vem o inicial sem descer
+describe('"−" no valor inicial', () => {
+  it('FdV na Coragem 3: a dica junta os dois lados, e o "−" não desce', async () => {
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const control = () =>
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+    expect(control().props.accessibilityHint).toBe(
+      'Aumentar: +1 = 1 bônus. Diminuir: Na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(screen.getByTestId('notice-willpower')).toHaveTextContent(
+      'Força de Vontade: na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    // Comprar 1 e voltar deixa o "−" livre no 4 e zera o contador
+    step('Força de Vontade permanente')
+    expect(control()).toHaveAccessibilityValue({ now: 4 })
+    expect(control().props.accessibilityHint).toBe('+1 = 1 bônus')
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    expect(screen.getByText(/0 alterações/)).toBeTruthy()
+  })
+})
+
 // T-18: o saldo que sobra não se lê como gasto, e a conta fechada com bônus
 // livres diz que eles ainda podem ser gastos
 describe('bônus que sobram', () => {

@@ -25,6 +25,7 @@ import {
   freebiesNotes,
   groupFor,
   priorityNote,
+  problemText,
   reorder,
   stepAdvice,
 } from '../creation'
@@ -809,5 +810,158 @@ describe('previsão e motivo: casos de borda', () => {
     })
     // A outra Esfera não é a da afinidade: compra normal
     expect(touch('sphereB')).toBeNull()
+  })
+})
+
+// T-85: o "−" no valor inicial. A previsão diz de onde vem o inicial, o toque
+// que desce é recusado só no app, e o texto do problema diz o número.
+describe('o "−" no valor inicial (T-85)', () => {
+  const WOD: CreationChoices = {
+    priorities: {
+      attributes: ['physical', 'social', 'mental'],
+      abilities: ['talents', 'skills', 'knowledges'],
+    },
+  }
+  const w20 = modelOf('wta-w20')
+  const v20 = modelOf('vtm-v20')
+  const m20 = modelOf('mta-m20')
+  const AHROUN = {
+    name: 'Lupa',
+    breed: 'lupino',
+    auspice: 'ahroun',
+    tribe: 'fianna',
+  }
+  const checkOf = (m: SheetModel, values: Record<string, unknown>) =>
+    checkCreation(
+      m,
+      { values },
+      { config: effectiveCreationConfig(m), choices: WOD }
+    )
+  const down = (m: SheetModel, values: Record<string, unknown>, path: string) =>
+    stepAdvice(
+      m,
+      checkOf(m, values),
+      'freebies',
+      path,
+      resolve(m, { values }),
+      'down'
+    )
+
+  it('Ahroun em 5: o "−" da Fúria trava e diz o Augúrio; em 6, livre', () => {
+    expect(down(w20, AHROUN, 'values.rage')).toEqual({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).',
+      cost: null,
+      inline: false,
+    })
+    expect(
+      down(
+        w20,
+        { ...AHROUN, rage: { permanent: 6, current: 6 } },
+        'values.rage'
+      )
+    ).toBeNull()
+    // o "+" continua com a previsão de sempre
+    expect(
+      stepAdvice(w20, checkOf(w20, AHROUN), 'freebies', 'values.rage')
+    ).not.toMatchObject({ blocked: 'initial' })
+  })
+
+  it('V20: a FdV na Coragem diz a Coragem; M20: a FdV fixa, sem origem', () => {
+    expect(
+      down(v20, { name: 'A', clan: 'brujah', courage: 3 }, 'values.willpower')
+    ).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 3 (vem de Coragem).',
+    })
+    expect(down(m20, { name: 'C' }, 'values.willpower')).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 5.',
+    })
+  })
+
+  it('no mínimo do campo ou com baseline travado, nada a prever', () => {
+    // Coragem 1: a FdV 1 já é o mínimo do template
+    expect(
+      down(v20, { name: 'A', clan: 'brujah', courage: 1 }, 'values.willpower')
+    ).toBeNull()
+    // Nosferatu: a Aparência 0 é baseline travado
+    expect(
+      down(v20, { name: 'A', clan: 'nosferatu' }, 'values.appearance')
+    ).toBeNull()
+    // fora da conta
+    expect(down(v20, { name: 'A' }, 'values.name')).toBeNull()
+  })
+
+  const refuse = (
+    m: SheetModel,
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    paths: string[],
+    phase: CreationPhase = 'freebies'
+  ) => {
+    const input = { config: effectiveCreationConfig(m), choices: WOD }
+    const sheets = {
+      before: { values: before } as SheetData,
+      after: { values: after } as SheetData,
+    }
+    return draftRefusal(
+      m,
+      sheets,
+      {
+        before: checkCreation(m, sheets.before, input),
+        after: checkCreation(m, sheets.after, input),
+      },
+      input,
+      phase,
+      paths
+    )
+  }
+
+  it('o toque que desce abaixo do inicial é recusado, com o número e a origem', () => {
+    const lower = { ...AHROUN, rage: { permanent: 4, current: 4 } }
+    expect(refuse(w20, AHROUN, lower, ['values.rage'])).toEqual({
+      cause: 'initial',
+      text: 'Fúria: na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).',
+    })
+    // nas duas fases: em Básicos também
+    expect(refuse(w20, AHROUN, lower, ['values.rage'], 'basics')?.cause).toBe(
+      'initial'
+    )
+  })
+
+  it('o problema que nasce noutro caminho não é recusado', () => {
+    const v = { name: 'A', clan: 'brujah', courage: 2 }
+    const bought = { ...v, willpower: { permanent: 3, current: 3 } }
+    // a Coragem sobe e a FdV comprada fica abaixo do inicial novo
+    expect(
+      refuse(v20, bought, { ...bought, courage: 4 }, ['values.courage'])
+    ).toBeNull()
+    // trocar o Augúrio também não
+    const four = { permanent: 4, current: 4 }
+    expect(
+      refuse(
+        w20,
+        { ...AHROUN, auspice: 'galliard', rage: four },
+        { ...AHROUN, rage: four },
+        ['values.auspice']
+      )
+    ).toBeNull()
+    // sem os caminhos do toque (quem chama sem eles), o de antes
+    expect(refuse(w20, AHROUN, { ...AHROUN, rage: four }, [])).toBeNull()
+  })
+
+  it('o texto do problema diz o número e, com a ficha, a opção', () => {
+    const values = { ...AHROUN, rage: { permanent: 4, current: 4 } }
+    const check = checkOf(w20, values)
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (!p) throw new Error('sem o problema')
+    expect(problemText(w20, check, p, resolve(w20, { values }))).toBe(
+      'Fúria: abaixo de 5, o valor inicial (vem de Augúrio: Ahroun).'
+    )
+    expect(problemText(w20, check, p)).toBe(
+      'Fúria: abaixo de 5, o valor inicial (vem de Augúrio).'
+    )
+    expect(problemText(w20, null, p)).toBe('Fúria: abaixo do valor inicial.')
   })
 })

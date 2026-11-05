@@ -185,6 +185,8 @@ export function CreationPanel() {
   const { model, roles, store, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
   const phase = useSheetSelector(s => s.creationPhase)
+  // A origem do valor inicial ("vem de Augúrio: Ahroun", T-85)
+  const resolved = useSheetSelector(s => s.resolved)
   if (
     !creation?.active ||
     creation.status !== 'creating' ||
@@ -239,7 +241,7 @@ export function CreationPanel() {
               variant="caption"
               color={p.severity === 'blocking' ? 'danger' : 'inkMuted'}
             >
-              {problemText(model, check, p)}
+              {problemText(model, check, p, resolved)}
             </Text>
           ))}
         </View>

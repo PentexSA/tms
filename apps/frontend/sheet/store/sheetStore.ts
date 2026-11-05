@@ -492,7 +492,8 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         { before: shown(s.values, draftNow), after: r.sheet },
         { before: s.check, after: next.check },
         s.creation,
-        s.creationPhase
+        s.creationPhase,
+        events.map(e => e.path)
       )
       if (why)
         return {

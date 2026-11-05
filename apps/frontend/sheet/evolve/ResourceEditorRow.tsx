@@ -41,6 +41,7 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
     onChange: (n: number) => void
     blocked: string | null
     increase?: StepperIncrease
+    decrease?: StepperIncrease
   }[] = []
   if (def.permanent && r.permanent !== null)
     rows.push({
@@ -54,6 +55,8 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
       onChange: n => write('permanent', n),
       blocked: advance,
       increase: feedback.increase,
+      // Só o permanente tem valor inicial; o atual é de jogo (T-85)
+      decrease: feedback.decrease,
     })
   const storedMax =
     def.max && typeof def.max === 'object' && 'stored' in def.max
@@ -100,6 +103,7 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
                 onChange={row.onChange}
                 disabled={row.blocked !== null}
                 increase={row.increase}
+                decrease={row.decrease}
               />
             </View>
           ))}
