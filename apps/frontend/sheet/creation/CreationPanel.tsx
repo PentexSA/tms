@@ -8,6 +8,7 @@ import {
   TextField,
   tokens,
   useToast,
+  WithHelp,
 } from '@tms/ui'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
@@ -43,7 +44,6 @@ import {
   restam,
 } from './creation'
 import { CREATION_HELP } from './help'
-import { InlineHelp } from './InlineHelp'
 import { RadioChips } from './RadioChips'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
@@ -219,11 +219,7 @@ export function CreationPanel() {
       ) : null}
       {freebies ? (
         // O "?" dos pontos de bônus fica no rótulo do saldo (R-19, P10-D §3.7)
-        <InlineHelp
-          subject={CREATION_HELP.freebies.subject}
-          text={CREATION_HELP.freebies.text}
-          testID="freebies-help"
-        >
+        <WithHelp help={CREATION_HELP.freebies} testID="freebies-help">
           <Text
             testID="creation-freebies"
             color={freebies.remaining < 0 ? 'danger' : 'ink'}
@@ -232,7 +228,7 @@ export function CreationPanel() {
               ? `Bônus: ${-freebies.remaining} acima do saldo (${freebies.spent} de ${freebies.available + freebies.credit}).`
               : `${freebiesBalance(check)}.`}
           </Text>
-        </InlineHelp>
+        </WithHelp>
       ) : null}
       <Ledger />
       {problems.length ? (

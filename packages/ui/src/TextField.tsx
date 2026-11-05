@@ -7,7 +7,7 @@ import {
   type TextInputProps,
   View,
 } from 'react-native'
-import { HelpButton, HelpText, useHelp } from './HelpButton'
+import { type Help, WithHelp } from './HelpButton'
 import { hitTarget } from './metrics'
 import { Text } from './Text'
 import { textStyle, useTheme } from './theme'
@@ -21,7 +21,7 @@ export interface TextFieldProps
   readonly error?: string | null
   readonly hint?: string
   /** O "?" ao lado do rótulo, com a frase de ajuda abaixo dele (R-19). */
-  readonly help?: { readonly subject: string; readonly text: string }
+  readonly help?: Help | null
   // Mostra o contador "12/80" quando há maxLength.
   readonly counter?: boolean
   // Com o React 19 o ref é prop: quem chama foca o campo (T-21). O `...rest`
@@ -45,34 +45,13 @@ export function TextField({
   const theme = useTheme()
   const id = useId()
   const { colors } = theme
-  const helpState = useHelp()
-  const labelText = (
-    <Text
-      variant="fieldLabel"
-      nativeID={`${id}-label`}
-      style={help ? styles.labelText : undefined}
-    >
-      {label}
-    </Text>
-  )
   return (
     <View style={styles.root}>
-      {help ? (
-        <View style={styles.labelRow}>
-          {labelText}
-          <HelpButton
-            subject={help.subject}
-            expanded={helpState.expanded}
-            onToggle={helpState.toggle}
-            controls={helpState.textId}
-          />
-        </View>
-      ) : (
-        labelText
-      )}
-      {help && helpState.expanded ? (
-        <HelpText id={helpState.textId} text={help.text} />
-      ) : null}
+      <WithHelp help={help}>
+        <Text variant="fieldLabel" nativeID={`${id}-label`}>
+          {label}
+        </Text>
+      </WithHelp>
       <TextInput
         testID={testID}
         accessibilityLabel={label}
@@ -137,12 +116,6 @@ export function TextArea(props: TextFieldProps) {
 
 const styles = StyleSheet.create({
   root: { gap: tokens.space[1] },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.space[1],
-  },
-  labelText: { flexShrink: 1 },
   input: {
     borderWidth: tokens.borderWidth.control,
     borderRadius: tokens.radius.md,

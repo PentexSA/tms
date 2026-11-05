@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react-native'
 import { compileTemplate, type SheetData } from '@tms/sheet-core'
 import { modelOf, templateJson } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { blockHelp } from '../../layouts/groupHelp'
 
 // R-19 (P10-D): o "?" da ajuda do template nas linhas do Editar (e da
 // criação, que usa os mesmos editores). Só nesses modos: em Jogo e Leitura,
@@ -145,5 +146,60 @@ describe('Editar: o "?" no grupo e na opção (R-19)', () => {
     const m = withHelp()
     await renderLive({ model: m, sheet: nova }, fakeServer(m, nova).post)
     expect(screen.queryByTestId('group-help-physical')).toBeNull()
+  })
+})
+
+// Revisão (item 6): no bloco que o título nomeia, a frase do grupo e a da
+// lista aparecem juntas no mesmo "?", a do grupo primeiro; nenhuma se perde.
+describe('blockHelp: as duas frases do bloco', () => {
+  it('as duas, na ordem; a repetida sai; nenhuma, sem "?"', () => {
+    expect(blockHelp('Qualidades', 'Do grupo.', 'Da lista.')).toEqual({
+      subject: 'Qualidades',
+      text: 'Do grupo. Da lista.',
+    })
+    expect(blockHelp('X', 'Igual.', 'Igual.')?.text).toBe('Igual.')
+    expect(blockHelp('X', null, 'Da lista.')?.text).toBe('Da lista.')
+    expect(blockHelp('X', 'Do grupo.', undefined)?.text).toBe('Do grupo.')
+    expect(blockHelp('X', null, null)).toBeNull()
+  })
+})
+
+function withBlockHelp(system: string, section: string, group: string) {
+  const t = templateJson(system)
+  const s = (t.sections as Json[]).find(x => x.id === section)
+  const g = ((s?.groups ?? []) as Json[]).find(x => x.id === group)
+  if (g) g.help = 'Frase do grupo, do teste.'
+  return compileTemplate(t)
+}
+
+describe('Editar: o bloco com frase do grupo e da lista (R-19)', () => {
+  it('título do grupo que nomeia a lista: um "?" com as duas frases', async () => {
+    const m = withBlockHelp('vtm-v20', 'merits-flaws', 'merits')
+    await renderLive(
+      { model: m, sheet: nova, mode: 'evolve' },
+      fakeServer(m, nova).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const help = screen.getByTestId('group-help-merits')
+    expect(help.props.accessibilityLabel).toBe('Ajuda: Qualidades')
+    fireEvent.press(help)
+    const list = m.fields.get('merits')?.def.help ?? '-'
+    expect(screen.getByText(`Frase do grupo, do teste. ${list}`)).toBeTruthy()
+  })
+
+  it('título da seção que nomeia o bloco (echo): a frase do grupo não some', async () => {
+    const m = withBlockHelp('mta-m20', 'backgrounds', 'backgrounds')
+    const sheet: SheetData = {
+      values: { name: 'Nova', tradition: 'verbena' },
+      specialties: {},
+    }
+    await renderLive(
+      { model: m, sheet, mode: 'evolve' },
+      fakeServer(m, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByTestId('group-help-backgrounds'))
+    const list = m.fields.get('backgrounds')?.def.help ?? '-'
+    expect(screen.getByText(`Frase do grupo, do teste. ${list}`)).toBeTruthy()
   })
 })

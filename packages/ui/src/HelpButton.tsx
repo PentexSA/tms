@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useId, useState } from 'react'
-import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
+import { type ReactNode, useCallback, useEffect, useId, useState } from 'react'
+import {
+  AccessibilityInfo,
+  Platform,
+  type StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
 import { useTheme } from './theme'
@@ -73,33 +80,43 @@ export function HelpButton({
 export interface HelpTextProps {
   readonly id: string
   readonly text: string
+  /** Aberta: a frase aparece. Fechada: o contêiner fica montado e vazio. */
+  readonly expanded: boolean
   readonly testID?: string
+  readonly style?: StyleProp<ViewStyle>
 }
 
 /**
- * A frase expandida. Sempre texto puro, num Text: o template nunca desenha
- * HTML nem link. Ao aparecer, é anunciada: região viva no web e no Android;
- * no iOS, onde não há região viva, pelo announceForAccessibility.
+ * A região da frase. O contêiner fica sempre montado, vazio quando fechado,
+ * e só o conteúdo muda: a região viva já existe quando a frase entra, então
+ * o web e o Android a anunciam, e o `aria-controls` do botão sempre aponta
+ * um elemento que existe. No iOS, onde não há região viva, a frase é
+ * anunciada ao abrir. Fechado, o contêiner sai do fluxo (absoluto e sem
+ * tamanho), para não somar o `gap` do pai. Sempre texto puro, num Text: o
+ * template nunca desenha HTML nem link.
  */
-export function HelpText({ id, text, testID }: HelpTextProps) {
+export function HelpText({ id, text, expanded, testID, style }: HelpTextProps) {
   useEffect(() => {
-    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(text)
-  }, [text])
+    if (expanded && Platform.OS === 'ios')
+      AccessibilityInfo.announceForAccessibility(text)
+  }, [expanded, text])
   const os = Platform.OS
   return (
-    <Text
+    <View
       testID={testID}
       nativeID={id}
-      variant="caption"
-      color="inkMuted"
       {...(os === 'web' ? { 'aria-live': 'polite' as const } : {})}
       {...(os === 'android'
         ? { accessibilityLiveRegion: 'polite' as const }
         : {})}
-      style={styles.text}
+      style={expanded ? style : styles.closed}
     >
-      {text}
-    </Text>
+      {expanded ? (
+        <Text variant="caption" color="inkMuted" style={styles.text}>
+          {text}
+        </Text>
+      ) : null}
+    </View>
   )
 }
 
@@ -118,6 +135,64 @@ export function useHelp(): HelpState {
   return { expanded, toggle, textId }
 }
 
+/** A frase de ajuda de um nó: o nome do "?" e o texto. */
+export interface Help {
+  readonly subject: string
+  readonly text: string
+}
+
+export interface WithHelpProps {
+  /** Sem frase, só o conteúdo, sem "?". */
+  readonly help: Help | null | undefined
+  /** O rótulo, o botão da linha ou o título; vazio, só o "?". */
+  readonly children?: ReactNode
+  /** O conteúdo ocupa o resto da linha, e o "?" fica na ponta. */
+  readonly fill?: boolean
+  readonly testID?: string
+  readonly style?: StyleProp<ViewStyle>
+  /** Onde a frase aberta fica (o respiro lateral, por exemplo). */
+  readonly textStyle?: StyleProp<ViewStyle>
+}
+
+/**
+ * A composição de todo "?": [conteúdo][?] numa linha e, abaixo, a frase.
+ * O "?" é irmão do conteúdo, nunca filho dele: o nome do botão ou do rádio
+ * da linha não muda.
+ */
+export function WithHelp({
+  help,
+  children,
+  fill,
+  testID,
+  style,
+  textStyle,
+}: WithHelpProps) {
+  const state = useHelp()
+  if (!help) return <>{children}</>
+  return (
+    <View style={[styles.wrap, style]}>
+      <View style={styles.row}>
+        {children != null ? (
+          <View style={fill ? styles.fill : styles.shrink}>{children}</View>
+        ) : null}
+        <HelpButton
+          subject={help.subject}
+          expanded={state.expanded}
+          onToggle={state.toggle}
+          controls={state.textId}
+          testID={testID}
+        />
+      </View>
+      <HelpText
+        id={state.textId}
+        text={help.text}
+        expanded={state.expanded}
+        style={textStyle}
+      />
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
@@ -133,4 +208,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { flexShrink: 1 },
+  closed: { position: 'absolute', width: 0, height: 0, overflow: 'hidden' },
+  wrap: { gap: tokens.space[1] },
+  row: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[1] },
+  fill: { flex: 1 },
+  shrink: { flexShrink: 1 },
 })

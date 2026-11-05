@@ -27,7 +27,7 @@ import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
 import { ChipFlow } from './ChipFlow'
-import { GroupHelpLine, GroupTitle } from './groupHelp'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
@@ -127,11 +127,12 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             g.fieldIds,
             header ? g.title : echo ? section.def.title : null
           )
-          // A frase do grupo ou, no bloco que o título nomeia (T-58), a da lista
+          // A frase do grupo e, no bloco que o título nomeia (T-58), a da
+          // lista: com as duas, o "?" mostra as duas (blockHelp)
           const listDef = headed ? model.fields.get(headed)?.def : undefined
-          const listHelp =
-            listDef?.help && isDraftMode(mode) ? listDef.help : null
-          const help = (isDraftMode(mode) ? (g.help ?? null) : null) ?? listHelp
+          const draft = isDraftMode(mode)
+          const groupText = draft ? g.help : null
+          const listText = draft ? listDef?.help : null
           return (
             <GroupBlock
               key={g.id}
@@ -142,7 +143,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
                 <View style={styles.title}>
                   <GroupTitle
                     title={g.title}
-                    help={help}
+                    help={blockHelp(g.title, groupText, listText)}
                     testID={`group-help-${g.id}`}
                     right={
                       <CreationCounter fieldIds={g.fieldIds} items={headed} />
@@ -152,15 +153,18 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
               ) : g.title && !echo ? (
                 // Com abas, o "?" vai no topo do conteúdo da aba
                 <GroupHelpLine
-                  title={g.title}
-                  help={help}
+                  help={blockHelp(g.title, groupText, null)}
                   testID={`group-help-${g.id}`}
                 />
-              ) : echo && listDef ? (
-                // O título da seção nomeia a lista: o "?" da lista vem logo abaixo
+              ) : echo ? (
+                // O título da seção nomeia o bloco: o "?" vem logo abaixo, com
+                // a frase do grupo e a da lista
                 <GroupHelpLine
-                  title={listDef.label}
-                  help={listHelp}
+                  help={blockHelp(
+                    listDef?.label ?? section.def.title,
+                    groupText,
+                    listText
+                  )}
                   testID={`group-help-${g.id}`}
                 />
               ) : null}

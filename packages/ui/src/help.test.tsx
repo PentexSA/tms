@@ -33,9 +33,12 @@ function HelpHarness({ text = 'Frase do time.' }: { readonly text?: string }) {
         onToggle={toggle}
         controls={textId}
       />
-      {expanded ? (
-        <HelpText id={textId} text={text} testID="help-text" />
-      ) : null}
+      <HelpText
+        id={textId}
+        text={text}
+        expanded={expanded}
+        testID="help-text"
+      />
     </>
   )
 }
@@ -71,6 +74,32 @@ describe('HelpButton e HelpText', () => {
     expect(flat(helpButton()).minWidth).toBe(size)
   })
 
+  // Revisão: a região viva nasce vazia e fica montada; só o conteúdo muda.
+  // Montada junto com a frase, o leitor de tela não a anunciava, e o
+  // aria-controls apontava um id que não existia.
+  it('web: a região viva existe fechada, vazia, e o aria-controls a aponta', () => {
+    setOS('web')
+    render(<HelpHarness />)
+    const region = screen.getByTestId('help-text')
+    expect(region.props['aria-live']).toBe('polite')
+    expect(helpButton().props['aria-controls']).toBe(region.props.nativeID)
+    expect(screen.queryByText('Frase do time.')).toBeNull()
+    fireEvent.press(helpButton())
+    // O mesmo elemento, agora com a frase dentro
+    expect(screen.getByTestId('help-text')).toBe(region)
+    expect(within(region).getByText('Frase do time.')).toBeTruthy()
+    fireEvent.press(helpButton())
+    expect(screen.getByTestId('help-text')).toBe(region)
+    expect(within(region).queryByText('Frase do time.')).toBeNull()
+  })
+
+  it('fechada, a região sai do fluxo (não soma o gap do pai)', () => {
+    render(<HelpHarness />)
+    expect(flat(screen.getByTestId('help-text')).position).toBe('absolute')
+    fireEvent.press(helpButton())
+    expect(flat(screen.getByTestId('help-text')).position).toBeUndefined()
+  })
+
   it('web: aria-controls aponta a frase, que é região viva educada', () => {
     setOS('web')
     render(<HelpHarness />)
@@ -80,9 +109,12 @@ describe('HelpButton e HelpText', () => {
     expect(text.props['aria-live']).toBe('polite')
   })
 
-  it('Android: região viva e sem aria-controls', () => {
+  it('Android: região viva já montada, e sem aria-controls', () => {
     setOS('android')
     render(<HelpHarness />)
+    expect(screen.getByTestId('help-text').props.accessibilityLiveRegion).toBe(
+      'polite'
+    )
     fireEvent.press(helpButton())
     expect(screen.getByTestId('help-text').props.accessibilityLiveRegion).toBe(
       'polite'
@@ -190,18 +222,18 @@ describe('Choice com ajuda', () => {
     expect(screen.queryByRole('button', { name: 'Ajuda: Clã' })).toBeNull()
   })
 
-  it('com frase: 1 coluna abaixo de 480, 2 a partir de 480; sem frase: 2', () => {
+  // Revisão: sem medir a tela. A célula tem base de 240 e cresce: 1 coluna
+  // abaixo de 480, 2 a partir dela, sem o salto de 1 para 2 no onLayout
+  it('com frase, a grade é fluida (base 240); sem frase, a de 50%', () => {
     const { rerender } = render(
       <Choice label="X" options={MANY} value={null} onChange={jest.fn()} />
     )
-    fireEvent(screen.getByLabelText('X'), 'layout', {
-      nativeEvent: { layout: { width: 360 } },
+    expect(screen.getByLabelText('X').props.onLayout).toBeUndefined()
+    expect(flat(radio('Opção 1'))).toMatchObject({
+      flexGrow: 1,
+      flexBasis: 240,
     })
     expect(flat(radio('Opção 1')).width).toBeUndefined()
-    fireEvent(screen.getByLabelText('X'), 'layout', {
-      nativeEvent: { layout: { width: 600 } },
-    })
-    expect(flat(radio('Opção 1')).width).toBe('50%')
     rerender(
       <Choice
         label="X"
@@ -211,6 +243,15 @@ describe('Choice com ajuda', () => {
       />
     )
     expect(flat(radio('Opção 1')).width).toBe('50%')
+    expect(flat(radio('Opção 1')).flexBasis).toBeUndefined()
+  })
+
+  it('em 1 coluna, nem grade nem base, com ou sem frase', () => {
+    render(
+      <Choice label="X" options={WITH_HELP} value={null} onChange={jest.fn()} />
+    )
+    expect(flat(radio('Tremere')).flexBasis).toBeUndefined()
+    expect(flat(radio('Tremere')).width).toBeUndefined()
   })
 })
 

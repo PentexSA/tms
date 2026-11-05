@@ -6,7 +6,7 @@ import { useSheet } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
 import { DENSE_GRID_MAX, DenseCells } from '../views/dense'
-import { GroupHelpLine, GroupTitle } from './groupHelp'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -41,15 +41,22 @@ export function GridLayout({ section }: LayoutProps) {
                 <View style={styles.title}>
                   <GroupTitle
                     title={g.title}
-                    help={isDraftMode(mode) ? (g.help ?? null) : null}
+                    help={blockHelp(
+                      g.title,
+                      isDraftMode(mode) ? g.help : null,
+                      null
+                    )}
                     testID={`group-help-${g.id}`}
                     right={<CreationCounter fieldIds={g.fieldIds} />}
                   />
                 </View>
               ) : g.title ? (
                 <GroupHelpLine
-                  title={g.title}
-                  help={isDraftMode(mode) ? (g.help ?? null) : null}
+                  help={blockHelp(
+                    g.title,
+                    isDraftMode(mode) ? g.help : null,
+                    null
+                  )}
                   testID={`group-help-${g.id}`}
                 />
               ) : null}
@@ -100,8 +107,7 @@ export function GridLayout({ section }: LayoutProps) {
             </Text>
             {/* O título é visual; o "?" diz de qual grupo é a frase */}
             <GroupHelpLine
-              title={g.title}
-              help={isDraftMode(mode) ? (g.help ?? null) : null}
+              help={blockHelp(g.title, isDraftMode(mode) ? g.help : null, null)}
               testID={`group-help-${g.id}`}
               inset={false}
             />

@@ -2,8 +2,6 @@ import { type ListItem, type ResolvedList, stored } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
-  HelpButton,
-  HelpText,
   Pressable,
   Stepper,
   type StepperIncrease,
@@ -11,8 +9,8 @@ import {
   TextArea,
   TextField,
   tokens,
-  useHelp,
   useTheme,
+  WithHelp,
 } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
@@ -197,29 +195,16 @@ function EditorListHeader({
   readonly list: ResolvedList
   readonly sheet: FieldViewProps['sheet']
 }) {
-  const state = useHelp()
-  const help = fieldHelp(list.field.def)
-  if (!help) return <ListHeader resolved={list} sheet={sheet} />
   return (
-    <View>
-      <View style={styles.headerRow}>
-        <View style={styles.flex}>
-          <ListHeader resolved={list} sheet={sheet} />
-        </View>
-        <HelpButton
-          subject={help.subject}
-          expanded={state.expanded}
-          onToggle={state.toggle}
-          controls={state.textId}
-          testID={`editor-${list.id}-help`}
-        />
-      </View>
-      {state.expanded ? (
-        <View style={styles.headerHelp}>
-          <HelpText id={state.textId} text={help.text} />
-        </View>
-      ) : null}
-    </View>
+    <WithHelp
+      help={fieldHelp(list.field.def)}
+      fill
+      testID={`editor-${list.id}-help`}
+      style={styles.headerRow}
+      textStyle={styles.headerHelp}
+    >
+      <ListHeader resolved={list} sheet={sheet} />
+    </WithHelp>
   )
 }
 
@@ -552,11 +537,7 @@ function ItemSheet({
 
 const styles = StyleSheet.create({
   wrap: { width: '100%' },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: tokens.layout.gutter,
-  },
+  headerRow: { paddingRight: tokens.layout.gutter },
   headerHelp: { paddingHorizontal: tokens.layout.gutter },
   row: {
     flexDirection: 'row',

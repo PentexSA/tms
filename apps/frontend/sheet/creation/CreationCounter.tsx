@@ -4,7 +4,7 @@ import {
   plural,
   short,
 } from '@tms/sheet-core'
-import { Text, tokens } from '@tms/ui'
+import { Text, tokens, WithHelp } from '@tms/ui'
 import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
@@ -13,7 +13,6 @@ import type { FieldEntry } from '../store/sheetStore'
 import { useCreation } from './CreationContext'
 import { counterSpoken, counterText, findGroup, groupFor } from './creation'
 import { CREATION_HELP } from './help'
-import { InlineHelp } from './InlineHelp'
 import { RadioChips } from './RadioChips'
 import { usePriorityChoice } from './usePriorityChoice'
 
@@ -60,16 +59,16 @@ export function CreationCounter({
   const over = group.budget !== null && group.extra > 0
   const counter =
     pickable && group.budget === null ? (
-      <InlineHelp
-        subject={CREATION_HELP.priority.subject}
-        text={CREATION_HELP.priority.text}
+      // Ao lado do título do grupo, a frase não espreme o título
+      <WithHelp
+        help={CREATION_HELP.priority}
         testID={`priority-help-${group.id}`}
-        narrow={!line}
+        style={line ? undefined : styles.narrow}
       >
         <Text variant="caption" color="action">
           Prioridade
         </Text>
-      </InlineHelp>
+      </WithHelp>
     ) : (
       <Text
         variant="caption"
@@ -132,6 +131,7 @@ function PriorityPicker({
 }
 
 const styles = StyleSheet.create({
+  narrow: { maxWidth: 220, alignItems: 'flex-end' },
   row: {
     flexShrink: 1,
     flexDirection: 'row',

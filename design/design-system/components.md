@@ -133,15 +133,17 @@ O "?" da ajuda contextual (R-19, D-11): uma frase curta do template, expandida n
 
   ```ts
   type HelpButtonProps = { subject: string; expanded: boolean; onToggle(): void; controls?: string }
-  type HelpTextProps = { id: string; text: string }
+  type HelpTextProps = { id: string; text: string; expanded: boolean }
+  type Help = { subject: string; text: string }
+  type WithHelpProps = { help: Help | null; children?: ReactNode; fill?: boolean; style?; textStyle? }
   function useHelp(): { expanded: boolean; toggle(): void; textId: string }
   ```
-  O `Choice` (`help` no grupo e em cada opção) e o `TextField` (`help: { subject, text }`) já montam o par. Para a linha que põe o "?" ao lado do rótulo e a frase embaixo, use o `useHelp`.
+  O `WithHelp` é a composição de todo "?": [conteúdo][?] numa linha e, abaixo, a frase (`fill` estica o conteúdo e põe o "?" na ponta). O `Choice` (`help` no grupo e em cada opção) e o `TextField` (`help: Help`) já o usam. O `useHelp` com o `HelpButton` e o `HelpText` fica para quem põe a frase longe do "?" (a linha do Editar, com a frase na largura da linha).
 - **Alvo:** o do `Pressable` (44, 48 no Android), com o glifo "?" num círculo de 22. Borda `border-control`; aberto, borda e glifo `action`.
-- **A11y:** nome "Ajuda: <nome do campo ou da opção>", papel `button`, `aria-expanded` (web) e `accessibilityState.expanded` (app), `aria-controls` no web. A frase é `caption`/`ink-muted`, anunciada ao abrir: `aria-live="polite"` no web, `accessibilityLiveRegion="polite"` no Android e `announceForAccessibility` no iOS.
+- **A11y:** nome "Ajuda: <nome do campo ou da opção>", papel `button`, `aria-expanded` (web) e `accessibilityState.expanded` (app), `aria-controls` no web. A frase é `caption`/`ink-muted`, numa região viva **sempre montada**, vazia quando fechada (fora do fluxo, sem somar o `gap`), em que só o conteúdo muda: assim ela é anunciada ao abrir (`aria-live="polite"` no web, `accessibilityLiveRegion="polite"` no Android), e o `aria-controls` sempre aponta um elemento que existe. No iOS, `announceForAccessibility` ao abrir.
   - **Fora do controle:** o "?" é irmão do rádio ou do botão da linha, nunca filho. Botão dentro de rádio não é aceito pelo ARIA, e no app seria um alvo dentro de outro. O nome do rádio não muda.
   - **Teclado:** cada "?" é uma parada de Tab. No `Choice`, as setas continuam só nos rádios (o foco itinerante não passa pelos "?").
-- **Colunas do `Choice`:** com frase em alguma opção, 2 colunas só com 480 ou mais de largura medida; abaixo, 1 coluna.
+- **Colunas do `Choice`:** com frase em alguma opção, a célula tem base de 240 e cresce (`flexBasis`, sem medir a tela): 2 colunas a partir de 480 de largura, 1 abaixo, sem salto.
 - **Onde aparece:** na criação, no Editar e na Nova ficha. Em Leitura e Jogo, as folhas de detalhe já mostram o `help`.
 - **Multi-sistema:** o mesmo "?" em qualquer template. Nó sem frase não mostra "?", então um template sem frase fica igual. O texto é sempre texto puro, nunca HTML nem link.
 

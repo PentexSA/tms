@@ -1,4 +1,12 @@
-import { HelpButton, HelpText, Text, tokens, useHelp, useTheme } from '@tms/ui'
+import {
+  type Help,
+  HelpButton,
+  HelpText,
+  Text,
+  tokens,
+  useHelp,
+  useTheme,
+} from '@tms/ui'
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -73,8 +81,12 @@ export function EditorShell({
         </View>
         {children}
       </View>
-      {help && helpState.expanded ? (
-        <HelpText id={helpState.textId} text={help.text} />
+      {help ? (
+        <HelpText
+          id={helpState.textId}
+          text={help.text}
+          expanded={helpState.expanded}
+        />
       ) : null}
       {below}
     </View>
@@ -101,10 +113,7 @@ const styles = StyleSheet.create({
 })
 
 /** A frase de ajuda de uma linha: o nome do "?" e o texto do template. */
-export interface FieldHelp {
-  readonly subject: string
-  readonly text: string
-}
+export type FieldHelp = Help
 
 /** A ajuda do campo, se o template tiver frase (campo sem frase não mostra "?"). */
 export function fieldHelp(def: {
