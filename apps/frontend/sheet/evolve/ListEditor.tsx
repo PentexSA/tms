@@ -16,6 +16,7 @@ import {
   TextField,
   tokens,
   useTheme,
+  WithHelp,
 } from '@tms/ui'
 import { type ReactNode, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
@@ -31,6 +32,7 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
+import { fieldHelp, nameHelp } from './help'
 import {
   useClassNote,
   useDraftNotice,
@@ -170,7 +172,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   )
   return (
     <View testID={`editor-${list.id}`} style={styles.wrap}>
-      {headed ? null : <ListHeader resolved={list} sheet={sheet} />}
+      {headed ? null : <EditorListHeader list={list} sheet={sheet} />}
       {blocked && def.item.value ? (
         <Text variant="caption" color="inkMuted" style={styles.empty}>
           {blocked}
@@ -259,6 +261,29 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
         />
       ) : null}
     </View>
+  )
+}
+
+// O cabeçalho da lista no Editar e na criação, com o "?" da frase do campo
+// (R-19) ao lado. Quando o título do bloco já nomeia a lista (T-58), o "?" vai
+// nele (layouts/groupHelp.tsx).
+function EditorListHeader({
+  list,
+  sheet,
+}: {
+  readonly list: ResolvedList
+  readonly sheet: FieldViewProps['sheet']
+}) {
+  return (
+    <WithHelp
+      help={fieldHelp(list.field.def)}
+      fill
+      testID={`editor-${list.id}-help`}
+      style={styles.headerRow}
+      textStyle={styles.headerHelp}
+    >
+      <ListHeader resolved={list} sheet={sheet} />
+    </WithHelp>
   )
 }
 
@@ -446,29 +471,33 @@ function AddItemSheet({
     const labels = identity.recommended.get(name) ?? []
     const secondary = [...metasOf(name), ...labels]
     const spoken = [name, ...secondary, ...(taken ? ['já na ficha'] : [])]
+    // O "?" da opção à direita do selo (R-19; onda-4.md §4.4): irmão do
+    // botão, que não muda de nome
     return (
       <View key={name}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={spoken.join(', ')}
-          disabled={taken}
-          onPress={() => pick(name, `option:${name}`)}
-          style={styles.option}
-        >
-          <View style={styles.flex}>
-            <Text>{name}</Text>
-            {secondary.length ? (
+        <WithHelp help={nameHelp(def.catalogHelp, name)} fill>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={spoken.join(', ')}
+            disabled={taken}
+            onPress={() => pick(name, `option:${name}`)}
+            style={styles.option}
+          >
+            <View style={styles.flex}>
+              <Text>{name}</Text>
+              {secondary.length ? (
+                <Text variant="caption" color="inkMuted">
+                  {secondary.join(' · ')}
+                </Text>
+              ) : null}
+            </View>
+            {taken ? (
               <Text variant="caption" color="inkMuted">
-                {secondary.join(' · ')}
+                já na ficha
               </Text>
             ) : null}
-          </View>
-          {taken ? (
-            <Text variant="caption" color="inkMuted">
-              já na ficha
-            </Text>
-          ) : null}
-        </Pressable>
+          </Pressable>
+        </WithHelp>
         {noticeAt(`option:${name}`)}
       </View>
     )
@@ -713,6 +742,12 @@ function ItemSheet({
   // até o próximo ajuste (T-19)
   const notice = useListNotice(list)
   const title = itemTitle(list, item) || def.itemLabel
+  // A frase do item: a do item fixo ou a do nome no catálogo (R-19), pelo
+  // nome do rascunho (acompanha a edição) e sem acento nem caixa, como a busca
+  // e o selo; no aspecto, o título é o texto
+  const fixedHelp =
+    def.fixed?.find(x => x.id === item.id)?.help ??
+    nameHelp(def.catalogHelp, itemTitle(list, draft))?.text
   const patch = (p: Partial<Mutable<ListItem>>) => {
     notice.clear()
     setDraft(d => ({ ...d, ...p }))
@@ -765,6 +800,13 @@ function ItemSheet({
           </>
         ) : (
           <>
+            {/* A frase do item fixo (R-19): quem abriu a folha já pediu o item,
+                então ela vai como texto, sem "?" */}
+            {fixedHelp ? (
+              <Text variant="caption" color="inkMuted" testID="item-help">
+                {fixedHelp}
+              </Text>
+            ) : null}
             {def.fixed || schema.aspect ? (
               <TextField
                 label={def.itemLabel}
@@ -831,6 +873,8 @@ function ItemSheet({
 
 const styles = StyleSheet.create({
   wrap: { width: '100%' },
+  headerRow: { paddingRight: tokens.layout.gutter },
+  headerHelp: { paddingHorizontal: tokens.layout.gutter },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

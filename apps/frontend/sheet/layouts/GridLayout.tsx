@@ -1,11 +1,12 @@
 import { type CompiledGroup, isDraftMode } from '@tms/sheet-core'
-import { SectionHeader, Text, tokens, useLayout } from '@tms/ui'
+import { Text, tokens, useLayout } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { contentWidthOf } from '../contentWidth'
 import { useSheet } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { FieldSlot } from '../FieldSlot'
 import { DENSE_GRID_MAX, DenseCells } from '../views/dense'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import type { LayoutProps } from './types'
 
@@ -38,12 +39,26 @@ export function GridLayout({ section }: LayoutProps) {
               {/* Com abas, o título do grupo é a própria aba */}
               {g.title && !tabs.tabbed ? (
                 <View style={styles.title}>
-                  <SectionHeader
+                  <GroupTitle
                     title={g.title}
-                    level="group"
+                    help={blockHelp(
+                      g.title,
+                      isDraftMode(mode) ? g.help : null,
+                      null
+                    )}
+                    testID={`group-help-${g.id}`}
                     right={<CreationCounter fieldIds={g.fieldIds} />}
                   />
                 </View>
+              ) : g.title ? (
+                <GroupHelpLine
+                  help={blockHelp(
+                    g.title,
+                    isDraftMode(mode) ? g.help : null,
+                    null
+                  )}
+                  testID={`group-help-${g.id}`}
+                />
               ) : null}
               {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
               {tabs.tabbed && !tabs.inStrip ? (
@@ -90,6 +105,12 @@ export function GridLayout({ section }: LayoutProps) {
             >
               {g.title}
             </Text>
+            {/* O título é visual; o "?" diz de qual grupo é a frase */}
+            <GroupHelpLine
+              help={blockHelp(g.title, isDraftMode(mode) ? g.help : null, null)}
+              testID={`group-help-${g.id}`}
+              inset={false}
+            />
             <View style={styles.counter}>
               <CreationCounter fieldIds={g.fieldIds} />
             </View>

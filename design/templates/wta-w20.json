@@ -4,7 +4,7 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.6.0",
+  "templateVersion": "1.7.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
@@ -43,15 +43,33 @@
   "fields": {
     "name": { "type": "text", "label": "Nome", "maxLength": 80 },
     "deedName": { "type": "text", "label": "Nome de feito", "maxLength": 80 },
-    "concept": { "type": "text", "label": "Conceito", "maxLength": 80 },
+    "concept": {
+      "type": "text",
+      "label": "Conceito",
+      "maxLength": 80,
+      "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+    },
     "breed": {
       "type": "choice",
       "label": "Raça",
       "options": [
-        { "id": "hominideo", "label": "Hominídeo" },
-        { "id": "impuro", "label": "Impuro" },
-        { "id": "lupino", "label": "Lupino" }
-      ]
+        {
+          "id": "hominideo",
+          "label": "Hominídeo",
+          "help": "Nasceu humano e cresceu entre pessoas. Entende a cidade melhor que o mato."
+        },
+        {
+          "id": "impuro",
+          "label": "Impuro",
+          "help": "Filho de dois pais da mesma espécie. Carrega uma deformidade desde o nascimento."
+        },
+        {
+          "id": "lupino",
+          "label": "Lupino",
+          "help": "Nasceu lobo e aprendeu a forma humana depois. Entende o mato melhor que a cidade."
+        }
+      ],
+      "help": "A forma em que o personagem nasceu: humana, lobo ou mestiça. Muda a Gnose inicial e os Dons à mão."
     },
     "auspice": {
       "type": "choice",
@@ -62,55 +80,111 @@
           "id": "ragabash",
           "label": "Ragabash",
           "meta": "lua nova",
-          "glyphParam": 0
+          "glyphParam": 0,
+          "help": "Nasceu na lua nova: o questionador e trapaceiro, que testa as regras do grupo."
         },
         {
           "id": "theurge",
           "label": "Theurge",
           "meta": "lua crescente",
-          "glyphParam": 0.25
+          "glyphParam": 0.25,
+          "help": "Nasceu na lua crescente: o místico, que lida com os espíritos."
         },
         {
           "id": "philodox",
           "label": "Philodox",
           "meta": "meia-lua",
-          "glyphParam": 0.5
+          "glyphParam": 0.5,
+          "help": "Nasceu na meia-lua: o juiz, que busca o equilíbrio e guarda a tradição."
         },
         {
           "id": "galliard",
           "label": "Galliard",
           "meta": "lua gibosa",
-          "glyphParam": 0.75
+          "glyphParam": 0.75,
+          "help": "Nasceu na lua gibosa: o contador de histórias, que guarda a memória do grupo."
         },
         {
           "id": "ahroun",
           "label": "Ahroun",
           "meta": "lua cheia",
-          "glyphParam": 1
+          "glyphParam": 1,
+          "help": "Nasceu na lua cheia: o guerreiro, que vai à frente na luta."
         }
-      ]
+      ],
+      "help": "A fase da lua no nascimento, que define o papel no grupo. Muda a Fúria inicial e os Dons à mão."
     },
     "tribe": {
       "type": "choice",
       "label": "Tribo",
       "options": [
-        { "id": "furias-negras", "label": "Fúrias Negras" },
-        { "id": "roedores-de-ossos", "label": "Roedores de Ossos" },
-        { "id": "filhos-de-gaia", "label": "Filhos de Gaia" },
-        { "id": "fianna", "label": "Fianna" },
-        { "id": "crias-de-fenris", "label": "Crias de Fenris" },
-        { "id": "andarilhos-do-asfalto", "label": "Andarilhos do Asfalto" },
-        { "id": "garras-vermelhas", "label": "Garras Vermelhas" },
-        { "id": "senhores-das-sombras", "label": "Senhores das Sombras" },
-        { "id": "peregrinos-silenciosos", "label": "Peregrinos Silenciosos" },
-        { "id": "presas-de-prata", "label": "Presas de Prata" },
+        {
+          "id": "furias-negras",
+          "label": "Fúrias Negras",
+          "help": "Tribo quase só de mulheres, protetoras dos lugares selvagens."
+        },
+        {
+          "id": "roedores-de-ossos",
+          "label": "Roedores de Ossos",
+          "help": "Tribo dos que vivem à margem, entre os pobres e esquecidos das cidades."
+        },
+        {
+          "id": "filhos-de-gaia",
+          "label": "Filhos de Gaia",
+          "help": "Tribo de curandeiros e pacificadores, que busca a união entre as tribos."
+        },
+        {
+          "id": "fianna",
+          "label": "Fianna",
+          "help": "Tribo de bardos e guerreiros de origem celta, amantes de festas e histórias."
+        },
+        {
+          "id": "crias-de-fenris",
+          "label": "Crias de Fenris",
+          "help": "Tribo de guerreiros de origem nórdica, que valoriza a força e a batalha."
+        },
+        {
+          "id": "andarilhos-do-asfalto",
+          "label": "Andarilhos do Asfalto",
+          "help": "Tribo adaptada à cidade e à tecnologia."
+        },
+        {
+          "id": "garras-vermelhas",
+          "label": "Garras Vermelhas",
+          "help": "Tribo de lupinos que rejeita a humanidade e defende a natureza."
+        },
+        {
+          "id": "senhores-das-sombras",
+          "label": "Senhores das Sombras",
+          "help": "Tribo ambiciosa e disciplinada, que busca o poder e a liderança."
+        },
+        {
+          "id": "peregrinos-silenciosos",
+          "label": "Peregrinos Silenciosos",
+          "help": "Tribo de viajantes e mensageiros, sem um lar fixo."
+        },
+        {
+          "id": "presas-de-prata",
+          "label": "Presas de Prata",
+          "help": "Tribo nobre, de linhagens antigas, que por tradição lidera as outras."
+        },
         {
           "id": "observadores-das-estrelas",
-          "label": "Observadores das Estrelas"
+          "label": "Observadores das Estrelas",
+          "help": "Tribo de místicos e filósofos, voltada à meditação e ao equilíbrio."
         },
-        { "id": "uktena", "label": "Uktena" },
-        { "id": "wendigo", "label": "Wendigo" }
-      ]
+        {
+          "id": "uktena",
+          "label": "Uktena",
+          "help": "Tribo de místicos, ligada a segredos e a espíritos antigos."
+        },
+        {
+          "id": "wendigo",
+          "label": "Wendigo",
+          "help": "Tribo de guerreiros ligada aos povos originários da América do Norte."
+        }
+      ],
+      "help": "A sociedade a que o personagem pertence. Muda a Força de Vontade inicial e os Dons à mão."
     },
     "rank": {
       "type": "rating",
@@ -124,7 +198,8 @@
         "3": "Adren",
         "4": "Athro",
         "5": "Ancião"
-      }
+      },
+      "help": "A posição na sociedade. Começa em 1 e sobe com o Renome. Dom acima do Posto pede a confirmação do narrador."
     },
     "sept": { "type": "text", "label": "Seita", "maxLength": 80 },
     "totem": { "type": "text", "label": "Totem da matilha", "maxLength": 60 },
@@ -472,7 +547,8 @@
       },
       "editableIn": ["play"],
       "defaultAction": "spend1",
-      "colorRole": "accent"
+      "colorRole": "accent",
+      "help": "A raiva do lobo. Dá ações extras e ajuda a mudar de forma. Começa no valor do Augúrio e, na criação, não fica abaixo dele."
     },
     "gnosis": {
       "type": "resource",
@@ -488,7 +564,7 @@
       "editableIn": ["play"],
       "defaultAction": "spend1",
       "colorRole": "alt-warm",
-      "help": "Recurso par da Fúria: cor quase neutra e preenchimento hachurado, para nunca depender só da cor."
+      "help": "A ligação com o mundo espiritual. Usada em Dons, em fetiches e para atravessar ao outro lado. Começa pela Raça."
     },
     "willpower": {
       "type": "resource",
@@ -517,7 +593,8 @@
         }
       },
       "editableIn": ["play"],
-      "defaultAction": "spend1"
+      "defaultAction": "spend1",
+      "help": "Determinação. Gastar um ponto garante um sucesso numa rolagem ou ajuda a resistir a um impulso. Começa pela Tribo."
     },
     "glory": {
       "type": "resource",
@@ -590,7 +667,8 @@
           { "id": "source", "type": "text", "label": "Origem" }
         ],
         "notes": true
-      }
+      },
+      "help": "Poderes ensinados pelos espíritos. Os da Raça, do Augúrio e da Tribo aparecem primeiro; o Posto mostra o nível."
     },
     "rites": {
       "type": "list",
@@ -655,7 +733,20 @@
         "Ritos",
         "Totem",
         "Raça Pura"
-      ]
+      ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Ancestrais": "A memória dos antepassados, que o personagem pode chamar para pedir conselho ou habilidade.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Fetiche": "Um objeto com um espírito dentro, que o personagem já tem no começo. O nível é o do fetiche.",
+        "Parentes": "Humanos e lobos da família que sabem do segredo e ajudam o personagem.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Ritos": "Ritos que o personagem já conhece no começo. Cada ponto vale um nível de rito.",
+        "Totem": "O espírito protetor da matilha. Os pontos dos membros se somam para o totem.",
+        "Raça Pura": "Sangue de linhagem antiga e reconhecida. Os outros da espécie reagem com mais respeito."
+      },
+      "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
     "battleScars": {
       "type": "list",
@@ -745,17 +836,20 @@
         {
           "id": "physical",
           "title": "Físicos",
-          "fields": ["strength", "dexterity", "stamina"]
+          "fields": ["strength", "dexterity", "stamina"],
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
         },
         {
           "id": "social",
           "title": "Sociais",
-          "fields": ["charisma", "manipulation", "appearance"]
+          "fields": ["charisma", "manipulation", "appearance"],
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
         },
         {
           "id": "mental",
           "title": "Mentais",
-          "fields": ["perception", "intelligence", "wits"]
+          "fields": ["perception", "intelligence", "wits"],
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
         }
       ]
     },
@@ -786,7 +880,8 @@
             "primalUrge",
             "streetwise",
             "subterfuge"
-          ]
+          ],
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
         },
         {
           "id": "skills",
@@ -802,7 +897,8 @@
             "performance",
             "stealth",
             "survival"
-          ]
+          ],
+          "help": "Habilidades aprendidas com treino ou com um ofício."
         },
         {
           "id": "knowledges",
@@ -818,7 +914,8 @@
             "rituals",
             "science",
             "technology"
-          ]
+          ],
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
         }
       ]
     },
@@ -832,7 +929,8 @@
         {
           "id": "renown",
           "title": "Renome",
-          "fields": ["glory", "honor", "wisdom"]
+          "fields": ["glory", "honor", "wisdom"],
+          "help": "Glória, Honra e Sabedoria: a fama que o personagem ganha. O permanente começa pelo Augúrio."
         }
       ]
     },

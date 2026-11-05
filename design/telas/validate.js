@@ -44,6 +44,8 @@ const REGISTRY = {
   budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
   capRules: ['creation-cap', 'hard-cap'],
   costRules: ['flat', 'per-current', 'item-meta', 'credit'],
+  // Avisos da criação que não bloqueiam (README §14, creation.advice)
+  creationAdvice: ['item-meta-max'],
   optionEffects: ['flag', 'choice', 'bounded-number'],
 }
 
@@ -63,11 +65,11 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions'],
-    longText: ['maxLength', 'placeholder'],
-    choice: ['options', 'glyph'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'suggestionHelp', 'default'],
+    longText: ['maxLength', 'placeholder', 'default'],
+    choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
-    list: ['itemLabel', 'item', 'catalog', 'searchable', 'density', 'fixed', 'rollAs'],
+    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'catalogHelp', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
   },
   section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'groupTabs', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
   roll: ['model', 'label', 'die', 'dice', 'slots', 'difficulty', 'penalty', 'specialty', 'boosts', 'presets', 'advantage', 'target', 'conditions', 'bonusDice', 'ladder'],
@@ -186,7 +188,8 @@ function targetKind(f) {
 }
 
 const ACCOUNTING_KEYS = {
-  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked'],
+  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked', 'advice'],
+  advice: ['rule', 'targets', 'meta', 'max'],
   budget: {
     'priority-budget': ['id', 'label', 'rule', 'budgets', 'groups'],
     'fixed-budget': ['id', 'label', 'rule', 'budget', 'targets'],
@@ -537,6 +540,60 @@ function checkAccounting(t, c) {
       else if (tracked(id))
         err('creation.untracked', `campo '${id}' já está na conta da criação`)
     }
+  // Avisos que não bloqueiam (D-07): o meta numérico de itens de lista
+  const advice = creation.advice === undefined ? [] : objs('creation.advice', creation.advice, 20)
+  for (const [i, a] of advice.entries()) {
+    const p = `creation.advice.${i}`
+    keys(p, a, ACCOUNTING_KEYS.advice)
+    if (!REGISTRY.creationAdvice.includes(a.rule)) err(`${p}.rule`, `regra '${a.rule}' fora da lista fechada`)
+    let min = -NUM_LIMIT
+    let max = NUM_LIMIT
+    for (const id of targets(`${p}.targets`, a.targets, ['items'])) {
+      const m = asArray(rec(field(id)?.item)?.meta).map(rec).find(x => x?.id === a.meta)
+      if (m?.type !== 'number') {
+        err(`${p}.meta`, `'${id}' não tem meta numérico '${a.meta}'`)
+        continue
+      }
+      if (typeof m.min === 'number') min = Math.max(min, m.min)
+      if (typeof m.max === 'number') max = Math.min(max, m.max)
+    }
+    required(`${p}.max`, a.max, min, max)
+  }
+}
+
+// Regras só da publicação (R-19): a ajuda é de uma linha e sem link, nos nós de $defs/helpText e
+// $defs/helpShort do schema.json. O mesmo publicationIssues do core (validate/publication.ts).
+function publicationIssues(t) {
+  const errors = []
+  const isObjL = v => typeof v === 'object' && v !== null && !Array.isArray(v)
+  const objs = v => (Array.isArray(v) ? v.filter(isObjL) : [])
+  const check = (path, v) => {
+    if (typeof v !== 'string') return
+    if (/[\t\n\r]/.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda em uma linha só`)
+    if (/:\/\/|www\./i.test(v)) errors.push(`${t?.system ?? '?'} ${path}: ajuda com link (://, www.): a frase é texto puro`)
+  }
+  if (!isObjL(t)) return errors
+  for (const [id, f] of Object.entries(isObjL(t.fields) ? t.fields : {})) {
+    if (!isObjL(f)) continue
+    const p = `fields.${id}`
+    check(`${p}.help`, f.help)
+    for (const o of objs(f.options)) {
+      if (f.type === 'state') check(`${p}.options.${o.id}.note`, o.note)
+      if (f.type === 'state' || f.type === 'choice') check(`${p}.options.${o.id}.help`, o.help)
+    }
+    if (f.type === 'list') {
+      for (const x of objs(f.fixed)) check(`${p}.fixed.${x.id}.help`, x.help)
+      for (const [name, v] of Object.entries(isObjL(f.catalogHelp) ? f.catalogHelp : {})) check(`${p}.catalogHelp.${name}`, v)
+    }
+    if (f.type === 'text') for (const [name, v] of Object.entries(isObjL(f.suggestionHelp) ? f.suggestionHelp : {})) check(`${p}.suggestionHelp.${name}`, v)
+    if (f.type === 'resource') for (const a of objs(f.actions)) check(`${p}.actions.${a.id}.help`, a.help)
+  }
+  for (const s of objs(t.sections)) for (const g of objs(s.groups)) check(`sections.${s.id}.groups.${g.id}.help`, g.help)
+  for (const pr of objs(isObjL(t.roll) ? t.roll.presets : [])) check(`roll.presets.${pr.id}.help`, pr.help)
+  for (const a of objs(t.actions)) check(`actions.${a.id}.help`, a.help)
+  for (const o of objs(t.options)) check(`options.${o.id}.help`, o.help)
+  for (const r of objs(t.recoveries)) check(`recoveries.${r.id}.help`, r.help)
+  return errors
 }
 
 function validateTemplate(t, palette) {
@@ -547,6 +604,20 @@ function validateTemplate(t, palette) {
     if (typeof v !== 'string' || !v.length) return err(path, 'texto obrigatório')
     if (v.length > max) err(path, `texto acima de ${max} caracteres`)
     if (!isSafeText(v)) err(path, 'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML')
+  }
+  // Ajuda (campo, opção, grupo, item fixo): texto puro, com o limite do nó. O "sem link" e a
+  // linha única ficam em publicationIssues, como no core.
+  const help = (path, v, max) => text(path, v, max)
+  // A frase por nome (catálogo, sugestões): só nomes que a lista tem (o mesmo helpMap do core)
+  const helpMap = (path, v, names, max) => {
+    if (!isObj(v)) return err(path, 'precisa ser objeto')
+    const entries = Object.entries(v)
+    if (!entries.length || entries.length > max) err(path, `de 1 a ${max} nomes`)
+    const known = new Set(names)
+    for (const [name, phrase] of entries.slice(0, max)) {
+      if (!known.has(name)) err(path, `'${name}' não está na lista`)
+      help(`${path}.${name}`, phrase, 200)
+    }
   }
   const oneOf = (path, v, list, what) => {
     if (!list.includes(v)) err(path, `${what} '${v}' fora da lista fechada`)
@@ -583,6 +654,48 @@ function validateTemplate(t, palette) {
     }
   }
   const accentOk = v => v === 'accent-neutral' || palette.includes(v)
+  const field = id => (has(id) ? rec(fields[id]) : undefined)
+  // Lista opcional de objetos: ausente vale vazia; item que não é objeto é erro e fica de fora
+  const objsOf = (path, v) => {
+    if (v == null) return []
+    if (!Array.isArray(v)) { err(path, 'precisa ser lista'); return [] }
+    return v.flatMap((x, i) => { if (isObj(x)) return [x]; err(`${path}.${i}`, 'precisa ser objeto'); return [] })
+  }
+  // Mapa de opção de um choice: chaves que existem, de 1 a 100 entradas
+  const optionMap = (path, from, map) => {
+    const choice = field(from)
+    if (choice?.type !== 'choice') { err(`${path}.from`, `campo '${from}' não é um choice`); return [] }
+    const m = rec(map)
+    if (!m) { err(`${path}.map`, 'precisa ser objeto'); return [] }
+    const entries = Object.entries(m)
+    if (!entries.length || entries.length > 100) err(`${path}.map`, 'de 1 a 100 opções')
+    const options = asArray(choice.options).map(o => rec(o)?.id)
+    for (const [k] of entries) if (!options.includes(k)) err(`${path}.map.${k}`, `opção '${k}' não existe em '${from}'`)
+    return entries.slice(0, 100)
+  }
+  // `recommend` (lista ou choice): nomes do catálogo ou ids de opção do campo
+  const recommend = (p, f) => {
+    if (f.recommend == null) return
+    const path = `${p}.recommend`
+    keys(path, f.recommend, ['outside', 'by'])
+    const r = rec(f.recommend)
+    if (!r) return
+    text(`${path}.outside`, r.outside, 60)
+    const by = objsOf(`${path}.by`, r.by)
+    if (!by.length || by.length > 4) err(`${path}.by`, 'de 1 a 4 fontes')
+    const allowed = f.type === 'list' ? asArray(f.catalog) : asArray(f.options).map(o => rec(o)?.id)
+    for (const [i, s] of by.slice(0, 4).entries()) {
+      const sp = `${path}.by.${i}`
+      keys(sp, s, ['from', 'label', 'map'])
+      text(`${sp}.label`, s.label, 24)
+      for (const [k, names] of optionMap(sp, s.from, s.map)) {
+        if (!Array.isArray(names) || !names.length || names.length > 200) { err(`${sp}.map.${k}`, 'lista de 1 a 200 entradas'); continue }
+        if (new Set(names).size !== names.length) err(`${sp}.map.${k}`, 'entrada repetida')
+        for (const n of names)
+          if (!allowed.includes(n)) err(`${sp}.map.${k}`, f.type === 'list' ? `'${n}' não está no catálogo` : `opção '${n}' não existe`)
+      }
+    }
+  }
 
   // Toda string do template, em qualquer profundidade, é texto puro e limitada.
   const walk = (path, v, depth = 0) => {
@@ -610,7 +723,7 @@ function validateTemplate(t, palette) {
     keys(p, f, [...KEYS.fieldCommon, ...(KEYS.field[f.type] ?? [])])
     text(`${p}.label`, f.label)
     if (f.shortLabel) text(`${p}.shortLabel`, f.shortLabel, 16)
-    if (f.help) text(`${p}.help`, f.help, 400)
+    if (f.help) help(`${p}.help`, f.help, 400)
     for (const m of f.editableIn ?? []) oneOf(`${p}.editableIn`, m, REGISTRY.modes, 'modo')
     if (f.colorRole) oneOf(`${p}.colorRole`, f.colorRole, REGISTRY.colorRoles, 'colorRole')
     if (f.defaultAction) oneOf(`${p}.defaultAction`, f.defaultAction, REGISTRY.defaultActions, 'defaultAction')
@@ -628,8 +741,23 @@ function validateTemplate(t, palette) {
           err(`${p}.suggestions`, 'sugestão repetida')
       }
     }
+    if (f.type === 'text' && f.suggestionHelp != null) helpMap(`${p}.suggestionHelp`, f.suggestionHelp, Array.isArray(f.suggestions) ? f.suggestions : [], 100)
     if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
-    else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
+    else if (f.type === 'text' || f.type === 'longText') {
+      // Texto por opção de um choice (a Fraqueza pelo Clã), uma linha cada
+      if (f.default != null) {
+        const d = rec(f.default)
+        if (!d) err(`${p}.default`, 'precisa ser objeto { from, map }')
+        else {
+          keys(`${p}.default`, d, ['from', 'map'])
+          const max = Math.min(typeof f.maxLength === 'number' ? f.maxLength : f.type === 'text' ? 200 : 4000, 400)
+          for (const [k, v] of optionMap(`${p}.default`, d.from, d.map)) {
+            text(`${p}.default.map.${k}`, v, max)
+            if (typeof v === 'string' && /[\t\n\r]/.test(v)) err(`${p}.default.map.${k}`, 'uma linha só')
+          }
+        }
+      }
+    } else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
     if (f.spendLabel) text(`${p}.spendLabel`, f.spendLabel, 24)
     if (f.gainLabel) text(`${p}.gainLabel`, f.gainLabel, 24)
     if (f.type === 'rating') {
@@ -703,6 +831,7 @@ function validateTemplate(t, palette) {
     if (f.type === 'state') {
       for (const o of f.options ?? []) {
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
         for (const m of o.modifiers ?? []) {
           if (!has(m.field)) err(`${p}.options.${o.id}.modifiers`, `campo '${m.field}' não existe`)
           oneOf(`${p}.options.${o.id}.modifiers.op`, m.op, REGISTRY.modifierOps, 'op')
@@ -716,15 +845,43 @@ function validateTemplate(t, palette) {
       if (!own(t.markStates, f.states)) err(`${p}.states`, `conjunto '${f.states}' não declarado em markStates`)
       if (f.bonus) { oneOf(`${p}.bonus.derive`, f.bonus.derive, REGISTRY.derive, 'derive'); if (!has(f.bonus.ability)) err(`${p}.bonus.ability`, 'campo não existe') }
     }
+    if (f.type === 'choice' || f.type === 'list') recommend(p, f)
     if (['choice', 'tags'].includes(f.type)) {
-      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label) }
+      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label); if (f.type === 'choice' && o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200) }
       for (const o of f.options ?? []) if (o.roll) oneOf(`${p}.options.${o.id}.roll`, o.roll, REGISTRY.conditionRoll, 'roll')
       if (f.glyph) oneOf(`${p}.glyph`, f.glyph, REGISTRY.glyphs, 'glyph')
     }
     if (f.type === 'list') {
       for (const c of f.catalog ?? []) text(`${p}.catalog`, c, 80)
+      for (const x of f.fixed ?? []) if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
+      if (f.catalogHelp != null) helpMap(`${p}.catalogHelp`, f.catalogHelp, Array.isArray(f.catalog) ? f.catalog : [], 200)
       for (const m of f.item?.meta ?? []) text(`${p}.item.meta.${m.id}.label`, m.label)
       if (f.item?.value) { num(`${p}.item.value.min`, f.item.value.min, 0, 10); num(`${p}.item.value.max`, f.item.value.max, 1, 10) }
+      // O meta inicial de nomes do catálogo (o Posto de cada Dom)
+      if (f.catalogDefaults != null) {
+        const defaults = objsOf(`${p}.catalogDefaults`, f.catalogDefaults)
+        if (!defaults.length || defaults.length > 10) err(`${p}.catalogDefaults`, 'de 1 a 10 entradas')
+        const catalog = asArray(f.catalog)
+        const metas = asArray(rec(f.item)?.meta).map(rec)
+        const seen = new Map()
+        for (const [i, d] of defaults.slice(0, 10).entries()) {
+          const dp = `${p}.catalogDefaults.${i}`
+          keys(dp, d, ['meta', 'value', 'items'])
+          const m = metas.find(x => x?.id === d.meta)
+          if (m?.type !== 'number') { err(`${dp}.meta`, `meta numérico '${d.meta}' não existe no item`); continue }
+          if (d.value == null) err(`${dp}.value`, 'obrigatório')
+          else num(`${dp}.value`, d.value, typeof m.min === 'number' ? m.min : -NUM_LIMIT, typeof m.max === 'number' ? m.max : NUM_LIMIT)
+          const names = d.items
+          if (!Array.isArray(names) || !names.length || names.length > 200) { err(`${dp}.items`, 'lista de 1 a 200 nomes'); continue }
+          const done = seen.get(d.meta) ?? new Set()
+          seen.set(d.meta, done)
+          for (const n of names) {
+            if (!catalog.includes(n)) err(`${dp}.items`, `'${n}' não está no catálogo`)
+            if (done.has(n)) err(`${dp}.items`, `'${n}' já tem valor de '${d.meta}'`)
+            done.add(n)
+          }
+        }
+      }
     }
   }
 
@@ -742,7 +899,7 @@ function validateTemplate(t, palette) {
     num(`${p}.columns`, s.columns, 1, 6)
     num(`${p}.minColWidth`, s.minColWidth, 120, 600)
     const ids = [...(s.fields ?? []), ...(s.groups ?? []).flatMap(g => g.fields)]
-    for (const g of s.groups ?? []) text(`${p}.groups.${g.id}.title`, g.title)
+    for (const g of s.groups ?? []) { text(`${p}.groups.${g.id}.title`, g.title); if (g.help != null) help(`${p}.groups.${g.id}.help`, g.help, 200) }
     for (const id of ids) if (!has(id)) err(`${p}`, `campo '${id}' não existe`)
     if (s.filter) { oneOf(`${p}.filter.rule`, s.filter.rule, REGISTRY.filterRules, 'filtro'); text(`${p}.filter.label`, s.filter.label) }
     if (s.badge && !has(s.badge.field)) err(`${p}.badge`, `campo '${s.badge.field}' não existe`)

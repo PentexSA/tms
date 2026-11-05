@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
+import { WithHelp } from './HelpButton'
 import { Pressable } from './Pressable'
 import { useRovingFocus } from './roving'
 import { Text } from './Text'
@@ -12,6 +13,8 @@ export interface ChoiceOption {
   readonly meta?: string
   // Nome acessível por extenso, quando o meta usa abreviações ("For 7").
   readonly spoken?: string
+  /** Frase curta de ajuda da opção: um "?" ao lado do rádio (R-19). */
+  readonly help?: string
 }
 
 export interface ChoiceProps {
@@ -29,10 +32,15 @@ export interface ChoiceProps {
   readonly showLabel?: boolean
   /** Todas as opções sem toque (por exemplo, com um pedido em andamento). */
   readonly disabled?: boolean
+  /** Frase de ajuda do grupo: um "?" na linha do título (R-19). */
+  readonly help?: string
 }
 
 // A partir daqui a lista vira grade, para não rolar uma coluna longa
 const GRID_FROM = 8
+// Com "?" nas opções, a célula tem base de 240 (o "?" ocupa 44/48): duas
+// cabem a partir de 480
+const GRID_WITH_HELP_CELL = 240
 
 /**
  * Escolha única: radiogroup com um radio marcado (Clã, Natureza...).
@@ -55,10 +63,15 @@ export function Choice({
   columns = options.length >= GRID_FROM ? 2 : 1,
   showLabel = true,
   disabled = false,
+  help,
 }: ChoiceProps) {
   const { colors } = useTheme()
   const titleId = `${useId()}-choice-label`
   const grid = columns === 2
+  // Com "?" nas opções, a célula tem base de 240 e cresce: 2 colunas a partir
+  // de 480 de largura, 1 abaixo, sem medir a tela nem saltar de 1 para 2
+  const fluid = grid && options.some(o => o.help)
+  const cell = fluid ? styles.fluidCell : grid ? styles.cell : undefined
   const os = Platform.OS
   const roving = useRovingFocus({
     count: options.length,
@@ -75,7 +88,7 @@ export function Choice({
     >
       {options.map((o, i) => {
         const checked = o.id === value
-        return (
+        const radio = (
           <Pressable
             key={o.id}
             {...roving(i)}
@@ -86,7 +99,7 @@ export function Choice({
             aria-checked={checked}
             disabled={disabled}
             onPress={() => onChange(o.id)}
-            style={[styles.row, grid && styles.cell]}
+            style={[styles.row, !o.help && cell]}
           >
             <View
               style={[
@@ -110,19 +123,33 @@ export function Choice({
             </View>
           </Pressable>
         )
+        // A opção com frase: [rádio (flex 1)][?] e, abaixo, a frase
+        if (!o.help) return radio
+        return (
+          <WithHelp
+            key={o.id}
+            help={{ subject: o.label, text: o.help }}
+            fill
+            style={cell}
+          >
+            {radio}
+          </WithHelp>
+        )
       })}
     </View>
   )
   if (!showLabel) return group
   return (
     <View style={styles.root}>
-      <Text
-        variant="fieldLabel"
-        nativeID={titleId}
-        {...(os === 'android' ? { 'aria-hidden': true } : {})}
-      >
-        {label}
-      </Text>
+      <WithHelp help={help ? { subject: label, text: help } : null}>
+        <Text
+          variant="fieldLabel"
+          nativeID={titleId}
+          {...(os === 'android' ? { 'aria-hidden': true } : {})}
+        >
+          {label}
+        </Text>
+      </WithHelp>
       {group}
     </View>
   )
@@ -134,6 +161,12 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 0 },
   // 50% menos o respiro, para o rótulo não colar na coluna ao lado
   cell: { width: '50%', paddingRight: tokens.space[2] },
+  // Com "?": base de 240 (o "?" ocupa 44/48), crescendo até a linha toda
+  fluidCell: {
+    flexGrow: 1,
+    flexBasis: GRID_WITH_HELP_CELL,
+    paddingRight: tokens.space[2],
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

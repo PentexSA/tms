@@ -51,6 +51,8 @@ export interface CompiledField<F extends FieldDef = FieldDef> {
 export interface CompiledGroup {
   readonly id: string
   readonly title: string
+  // A frase de ajuda do grupo (R-19), se o template tiver
+  readonly help?: string
   readonly fieldIds: readonly FieldId[]
 }
 
@@ -217,6 +219,7 @@ const compileGroup = (g: SectionGroup): CompiledGroup =>
   Object.freeze({
     id: g.id,
     title: g.title,
+    ...(g.help ? { help: g.help } : {}),
     fieldIds: Object.freeze([...g.fields]),
   })
 

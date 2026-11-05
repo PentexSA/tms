@@ -21,7 +21,9 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   await page.getByRole('button', { name: 'Nova ficha' }).click()
 
   await page.getByLabel('Nome (obrigatório)').fill('Helena Varga')
-  await page.getByLabel('Conceito').fill('Arquivista da Capela')
+  await page
+    .getByLabel('Conceito', { exact: true })
+    .fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
   await expect(page.getByRole('radio', { name: 'Tremere' })).toBeChecked()
   // A Geração não está no formulário: sai do antecedente, em Editar

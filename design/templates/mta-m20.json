@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.6.0",
+  "templateVersion": "1.7.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
@@ -37,36 +37,115 @@
   },
   "fields": {
     "name": { "type": "text", "label": "Nome", "maxLength": 80 },
-    "concept": { "type": "text", "label": "Conceito", "maxLength": 80 },
+    "concept": {
+      "type": "text",
+      "label": "Conceito",
+      "maxLength": 80,
+      "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+    },
     "tradition": {
       "type": "choice",
       "label": "Tradição",
       "options": [
-        { "id": "ordem-de-hermes", "label": "Ordem de Hermes" },
-        { "id": "coro-celestial", "label": "Coro Celestial" },
-        { "id": "culto-do-extase", "label": "Culto do Êxtase" },
-        { "id": "eutanatos", "label": "Eutanatos" },
-        { "id": "irmandade-akashica", "label": "Irmandade Akáshica" },
-        { "id": "sonhadores", "label": "Sonhadores (Kha'vadi)" },
-        { "id": "verbena", "label": "Verbena" },
-        { "id": "filhos-do-eter", "label": "Sociedade do Éter" },
-        { "id": "virtualidade", "label": "Adeptos da Virtualidade" },
-        { "id": "orfao", "label": "Órfão" }
-      ]
+        {
+          "id": "ordem-de-hermes",
+          "label": "Ordem de Hermes",
+          "help": "Magos de fórmulas, rituais e hierarquia, organizados em Casas."
+        },
+        {
+          "id": "coro-celestial",
+          "label": "Coro Celestial",
+          "help": "Magos da fé, que veem a magia como expressão do divino."
+        },
+        {
+          "id": "culto-do-extase",
+          "label": "Culto do Êxtase",
+          "help": "Magos da experiência e dos sentidos, que buscam a magia no êxtase."
+        },
+        {
+          "id": "eutanatos",
+          "label": "Eutanatos",
+          "help": "Magos da vida e da morte, ligados ao ciclo e ao destino."
+        },
+        {
+          "id": "irmandade-akashica",
+          "label": "Irmandade Akáshica",
+          "help": "Magos da disciplina do corpo e da mente, das artes marciais e da meditação."
+        },
+        {
+          "id": "sonhadores",
+          "label": "Sonhadores (Kha'vadi)",
+          "help": "Magos dos espíritos e dos sonhos, ligados a tradições xamânicas."
+        },
+        {
+          "id": "verbena",
+          "label": "Verbena",
+          "help": "Magos da natureza, do sangue e da vida, herdeiros da bruxaria antiga."
+        },
+        {
+          "id": "filhos-do-eter",
+          "label": "Sociedade do Éter",
+          "help": "Magos da ciência estranha, de invenções e teorias que a ciência comum rejeita."
+        },
+        {
+          "id": "virtualidade",
+          "label": "Adeptos da Virtualidade",
+          "help": "Magos da informação e da tecnologia digital."
+        },
+        {
+          "id": "orfao",
+          "label": "Órfão",
+          "help": "Mago sem Tradição. Não tem Esfera da Tradição sugerida."
+        }
+      ],
+      "help": "O grupo de magos e a sua maneira de entender a magia. Sugere a Esfera de afinidade."
     },
     "essence": {
       "type": "choice",
       "label": "Essência",
       "options": [
-        { "id": "dinamica", "label": "Essência Dinâmica" },
-        { "id": "padrao", "label": "Essência Padrão" },
-        { "id": "primordial", "label": "Essência Primordial" },
-        { "id": "questionadora", "label": "Essência Questionadora" }
-      ]
+        {
+          "id": "dinamica",
+          "label": "Essência Dinâmica",
+          "help": "Avatar que busca mudança, movimento e novidade."
+        },
+        {
+          "id": "padrao",
+          "label": "Essência Padrão",
+          "help": "Avatar que busca ordem, estabilidade e permanência."
+        },
+        {
+          "id": "primordial",
+          "label": "Essência Primordial",
+          "help": "Avatar ligado às origens, aos ciclos e ao que é antigo."
+        },
+        {
+          "id": "questionadora",
+          "label": "Essência Questionadora",
+          "help": "Avatar inquieto, que busca algo que nem sempre sabe nomear."
+        }
+      ],
+      "help": "A natureza do Avatar, a parte mágica do personagem. Diz o que move a busca dele."
     },
-    "house": { "type": "text", "label": "Casa", "maxLength": 60 },
-    "nature": { "type": "text", "label": "Natureza", "maxLength": 40 },
-    "demeanor": { "type": "text", "label": "Comportamento", "maxLength": 40 },
+    "house": {
+      "type": "text",
+      "label": "Casa ou subgrupo",
+      "maxLength": 60,
+      "placeholder": "Opcional",
+      "help": "Uma facção dentro da Tradição. É opcional: deixe em branco se a Tradição não tiver uma ou se o personagem não fizer parte."
+    },
+    "nature": {
+      "type": "text",
+      "label": "Natureza",
+      "maxLength": 40,
+      "help": "Quem o personagem é por dentro. Agir de acordo com ela, na mesa, pode devolver Força de Vontade."
+    },
+    "demeanor": {
+      "type": "text",
+      "label": "Comportamento",
+      "maxLength": 40,
+      "help": "A máscara que o personagem mostra aos outros. Pode ser diferente da Natureza."
+    },
     "quote": { "type": "text", "label": "Citação", "maxLength": 160 },
 
     "strength": {
@@ -344,7 +423,7 @@
       "label": "Arete",
       "min": 1,
       "max": 10,
-      "help": "Limita todas as Esferas. Baixar o Arete não apaga as Esferas: as que ficarem acima ficam inativas e voltam quando o Arete sobe."
+      "help": "O domínio geral da magia: nenhuma Esfera passa do Arete, que vai até 3 na criação. Baixar o Arete deixa as Esferas acima inativas, sem apagar."
     },
     "affinity": {
       "type": "choice",
@@ -379,7 +458,8 @@
             }
           }
         ]
-      }
+      },
+      "help": "A Esfera mais natural para o personagem, em geral ligada à Tradição."
     },
     "correspondence": {
       "type": "rating",
@@ -460,7 +540,24 @@
         "Nodo",
         "Recursos",
         "Sonho"
-      ]
+      ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Avatar": "A força do Avatar, a parte mágica do personagem. Define a Quintessência inicial.",
+        "Biblioteca": "Livros, arquivos e fontes de estudo à mão do mago.",
+        "Capela": "Um refúgio dividido com outros magos, com recursos e proteção.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Destino": "Um grande propósito ligado ao personagem, que às vezes o ajuda no último momento.",
+        "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+        "Familiar": "Um espírito num corpo de animal, ligado ao mago.",
+        "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+        "Maravilha": "Um objeto mágico que o mago já tem no começo.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Nodo": "Um lugar de poder que gera Quintessência para o mago.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Sonho": "Acesso a saberes que o mago nunca estudou, vindos do Avatar."
+      },
+      "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
 
     "rotes": {
@@ -478,7 +575,7 @@
       "permanent": { "min": 1, "max": 10, "default": 5 },
       "editableIn": ["play"],
       "defaultAction": "spend1",
-      "help": "Permanente limita o temporário. O permanente só muda em Evoluir."
+      "help": "Determinação: gastar um ponto garante um sucesso ou ajuda a resistir a um impulso. O permanente limita o temporário e só muda em Evoluir."
     },
     "wheel": {
       "type": "clock",
@@ -529,12 +626,23 @@
       ]
     },
 
-    "paradigm": { "type": "longText", "label": "Paradigma", "maxLength": 600 },
-    "practice": { "type": "text", "label": "Prática", "maxLength": 80 },
+    "paradigm": {
+      "type": "longText",
+      "label": "Paradigma",
+      "maxLength": 600,
+      "help": "No que o mago acredita sobre como o mundo funciona. Escreva com as suas palavras."
+    },
+    "practice": {
+      "type": "text",
+      "label": "Prática",
+      "maxLength": 80,
+      "help": "O jeito como o mago faz magia: ritual, ciência, oração, arte."
+    },
     "instruments": {
       "type": "longText",
       "label": "Instrumentos",
-      "maxLength": 600
+      "maxLength": 600,
+      "help": "Os objetos e gestos que o mago usa para fazer magia, de acordo com a Prática."
     },
     "resonance": {
       "type": "list",
@@ -645,17 +753,20 @@
         {
           "id": "physical",
           "title": "Físicos",
-          "fields": ["strength", "dexterity", "stamina"]
+          "fields": ["strength", "dexterity", "stamina"],
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
         },
         {
           "id": "social",
           "title": "Sociais",
-          "fields": ["charisma", "manipulation", "appearance"]
+          "fields": ["charisma", "manipulation", "appearance"],
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
         },
         {
           "id": "mental",
           "title": "Mentais",
-          "fields": ["perception", "intelligence", "wits"]
+          "fields": ["perception", "intelligence", "wits"],
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
         }
       ]
     },
@@ -687,7 +798,8 @@
             "leadership",
             "streetwise",
             "subterfuge"
-          ]
+          ],
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
         },
         {
           "id": "skills",
@@ -704,7 +816,8 @@
             "stealth",
             "survival",
             "technology"
-          ]
+          ],
+          "help": "Habilidades aprendidas com treino ou com um ofício."
         },
         {
           "id": "knowledges",
@@ -721,7 +834,8 @@
             "occult",
             "politics",
             "science"
-          ]
+          ],
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
         }
       ]
     },
@@ -750,7 +864,8 @@
             "prime",
             "spirit",
             "time"
-          ]
+          ],
+          "help": "Os campos da realidade que o mago sabe mudar. Cada Esfera vai de 0 a 5 e não passa do Arete."
         }
       ]
     },
