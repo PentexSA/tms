@@ -109,6 +109,31 @@ describe('V20', () => {
     expect(r.freebies?.spent).toBe(2 + 2 + 7 + 4)
   })
 
+  // P07-D: a tela avisa "fora do clã" e mostra o custo da Qualidade, mas a
+  // conta da criação continua a mesma (o servidor repete esta função).
+  it('Disciplina fora do clã fecha a criação como uma do clã', () => {
+    const outside = creation(vtm, {
+      ...BRUJAH,
+      disciplines: [
+        { id: 'd1', name: 'Dominação', value: 2 },
+        { id: 'd2', name: 'Auspícios', value: 1 },
+      ],
+    })
+    expect(outside).toEqual(creation(vtm, BRUJAH))
+  })
+
+  it('Qualidade: o Custo sai dos bônus, item a item', () => {
+    const r = creation(vtm, {
+      ...BRUJAH,
+      merits: [
+        { id: 'm1', name: 'Um', meta: { kind: 'Físico', cost: 2 } },
+        { id: 'm2', name: 'Dois', meta: { kind: 'Social', cost: 3 } },
+      ],
+    })
+    expect(r.problems).toEqual([])
+    expect(r.freebies?.spent).toBe(5)
+  })
+
   it('Habilidade acima de 3 só com bônus', () => {
     const r = creation(vtm, { ...BRUJAH, alertness: 4 })
     expect(r.problems).toEqual([])
