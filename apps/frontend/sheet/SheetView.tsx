@@ -78,7 +78,7 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
 // template). Aba sem seção legível some.
 //
-// Na criação por pontos, a conta ganha uma aba própria (Orçamento), depois
+// Na criação por pontos, a conta ganha uma aba própria (Pontos), depois
 // das da ficha: a distribuição fica nas abas, a conta não empurra a ficha.
 //
 // Em Jogo, no celular (compact), o "Em jogo" vira o CombatDock fixo embaixo;
@@ -210,7 +210,7 @@ function SheetBody({
   const [tab, setTab] = useState<string>(zones[0]?.id ?? 'build')
   const mode = useStore(store, s => s.mode)
   const creating = useCreating()
-  // T-33: a conta (aba Orçamento) também em Leitura, para o narrador na ficha
+  // T-33: a conta (aba Pontos) também em Leitura, para o narrador na ficha
   // alheia em criação por pontos; o que é de edição (o aviso de bônus, as
   // recusas e as "Regras da casa") continua só na Criação
   const narrator = roles.includes('storyteller') && !roles.includes('owner')
@@ -223,7 +223,7 @@ function SheetBody({
     : (zones.find(z => z.id === tab) ?? zones[0])
   const tabs = [
     ...zones.map(z => ({ id: z.id, label: z.label ?? z.id })),
-    ...(budget ? [{ id: BUDGET_TAB, label: 'Orçamento' }] : []),
+    ...(budget ? [{ id: BUDGET_TAB, label: 'Pontos' }] : []),
   ]
   // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
   // conteúdo fica num contêiner comum, sem papel de painel
@@ -273,7 +273,7 @@ function SheetBody({
     },
     [groupTabs.store]
   )
-  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  // "Ver Pontos" nos avisos da recusa (T-07): só com a aba Pontos
   const openBudget = useMemo(
     () => (budget ? () => showTab(BUDGET_TAB) : null),
     [budget, showTab]

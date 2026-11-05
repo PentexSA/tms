@@ -126,7 +126,7 @@ async function open(values?: Record<string, unknown>, options: Options = {}) {
     <SheetScreen id={ID} initialMode="create" />,
     session
   )
-  // A criação livre não tem a aba Orçamento
+  // A criação livre não tem a aba Pontos
   fireEvent.press(await screen.findByRole('tab', { name: 'Vantagens' }))
   return view
 }
@@ -142,7 +142,7 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
     expect(
       within(screen.getByTestId('editor-flaws')).getByText('Bônus 1')
     ).toBeTruthy()
-    tab('Orçamento')
+    tab('Pontos')
     // O crédito do Defeito entra no saldo (15 + 1), nada gasto
     expect(screen.getByTestId('creation-freebies')).toHaveTextContent(
       /\b16 de 16\b/
@@ -161,7 +161,7 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
     expect(
       screen.queryByRole('button', { name: 'Adicionar “Ambidestro”' })
     ).toBeNull()
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-freebies')).toHaveTextContent(
       /\b14 de 15\b/
     )
@@ -314,7 +314,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
 
   it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
     await open(THREE)
-    tab('Orçamento')
+    tab('Pontos')
     fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
     tab('Ficha')
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))

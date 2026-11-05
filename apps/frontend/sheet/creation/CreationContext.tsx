@@ -26,7 +26,7 @@ export const useCreation = (): CreationContextValue | null =>
   useContext(CreationContext)
 
 /**
- * "Ver orçamento" (T-07): leva à aba Orçamento, onde a fase é escolhida. A
+ * "Ver Pontos" (T-07): leva à aba Pontos, onde a fase é escolhida. A
  * tela da ficha o passa ao SheetProvider só quando a aba existe (Criação por
  * pontos em `creating`); sem ele, o aviso não oferece o atalho.
  */

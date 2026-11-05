@@ -2,6 +2,7 @@ import {
   Banner,
   BottomSheet,
   Button,
+  Pressable,
   SectionHeader,
   Stepper,
   Text,
@@ -20,8 +21,9 @@ import {
   useSaveCreation,
 } from '../../lib/queries/creation'
 import { useSheet, useSheetSelector } from '../context'
+import { useAnchor } from '../layouts/anchor'
 import { CompletionMessage } from './CompletionMessage'
-import { useCreation } from './CreationContext'
+import { useCreation, useGuideNav } from './CreationContext'
 import {
   completionBy,
   completionCopy,
@@ -38,16 +40,17 @@ import {
   freebieLedger,
   freebiesBalance,
   freebiesNotes,
-  problemText,
   REFUSAL_TEXT,
   restam,
 } from './creation'
+import { useGuideItems } from './GuideRow'
+import { confirmNote, type GuideItem, useCreationNotices } from './guide'
 import { CLOSED_COPY } from './nextStep'
 import { RadioChips } from './RadioChips'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
 // a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
-// Orçamento (CreationPanel), e a barra (ModeBar) tem "Salvar" sempre e, com
+// Pontos (CreationPanel), e a barra (ModeBar) tem "Salvar" sempre e, com
 // a conta fechada, a conclusão ao lado (D-01). As prioridades ficam no
 // cabeçalho de cada grupo (CreationCounter). Concluir exige rede, rascunho
 // salvo e a fila confirmada: a conclusão nunca confirma escolhas ainda locais.
@@ -60,7 +63,7 @@ const PHASES: readonly {
   { id: 'freebies', label: 'Pontos de bônus' },
 ]
 
-/** A criação por pontos em `creating`: a aba Orçamento e o botão concluir. */
+/** A criação por pontos em `creating`: a aba Pontos e o botão concluir. */
 export function useCreating(): boolean {
   const creation = useCreation()
   return Boolean(
@@ -81,7 +84,12 @@ export function useFreebiesText(): string | null {
  */
 export function useFreebiesNotes(): readonly string[] {
   const left = useSheetSelector(s => completionFreebies(s.check))
-  return useMemo(() => freebiesNotes(left), [left])
+  // Os avisos que não bloqueiam (P05-D §3.9): uma linha, como a sobra
+  const confirm = useCreationNotices().length
+  return useMemo(() => {
+    const note = confirmNote(confirm)
+    return note ? [...freebiesNotes(left), note] : freebiesNotes(left)
+  }, [left, confirm])
 }
 
 /**
@@ -180,12 +188,16 @@ export function CreationAlerts() {
   )
 }
 
-/** A aba Orçamento: o que os pontos gastam, o saldo e o que falta. */
+/** A aba Pontos: o que os pontos gastam, o saldo e o que falta. */
 export function CreationPanel() {
   const creation = useCreation()
-  const { model, roles, store, mode } = useSheet()
+  const { roles, store, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
   const phase = useSheetSelector(s => s.creationPhase)
+  const missing = useGuideItems()
+  const notices = useCreationNotices()
+  // O "ir ao grupo" (P05-D): o painel e os blocos dele são âncoras
+  const panel = useAnchor('creation-panel', { focusable: false })
   if (
     !creation?.active ||
     creation.status !== 'creating' ||
@@ -194,10 +206,14 @@ export function CreationPanel() {
   )
     return null
   const storyteller = roles.has('storyteller')
-  const { problems, freebies } = check
+  const { freebies } = check
 
   return (
-    <View style={styles.panel} testID="creation-panel">
+    <View
+      style={styles.panel}
+      testID="creation-panel"
+      onLayout={panel.onLayout}
+    >
       {freebies ? (
         <View style={styles.block}>
           <RadioChips
@@ -212,7 +228,7 @@ export function CreationPanel() {
           <Text variant="caption" color="inkMuted">
             {phase === 'basics'
               ? 'Cada grupo trava quando os pontos básicos acabam. Depois, passe para os pontos de bônus.'
-              : 'Passar do orçamento de um grupo usa os pontos de bônus, até o saldo acabar.'}
+              : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
           </Text>
         </View>
       ) : null}
@@ -227,23 +243,14 @@ export function CreationPanel() {
         </Text>
       ) : null}
       <Ledger />
-      {problems.length ? (
-        <View
-          style={styles.block}
-          accessibilityLabel="O que falta na criação"
+      {missing.length ? (
+        <GuideList
+          anchor="creation-missing"
+          title="O que falta"
+          label="O que falta na criação"
+          items={missing}
           testID="creation-problems"
-        >
-          <SectionHeader title="O que falta" level="group" />
-          {problems.slice(0, 12).map(p => (
-            <Text
-              key={`${p.code}:${p.budget ?? ''}:${p.group ?? ''}:${p.paths.join(',')}`}
-              variant="caption"
-              color={p.severity === 'blocking' ? 'danger' : 'inkMuted'}
-            >
-              {problemText(model, check, p)}
-            </Text>
-          ))}
-        </View>
+        />
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
           {freebies && freebies.remaining > 0
@@ -251,8 +258,68 @@ export function CreationPanel() {
             : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
+      {notices.length ? (
+        <GuideList
+          anchor="creation-confirm"
+          title="Para confirmar com o narrador"
+          label="Para confirmar com o narrador"
+          items={notices}
+          testID="creation-notices"
+        />
+      ) : null}
       {/* As "Regras da casa" gravam: só na Criação, nunca na Leitura (T-33) */}
       {storyteller && mode === 'create' ? <BudgetControls /> : null}
+    </View>
+  )
+}
+
+/**
+ * Uma lista do guia na aba Pontos: cada item é um botão que leva ao grupo
+ * (P05-D, R-18). O que impede salvar fica em perigo, e o texto diz
+ * "acima"; o "confirme com o narrador" (`confirm`) não impede nada.
+ */
+function GuideList({
+  anchor,
+  title,
+  label,
+  items,
+  testID,
+}: {
+  readonly anchor: string
+  readonly title: string
+  readonly label: string
+  readonly items: readonly GuideItem[]
+  readonly testID: string
+}) {
+  const goTo = useGuideNav()
+  const { onLayout, target } = useAnchor(anchor, { parent: 'creation-panel' })
+  return (
+    <View
+      style={styles.block}
+      accessibilityLabel={label}
+      testID={testID}
+      onLayout={onLayout}
+    >
+      <View {...target}>
+        <SectionHeader title={title} level="group" />
+      </View>
+      {items.map(item => (
+        <Pressable
+          key={item.key}
+          accessibilityRole="button"
+          accessibilityHint={goTo ? 'Vai ao grupo na ficha' : undefined}
+          disabled={!goTo}
+          onPress={() => goTo?.(item.target)}
+          style={styles.item}
+        >
+          <Text
+            variant="caption"
+            color={item.kind === 'blocking' ? 'danger' : 'inkMuted'}
+          >
+            {item.text}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   )
 }
@@ -261,6 +328,9 @@ export function CreationPanel() {
 function Ledger() {
   const { model } = useSheet()
   const check = useSheetSelector(s => s.check)
+  const { onLayout, target } = useAnchor('creation-ledger', {
+    parent: 'creation-panel',
+  })
   const ledger = freebieLedger(model, check)
   if (!ledger) return null
   return (
@@ -268,8 +338,11 @@ function Ledger() {
       style={styles.block}
       accessibilityLabel="Onde foram os bônus"
       testID="creation-ledger"
+      onLayout={onLayout}
     >
-      <SectionHeader title="Onde foram os bônus" level="group" />
+      <View {...target}>
+        <SectionHeader title="Onde foram os bônus" level="group" />
+      </View>
       {ledger.entries.map(e => (
         <View key={e.key} style={styles.entry}>
           <Text variant="caption">{e.text}</Text>
@@ -338,7 +411,7 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
       footer={
         <>
           <Button
-            title="Ver orçamento"
+            title="Ver Pontos"
             variant="ghost"
             onPress={() => {
               setOpen(false)
@@ -585,6 +658,7 @@ const styles = StyleSheet.create({
   },
   block: { gap: tokens.space[2] },
   entry: { gap: tokens.space['0.5'] },
+  item: { justifyContent: 'center', alignItems: 'flex-start' },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

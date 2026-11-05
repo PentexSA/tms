@@ -37,7 +37,7 @@ export function SheetProvider({
   children,
 }: {
   readonly store: SheetStore
-  // "Ver orçamento" dos avisos da recusa (T-07), quando a aba existe
+  // "Ver Pontos" dos avisos da recusa (T-07), quando a aba existe
   readonly openBudget?: (() => void) | null
   // O "ir ao grupo" do "O que falta" (P05-D), quando a ficha tem as abas
   readonly goTo?: ((target: GuideTarget | null) => void) | null

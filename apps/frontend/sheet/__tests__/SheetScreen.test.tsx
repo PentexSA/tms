@@ -408,7 +408,7 @@ describe('modo de abertura (T-05)', () => {
     calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
     renderWithSession(<SheetScreen id={ID} />, await signedIn())
     expect(await radio('Criação')).toBeChecked()
-    expect(screen.getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeTruthy()
   })
 
   it('na criação livre, sem ?mode=, abre em Editar', async () => {

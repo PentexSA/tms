@@ -28,6 +28,7 @@ import {
   tokens,
 } from '../../../test/session'
 import { SheetScreen } from '../../SheetScreen'
+import * as guideModule from '../guide'
 
 // A prioridade escolhida no próprio grupo (Físicos: 7 · 5 · 3) e a trava a
 // cada toque: em Pontos básicos, o grupo cheio não aceita o próximo ponto;
@@ -121,7 +122,7 @@ async function open(
   )
   await session.restore()
   renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-  await screen.findByRole('tab', { name: 'Orçamento' })
+  await screen.findByRole('tab', { name: 'Pontos' })
 }
 
 const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
@@ -260,7 +261,7 @@ describe('trava da distribuição', () => {
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
 
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-panel')).toBeTruthy()
     fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
     tab('Ficha')
@@ -269,7 +270,7 @@ describe('trava da distribuição', () => {
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus · +1 = 5 bônus'
     )
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
       'Bônus: restam 10 de 15.'
     )
@@ -309,7 +310,7 @@ describe('aviso ao lado do toque', () => {
     expect(within(column).getByTestId('notice-wits')).toHaveTextContent(
       'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
     )
-    // "Ver orçamento" leva à aba da fase
+    // "Ver Pontos" leva à aba da fase
     expect(screen.getByTestId('notice-wits-budget')).toBeTruthy()
     step('Inteligência')
     expect(screen.queryByTestId('notice-wits')).toBeNull()
@@ -388,10 +389,10 @@ describe('"+" com a previsão da conta', () => {
 // T-18: o saldo que sobra não se lê como gasto, e a conta fechada com bônus
 // livres diz que eles ainda podem ser gastos
 describe('bônus que sobram', () => {
-  it('com os básicos completos e 15 livres, o Orçamento e a barra dizem o que resta', async () => {
+  it('com os básicos completos e 15 livres, a aba Pontos e a barra dizem o que resta', async () => {
     await open(PRIORITIES, { ...ALMOST, stamina: 3 })
     expect(screen.getByText(/Bônus: restam 15 de 15/)).toBeTruthy()
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-ready')).toHaveTextContent(
       'Pontos básicos completos; restam 15 de bônus. Gaste-os nos grupos ou conclua pela barra de cima.'
     )
@@ -403,7 +404,7 @@ describe('bônus que sobram', () => {
   it('com o bônus zerado, a conta fechou', async () => {
     // 15 de bônus: 3 pontos de atributo acima dos básicos (5 cada)
     await open(PRIORITIES, { ...ALMOST, stamina: 3, strength: 5, dexterity: 5 })
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-ready')).toHaveTextContent(
       'A conta fechou: conclua a criação pela barra de cima.'
     )
@@ -414,14 +415,14 @@ describe('bônus que sobram', () => {
 })
 
 describe('extrato do bônus (R-17)', () => {
-  it('o Orçamento mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
+  it('a aba Pontos mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
     await open(PRIORITIES, {
       ...ALMOST,
       stamina: 3,
       alertness: 4,
       willpower: { permanent: 4, current: 4 },
     })
-    tab('Orçamento')
+    tab('Pontos')
     const ledger = screen.getByTestId('creation-ledger')
     expect(ledger).toHaveTextContent(/Habilidades › Talentos: 1 × 2 = 2/)
     expect(ledger).toHaveTextContent(/Prontidão acima de 3: 1/)
@@ -433,14 +434,14 @@ describe('extrato do bônus (R-17)', () => {
   })
 })
 
-describe('aba Orçamento; Salvar sempre', () => {
+describe('aba Pontos; Salvar sempre', () => {
   it('a conta fica na aba; antes de fechar, a barra só tem "Salvar"', async () => {
     await open(PRIORITIES)
     expect(screen.queryByTestId('creation-panel')).toBeNull()
     expect(screen.queryByText('Concluir criação')).toBeNull()
     expect(screen.queryByTestId('creation-action')).toBeNull()
     expect(screen.getByTestId('mode-save')).toHaveTextContent(/^Salvar$/)
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-problems')).toBeTruthy()
   })
 
@@ -514,7 +515,7 @@ describe('Salvar e Concluir lado a lado (D-01)', () => {
     )
     await session.restore()
     renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-    await screen.findByRole('tab', { name: 'Orçamento' })
+    await screen.findByRole('tab', { name: 'Pontos' })
   }
 
   it('antes de a conta fechar: "Salvar" (nome "Salvar alterações"), sem ação seguinte', async () => {
@@ -711,7 +712,7 @@ describe('"Faltam" na barra (R-18)', () => {
     expect(guide().queryByText('Faltam:')).toBeNull()
     expect(guide().getByRole('button')).toHaveTextContent('Faltam 5 itens')
     fireEvent.press(guide().getByRole('button'))
-    expect(screen.getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
     expect(screen.getByTestId('creation-problems')).toBeTruthy()
   })
 
@@ -805,6 +806,55 @@ describe('"Faltam" na barra (R-18)', () => {
   })
 })
 
+// P05-D (R-18): a aba "Pontos" e o "O que falta" tocável; o "confirme com o
+// narrador" (o ponto de extensão do P07-D) separado do que falta
+describe('aba Pontos (R-18)', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it('a aba se chama "Pontos"; o "O que falta" tem um botão por item, que leva ao grupo', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const list = within(screen.getByTestId('creation-problems'))
+    expect(list.getByRole('header', { name: 'O que falta' })).toBeTruthy()
+    const items = list.getAllByRole('button')
+    // Sem o corte em 12: os 9 grupos do V20
+    expect(items).toHaveLength(9)
+    expect(items[0]).toHaveTextContent('Físicos: faltam 7 pontos básicos.')
+    const virtues = list.getByRole('button', {
+      name: 'Virtudes: faltam 7 pontos básicos.',
+    })
+    fireEvent.press(virtues)
+    expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeSelected()
+  })
+
+  it('o "confirme com o narrador" fica na aba e na confirmação, nunca no "Faltam"', async () => {
+    const notice: guideModule.GuideItem = {
+      key: 'confirm:gift',
+      kind: 'confirm',
+      short: 'Dom',
+      text: 'Confirme com o narrador: um Dom acima do Posto 1.',
+      target: null,
+    }
+    jest.spyOn(guideModule, 'useCreationNotices').mockReturnValue([notice])
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    // A conta fechada: o aviso não esconde o "Concluir" nem entra no "Faltam"
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    tab('Pontos')
+    const block = within(screen.getByTestId('creation-notices'))
+    expect(
+      block.getByRole('header', { name: 'Para confirmar com o narrador' })
+    ).toBeTruthy()
+    expect(block.getByRole('button')).toHaveTextContent(
+      'Confirme com o narrador: um Dom acima do Posto 1.'
+    )
+    fireEvent.press(screen.getByTestId('creation-action'))
+    expect(
+      screen.getByText('1 item para confirmar com o narrador; veja em Pontos.')
+    ).toBeTruthy()
+  })
+})
+
 // T-32: a barra usa o mesmo texto do menu, escrito para quem lê
 describe('confirmação da barra', () => {
   it('a dona lê "passa pelo narrador"; o narrador, "passa por você"', async () => {
@@ -849,7 +899,7 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
     step('Vigor')
     expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
-    fireEvent.press(screen.getByRole('button', { name: 'Ver orçamento' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Ver Pontos' }))
     expect(screen.getByRole('radio', { name: 'Pontos de bônus' })).toBeChecked()
     // Em Bônus, o grupo cheio passa
     tab('Ficha')

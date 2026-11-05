@@ -345,7 +345,7 @@ export interface CreationNotice {
   readonly cause: RefusalCause
   // Só rótulos do template e números da conta; nunca texto da ficha
   readonly text: string
-  // "Ver orçamento" (T-07): leva à aba onde a fase é escolhida
+  // "Ver Pontos" (T-07): leva à aba onde a fase é escolhida
   readonly action?: 'budget'
 }
 
