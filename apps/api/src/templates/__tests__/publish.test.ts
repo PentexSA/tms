@@ -285,6 +285,107 @@ describe('publishTemplate', () => {
   })
 })
 
+// R-19 (P10-D): a frase de ajuda nas opções, nos grupos e nos itens fixos.
+// As duas camadas (Ajv e contrato) recusam a frase com link, grande ou com
+// marcação, e a recusa não ecoa a frase.
+type Help = (t: Json, help: string) => void
+const fieldsOf = (t: Json) => t.fields as Record<string, Json>
+const clanOption: Help = (t, help) => {
+  const [o] = (fieldsOf(t).clan?.options ?? []) as Json[]
+  if (o) o.help = help
+}
+const attributesGroup: Help = (t, help) => {
+  const s = (t.sections as Json[]).find(x => x.id === 'attributes')
+  const [g] = (s?.groups ?? []) as Json[]
+  if (g) g.help = help
+}
+const humanityHelp: Help = (t, help) => {
+  const f = fieldsOf(t).humanity
+  if (f) f.help = help
+}
+const ADDED = 'texto-de-teste'
+
+describe('ajuda no template (R-19)', () => {
+  it('o Ajv aceita a frase na opção, no grupo, no item fixo e na Forma', () => {
+    const v = template('vtm-v20')
+    clanOption(v, 'Frase curta do time.')
+    attributesGroup(v, 'Frase curta do time.')
+    expect(schemaIssues(v)).toEqual([])
+    const m = template('mta-m20')
+    const [fixed] = (fieldsOf(m).resonance?.fixed ?? []) as Json[]
+    if (fixed) fixed.help = 'Frase curta do time.'
+    expect(schemaIssues(m)).toEqual([])
+    const w = template('wta-w20')
+    const [form] = (fieldsOf(w).form?.options ?? []) as Json[]
+    if (form) form.help = 'Frase curta do time.'
+    expect(schemaIssues(w)).toEqual([])
+  })
+
+  it.each([
+    ['link na opção', clanOption, `${ADDED} https://exemplo.test`],
+    ['www na opção', clanOption, `${ADDED} WWW.exemplo.test`],
+    ['opção acima de 200', clanOption, ADDED + 'a'.repeat(200)],
+    ['marcação no grupo', attributesGroup, `<b>${ADDED}</b>`],
+    ['quebra de linha no grupo', attributesGroup, `${ADDED}\nmais`],
+    ['link no help do campo', humanityHelp, `${ADDED} www.exemplo.test`],
+  ] as [string, Help, string][])(
+    'recusa %s, sem gravar e sem ecoar a frase',
+    async (_, put, help) => {
+      const { db, destroy } = await createPGliteTestDb(beforeProductTemplates)
+      try {
+        const t = template('vtm-v20')
+        put(t, help)
+        expect(schemaIssues(t).length).toBeGreaterThan(0)
+        const error = await rejection(publishTemplate(db, t))
+        expect(error.issues.every(i => i.stage === 'schema')).toBe(true)
+        for (const i of error.issues) {
+          expect(i.message).not.toContain(ADDED)
+          expect(i.path).not.toContain(ADDED)
+        }
+        const rows = await db.selectFrom('game_systems').select('id').execute()
+        expect(rows).toEqual([])
+      } finally {
+        await destroy()
+      }
+    }
+  )
+
+  it('o contrato também recusa, se o schema deixasse passar', async () => {
+    const { db, destroy } = await createPGliteTestDb(beforeProductTemplates)
+    try {
+      const t = template('vtm-v20')
+      clanOption(t, `${ADDED} https://exemplo.test`)
+      const error = await rejection(publishTemplate(db, t))
+      expect(error.issues.length).toBeGreaterThan(0)
+      // A camada do core sozinha (a que o app e o servidor rodam).
+      const { validateTemplate } = await import('@tms/sheet-core')
+      const [option] = (fieldsOf(t).clan?.options ?? []) as Json[]
+      expect(validateTemplate(t, [])).toContainEqual(
+        expect.objectContaining({
+          path: `fields.clan.options.${option?.id}.help`,
+          message: 'ajuda com link (://, www.): a frase é texto puro',
+        })
+      )
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('o template com frases é publicado', async () => {
+    const { db, destroy } = await createPGliteTestDb(beforeProductTemplates)
+    try {
+      const t = template('vtm-v20')
+      clanOption(t, 'Frase curta do time.')
+      attributesGroup(t, 'Frase curta do time.')
+      humanityHelp(t, 'Frase do campo, sem link.')
+      const result = await publishTemplate(db, t)
+      expect(result.status).toBe('published')
+    } finally {
+      await destroy()
+    }
+  })
+})
+
 describe('pnpm templates:publish (CLI)', () => {
   let db: Kysely<DB>
   let destroy: () => Promise<void>
