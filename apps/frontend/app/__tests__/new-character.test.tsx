@@ -220,6 +220,33 @@ describe('Nova ficha', () => {
 // L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
 // não abrir, a pessoa sabe que ela existe e não cria outra igual
 // T-29: a Nova ficha diz o modo em que a ficha vai abrir e o orçamento
+// R-19 (IA-06): na Nova ficha, o "?" do Clã (o título do grupo e cada clã) e
+// o da Natureza, com as frases do template; o nome dos rádios não muda.
+describe('Nova ficha: o "?" da ajuda', () => {
+  it('Clã e Natureza têm "?", com a frase do template', async () => {
+    const t = templateJson('vtm-v20') as {
+      fields: Record<
+        string,
+        { help?: string; options?: { id: string; help?: string }[] }
+      >
+    }
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    await screen.findByTestId('editor-name')
+    expect(screen.getByRole('radio', { name: 'Brujah' })).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Brujah' }))
+    const brujah = t.fields.clan?.options?.find(o => o.id === 'brujah')
+    expect(screen.getByText(brujah?.help ?? '-')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Clã' }))
+    expect(screen.getByText(t.fields.clan?.help ?? '-')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Natureza' }))
+    expect(screen.getByText(t.fields.nature?.help ?? '-')).toBeTruthy()
+    // A frase não fica mais como dica sempre visível do campo
+    expect(
+      screen.getByTestId('editor-nature').props.accessibilityHint
+    ).toBeUndefined()
+  })
+})
+
 // U-06 (D-12): no Mago, "Casa ou subgrupo" com "Opcional" e o "?" da frase;
 // uma Verbena sem Casa é criada. Nada é exigido além do Nome.
 describe('Nova ficha do Mago: Casa ou subgrupo', () => {

@@ -100,12 +100,16 @@ function withHelp() {
   const t = templateJson('vtm-v20')
   const sections = t.sections as Json[]
   const attributes = sections.find(s => s.id === 'attributes')
-  const [physical] = (attributes?.groups ?? []) as Json[]
+  const [physical, social] = (attributes?.groups ?? []) as Json[]
   if (physical) physical.help = 'Frase do grupo, do teste.'
+  // Sem frase, nada de "?" (o template do produto já tem as frases)
+  if (social) delete social.help
   const clan = (t.fields as Record<string, Json>).clan
   const options = (clan?.options ?? []) as Json[]
   const brujah = options.find(o => o.id === 'brujah')
   if (brujah) brujah.help = 'Frase da opção, do teste.'
+  const tremere = options.find(o => o.id === 'tremere')
+  if (tremere) delete tremere.help
   return compileTemplate(t)
 }
 
