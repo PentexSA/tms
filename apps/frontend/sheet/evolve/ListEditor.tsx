@@ -1,6 +1,7 @@
 import {
   editClass,
   type ListItem,
+  type ListMeta,
   type ResolvedList,
   type ResolvedSheet,
   stored,
@@ -19,7 +20,7 @@ import {
 import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
-import { addAdvice } from '../creation/creation'
+import { addAdvice, metaAdvice } from '../creation/creation'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -630,6 +631,69 @@ function ItemEditorRow({
   )
 }
 
+/**
+ * O "+" de um meta que é preço do item (o Custo, o Bônus do Defeito), com a
+ * previsão antes do toque, como as linhas (T-08). Com o meta já mudado na
+ * folha, a previsão sai: quem decide é o "Aplicar".
+ */
+function MetaStepper({
+  list,
+  item,
+  meta,
+  title,
+  value,
+  refused,
+  onChange,
+}: {
+  readonly list: ResolvedList
+  readonly item: ListItem
+  readonly meta: ListMeta
+  readonly title: string
+  readonly value: number
+  readonly refused: boolean
+  readonly onChange: (n: number) => void
+}) {
+  const advice = useSheetSelector(
+    s =>
+      s.mode === 'create' && s.check
+        ? metaAdvice(s.model, s.check, list.id, meta.id)
+        : null,
+    (a, b) => a?.text === b?.text && a?.blocked === b?.blocked
+  )
+  const stored = Number(item.meta?.[meta.id] ?? meta.min ?? 0)
+  const fresh = value === stored
+  const id = `advice-${list.id}-${item.id}-${meta.id}`
+  const written = advice && fresh && !refused ? advice.text : null
+  return (
+    <>
+      <View style={styles.inline}>
+        <Text style={styles.flex}>{meta.label}</Text>
+        <Stepper
+          label={`${title}, ${meta.label}`}
+          value={value}
+          min={meta.min ?? -99}
+          max={meta.max ?? 99}
+          onChange={onChange}
+          increase={
+            advice && fresh
+              ? {
+                  blocked: advice.blocked !== null,
+                  hint: advice.text,
+                  hintID: refused ? `notice-${list.id}` : written ? id : null,
+                }
+              : undefined
+          }
+        />
+      </View>
+      {written ? (
+        <Text variant="caption" color="inkMuted" nativeID={id} testID={id}>
+          {written}
+        </Text>
+      ) : null}
+    </>
+  )
+}
+
 function ItemSheet({
   list,
   item,
@@ -724,18 +788,16 @@ function ItemSheet({
             {/* O Valor fica na linha, com o −/+ (R-25) */}
             {(schema.meta ?? []).map(m =>
               m.type === 'number' ? (
-                <View key={m.id} style={styles.inline}>
-                  <Text style={styles.flex}>{m.label}</Text>
-                  <Stepper
-                    label={`${title}, ${m.label}`}
-                    value={Number(draft.meta?.[m.id] ?? m.min ?? 0)}
-                    min={m.min ?? -99}
-                    max={m.max ?? 99}
-                    onChange={n =>
-                      patch({ meta: { ...draft.meta, [m.id]: n } })
-                    }
-                  />
-                </View>
+                <MetaStepper
+                  key={m.id}
+                  list={list}
+                  item={item}
+                  meta={m}
+                  title={title}
+                  value={Number(draft.meta?.[m.id] ?? m.min ?? 0)}
+                  refused={refusal !== null}
+                  onChange={n => patch({ meta: { ...draft.meta, [m.id]: n } })}
+                />
               ) : (
                 <TextField
                   key={m.id}

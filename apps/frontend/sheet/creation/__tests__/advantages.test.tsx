@@ -443,6 +443,47 @@ describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
   })
 })
 
+describe('T-08: a previsão do "+" do Custo e do Bônus na folha do item', () => {
+  it('com saldo, o "+" do Custo diz o preço e o saldo, escrito e na dica', async () => {
+    await open({
+      merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+    })
+    fireEvent.press(screen.getByRole('button', { name: /^Ambidestro/ }))
+    const plus = screen.getByRole('adjustable', { name: 'Ambidestro, Custo' })
+    expect(plus.props.accessibilityHint).toMatch(/\+1 = 1 bônus; restam 14/)
+    expect(plus.props['aria-disabled']).toBe(false)
+    expect(screen.getByTestId('advice-merits-m1-cost')).toHaveTextContent(
+      /restam 14/
+    )
+    // Com o Custo mudado na folha, a previsão sai: o Aplicar decide
+    fireEvent(plus, 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    expect(screen.queryByTestId('advice-merits-m1-cost')).toBeNull()
+  })
+
+  it('sem saldo, o "+" do Custo diz o motivo e continua tocável', async () => {
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: /^Sono Leve/ }))
+    const plus = screen.getByRole('adjustable', { name: 'Sono Leve, Custo' })
+    // No app, o controle ajustável não fica desabilitado: o toque decide (o
+    // "+" com cara de indisponível e aria-disabled é do web, no E2E)
+    expect(plus.props['aria-disabled']).toBe(false)
+    expect(plus.props.accessibilityHint).toMatch(/restam 0/)
+    expect(screen.getByTestId('advice-merits-m2-cost')).toHaveTextContent(
+      /restam 0/
+    )
+  })
+
+  it('o "+" do Bônus do Defeito diz que devolve, até 7', async () => {
+    await open({ flaws: [{ id: 'f1', name: 'Inimigo', meta: { bonus: 2 } }] })
+    fireEvent.press(screen.getByRole('button', { name: /^Inimigo/ }))
+    expect(screen.getByTestId('advice-flaws-f1-bonus')).toHaveTextContent(
+      '+1 = devolve 1, até 7.'
+    )
+  })
+})
+
 describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
   it('Brujah: "Do clã" com as 3 e "Outras" com as 14; Dominação entra e a linha avisa, sem bloquear', async () => {
     await open({ clan: 'brujah' }, { identity: true })

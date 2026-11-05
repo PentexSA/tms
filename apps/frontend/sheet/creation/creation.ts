@@ -806,6 +806,42 @@ export function addAdvice(
   return null
 }
 
+/**
+ * A previsão do "+" de um meta que é preço do item (T-08): o Custo da
+ * Qualidade (`item-meta`) e o Bônus do Defeito (`credit`). Pela conta que o
+ * store tem: com o meta já mudado na folha, quem decide é o "Aplicar" (a
+ * conta exata) e depois o servidor. Meta fora dessas regras: null.
+ */
+export function metaAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  list: FieldId,
+  meta: string
+): StepAdvice | null {
+  const rule = model.template.costs?.freebie?.find(
+    r =>
+      (r.rule === 'item-meta' || r.rule === 'credit') &&
+      r.meta === meta &&
+      r.targets.includes(list)
+  )
+  const freebies = check.freebies
+  if (!rule || !freebies) return null
+  if (rule.rule === 'credit') {
+    const line = check.lines.find(l => l.id === rule.id)
+    const max = rule.max ?? 0
+    return (line?.cost ?? 0) >= max
+      ? advice(null, `+1 não devolve mais: o crédito já está em ${max}.`)
+      : advice(null, `+1 = devolve 1, até ${max}.`)
+  }
+  return freebies.remaining < 1
+    ? advice(
+        'freebies',
+        `${bonus(1)}; ${restam(Math.max(0, freebies.remaining))}.`,
+        1
+      )
+    : advice(null, `${bonus(1)}; ${restam(freebies.remaining)}.`, 1)
+}
+
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */
 function pointBuyAdvice(
   model: SheetModel,
