@@ -286,8 +286,11 @@ function check(
     const entries = Object.entries(v)
     if (!entries.length || entries.length > max)
       err(path, `de 1 a ${max} nomes`)
-    for (const [name, phrase] of entries) {
-      if (!names.includes(name)) err(path, `'${name}' não está na lista`)
+    // Depois do erro de tamanho, só as primeiras: um mapa enorme não vira
+    // milhares de erros nem um laço quadrático
+    const known = new Set(names)
+    for (const [name, phrase] of entries.slice(0, max)) {
+      if (!known.has(name)) err(path, `'${name}' não está na lista`)
       help(`${path}.${name}`, phrase, 200)
     }
   }

@@ -613,8 +613,9 @@ function validateTemplate(t, palette) {
     if (!isObj(v)) return err(path, 'precisa ser objeto')
     const entries = Object.entries(v)
     if (!entries.length || entries.length > max) err(path, `de 1 a ${max} nomes`)
-    for (const [name, phrase] of entries) {
-      if (!names.includes(name)) err(path, `'${name}' não está na lista`)
+    const known = new Set(names)
+    for (const [name, phrase] of entries.slice(0, max)) {
+      if (!known.has(name)) err(path, `'${name}' não está na lista`)
       help(`${path}.${name}`, phrase, 200)
     }
   }

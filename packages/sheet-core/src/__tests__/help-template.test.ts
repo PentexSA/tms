@@ -400,6 +400,26 @@ describe('catalogHelp e suggestionHelp', () => {
     }
   )
 
+  it('um mapa acima do limite dá um erro de tamanho e confere só os primeiros', () => {
+    const t = vtm()
+    const names = Object.fromEntries(
+      Array.from({ length: 1000 }, (_, i) => [`Inventado ${i}`, 'Frase.'])
+    )
+    background(t).catalogHelp = names
+    const issues = validateTemplate(t, palette).filter(i =>
+      i.path.startsWith('fields.backgrounds.catalogHelp')
+    )
+    expect(issues).toContainEqual({
+      path: 'fields.backgrounds.catalogHelp',
+      message: 'de 1 a 200 nomes',
+    })
+    // 1 de tamanho e 200 de nome fora da lista, não 1000
+    expect(issues).toHaveLength(201)
+    expect(fmt('vtm-v20', validateTemplate(t, palette))).toEqual(
+      reference.validateTemplate(t, palette)
+    )
+  })
+
   it('a chave proibida no nome continua barrada', () => {
     const t = vtm()
     background(t).catalogHelp = JSON.parse('{"__proto__": "x"}')
