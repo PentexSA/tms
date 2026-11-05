@@ -14,6 +14,8 @@ import {
   adviceNotices,
   basicsClosed,
   basicsDone,
+  basicsSpentText,
+  basicUnits,
   type CreationPhase,
   completeLabel,
   completionFreebies,
@@ -1347,5 +1349,76 @@ describe('basicsClosed × basicsDone', () => {
     }
     expect(basicsClosed(spent)).toBe(true)
     expect(basicsDone(spent)).toBe(false)
+  })
+})
+
+// B2 (roteiro do Android): o adjetivo concorda com o número
+describe('"falta 1 ponto básico" (B2)', () => {
+  const vtm = modelOf('vtm-v20')
+  const wta = modelOf('wta-w20')
+  const checkOf = (model: SheetModel) =>
+    checkCreation(
+      model,
+      { values: {}, specialties: {} },
+      {
+        config: effectiveCreationConfig(model),
+        choices: {
+          priorities: {
+            attributes: ['physical', 'social', 'mental'],
+            abilities: ['talents', 'skills', 'knowledges'],
+          },
+        },
+      }
+    )
+  it('basicUnits: singular e plural, em pontos ou itens', () => {
+    expect(basicUnits(1)).toBe('1 ponto básico')
+    expect(basicUnits(3)).toBe('3 pontos básicos')
+    expect(basicUnits(1, true)).toBe('1 item básico')
+    expect(basicUnits(3, true)).toBe('3 itens básicos')
+  })
+  it('o "O que falta" com 1 e com N, e os Dons em itens', () => {
+    const check = checkOf(vtm)
+    const unspent = (amount: number) => ({
+      code: 'CREATION_BASICS_UNSPENT' as const,
+      severity: 'incomplete' as const,
+      budget: 'virtues',
+      group: 'virtues',
+      paths: [],
+      amount,
+    })
+    expect(problemText(vtm, check, unspent(1))).toBe(
+      'Virtudes: falta 1 ponto básico.'
+    )
+    expect(problemText(vtm, check, unspent(7))).toBe(
+      'Virtudes: faltam 7 pontos básicos.'
+    )
+    expect(
+      problemText(wta, checkOf(wta), {
+        ...unspent(3),
+        budget: 'gifts',
+        group: 'gifts',
+      })
+    ).toBe('Dons: faltam 3 itens básicos.')
+  })
+  it('o contador falado e a recusa com orçamento 1 ficam no singular', () => {
+    const g = {
+      id: 'g',
+      label: 'Fé',
+      budget: 1,
+      measure: 'points' as const,
+      invested: 1,
+      eligible: 1,
+      basic: 1,
+      missing: 0,
+      extra: 0,
+      price: null,
+      freebieCost: 0,
+      components: [],
+    }
+    expect(counterSpoken(g)).toBe('Fé: 1 de 1 ponto básico')
+    expect(basicsSpentText(g, false)).toBe('Fé: o 1 ponto básico já foi usado.')
+    expect(basicsSpentText({ ...g, budget: 3 }, false)).toBe(
+      'Fé: os 3 pontos básicos já foram usados.'
+    )
   })
 })
