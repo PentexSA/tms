@@ -34,6 +34,7 @@ import {
   STALE_COMPLETION,
 } from './completion'
 import {
+  basicsClosed,
   basicsDone,
   type CreationPhase,
   completeLabel,
@@ -308,14 +309,9 @@ function PhaseBlock() {
   const { store } = useSheet()
   const phase = useSheetSelector(s => s.creationPhase)
   // Todos os grupos com prioridade e sem básico sobrando
-  const closed = useSheetSelector(s =>
-    Boolean(
-      s.check?.budgets.length &&
-        s.check.budgets
-          .flatMap(b => b.groups)
-          .every(g => g.budget !== null && g.missing === 0)
-    )
-  )
+  // Sem o saldo do `basicsDone`: com os básicos fechados, voltar a eles não
+  // muda nada, mesmo com os bônus já gastos
+  const closed = useSheetSelector(s => basicsClosed(s.check))
   const set = (next: CreationPhase) => store.getState().setCreationPhase(next)
   const basics = phase === 'basics'
   return (
