@@ -79,16 +79,39 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]{36}(\?mode=evolve)?$/)
   const id = /characters\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? ''
 
-  // 3. Editar: Força e um Dom. Salvar grava UM lote
+  // 3. Editar: Força e dois Dons. Salvar grava UM lote
   await expect(page.getByText('Editando · 0 alterações')).toBeVisible()
   await stepper(page, 'Aumentar Força').click()
   await stepper(page, 'Aumentar Força').click()
   await page.getByRole('tab', { name: 'Vantagens' }).click()
-  await page.getByRole('button', { name: 'Adicionar Dom' }).click()
+  // Onda 4 (P07-D §4.3): o catálogo de Dons. Hominídeo Galliard Fianna: a
+  // folha abre com os Dons da Raça, do Augúrio e da Tribo, e um recomendado
+  // entra com Posto 1
+  const addGift = page.getByRole('button', { name: 'Adicionar Dom' })
+  const giftSheet = page.getByTestId('add-sheet-gifts')
+  await addGift.click()
+  for (const block of [
+    'Da Raça · Hominídeo',
+    'Do Augúrio · Galliard',
+    'Da Tribo · Fianna',
+  ])
+    await expect(
+      giftSheet.getByRole('heading', { name: block, exact: true })
+    ).toBeVisible()
+  await giftSheet
+    .getByRole('button', {
+      name: 'Persuasão, Posto 1, da Raça, da Tribo',
+      exact: true,
+    })
+    .click()
+  await expect(giftSheet).toHaveCount(0)
+  // Um nome fictício, fora do catálogo: o texto livre continua
+  await addGift.click()
+  await page.getByLabel('Buscar Dom', { exact: true }).fill('Faro do Asfalto')
   await page
-    .getByRole('textbox', { name: 'Nome', exact: true })
-    .fill('Persuasão')
-  await page.getByRole('button', { name: 'Adicionar “Persuasão”' }).click()
+    .getByRole('button', { name: 'Adicionar “Faro do Asfalto”', exact: true })
+    .click()
+  await expect(giftSheet).toHaveCount(0)
   await expect(page.getByText('Editando · 2 alterações')).toBeVisible()
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
@@ -97,9 +120,15 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   const evolveBatch = (await evolved).request().postDataJSON() as {
-    events: unknown[]
+    events: { path: string; to?: unknown }[]
   }
   expect(evolveBatch.events).toHaveLength(2)
+  expect(
+    evolveBatch.events.find(e => e.path === 'values.gifts')?.to
+  ).toMatchObject([
+    { name: 'Persuasão', meta: { rank: 1 } },
+    { name: 'Faro do Asfalto', meta: { rank: 1 } },
+  ])
 
   // A narradora marca a Fúria da ficha (3 de 4)
   await apiAs(desk, storyteller, 'POST', `/characters/${id}/events`, {
