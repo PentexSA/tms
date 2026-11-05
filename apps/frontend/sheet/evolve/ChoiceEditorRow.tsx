@@ -16,12 +16,13 @@ import { badgeText, outsideText, useIdentityAdvice } from './recommend'
 // Choice lê no nome ("Forças, da Tradição"). Na criação, uma escolha fora
 // avisa sob o valor, sem bloquear.
 
-export function ChoiceEditorRow({ resolved, sheet }: FieldViewProps) {
+export function ChoiceEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   const compact = useCompact()
-  const identity = useIdentityAdvice(resolved.id, sheet)
+  // Pelo store: trocar a Tradição não muda a entrada deste campo
+  const identity = useIdentityAdvice(resolved.id)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   if (resolved.type !== 'choice' && resolved.type !== 'state') return null

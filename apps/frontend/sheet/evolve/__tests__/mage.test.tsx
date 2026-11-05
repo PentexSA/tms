@@ -129,6 +129,16 @@ describe('R-26: a Esfera de afinidade pela Tradição', () => {
     )
   })
 
+  it('trocar a Tradição com a Esfera na tela atualiza o aviso (code review)', async () => {
+    await open({ tradition: 'verbena', affinity: 'time' })
+    expect(screen.getByTestId('identity-affinity')).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Tradição/ }))
+    fireEvent.press(screen.getByRole('radio', { name: 'Culto do Êxtase' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.queryByTestId('identity-affinity')).toBeNull()
+  })
+
   it('dentro da Tradição, ou sem Tradição, nada avisa', async () => {
     await open({ tradition: 'verbena', affinity: 'life' })
     expect(screen.queryByTestId('identity-affinity')).toBeNull()

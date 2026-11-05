@@ -539,6 +539,62 @@ describe('R-26 e T-24: o que a identidade recomenda', () => {
     expect(sheet.queryByRole('button', { name: /do clã/ })).toBeNull()
   })
 
+  it('trocar o Clã com a lista na tela atualiza o selo e a folha (code review)', async () => {
+    await render(v20, {
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: 'Potência', value: 1 }],
+    })
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5, do clã' })
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Clã/ }))
+    fireEvent.press(screen.getByRole('radio', { name: 'Tremere' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'fora do clã: confirme com o narrador'
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const clan = within(screen.getByTestId('add-block-by-clan'))
+    expect(
+      clan.getAllByRole('button').map(b => b.props.accessibilityLabel)
+    ).toEqual(['Auspícios, do clã', 'Dominação, do clã', 'Taumaturgia, do clã'])
+  })
+
+  it('o nome gravado sem acento ou com outra caixa leva o selo do catálogo', async () => {
+    await render(v20, {
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: 'potencia', value: 1 }],
+    })
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'do clã'
+    )
+    expect(screen.getByTestId('identity-disciplines-d1')).not.toHaveTextContent(
+      /fora/
+    )
+  })
+
+  it('com uma fonte sem escolha: nada "fora" e a frase diz qual falta', async () => {
+    await render(w20, {
+      breed: 'lupino',
+      gifts: [{ id: 'g1', name: GIFTS.other, meta: { rank: 1 } }],
+    })
+    expect(screen.queryByTestId('identity-gifts-g1')).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    const sheet = within(screen.getByTestId('add-sheet-gifts'))
+    expect(
+      sheet.getByText(
+        'Escolha Augúrio ou Tribo na identidade para ver as recomendações.'
+      )
+    ).toBeTruthy()
+    expect(sheet.getByRole('header', { name: 'Da Raça · Lupino' })).toBeTruthy()
+  })
+
   it('Caitiff (sem entrada no mapa): nenhum selo e nenhum "fora"', async () => {
     await render(v20, {
       clan: 'caitiff',

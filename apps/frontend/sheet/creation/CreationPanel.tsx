@@ -188,7 +188,8 @@ export function CreationPanel() {
   const phase = useSheetSelector(s => s.creationPhase)
   // O que só avisa (D-07, D-09): depois do "O que falta", nunca em `danger`.
   // Texto, sem toque: o P05-D faz os itens tocáveis (useCreationNotices)
-  const notices = useCreationAdvice()
+  const notices = useCreationAdvice(creation?.status === 'creating')
+  const resolved = useSheetSelector(s => s.resolved)
   if (
     !creation?.active ||
     creation.status !== 'creating' ||
@@ -243,7 +244,7 @@ export function CreationPanel() {
               variant="caption"
               color={p.severity === 'blocking' ? 'danger' : 'inkMuted'}
             >
-              {problemText(model, check, p)}
+              {problemText(model, check, p, resolved)}
             </Text>
           ))}
         </View>

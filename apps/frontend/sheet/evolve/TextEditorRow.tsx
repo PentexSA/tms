@@ -18,7 +18,7 @@ import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
 import { useFieldIssue, useSetDraft } from './hooks'
-import { textDefaultOf } from './recommend'
+import { useTextDefault } from './recommend'
 
 // text e longText em Evoluir: a linha mostra o começo do texto e abre um
 // sheet com o campo, o contador e o limite do template (o mesmo do servidor).
@@ -30,7 +30,7 @@ import { textDefaultOf } from './recommend'
 // tudo volta ao texto da opção. Com um texto próprio, a folha oferece voltar
 // a ele ("Usar o resumo"), com confirmação.
 
-export function TextEditorRow({ resolved, sheet }: FieldViewProps) {
+export function TextEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
   const { model } = useSheet()
   const set = useSetDraft()
@@ -40,8 +40,9 @@ export function TextEditorRow({ resolved, sheet }: FieldViewProps) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  // Pelo store: com o texto gravado, trocar o Clã não muda este campo
+  const initial = useTextDefault(resolved.id)
   if (resolved.type !== 'text' && resolved.type !== 'longText') return null
-  const initial = textDefaultOf(model, sheet, resolved.id)
   const def = resolved.field.def
   const long = resolved.type === 'longText'
   const max = def.maxLength ?? (long ? 4000 : 200)

@@ -204,6 +204,18 @@ describe('T-10: Enter aplica na folha de uma linha', () => {
       expect(row()).toHaveTextContent(/Resumo fictício de teste A\./)
     })
 
+    it('com texto próprio, trocar o Clã troca o "Usar o resumo de …" (code review)', async () => {
+      await open({
+        values: { name: 'Nova', clan: 'brujah', weakness: 'Meu texto' },
+        specialties: {},
+      })
+      pickClan('Toreador')
+      fireEvent.press(row())
+      expect(
+        screen.getByRole('button', { name: 'Usar o resumo de Toreador' })
+      ).toBeTruthy()
+    })
+
     it('Caitiff (sem resumo) e sem Clã: o campo fica vazio, sem "Usar o resumo"', async () => {
       await open({
         values: { name: 'Nova', clan: 'caitiff' },

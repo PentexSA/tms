@@ -1,9 +1,9 @@
 import {
   editClass,
   type ListItem,
+  type ListItemSchema,
   type ListMeta,
   type ResolvedList,
-  type ResolvedSheet,
   stored,
 } from '@tms/sheet-core'
 import {
@@ -43,7 +43,7 @@ import {
   chooseText,
   type IdentityAdvice,
   itemAdviceLines,
-  missingSources,
+  itemLabels,
   useIdentityAdvice,
 } from './recommend'
 import { fold, nextItemId, noneOf } from './text'
@@ -103,7 +103,8 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const { model } = useSheet()
   const store = useSheetStore()
   // O selo da identidade e os avisos da criação (D-07, D-09)
-  const identity = useIdentityAdvice(resolved.id, sheet)
+  // Pelo store: a prop `sheet` fica velha quando só a identidade muda
+  const identity = useIdentityAdvice(resolved.id)
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   // Ficha ativa: mudar o valor do item é evolução e pede o narrador, como
@@ -156,7 +157,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const current = items.find(i => i.id === editing)
   const border = { borderBottomColor: colors.borderSubtle }
   const badge = (item: ListItem) =>
-    badgeText(identity.recommended.get(itemTitle(list, item)))
+    badgeText(itemLabels(identity, itemTitle(list, item)))
   // O nome acessível leva o selo: "Potência, 2 de 5, do clã"
   const label = (item: ListItem) =>
     [describeItem(list, item), badge(item)].filter(Boolean).join(', ')
@@ -181,6 +182,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
             key={item.id}
             list={list}
             item={item}
+            schema={def.item.value}
             label={label(item)}
             blocked={blocked !== null}
             onOpen={() => open(item.id)}
@@ -234,7 +236,6 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
       <AddItemSheet
         visible={adding}
         list={list}
-        sheet={sheet}
         identity={identity}
         onClose={() => setAdding(false)}
         onAdd={add}
@@ -309,7 +310,6 @@ interface OptionBlock {
  */
 function optionBlocks(
   list: ResolvedList,
-  sheet: ResolvedSheet,
   identity: IdentityAdvice,
   query: string,
   options: readonly string[]
@@ -325,19 +325,17 @@ function optionBlocks(
   const catalog = list.field.def.catalog ?? []
   const seen = new Set<string>()
   const blocks: OptionBlock[] = []
-  for (const source of recommend.by) {
-    const r = sheet.get(source.from)
-    if (r?.type !== 'choice' || !r.option) continue
-    const mapped = Object.hasOwn(source.map, r.option.id)
-      ? (source.map[r.option.id] ?? [])
-      : []
-    const names = catalog.filter(n => mapped.includes(n) && !seen.has(n))
+  // As fontes do core (recommendedBySource): a mesma regra do selo
+  for (const source of identity.sources) {
+    if (!source.option) continue
+    const names = catalog.filter(n => source.names.includes(n) && !seen.has(n))
     for (const n of names) seen.add(n)
     if (!names.length) continue
     const title = capitalize(source.label)
     blocks.push({
       key: `by-${source.from}`,
-      title: recommend.by.length > 1 ? `${title} · ${r.option.label}` : title,
+      title:
+        recommend.by.length > 1 ? `${title} · ${source.option.label}` : title,
       names,
     })
   }
@@ -353,19 +351,16 @@ function optionBlocks(
 function AddItemSheet({
   visible,
   list,
-  sheet,
   identity,
   onClose,
   onAdd,
 }: {
   readonly visible: boolean
   readonly list: ResolvedList
-  readonly sheet: ResolvedSheet
   readonly identity: IdentityAdvice
   readonly onClose: () => void
   readonly onAdd: (name: string) => Write
 }) {
-  const { model } = useSheet()
   // A prévia do item novo (T-08; nota do P07-C), só na Criação com a conta
   const preview = useSheetSelector(s =>
     s.mode === 'create' && s.check
@@ -431,16 +426,11 @@ function AddItemSheet({
     )
   }
   const noticeAt = (where: string) => (at === where ? notice.text : null)
-  const blocks = optionBlocks(list, sheet, identity, query, options)
+  const blocks = optionBlocks(list, identity, query, options)
   const shown = blocks.reduce((n, b) => n + b.names.length, 0)
   // Sem escolha na identidade, a lista fica neutra e diz o que escolher
-  const missing = identity.recommend
-    ? missingSources(model, sheet, identity.recommend)
-    : []
-  const choose =
-    identity.recommend && missing.length === identity.recommend.by.length
-      ? chooseText(missing)
-      : null
+  // Uma fonte sem escolha: diga qual falta (as escolhidas já recomendam)
+  const choose = identity.missing.length ? chooseText(identity.missing) : null
   // O meta do catálogo de cada nome ("Posto 2"), no texto e no nome acessível
   const metasOf = (name: string): string[] =>
     (def.catalogDefaults ?? []).flatMap(d => {
@@ -573,6 +563,7 @@ function AddItemSheet({
 function ItemEditorRow({
   list,
   item,
+  schema,
   label,
   blocked,
   onOpen,
@@ -581,6 +572,8 @@ function ItemEditorRow({
 }: {
   readonly list: ResolvedList
   readonly item: ListItem
+  // O valor do item (só a lista com `item.value` desenha esta linha)
+  readonly schema: NonNullable<ListItemSchema['value']>
   // O nome acessível do botão do nome, com o selo
   readonly label: string
   readonly blocked: boolean
@@ -591,10 +584,8 @@ function ItemEditorRow({
 }) {
   const { colors } = useTheme()
   const def = list.field.def
-  const schema = def.item.value
   const field = `${list.id}-${item.id}`
   const feedback = useRowFeedback(`values.${list.id}#${item.id}`, field)
-  if (!schema) return null
   const min = schema.min ?? 0
   const title = itemTitle(list, item) || def.itemLabel
   return (
