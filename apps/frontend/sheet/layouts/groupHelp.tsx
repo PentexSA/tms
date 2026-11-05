@@ -1,25 +1,11 @@
-import {
-  type CompiledSection,
-  isDraftMode,
-  type SheetMode,
-} from '@tms/sheet-core'
 import { HelpButton, HelpText, SectionHeader, tokens, useHelp } from '@tms/ui'
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 // O "?" do grupo de seção (R-19): "Físicos", "Talentos", "Conhecimentos".
-// Só na criação e no Editar (pergunta 8 do P10-D): em Leitura e Jogo a ficha
-// fica como está. O grupo sem frase não mostra "?".
-
-/** A frase do grupo no template, se houver e se o modo pedir ajuda. */
-export function groupHelpOf(
-  section: CompiledSection,
-  groupId: string,
-  mode: SheetMode
-): string | null {
-  if (!isDraftMode(mode)) return null
-  return section.def.groups?.find(g => g.id === groupId)?.help ?? null
-}
+// A frase vem do `help` do CompiledGroup. Só na criação e no Editar
+// (pergunta 8 do P10-D): em Leitura e Jogo a ficha fica como está. O grupo
+// sem frase não mostra "?".
 
 /** O título do grupo com o "?" e, abaixo, a frase aberta. */
 export function GroupTitle({

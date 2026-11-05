@@ -27,7 +27,7 @@ import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
 import { ChipFlow } from './ChipFlow'
-import { GroupHelpLine, GroupTitle, groupHelpOf } from './groupHelp'
+import { GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
@@ -131,7 +131,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
           const listDef = headed ? model.fields.get(headed)?.def : undefined
           const listHelp =
             listDef?.help && isDraftMode(mode) ? listDef.help : null
-          const help = groupHelpOf(section, g.id, mode) ?? listHelp
+          const help = (isDraftMode(mode) ? (g.help ?? null) : null) ?? listHelp
           return (
             <GroupBlock
               key={g.id}

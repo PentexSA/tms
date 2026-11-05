@@ -439,3 +439,21 @@ describe('compileTemplate: a Casa do Mago', () => {
     expect(columns.flat()).toContain('house')
   })
 })
+
+// R-19 (P10-D): a frase do grupo vai ao modelo compilado
+describe('compileTemplate: a ajuda do grupo', () => {
+  it('o CompiledGroup leva o help; o grupo sem frase, não', () => {
+    const t = vtm()
+    const sections = t.sections as Json[]
+    const attributes = sections.find(s => s.id === 'attributes')
+    const [physical, social] = (attributes?.groups ?? []) as Json[]
+    if (physical) physical.help = 'Frase do grupo.'
+    if (social) delete social.help
+    const section = compileTemplate(t)
+      .zones.flatMap(z => z.sections)
+      .find(s => s.id === 'attributes')
+    const groups = section?.groups ?? []
+    expect(groups.find(g => g.id === 'physical')?.help).toBe('Frase do grupo.')
+    expect(groups.find(g => g.id === 'social')).not.toHaveProperty('help')
+  })
+})
