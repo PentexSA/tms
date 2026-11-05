@@ -222,6 +222,21 @@ const fieldLabel = (model: SheetModel, path: string): string => {
   return model.fields.get(id)?.def.label ?? 'Um campo'
 }
 
+/**
+ * O rótulo do meta que dá o preço do item (o Custo da Qualidade), quando o
+ * caminho é de um item de lista com regra `item-meta`; senão null.
+ */
+function itemPriceMeta(model: SheetModel, path: string): string | null {
+  if (!path.includes('#')) return null
+  const id = path.replace(/^values\./, '').split('#')[0] ?? ''
+  const rule = model.template.costs?.freebie?.find(
+    r => r.rule === 'item-meta' && r.targets.includes(id)
+  )
+  const def = model.fields.get(id)?.def
+  if (!rule || def?.type !== 'list') return null
+  return def.item.meta?.find(m => m.id === rule.meta)?.label ?? null
+}
+
 /** Uma frase por problema, com os rótulos do template; nunca texto da ficha. */
 export function problemText(
   model: SheetModel,
@@ -253,8 +268,15 @@ export function problemText(
       return `${field}: acima do limite da criação.`
     case 'CREATION_LOCKED':
       return `${field}: não sobe na criação.`
-    case 'CREATION_NOT_PURCHASABLE':
-      return `${field}: não se compra na criação.`
+    case 'CREATION_NOT_PURCHASABLE': {
+      // O item de uma lista com preço por item (a Qualidade) gravado sem o
+      // meta do preço (app antigo, API direta): "não se compra" enganava
+      // (QAA-05). O que de fato não se compra (o Renome) segue igual.
+      const meta = p.paths[0] ? itemPriceMeta(model, p.paths[0]) : null
+      return meta
+        ? `${field}: um item está sem ${meta}. Abra o item e informe o ${meta}.`
+        : `${field}: não se compra na criação.`
+    }
     case 'CREATION_BELOW_INITIAL':
       return `${field}: abaixo do valor inicial.`
   }
@@ -736,6 +758,52 @@ function groupAdvice(
         inline
       )
     : advice(null, bonus(price), price, inline)
+}
+
+/**
+ * O que um item novo na lista faria na conta, antes do toque (a prévia da
+ * folha "Adicionar …", P07-C §3.1): uma linha por folha, não por opção, porque
+ * o custo é o mesmo para todas as opções. Pelo grupo do orçamento da lista
+ * (básicos, depois bônus) ou pela linha de bônus por item (Custo da
+ * Qualidade, crédito do Defeito). É previsão: o toque decide, pela conta
+ * exata, com a recusa dentro da folha. Fora de qualquer conta: null.
+ */
+export function addAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  phase: CreationPhase,
+  list: FieldId
+): string | null {
+  const freebies = check.freebies
+  const g = findGroup(check, groupFor(model, [list]))
+  if (g) {
+    if (g.budget === null)
+      return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+    if (g.missing > 0)
+      return `Entra com os pontos básicos (faltam ${g.missing} de ${g.budget}).`
+    if (phase === 'basics') return basicsSpentText(g, freebies !== null)
+    if (g.price === null || !freebies)
+      return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
+    return g.measure === 'items'
+      ? `${g.label}: o próximo custa ${g.price} de bônus; ${restam(Math.max(0, freebies.remaining))}.`
+      : `${bonus(g.price)}; ${restam(Math.max(0, freebies.remaining))}.`
+  }
+  const rule = model.template.costs?.freebie?.find(r =>
+    r.targets.includes(list)
+  )
+  const def = model.fields.get(list)?.def
+  const meta =
+    rule?.meta && def?.type === 'list'
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  if (!rule || !freebies) return null
+  if (rule.rule === 'item-meta' && meta)
+    return `Custa o ${meta.label} do item em bônus (começa em ${meta.min ?? 0}); ${restam(Math.max(0, freebies.remaining))}.`
+  if (rule.rule === 'credit' && meta)
+    return `Devolve o ${meta.label} do item, até ${rule.max ?? 0} no total.`
+  if (rule.rule === 'flat' && rule.cost !== undefined)
+    return `${bonus(rule.cost)}; ${restam(Math.max(0, freebies.remaining))}.`
+  return null
 }
 
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */

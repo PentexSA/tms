@@ -18,7 +18,8 @@ import {
 } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
-import { useSheet, useSheetStore } from '../context'
+import { useSheet, useSheetSelector, useSheetStore } from '../context'
+import { addAdvice } from '../creation/creation'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -364,6 +365,12 @@ function AddItemSheet({
   readonly onAdd: (name: string) => Write
 }) {
   const { model } = useSheet()
+  // A prévia do item novo (T-08; nota do P07-C), só na Criação com a conta
+  const preview = useSheetSelector(s =>
+    s.mode === 'create' && s.check
+      ? addAdvice(s.model, s.check, s.creationPhase, list.id)
+      : null
+  )
   const [query, setQuery] = useState('')
   // Onde o aviso da recusa aparece (T-19): `option:<nome>` (a opção tocada),
   // `custom` (o botão do texto livre) ou `field` (o Enter no campo). O texto
@@ -411,6 +418,12 @@ function AddItemSheet({
     if (exact && have.has(fold(exact)))
       return explain(`${exact} já está na ficha.`)
     if (exact) return pick(exact, 'field')
+    // Nome livre repetido ("Ambidestro" duas vezes): o servidor aceita, e a
+    // folha pede o toque explícito no "Adicionar outro"
+    if (have.has(fold(custom)))
+      return explain(
+        `Já há “${custom}” na ficha. Toque em “Adicionar outro “${custom}”” para repetir.`
+      )
     if (!options.length) return pick(custom, 'field')
     explain(
       `Toque numa sugestão, ou em “Adicionar “${custom}”” para usar o nome como está.`
@@ -499,6 +512,11 @@ function AddItemSheet({
           {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
           onSubmitEditing={e => submit(e?.nativeEvent?.text ?? query)}
         />
+        {preview ? (
+          <Text variant="caption" color="inkMuted" testID="add-preview">
+            {preview}
+          </Text>
+        ) : null}
         {choose ? (
           <Text variant="caption" color="inkMuted">
             {choose}
@@ -521,8 +539,17 @@ function AddItemSheet({
         ) : null}
         {custom && !exact ? (
           <View style={styles.sheet}>
+            {have.has(fold(custom)) ? (
+              <Text variant="caption" color="inkMuted" testID="add-repeated">
+                {`Já há “${custom}” na ficha.`}
+              </Text>
+            ) : null}
             <Button
-              title={`Adicionar “${custom}”`}
+              title={
+                have.has(fold(custom))
+                  ? `Adicionar outro “${custom}”`
+                  : `Adicionar “${custom}”`
+              }
               variant="secondary"
               onPress={() => pick(custom, 'custom')}
             />

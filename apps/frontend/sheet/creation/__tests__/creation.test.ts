@@ -10,6 +10,7 @@ import {
 } from '@tms/sheet-core'
 import { modelOf } from '../../../test/fixtures'
 import {
+  addAdvice,
   type CreationPhase,
   completeLabel,
   completionFreebies,
@@ -25,6 +26,7 @@ import {
   freebiesNotes,
   groupFor,
   priorityNote,
+  problemText,
   reorder,
   stepAdvice,
 } from '../creation'
@@ -319,13 +321,14 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     ).toEqual({ cause: 'ceiling', text: 'Arete: na criação, vai até 3.' })
   })
 
-  it('o que não se compra continua com a frase de hoje', () => {
+  // T-08 (QAA-05): a Qualidade sem Custo não é "não se compra"
+  it('Qualidade sem Custo: a recusa diz que falta o Custo, com a mesma causa', () => {
     const merits = [{ id: 'm1', name: 'Q' }]
     expect(
       refusalOf(COMPLETE, { ...COMPLETE, merits }, { phase: 'freebies' })
     ).toEqual({
       cause: 'not-purchasable',
-      text: 'Qualidades: não se compra na criação.',
+      text: 'Qualidades: um item está sem Custo. Abra o item e informe o Custo.',
     })
   })
 
@@ -809,5 +812,88 @@ describe('previsão e motivo: casos de borda', () => {
     })
     // A outra Esfera não é a da afinidade: compra normal
     expect(touch('sphereB')).toBeNull()
+  })
+})
+
+// P07-D (T-08): a Qualidade gravada sem Custo não é "não se compra"; o
+// Renome, que de fato não se compra, segue com a frase de antes
+const WOD_PRIORITIES: CreationChoices = {
+  priorities: {
+    attributes: ['physical', 'social', 'mental'],
+    abilities: ['talents', 'skills', 'knowledges'],
+  },
+}
+
+describe('problemText: a Qualidade sem Custo', () => {
+  const vtm = modelOf('vtm-v20')
+  const wta = modelOf('wta-w20')
+  const input = (m: SheetModel) => ({
+    config: effectiveCreationConfig(m),
+    choices: WOD_PRIORITIES,
+  })
+
+  it('item de Qualidade sem Custo: "um item está sem Custo"', () => {
+    const sheet = {
+      values: { merits: [{ id: 'm1', name: 'Ambidestro' }] },
+    } as SheetData
+    const check = checkCreation(vtm, sheet, input(vtm))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    expect(p).toBeDefined()
+    if (p)
+      expect(problemText(vtm, check, p)).toBe(
+        'Qualidades: um item está sem Custo. Abra o item e informe o Custo.'
+      )
+  })
+
+  it('Renome acima do inicial: "não se compra na criação", como antes', () => {
+    const sheet = {
+      values: { glory: { permanent: 2, current: 2 } },
+    } as SheetData
+    const check = checkCreation(wta, sheet, input(wta))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    expect(p).toBeDefined()
+    if (p) expect(problemText(wta, check, p)).toMatch(/não se compra/)
+  })
+})
+
+describe('addAdvice: a prévia do item novo', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = {
+    config: effectiveCreationConfig(vtm),
+    choices: WOD_PRIORITIES,
+  }
+  const at = (values: Record<string, unknown>) =>
+    checkCreation(vtm, { values } as SheetData, input)
+  const one = (n: string) => [{ id: n, name: n, value: 1 }]
+
+  it('Disciplinas com básicos: entra com os pontos básicos', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'disciplines')).toBe(
+      'Entra com os pontos básicos (faltam 3 de 3).'
+    )
+  })
+
+  it('grupo cheio: em Pontos básicos, o motivo; em bônus, o preço e o saldo', () => {
+    const full = at({
+      disciplines: [...one('a'), ...one('b'), ...one('c')],
+    })
+    expect(addAdvice(vtm, full, 'basics', 'disciplines')).toMatch(
+      /Disciplinas: os 3 pontos básicos já foram usados/
+    )
+    expect(addAdvice(vtm, full, 'freebies', 'disciplines')).toBe(
+      '+1 = 7 bônus; restam 15.'
+    )
+  })
+
+  it('Qualidade: o Custo do item em bônus; Defeito: o crédito até 7', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (começa em 1); restam 15.'
+    )
+    expect(addAdvice(vtm, at({}), 'basics', 'flaws')).toBe(
+      'Devolve o Bônus do item, até 7 no total.'
+    )
+  })
+
+  it('lista fora de qualquer conta: nada', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
   })
 })

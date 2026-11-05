@@ -166,6 +166,38 @@ describe('ListEditor', () => {
     expect(screen.getByTestId('item-sheet-disciplines')).toBeTruthy()
   })
 
+  it('nome repetido sem catálogo: "Já há", o Enter explica e "Adicionar outro" repete', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: {
+        ...helena.values,
+        merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+      },
+    }
+    const { store } = await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'ambidestro')
+    expect(screen.getByTestId('add-repeated')).toHaveTextContent(
+      'Já há “ambidestro” na ficha.'
+    )
+    // O Enter não repete sem querer
+    fireEvent(textInput('Nome'), 'submitEditing', {
+      nativeEvent: { text: 'ambidestro' },
+    })
+    expect(store().getState().draftEvents()).toEqual([])
+    expect(screen.getByTestId('add-sheet-merits')).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar outro “ambidestro”' })
+    )
+    const merits = store().getState().draftEvents()[0]?.to as ListItem[]
+    expect(merits.map(m => m.name)).toEqual(['Ambidestro', 'ambidestro'])
+  })
+
   it('remover pede confirmação', async () => {
     const { disciplines } = await helenaInEvolve()
     const open = () =>

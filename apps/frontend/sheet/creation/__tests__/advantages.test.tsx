@@ -402,6 +402,43 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
   })
 })
 
+describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
+  it('"Adicionar Qualidade" diz o custo e o saldo antes do toque', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(
+      /Custa o Custo do item em bônus \(começa em 1\); restam 15\./
+    )
+  })
+
+  it('sem saldo: "restam 0", e o toque continua dando a recusa na folha', async () => {
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(/restam 0/)
+    fireEvent.changeText(textInput('Nome'), 'Ambidestro')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
+    )
+    expect(alertsIn('add-sheet-merits')).toHaveLength(1)
+  })
+
+  it('"Adicionar Disciplina": os básicos que faltam, ou o motivo com o grupo cheio', async () => {
+    await open()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(
+      /Entra com os pontos básicos \(faltam 3 de 3\)\./
+    )
+  })
+
+  it('fora da Criação (Editar), sem prévia', async () => {
+    await open({}, { mode: 'free' })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.queryByTestId('add-preview')).toBeNull()
+  })
+})
+
 describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
   it('Brujah: "Do clã" com as 3 e "Outras" com as 14; Dominação entra e a linha avisa, sem bloquear', async () => {
     await open({ clan: 'brujah' }, { identity: true })
