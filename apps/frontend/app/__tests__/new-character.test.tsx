@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
 import {
   useFocusEffect,
   useLocalSearchParams,
@@ -101,6 +107,24 @@ describe('Nova ficha', () => {
       values: { name: 'Helena', nature: 'Arquiteto', demeanor: 'Galã' },
       clientCommandId: expect.any(String),
     })
+  })
+
+  // T-60: a lista na ordem do rótulo em português, não na do livro em inglês
+  it('as sugestões da Natureza vêm na ordem do rótulo', async () => {
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.press(await screen.findByTestId('suggest-nature'))
+    const list = within(screen.getByTestId('suggest-nature-list'))
+    const names = list
+      .getAllByRole('button')
+      .map(b => String(b.props.accessibilityLabel ?? ''))
+    expect(names.slice(0, 5)).toEqual([
+      'Arquiteto',
+      'Autocrata',
+      'Bon Vivant',
+      'Caçador de Emoções',
+      'Camaleão',
+    ])
+    expect(names.slice(-3)).toEqual(['Trapaceiro', 'Valentão', 'Visionário'])
   })
 
   // T-21: o erro fica fora da tela; a tela rola até o campo e o foca

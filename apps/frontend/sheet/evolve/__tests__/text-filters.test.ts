@@ -1,7 +1,7 @@
 import { resolve } from '@tms/sheet-core'
 import { example, modelOf } from '../../../test/fixtures'
 import { filterActive, passesRule, visibleFields } from '../filters'
-import { fold, nextItemId, noneOf } from '../text'
+import { byLabel, fold, nextItemId, noneOf } from '../text'
 
 describe('texto de apoio', () => {
   it.each([
@@ -24,6 +24,67 @@ describe('texto de apoio', () => {
     ['Item', 'Nenhum Item'],
   ])('noneOf(%s)', (label, out) => {
     expect(noneOf(label)).toBe(out)
+  })
+
+  // T-60: a ordem do rótulo em português, igual no Hermes, no web e no Jest
+  it('byLabel: acento, "ç" e caixa não contam; o empate fica estável', () => {
+    expect(
+      byLabel(['ética', 'Zelo', 'açúcar', 'Ação', 'acaso', 'Bala'])
+    ).toEqual(['Ação', 'acaso', 'açúcar', 'Bala', 'ética', 'Zelo'])
+    // empate no fold: desempata pelo rótulo original, sempre igual
+    expect(byLabel(['área', 'Area', 'area'])).toEqual(['Area', 'area', 'área'])
+    expect(byLabel(['b', 'a'])).toEqual(['a', 'b'])
+    // com chave: o nome de um item que não é texto
+    expect(
+      byLabel([{ name: 'Rapidez' }, { name: 'Ofuscação' }], x => x.name)
+    ).toEqual([{ name: 'Ofuscação' }, { name: 'Rapidez' }])
+    // devolve cópia
+    const input = ['b', 'a']
+    byLabel(input)
+    expect(input).toEqual(['b', 'a'])
+  })
+
+  it('byLabel nos templates do V20: Arquétipos e Disciplinas', () => {
+    const v20 = modelOf('vtm-v20')
+    const def = (id: string) =>
+      v20.fields.get(id)?.def as unknown as {
+        suggestions?: string[]
+        catalog?: string[]
+      }
+    const archetypes = byLabel(def('nature').suggestions ?? [])
+    expect(archetypes).toHaveLength(42)
+    expect(archetypes.slice(0, 5)).toEqual([
+      'Arquiteto',
+      'Autocrata',
+      'Bon Vivant',
+      'Caçador de Emoções',
+      'Camaleão',
+    ])
+    expect(archetypes.slice(-3)).toEqual([
+      'Trapaceiro',
+      'Valentão',
+      'Visionário',
+    ])
+    const disciplines = byLabel(def('disciplines').catalog ?? [])
+    expect(disciplines).toEqual([
+      'Animalismo',
+      'Auspícios',
+      'Demência',
+      'Dominação',
+      'Fortitude',
+      'Metamorfose',
+      'Necromancia',
+      'Ofuscação',
+      'Potência',
+      'Presença',
+      'Quietus',
+      'Quimerismo',
+      'Rapidez',
+      'Serpentis',
+      'Taumaturgia',
+      'Tenebrosidade',
+      'Vicissitude',
+    ])
   })
 
   it('nextItemId não repete id', () => {
