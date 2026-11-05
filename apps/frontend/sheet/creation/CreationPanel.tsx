@@ -405,19 +405,33 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
   // "Ver Pontos" troca de aba depois que a folha sai (onClosed)
   const toPoints = useRef(false)
 
+  // A decisão de abrir espera a leitura do disco: depois de recarregar, a
+  // memória está vazia e a marca só chega pelo readBonusSeen (assíncrono).
+  // Decidir antes reabria a folha na mesma ficha (achado do E2E da onda 4)
+  const [ready, setReady] = useState(false)
+  const hasCheck = useSheetSelector(s => s.check != null)
+
   useEffect(() => {
     seen.current = bonusSeenNow(storage, characterId)
     let alive = true
-    void readBonusSeen(storage, characterId).then(value => {
-      if (alive && value) seen.current = true
-    })
+    if (seen.current) setReady(true)
+    else {
+      setReady(false)
+      void readBonusSeen(storage, characterId).then(value => {
+        if (!alive) return
+        if (value) seen.current = true
+        setReady(true)
+      })
+    }
     return () => {
       alive = false
     }
   }, [storage, characterId])
 
   useEffect(() => {
-    if (!creating) return
+    // Sem a conta ou sem a marca lida, nada é registrado: a primeira passagem
+    // com as duas vale como "abriu assim" (sem folha se já estava distribuído)
+    if (!creating || !hasCheck || !ready) return
     const before = was.current
     was.current = done
     const closedBefore = wasClosed.current
@@ -445,7 +459,18 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
       AccessibilityInfo.announceForAccessibility(
         sends ? CLOSED_COPY.announceSend : CLOSED_COPY.announce
       )
-  }, [creating, done, closed, spent, sends, store, storage, characterId])
+  }, [
+    creating,
+    hasCheck,
+    ready,
+    done,
+    closed,
+    spent,
+    sends,
+    store,
+    storage,
+    characterId,
+  ])
 
   return (
     <BottomSheet
