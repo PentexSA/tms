@@ -315,7 +315,7 @@ function GuideList({
  * bônus quando os básicos fecham. Rascunho do time, para revisão.
  */
 function PhaseBlock() {
-  const { store } = useSheet()
+  const { store, mode } = useSheet()
   const phase = useSheetSelector(s => s.creationPhase)
   // Todos os grupos com prioridade e sem básico sobrando
   // Sem o saldo do `basicsDone`: com os básicos fechados, voltar a eles não
@@ -333,7 +333,9 @@ function PhaseBlock() {
           ? 'Cada grupo trava quando os pontos básicos acabam. Quando todos fecharem, a fase passa sozinha para os pontos de bônus.'
           : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
       </Text>
-      {basics || !closed ? (
+      {/* A troca só para quem edita a criação: em Leitura (o narrador na
+          ficha alheia, T-33), nada fica editável, e a fase é só texto */}
+      {mode === 'create' && (basics || !closed) ? (
         <View style={styles.phaseAction}>
           <Button
             title={

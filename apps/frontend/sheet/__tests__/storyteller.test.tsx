@@ -364,6 +364,11 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     // Nada editável: nenhum controle de pontos, e nenhum lote na fila
     expect(screen.queryAllByRole('adjustable')).toHaveLength(0)
     expect(post).not.toHaveBeenCalled()
+    // A1 (roteiro web da onda 4): a fase é só texto, sem a troca manual
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos básicos'
+    )
+    expect(screen.queryByTestId('creation-phase-switch')).toBeNull()
   })
 
   it('"Editar como narrador" abre a Criação; voltar com alteração pergunta', async () => {
