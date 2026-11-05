@@ -139,9 +139,22 @@ describe('ListEditor', () => {
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     expect(screen.getByText('Nenhuma Disciplina')).toBeTruthy()
     expect(screen.getByText('Nenhum Antecedente')).toBeTruthy()
+    // T-66: o gênero pela regra do português, não pela letra final
+    expect(screen.getByText('Nenhuma Qualidade')).toBeTruthy()
+    expect(screen.queryByText('Nenhum Qualidade')).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Adicionar Antecedente' })
     ).toBeTruthy()
+  })
+
+  it('T-66: na Leitura, a lista vazia também concorda', async () => {
+    const nova = { values: { name: 'Nova' }, specialties: {} }
+    await renderLive(
+      { model: vtm, sheet: nova, mode: 'read' },
+      fakeServer(vtm, nova).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.getByText('Nenhuma Qualidade')).toBeTruthy()
   })
 
   it('renomear o item; o campo de nome respeita o limite do validador', async () => {

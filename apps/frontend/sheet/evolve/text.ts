@@ -48,14 +48,25 @@ const MASCULINE_A = new Set([
   'tema',
 ])
 
+// Terminações de substantivos femininos em português, já sem acento
+// ("-ção" → "cao"): Qualidade, Consequência (pelo "a"), Cicatriz, Imagem,
+// Espécie, Análise. Os masculinos que fogem da regra ficam na lista abaixo.
+const FEMININE_ENDINGS = ['ade', 'cao', 'sao', 'gem', 'ie', 'ise', 'triz']
+const MASCULINE_OTHER = new Set(['coracao', 'personagem'])
+
 /**
- * "Nenhuma Disciplina", "Nenhum Antecedente", "Nenhuma Magia", "Nenhum Dom".
- * O template só dá o rótulo do item; o gênero sai do substantivo principal
- * (a primeira palavra: "Arma de fogo" → "arma").
+ * "Nenhuma Disciplina", "Nenhum Antecedente", "Nenhuma Qualidade", "Nenhum
+ * Dom". O template só dá o rótulo do item; o gênero sai do substantivo
+ * principal (a primeira palavra: "Arma de fogo" → "arma"), pela regra do
+ * português (T-66): o "a" final, fora os masculinos conhecidos, e as
+ * terminações femininas ("-dade", "-ção", "-triz"…). A regra é do idioma
+ * dos templates de hoje (`pt-BR`).
  */
 export function noneOf(itemLabel: string): string {
   const head = fold(itemLabel).split(/\s+/)[0] ?? ''
-  const feminine = head.endsWith('a') && !MASCULINE_A.has(head)
+  const feminine = head.endsWith('a')
+    ? !MASCULINE_A.has(head)
+    : FEMININE_ENDINGS.some(e => head.endsWith(e)) && !MASCULINE_OTHER.has(head)
   return `${feminine ? 'Nenhuma' : 'Nenhum'} ${itemLabel}`
 }
 

@@ -3,6 +3,28 @@ import { example, modelOf } from '../../../test/fixtures'
 import { filterActive, passesRule, visibleFields } from '../filters'
 import { byLabel, fold, nextItemId, noneOf } from '../text'
 
+// O gênero de cada itemLabel dos seis templates
+const NONE_GENDER: Record<string, string> = {
+  Arma: 'Nenhuma',
+  Item: 'Nenhum',
+  Ataque: 'Nenhum',
+  Magia: 'Nenhuma',
+  Aspecto: 'Nenhum',
+  Consequência: 'Nenhuma',
+  Façanha: 'Nenhuma',
+  Antecedente: 'Nenhum',
+  Defeito: 'Nenhum',
+  Descritor: 'Nenhum',
+  Maravilha: 'Nenhuma',
+  Qualidade: 'Nenhuma',
+  Rotina: 'Nenhuma',
+  Disciplina: 'Nenhuma',
+  Cicatriz: 'Nenhuma',
+  Dom: 'Nenhum',
+  Fetiche: 'Nenhum',
+  Rito: 'Nenhum',
+}
+
 describe('texto de apoio', () => {
   it.each([
     ['Ocultismo', 'ocultismo'],
@@ -13,17 +35,61 @@ describe('texto de apoio', () => {
     expect(fold(input)).toBe(out)
   })
 
+  // T-66: os 25 itemLabel dos seis templates (cada template novo entra
+  // aqui) e os casos de borda da regra
   it.each([
-    ['Disciplina', 'Nenhuma Disciplina'],
-    ['Antecedente', 'Nenhum Antecedente'],
+    ['Arma', 'Nenhuma Arma'],
+    ['Item', 'Nenhum Item'],
+    ['Ataque', 'Nenhum Ataque'],
     ['Magia', 'Nenhuma Magia'],
-    ['Dom', 'Nenhum Dom'],
+    ['Aspecto', 'Nenhum Aspecto'],
+    ['Consequência', 'Nenhuma Consequência'],
     ['Façanha', 'Nenhuma Façanha'],
+    ['Antecedente', 'Nenhum Antecedente'],
+    ['Defeito', 'Nenhum Defeito'],
+    ['Descritor', 'Nenhum Descritor'],
+    ['Maravilha', 'Nenhuma Maravilha'],
+    ['Qualidade', 'Nenhuma Qualidade'],
+    ['Rotina', 'Nenhuma Rotina'],
+    ['Disciplina', 'Nenhuma Disciplina'],
+    ['Cicatriz', 'Nenhuma Cicatriz'],
+    ['Dom', 'Nenhum Dom'],
+    ['Fetiche', 'Nenhum Fetiche'],
+    ['Rito', 'Nenhum Rito'],
+    // bordas
     ['Arma de fogo', 'Nenhuma Arma de fogo'],
     ['Problema', 'Nenhum Problema'],
-    ['Item', 'Nenhum Item'],
+    ['Habilidade especial', 'Nenhuma Habilidade especial'],
+    ['Condição', 'Nenhuma Condição'],
+    ['Imagem', 'Nenhuma Imagem'],
+    ['Espécie', 'Nenhuma Espécie'],
+    ['Análise', 'Nenhuma Análise'],
+    ['Imperatriz', 'Nenhuma Imperatriz'],
+    ['Coração', 'Nenhum Coração'],
+    ['Personagem', 'Nenhum Personagem'],
+    ['Aliado', 'Nenhum Aliado'],
   ])('noneOf(%s)', (label, out) => {
     expect(noneOf(label)).toBe(out)
+  })
+
+  it('cobre todo itemLabel dos templates do produto e de teste', () => {
+    const labels = new Set<string>()
+    for (const system of [
+      'vtm-v20',
+      'wta-w20',
+      'mta-m20',
+      'dnd5e-2014',
+      'coc7e',
+      'fate-core',
+    ])
+      for (const [, f] of modelOf(system).fields)
+        if (f.def.type === 'list' && f.def.itemLabel)
+          labels.add(f.def.itemLabel)
+    expect(labels.size).toBe(18)
+    const wrong = [...labels].filter(
+      l => noneOf(l) !== `${NONE_GENDER[l] ?? '?'} ${l}`
+    )
+    expect(wrong).toEqual([])
   })
 
   // T-60: a ordem do rótulo em português, igual no Hermes, no web e no Jest
