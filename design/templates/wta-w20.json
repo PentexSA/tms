@@ -1180,7 +1180,10 @@
         "max": 3
       }
     ],
-    "untracked": ["rank", "rites", "fetishes", "battleScars"]
+    "untracked": ["rank", "rites", "fetishes", "battleScars"],
+    "advice": [
+      { "rule": "item-meta-max", "targets": ["gifts"], "meta": "rank", "max": 1 }
+    ]
   },
   "costs": {
     "freebie": [
