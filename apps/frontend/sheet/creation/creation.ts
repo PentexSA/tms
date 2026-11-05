@@ -259,7 +259,7 @@ export function problemText(
       const at = p.paths[0]
       const c = at ? componentAt(check, at) : null
       if (!c) return `${field}: abaixo do valor inicial.`
-      const source = startSource(model, c.field, resolved)
+      const source = initialSource(model, c, resolved)
       return `${field}: abaixo de ${c.initial}, o valor inicial${source ? ` (vem de ${source})` : ''}.`
     }
   }
@@ -503,6 +503,18 @@ function refusalNotice(
 }
 
 /**
+ * O toque que o `draftRefusal` avalia (T-85): os caminhos que ele mudou e,
+ * se quem chama já tem, a ficha resolvida depois dele (o store tem; sem ela,
+ * o `draftRefusal` resolve só quando precisa do texto).
+ */
+export interface DraftTouch {
+  readonly paths: readonly string[]
+  readonly resolved?: ResolvedSheet
+}
+
+const NO_TOUCH: DraftTouch = { paths: [] }
+
+/**
  * Por que uma mudança no rascunho da criação não entra, ou null. A mesma
  * avaliação parcial do "Salvar" (`checkCreationBatch`), agora a cada toque, e
  * em `basics` também o grupo que passaria do orçamento ou o traço que passaria
@@ -518,12 +530,12 @@ export function draftRefusal(
   },
   input: CreationInput,
   phase: CreationPhase,
-  paths: readonly string[] = []
+  touch: DraftTouch = NO_TOUCH
 ): CreationNotice | null {
   const refused = checkCreationBatch(model, sheets.before, sheets.after, input)
   if (refused)
     return refusalNotice(model, sheets, checks, refused.code, refused.problems)
-  const below = belowInitial(model, sheets.after, checks, paths)
+  const below = belowInitial(model, sheets.after, checks, touch)
   if (below) return below
   if (phase !== 'basics' || !checks.after) return null
   const freebies = checks.after.freebies !== null
@@ -566,7 +578,7 @@ function belowInitial(
     readonly before: CreationCheck | null
     readonly after: CreationCheck | null
   },
-  paths: readonly string[]
+  { paths, resolved }: DraftTouch
 ): CreationNotice | null {
   if (!paths.length || !checks.after) return null
   const touched = (p: string) =>
@@ -581,10 +593,17 @@ function belowInitial(
     if (!at || (p.amount ?? 0) <= amountBefore(at)) continue
     const c = componentAt(checks.after, at)
     if (!c) continue
-    return {
-      cause: 'initial',
-      text: `${fieldLabel(model, at)}: ${initialText(model, c, resolve(model, after))}`,
-    }
+    const sheet = resolved ?? resolve(model, after)
+    // O baseline travado diz o mesmo que a previsão do "−" (downAdvice)
+    return c.locked
+      ? {
+          cause: 'locked',
+          text: `${fieldLabel(model, at)}: ${lockedText(model, c, sheet)}`,
+        }
+      : {
+          cause: 'initial',
+          text: `${fieldLabel(model, at)}: ${initialText(model, c, sheet)}`,
+        }
   }
   return null
 }
@@ -595,8 +614,47 @@ function initialText(
   c: CreationComponent,
   resolved?: ResolvedSheet
 ): string {
-  const source = startSource(model, c.field, resolved)
+  const source = initialSource(model, c, resolved)
   return `na criação, não fica abaixo de ${c.initial}${source ? ` (vem de ${source})` : ''}.`
+}
+
+/** "fica em 0 na criação (Clã: Nosferatu)." */
+const lockedText = (
+  model: SheetModel,
+  c: CreationComponent,
+  resolved?: ResolvedSheet
+): string => `fica em ${c.initial} na criação${lockReason(model, resolved, c)}.`
+
+/**
+ * De onde vem o valor inicial de um componente, pelo mesmo critério da conta
+ * (`checkCreation`, `initialOf`): o baseline que vale (a escolha da condição
+ * dele, "Clã: Nosferatu"), a base do point-buy (sem origem a citar) ou a
+ * fórmula do campo ("Coragem", "Augúrio: Ahroun"). Sem a ficha resolvida,
+ * só a fórmula, e só quando nenhum baseline ou point-buy mira o campo.
+ */
+function initialSource(
+  model: SheetModel,
+  c: CreationComponent,
+  resolved?: ResolvedSheet
+): string | null {
+  const def = model.template.creation
+  const baselines = (def?.baselines ?? []).filter(bl =>
+    bl.targets.includes(c.field)
+  )
+  const pointBuy = (def?.budgets ?? []).some(
+    b => b.rule === 'point-buy' && b.targets.includes(c.field)
+  )
+  if (!resolved)
+    return baselines.length || pointBuy ? null : startSource(model, c.field)
+  for (const bl of baselines) {
+    if (bl.when && !conditionHolds(resolved, bl.when, c.field)) continue
+    if (!bl.when) return null
+    const r = resolved.get(bl.when.field)
+    return r?.type === 'choice' && r.option
+      ? `${r.field.def.label}: ${r.option.label}`
+      : null
+  }
+  return pointBuy ? null : startSource(model, c.field, resolved)
 }
 
 /** O menor valor que o campo aceita no template (o "−" desabilitado). */
@@ -634,6 +692,9 @@ export interface StepAdvice {
   readonly text: string | null
   readonly cost: number | null
   readonly inline: boolean
+  // Só no "−": até onde segurar o botão desce sem o toque ser recusado (o
+  // valor inicial). Acima dele, o "−" fica livre, e a repetição para ali
+  readonly floor?: number
 }
 
 const advice = (
@@ -709,9 +770,11 @@ export function stepAdvice(
 export type StepDirection = 'up' | 'down'
 
 /**
- * A previsão do "−" (T-85): no valor inicial, com o inicial acima do mínimo
- * do campo e sem baseline travado, o "−" fica com a cara de indisponível e
- * diz de onde vem o inicial. Acima do inicial, livre (desfazer uma compra).
+ * A previsão do "−" (T-85), com o mesmo critério da recusa (belowInitial):
+ * no valor inicial, com o inicial acima do mínimo do campo, o "−" fica com a
+ * cara de indisponível e diz de onde vem o inicial (ou que o baseline
+ * trava). Acima do inicial, livre (desfazer uma compra), com o `floor`: a
+ * repetição de segurar para no inicial.
  */
 function downAdvice(
   model: SheetModel,
@@ -720,10 +783,15 @@ function downAdvice(
   resolved?: ResolvedSheet
 ): StepAdvice | null {
   const c = placeOf(check, path)?.component
-  if (!c || c.locked) return null
-  if (c.value > c.initial || c.initial <= fieldMin(model, c)) return null
-  const text = initialText(model, c, resolved)
-  return advice('initial', text.charAt(0).toUpperCase() + text.slice(1))
+  if (!c || c.initial <= fieldMin(model, c)) return null
+  if (c.value > c.initial) return { ...advice(null, null), floor: c.initial }
+  const text = c.locked
+    ? lockedText(model, c, resolved)
+    : initialText(model, c, resolved)
+  return advice(
+    c.locked ? 'locked' : 'initial',
+    text.charAt(0).toUpperCase() + text.slice(1)
+  )
 }
 
 /** O próximo ponto num grupo de orçamento: básico, teto, preço ou saldo. */

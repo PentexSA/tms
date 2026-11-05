@@ -8,7 +8,7 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
-import { modelOf } from '../../../test/fixtures'
+import { modelOf, templateJson } from '../../../test/fixtures'
 import {
   type CreationPhase,
   completeLabel,
@@ -860,7 +860,14 @@ describe('o "−" no valor inicial (T-85)', () => {
         { ...AHROUN, rage: { permanent: 6, current: 6 } },
         'values.rage'
       )
-    ).toBeNull()
+      // em 6, livre; segurar para no 5 (o floor)
+    ).toEqual({
+      blocked: null,
+      text: null,
+      cost: null,
+      inline: false,
+      floor: 5,
+    })
     // o "+" continua com a previsão de sempre
     expect(
       stepAdvice(w20, checkOf(w20, AHROUN), 'freebies', 'values.rage')
@@ -914,7 +921,7 @@ describe('o "−" no valor inicial (T-85)', () => {
       },
       input,
       phase,
-      paths
+      { paths }
     )
   }
 
@@ -963,5 +970,143 @@ describe('o "−" no valor inicial (T-85)', () => {
       'Fúria: abaixo de 5, o valor inicial (vem de Augúrio).'
     )
     expect(problemText(w20, null, p)).toBe('Fúria: abaixo do valor inicial.')
+  })
+})
+
+// Achados 2 e 4 do /code-review: a previsão do "−" e a recusa concordam no
+// baseline travado, e o "(vem de …)" cita a origem certa do inicial (o
+// baseline que vale, não a fórmula do campo). Template de teste: o V20 com
+// dois baselines na FdV, que tem fórmula (Coragem).
+describe('o "−" no inicial: baseline e origem (achados 2 e 4)', () => {
+  const WOD: CreationChoices = {
+    priorities: {
+      attributes: ['physical', 'social', 'mental'],
+      abilities: ['talents', 'skills', 'knowledges'],
+    },
+  }
+  const t = JSON.parse(JSON.stringify(templateJson('vtm-v20')))
+  t.creation.baselines = [
+    ...t.creation.baselines,
+    {
+      targets: ['willpower'],
+      value: 4,
+      locked: true,
+      when: { field: 'clan', in: ['ventrue'] },
+    },
+    {
+      targets: ['willpower'],
+      value: 3,
+      when: { field: 'clan', in: ['brujah'] },
+    },
+  ]
+  const m = compileTemplate(t)
+  const input = { config: effectiveCreationConfig(m), choices: WOD }
+  const checkOf = (values: Record<string, unknown>) =>
+    checkCreation(m, { values }, input)
+  const down = (values: Record<string, unknown>) =>
+    stepAdvice(
+      m,
+      checkOf(values),
+      'freebies',
+      'values.willpower',
+      resolve(m, { values }),
+      'down'
+    )
+  const refuse = (
+    before: Record<string, unknown>,
+    after: Record<string, unknown>
+  ) => {
+    const sheets = {
+      before: { values: before } as SheetData,
+      after: { values: after } as SheetData,
+    }
+    return draftRefusal(
+      m,
+      sheets,
+      {
+        before: checkCreation(m, sheets.before, input),
+        after: checkCreation(m, sheets.after, input),
+      },
+      input,
+      'freebies',
+      { paths: ['values.willpower'] }
+    )
+  }
+
+  it('baseline travado acima do mínimo: a previsão e a recusa dizem o mesmo', () => {
+    const v = {
+      name: 'V',
+      clan: 'ventrue',
+      courage: 1,
+      willpower: { permanent: 4, current: 4 },
+    }
+    expect(down(v)).toMatchObject({
+      blocked: 'locked',
+      text: 'Fica em 4 na criação (Clã: Ventrue).',
+    })
+    expect(
+      refuse(v, { ...v, willpower: { permanent: 3, current: 3 } })
+    ).toEqual({
+      cause: 'locked',
+      text: 'Força de Vontade: fica em 4 na criação (Clã: Ventrue).',
+    })
+  })
+
+  it('o inicial do baseline cita a escolha dele, não a fórmula', () => {
+    // Coragem 1, mas o inicial é o 3 do baseline do Brujah
+    const v = { name: 'B', clan: 'brujah', courage: 1 }
+    expect(down(v)).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 3 (vem de Clã: Brujah).',
+    })
+    const lower = { ...v, willpower: { permanent: 2, current: 2 } }
+    const check = checkOf(lower)
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (!p) throw new Error('sem o problema')
+    expect(problemText(m, check, p, resolve(m, { values: lower }))).toBe(
+      'Força de Vontade: abaixo de 3, o valor inicial (vem de Clã: Brujah).'
+    )
+    // Sem a ficha, não dá para saber qual baseline vale: sem "vem de"
+    expect(problemText(m, check, p)).toBe(
+      'Força de Vontade: abaixo de 3, o valor inicial.'
+    )
+  })
+
+  it('baseline sem condição ou base de point-buy: sem "vem de"', () => {
+    const plain = JSON.parse(JSON.stringify(templateJson('vtm-v20')))
+    plain.creation.baselines = [{ targets: ['willpower'], value: 2 }]
+    const pm = compileTemplate(plain)
+    const values = { name: 'P', clan: 'brujah', courage: 1 }
+    expect(
+      stepAdvice(
+        pm,
+        checkCreation(
+          pm,
+          { values },
+          {
+            config: effectiveCreationConfig(pm),
+            choices: WOD,
+          }
+        ),
+        'freebies',
+        'values.willpower',
+        resolve(pm, { values }),
+        'down'
+      )
+    ).toMatchObject({ text: 'Na criação, não fica abaixo de 2.' })
+    const dnd = modelOf('dnd5e-2014')
+    const at = dnd.template.creation?.budgets.find(b => b.rule === 'point-buy')
+    if (!at || at.rule !== 'point-buy') throw new Error('sem point-buy')
+    const id = at.targets[0] as string
+    const check = checkCreation(
+      dnd,
+      { values: { name: 'D', [id]: at.base - 1 } },
+      { config: effectiveCreationConfig(dnd), choices: {} }
+    )
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (p)
+      expect(
+        problemText(dnd, check, p, resolve(dnd, { values: {} }))
+      ).not.toContain('vem de')
   })
 })

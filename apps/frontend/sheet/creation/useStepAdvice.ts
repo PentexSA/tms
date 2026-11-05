@@ -8,7 +8,8 @@ const same = (a: StepAdvice | null, b: StepAdvice | null): boolean =>
     a.blocked === b.blocked &&
     a.text === b.text &&
     a.cost === b.cost &&
-    a.inline === b.inline)
+    a.inline === b.inline &&
+    a.floor === b.floor)
 
 /**
  * A previsão do "+" (ou do "−", com `direction`, T-85) de um caminho (T-20,

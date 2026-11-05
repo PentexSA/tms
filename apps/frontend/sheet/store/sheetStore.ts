@@ -493,7 +493,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         { before: s.check, after: next.check },
         s.creation,
         s.creationPhase,
-        events.map(e => e.path)
+        { paths: events.map(e => e.path), resolved: next.resolved }
       )
       if (why)
         return {
