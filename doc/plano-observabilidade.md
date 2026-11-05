@@ -29,6 +29,34 @@ O caminho inicial usa UptimeRobot e Sentry; o PostHog entra somente na Fase 5b.
 Na consulta original, a página do PostHog dizia que o plano grátis não pede
 cartão; conferir condições, cotas e retenção antes de ativar a integração.
 
+### Estado e ordem do que falta (05/11/2026)
+
+Feitas: Fases 1 a 4 e a 5a (falta só rodá-la no Neon do deploy de teste,
+[Fase 5 §2](plano-observabilidade-fase-5.md#estado-05112026)). Ordem do resto:
+
+1. **Alerta de perda de edição, puxado da Fase 7.** A falha definitiva da fila
+   de sync já chega ao Sentry desde a Fase 3 (`captureError` com `source: sync`
+   em `apps/frontend/sheet/sync/sync.ts`: lote recusado e lote que não coube no
+   aparelho). Falta só uma regra de alerta para issue com `source:sync`, sem
+   código. Vem primeiro porque perda de edição é o pior erro do produto e o
+   sinal já existe.
+2. **Fase 6, traces.** Mesmo SDK, sem conta nova. Destrava a Fase 7: latência
+   por rota, p95 e taxa de 5xx saem dos traces, e os alertas dela dependem
+   disso. Sozinha, já mostra o peso do cold start do Neon numa ação real, as
+   queries lentas das rotas críticas e os Web Vitals do web.
+3. **Fase 7, métricas e alertas**, sobre os traces: só as métricas que eles
+   não mostram e os demais alertas iniciais.
+4. **Em paralelo, quando houver acesso ao Neon:** rodar a 5a com o role
+   restrito e registrar o custo.
+
+As medidas de tempo e toques na criação de ficha
+([Fase 5 §2](plano-observabilidade-fase-5.md#próximo-criação-de-ficha-tempo-e-toques))
+respondem pergunta de produto, não de saúde do sistema: entram quando essa
+resposta for necessária, sem competir com a Fase 6.
+
+Ficam esperando o próprio gatilho: 5b (pergunta que o relatório não responda e
+decisão nº 2, §7), 8 (distribuição do app nativo) e 9 (um dos gatilhos da fase).
+
 ## 2. Ponto de partida
 
 ### O que já existe
@@ -567,6 +595,9 @@ não mostram:
 
 **Alertas iniciais:** poucos, para continuarem sendo lidos. Taxa de 5xx acima de 2%
 por 10 min, p95 acima de 2 s nas rotas críticas e qualquer falha definitiva da fila.
+O alerta da fila não depende de métrica nem dos traces: sai antes da Fase 6,
+como regra sobre os issues `source:sync` que a Fase 3 já envia (§1, “Estado e
+ordem do que falta”).
 
 **Pronto quando:** um único painel diz se o sistema está saudável, e cada alerta
 tem uma ação clara.
