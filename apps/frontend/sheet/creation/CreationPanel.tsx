@@ -350,10 +350,11 @@ function PhaseBlock() {
 function Ledger() {
   const { model } = useSheet()
   const check = useSheetSelector(s => s.check)
-  const { onLayout, target } = useAnchor('creation-ledger', {
+  const ledger = freebieLedger(model, check)
+  // Sem extrato, sem âncora: o id nulo tira a posição velha do mapa
+  const { onLayout, target } = useAnchor(ledger ? 'creation-ledger' : null, {
     parent: 'creation-panel',
   })
-  const ledger = freebieLedger(model, check)
   if (!ledger) return null
   return (
     <View
