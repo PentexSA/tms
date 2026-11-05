@@ -673,6 +673,111 @@ describe('migrations', () => {
     }
   })
 
+  // Onda 4 (onda-4.md §4.7): a 0023 grava as versões novas dos templates do
+  // produto num banco que já tem as anteriores, que continuam lá
+  describe('0023: as versões da onda 4', () => {
+    const previous: Record<string, string> = {
+      'vtm-v20': '1.8.0',
+      'mta-m20': '1.6.0',
+      'wta-w20': '1.6.0',
+    }
+    const versions = async (
+      db: Awaited<ReturnType<typeof createPGliteTestDb>>['db']
+    ) =>
+      (
+        await db
+          .selectFrom('trait_templates as t')
+          .innerJoin('game_systems as g', 'g.id', 't.system_id')
+          .select(['g.code', 't.version'])
+          .orderBy('g.code')
+          .orderBy('t.version')
+          .execute()
+      ).map(r => `${r.code}@${r.version}`)
+
+    it('os arquivos estão nas versões da onda', () => {
+      expect(
+        PRODUCT_TEMPLATES.map(
+          s =>
+            (productTemplate(s) as { templateVersion: string }).templateVersion
+        )
+      ).toEqual(['1.9.0', '1.7.0', '1.7.0'])
+    })
+
+    it('um banco com as versões anteriores ganha as novas, e as anteriores ficam', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect(
+          (await migrator.migrateTo('0022_user_commands')).error
+        ).toBeUndefined()
+        // Como em produção antes da onda: só as versões anteriores no banco
+        await db.deleteFrom('trait_templates').execute()
+        for (const system of PRODUCT_TEMPLATES) {
+          const old = {
+            ...(productTemplate(system) as Record<string, unknown>),
+            templateVersion: previous[system],
+          }
+          expect((await storeTemplate(db, old)).status).toBe('published')
+        }
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+        // As anteriores ficam; as novas entram (a ordem de gravação é a de
+        // PRODUCT_TEMPLATES, no laço da migration; o published_at da mesma
+        // transação não a distingue)
+        expect((await versions(db)).sort()).toEqual([
+          'mta-m20@1.6.0',
+          'mta-m20@1.7.0',
+          'vtm-v20@1.8.0',
+          'vtm-v20@1.9.0',
+          'wta-w20@1.6.0',
+          'wta-w20@1.7.0',
+        ])
+        // Num banco novo, a 0020 já gravou estes arquivos: a 0023 só confirma
+        for (const system of PRODUCT_TEMPLATES)
+          expect(
+            (await storeTemplate(db, productTemplate(system))).status
+          ).toBe('unchanged')
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('a 0023 recusa a versão já gravada com outro conteúdo', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect(
+          (await migrator.migrateTo('0022_user_commands')).error
+        ).toBeUndefined()
+        await db.deleteFrom('trait_templates').execute()
+        const vtm = productTemplate('vtm-v20') as Record<string, unknown>
+        await storeTemplate(db, { ...vtm, name: 'Outro conteúdo' })
+        const result = await migrator.migrateToLatest()
+        expect(String(result.error)).toContain(
+          'já está no banco com outro conteúdo'
+        )
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('descer a 0023 não apaga versão publicada', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const before = await versions(db)
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        const down = await migrator.migrateTo('0022_user_commands')
+        expect(down.error).toBeUndefined()
+        expect(down.results?.map(r => r.migrationName)).toEqual([
+          '0023_templates_onda4',
+        ])
+        expect(await versions(db)).toEqual(before)
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+      } finally {
+        await destroy()
+      }
+    })
+  })
+
   // T-47: a hora da Mesa vinha 3 h no futuro e a ordem por última alteração
   // errava, porque as colunas das migrations 0002 a 0005 não tinham fuso
   it('0021: nenhuma coluna timestamp sem fuso no schema', async () => {
