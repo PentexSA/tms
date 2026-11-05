@@ -487,6 +487,60 @@ Os achados da onda 3 sem pacote ([onda-3.md](onda-3.md) §11) não entram aqui. 
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+**Implementação (04/11/2026), na `pacote/p10-c-template-derivados`, commits 1 a 10 da seção 8.1.** Sem resposta do time, as perguntas da seção 9 seguiram o padrão do plano:
+
+| Pergunta | O que foi aplicado |
+|---|---|
+| 1 | O "acompanha" vale em `creating` e `pending` (`useCreation()?.status`). Sem provedor e na ficha concluída, o de antes |
+| 2 | O contador volta a zero em **todo campo inteiro de `values`** (`values.<id>`, sem item). A suíte inteira do app passou sem caso indesejado, então a restrição aos campos com fórmula não foi precisa. O E2E da integração é a última conferência: um spec que contasse um "— → 0" subido e baixado agora vê "0 alterações" |
+| 3 | A previsão e a recusa no rascunho, como o "+" do P05-C |
+| 4 | `fold` com ponto de código |
+| 5 | Regra na tela, com a tabela dos 25 `itemLabel` |
+| 6 | U-05 fechada com o teste que prende o comportamento (`mage.test.tsx`); o roteiro manual é da integração |
+| 7 | "Na criação, não fica abaixo de N (vem de …)." (rascunho do time, para revisão) |
+| 8 | Fora do pacote, como o plano propõe |
+| 9 | Uma frase só: "Aumentar: …. Diminuir: …." (`joinHints`, sem ponto duplicado) |
+
+**Desvios:**
+
+1. **A dica do "−" sem o rótulo do campo.** A seção 3.3 escrevia a dica como "Fúria: na criação, não fica abaixo de 5 (…)". As previsões do "+" não repetem o rótulo (o controle já tem o nome), então a do "−" também não: "Na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun)." O aviso do toque (`notice-<campo>`) e o `problemText` continuam com o rótulo, como os outros avisos. Na dica junta do app, fica "Aumentar: +1 = 1 bônus. Diminuir: Na criação, …".
+2. **O `problemText` ganhou um 4º parâmetro opcional, `resolved`,** para dizer a opção ("vem de Augúrio: Ahroun"). Sem ele, diz só o campo da fonte ("vem de Augúrio"); sem a conta, o texto de antes ("abaixo do valor inicial"). O `CreationPanel` passa o `resolved`. **No rebase do P05-D**, o `guide.ts` pode passar o `s.resolved` do store para ter a opção no "Faltam".
+3. **O `draftRefusal` ganhou um 6º parâmetro opcional, `paths`** (os caminhos do toque; padrão `[]`, que desliga a recusa nova). O store passa `events.map(e => e.path)`. Um caminho de lista (`values.<lista>`) casa os itens dele (`values.<lista>#<item>`).
+4. **`components.md`:** a seção do Stepper ganhou o `increase`, o `decrease` e o `StepperIncrease`. A seção 8.5 não listava o arquivo; a seção 4.5 do onda-4.md pedia a entrada.
+5. **Os testes de tela do T-22 e da U-05 usam o `Live` dos testes com um `CreationContext`** (prop nova `creation` em `apps/frontend/test/live.tsx`), em vez de montar o `SheetScreen`.
+6. **O E2E do W20 cria a própria crônica `wta-w20`** pela API (o `pointsChronicle` do ajudante é só V20), e confere o atual que acompanha pela linha do "Em jogo", sem a Mesa nem o dock: a gravação 4/4 é conferida pela API no teste do V20, e o dock a 390, no Jest (`sheet.layout.test.tsx`). O `journey.spec.ts` (l.111) não muda: o "Aumentar" do permanente continua sendo 1 evento em `values.willpower`.
+7. **Nenhum `.test.ts` novo em `components/`**: os testes puros ficaram em `sheet/` e `packages/`.
+
+**API pública para o P07-D (assinaturas estáveis):**
+
+```ts
+// @tms/ui
+interface StepperProps { /* … */ increase?: StepperIncrease; decrease?: StepperIncrease }
+interface StepperIncrease { blocked?: boolean; hint?: string | null; hintID?: string | null }
+function joinHints(up?: string | null, down?: string | null): string | null
+
+// apps/frontend/sheet/evolve/text.ts
+function byLabel<T>(items: readonly T[], key?: (item: T) => string): T[]  // cópia ordenada
+
+// apps/frontend/sheet/evolve/useRowFeedback.tsx
+useRowFeedback(path, field): { notice; note; increase?: StepperIncrease; decrease?: StepperIncrease }
+
+// apps/frontend/sheet/creation
+useStepAdvice(path, direction?: 'up' | 'down')
+stepAdvice(model, check, phase, path, resolved?, direction?: StepDirection)
+type RefusalCause = … | 'initial'
+draftRefusal(model, sheets, checks, input, phase, paths?: readonly string[])
+problemText(model, check, problem, resolved?)
+
+// @tms/sheet-core
+editResource(r: ResolvedResource, part: 'permanent' | 'max' | 'current', n: number, { follow }): ResourceValue
+defaultStored(model, sheet, id): unknown   // undefined fora do modelo
+```
+
+O −/+ da linha do P07-D passa `increase` e `decrease` do `useRowFeedback('values.<lista>#<item>', …)`: o `downAdvice` já aceita caminho de item, com o mínimo do `item.value.min` da lista.
+
+**Fica para a integração:** o E2E (Chromium e WebKit), o `/code-review` do pacote e o `/security-review` recomendado no commit 2 (`05c05a5`), o roteiro manual da seção 11 e a conferência do "−" no VoiceOver e no TalkBack (a dica junta, pergunta 9).
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 O roteiro confere cada item na interface, nas três plataformas, com a API local e o seed do roteiro (só contas fictícias `@roteiro.test`). Ele detalha o passo 6 da seção 7. A coluna "Resultado" fica em branco e é preenchida na integração.
