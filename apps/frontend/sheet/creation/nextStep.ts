@@ -16,6 +16,9 @@ export interface NextStepInput {
   readonly mode: 'free' | 'points'
   readonly approval: boolean
   readonly marker: NextStepMarker
+  // Criação por pontos: a conta fechou (o `check.complete` local, o mesmo
+  // que mostra o "Concluir"); o servidor decide de novo ao concluir
+  readonly closed?: boolean
 }
 
 // Até ~48 caracteres: cabe numa linha a 360 dp (caption)
@@ -27,11 +30,17 @@ export function nextStepCopy({
   mode,
   approval,
   marker,
+  closed = false,
 }: NextStepInput): string | null {
   // O narrador na ficha de outra pessoa: o estado está no selo e no banner
   if (by === 'other') return null
-  if (by === 'storyteller') return 'Você conclui a criação.'
+  // A conta fechou (achado 3 do onda-3 §11): a linha muda junto com o botão
+  const done = closed && mode === 'points'
+  if (by === 'storyteller')
+    return done ? CLOSED_COPY.conclude : 'Você conclui a criação.'
   const asked = marker === 'adjust' || marker === 'returned'
+  // O pedido do narrador vem antes da conta
+  if (done && !asked) return approval ? CLOSED_COPY.send : CLOSED_COPY.conclude
   if (mode === 'free') {
     if (marker === 'ready') return 'Você avisou. O narrador conclui a criação.'
     return asked
@@ -46,6 +55,14 @@ export function nextStepCopy({
     ? 'Ajuste o pedido do narrador e conclua.'
     : 'Você conclui quando a conta fechar.'
 }
+
+/** As linhas com a conta fechada (rascunho do time, para revisão). */
+export const CLOSED_COPY = {
+  conclude: 'A conta fechou: você conclui.',
+  send: 'A conta fechou: envie ao narrador.',
+  // O anúncio, uma vez, quando a conta fecha na tela
+  announce: 'A conta fechou. Você pode concluir pela barra.',
+} as const
 
 /** O marcador que vale, na precedência do selo (D-02). */
 export function markerOf(info: CreationInfo | null): NextStepMarker {

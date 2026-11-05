@@ -42,6 +42,7 @@ import {
   REFUSAL_TEXT,
   restam,
 } from './creation'
+import { CLOSED_COPY } from './nextStep'
 import { RadioChips } from './RadioChips'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
@@ -295,26 +296,38 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
   const { store } = useSheet()
   const creating = useCreating()
   const done = useSheetSelector(s => basicsDone(s.check))
+  const closed = useSheetSelector(s => s.check?.complete === true)
   const remaining = useSheetSelector(s => s.check?.freebies?.remaining ?? 0)
   const [open, setOpen] = useState(false)
   const was = useRef<boolean | null>(null)
+  const wasClosed = useRef<boolean | null>(null)
   const shown = useRef(false)
 
   useEffect(() => {
     if (!creating) return
     const before = was.current
     was.current = done
-    if (!done || before === true) return
-    const s = store.getState()
-    if (s.creationPhase === 'basics') s.setCreationPhase('freebies')
-    // Já abriu com tudo distribuído: sem aviso
-    if (before === null || shown.current) return
-    shown.current = true
-    setOpen(true)
-    AccessibilityInfo.announceForAccessibility(
-      'Pontos básicos distribuídos. Agora os pontos gastam bônus.'
-    )
-  }, [creating, done, store])
+    const closedBefore = wasClosed.current
+    wasClosed.current = closed
+    let opened = false
+    if (done && before !== true) {
+      const s = store.getState()
+      if (s.creationPhase === 'basics') s.setCreationPhase('freebies')
+      // Já abriu com tudo distribuído: sem aviso
+      if (before !== null && !shown.current) {
+        shown.current = true
+        opened = true
+        setOpen(true)
+        AccessibilityInfo.announceForAccessibility(
+          'Pontos básicos distribuídos. Agora os pontos gastam bônus.'
+        )
+      }
+    }
+    // A conta fechou na tela (P05-D): um anúncio só, e nenhum quando a folha
+    // abriu na mesma passagem, porque ela já anuncia
+    if (closedBefore === false && closed && !opened)
+      AccessibilityInfo.announceForAccessibility(CLOSED_COPY.announce)
+  }, [creating, done, closed, store])
 
   return (
     <BottomSheet

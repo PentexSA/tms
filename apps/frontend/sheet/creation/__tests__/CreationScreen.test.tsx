@@ -751,6 +751,41 @@ describe('"Faltam" na barra (R-18)', () => {
     )
   })
 
+  // Achado 3 do onda-3 §11: a linha do próximo passo muda com o botão
+  it('fechar a conta muda a linha do próximo passo, e o anúncio sai uma vez', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3, conscience: 3 })
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    const announce = jest.mocked(AccessibilityInfo.announceForAccessibility)
+    tab('Vantagens')
+    announce.mockClear()
+    step('Consciência')
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'A conta fechou: você conclui.'
+    )
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    // Os básicos fecharam na mesma passagem: só a folha anuncia
+    expect(announce.mock.calls).toEqual([
+      ['Pontos básicos distribuídos. Agora os pontos gastam bônus.'],
+    ])
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    // Abrir e fechar a conta de novo, sem a folha: o anúncio da conta
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Consciência' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    announce.mockClear()
+    step('Consciência')
+    expect(announce.mock.calls).toEqual([
+      ['A conta fechou. Você pode concluir pela barra.'],
+    ])
+  })
+
   it('na criação livre (Editar), nada de "Faltam"', async () => {
     const free = character(PRIORITIES) as {
       data: Record<string, unknown> & { creation: Record<string, unknown> }
