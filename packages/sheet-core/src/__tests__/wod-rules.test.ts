@@ -7,6 +7,7 @@ import {
   checkCreation,
   effectiveCreationConfig,
 } from '../creation'
+import { creationAdvice } from '../recommend'
 import { resolve } from '../resolve'
 import { templates } from './fixtures'
 
@@ -350,6 +351,30 @@ describe('W20', () => {
     const r = creation(wta, AHROUN)
     expect(r.problems).toEqual([])
     expect(r.freebies?.remaining).toBe(15)
+  })
+
+  // P07-D (D-07, A2 do roteiro): o template avisa o Dom acima do Posto 1
+  it('Dom de Posto 2 dá ADVICE_ABOVE_LEVEL; o de Posto 1, não; a conta não muda', () => {
+    const at = (rank: number) => ({
+      ...AHROUN,
+      gifts: [
+        { id: 'g1', name: 'Faro do Asfalto', meta: { rank } },
+        ...(AHROUN.gifts as Values[]).slice(1),
+      ],
+    })
+    const sheet = (rank: number) => resolve(wta, { values: at(rank) })
+    expect(creationAdvice(wta, sheet(2))).toEqual([
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['values.gifts#g1'],
+        amount: 1,
+        rule: 0,
+      },
+    ])
+    expect(creationAdvice(wta, sheet(1))).toEqual([])
+    // Só avisa: a conta fecha igual com o Posto 2
+    expect(creation(wta, at(2))).toEqual(creation(wta, at(1)))
   })
 
   it('bônus: Dom 7, Gnose 2, Fúria 1; o Posto não entra na conta', () => {

@@ -739,6 +739,15 @@ A integração entrou em commits próprios, depois do merge:
   Eles aparecem no bloco "Para confirmar com o narrador" (`creation-notices`) e na linha das `notes` da confirmação de concluir. O texto não começa por "Confirme com o narrador:": o título do bloco já diz isso, e a frase ficaria repetida. Fica para o PO (onda-4.md §4.2). Os testes e o E2E usam a aba "Pontos" (o E2E só no typecheck);
 - **`fb6834f`.** O "−" da linha usa o `decrease` do `useRowFeedback` (`Stepper.decrease`, P10-C). Os blocos da folha ordenam pelo rótulo (`byLabel`) dentro de cada bloco. O teste U-05 do P10-C sobe o Avatar pela linha.
 
+**A2 do roteiro web: o aviso do Dom acima do Posto 1 no W20.** O commit 8 tinha deixado de fora a regra `creation.advice` do `wta-w20.json`, junto com o catálogo, embora ela não dependa de licença nem de catálogo (D-07; onda-4.md §4.7). Sem ela, um Dom de texto livre com Posto 2 não avisava em lugar nenhum.
+
+- **A correção entrou depois do merge da onda na ponta `3599998`** (P10-D e a versão 1.7.0 do W20, merge `e9a2d8d`): `item-meta-max` em `gifts`, meta `rank`, `max` 1. A `templateVersion` não mudou, porque a 1.7.0 ainda não saiu da máquina. A regra não leva texto: a frase é do app. O `design/telas/dados.js` foi regerado pelo `build.mjs`.
+- **Os testes:**
+  - **core:** com o `wta-w20` real, o Posto 2 dá `ADVICE_ABOVE_LEVEL`, o Posto 1 não dá, e a conta é a mesma;
+  - **app:** o aviso aparece na linha, em "Para confirmar com o narrador" e na nota da confirmação de concluir;
+  - **API:** o teste do commit 1 (o Posto 2 entra) roda com o template novo.
+- **O E2E não ganhou passo.** Nenhum spec tem um Dom com Posto, e estender o `journey-werewolf` mudaria o lote que ele confere depois.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)

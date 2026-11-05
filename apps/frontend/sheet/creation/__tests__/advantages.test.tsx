@@ -542,6 +542,61 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
 describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
   const LUPINO = { breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' }
 
+  // A2 do roteiro web: com o wta-w20 do produto (sem catálogo), o Dom de
+  // texto livre com Posto 2 avisa na linha, na aba Pontos e na confirmação
+  it('wta-w20 do produto: Dom livre de Posto 2 avisa na linha, em Pontos e ao concluir', async () => {
+    await open(
+      {
+        strength: 4,
+        dexterity: 3,
+        stamina: 3,
+        charisma: 3,
+        manipulation: 2,
+        appearance: 3,
+        perception: 2,
+        intelligence: 2,
+        wits: 2,
+        breed: 'hominideo',
+        auspice: 'ahroun',
+        tribe: 'fianna',
+        alertness: 3,
+        athletics: 3,
+        brawl: 3,
+        empathy: 2,
+        primalUrge: 2,
+        drive: 3,
+        melee: 3,
+        survival: 3,
+        enigmas: 2,
+        occult: 2,
+        rituals: 1,
+        backgrounds: [
+          { id: 'b1', name: 'Raça Pura', value: 3 },
+          { id: 'b2', name: 'Fetiche', value: 2 },
+        ],
+        gifts: [
+          { id: 'g1', name: 'Faro do Asfalto', meta: { rank: 2 } },
+          { id: 'g2', name: 'Inspiração', meta: { rank: 1 } },
+          { id: 'g3', name: 'Persuasão', meta: { rank: 1 } },
+        ],
+      },
+      { system: 'wta-w20' }
+    )
+    expect(screen.getByTestId('identity-gifts-g1')).toHaveTextContent(
+      /Posto 2: na criação, vai até 1\. Confirme com o narrador\./
+    )
+    expect(screen.queryByTestId('identity-gifts-g2')).toBeNull()
+    tab('Pontos')
+    expect(screen.getByTestId('creation-notices')).toHaveTextContent(
+      /Dons: 1 com Posto acima de 1\./
+    )
+    // A conta fechou: o aviso não esconde o "Concluir" e vai para as notas
+    fireEvent.press(screen.getByTestId('creation-action'))
+    expect(
+      screen.getByText('1 item para confirmar com o narrador; veja em Pontos.')
+    ).toBeTruthy()
+  })
+
   it('Dom de Posto 2 do catálogo entra com Posto 2; a linha e o "O que falta" avisam; o "Concluir" não muda', async () => {
     await open(LUPINO, { system: 'wta-w20', identity: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
