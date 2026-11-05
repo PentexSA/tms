@@ -62,6 +62,15 @@ export function templateWithIdentity(system: string): Json {
         },
       ],
     }
+  // Resumos fictícios: os da Fraqueza do produto são escritos pelo time
+  if (system === 'vtm-v20' && fields.weakness)
+    fields.weakness.default = {
+      from: 'clan',
+      map: {
+        brujah: 'Resumo fictício de teste A.',
+        toreador: 'Resumo fictício de teste B.',
+      },
+    }
   if (system === 'wta-w20' && fields.gifts) {
     fields.gifts.catalog = Object.values(GIFTS)
     fields.gifts.catalogDefaults = [

@@ -35,6 +35,28 @@ export const outsideText = (recommend: Recommend): string =>
 export const aboveText = (meta: ListMeta, value: number, max: number): string =>
   `${meta.label} ${value}: na criação, vai até ${max}. Confirme com o narrador.`
 
+/**
+ * O texto por opção de um campo de texto (a Fraqueza pelo Clã) e a opção que
+ * o escolhe, pela escolha atual da ficha; null sem `default`, sem escolha ou
+ * sem entrada para a opção.
+ */
+export function textDefaultOf(
+  model: SheetModel,
+  sheet: ResolvedSheet,
+  field: FieldId
+): { readonly text: string; readonly option: string } | null {
+  const def = model.fields.get(field)?.def
+  if ((def?.type !== 'text' && def?.type !== 'longText') || !def.default)
+    return null
+  const r = sheet.get(def.default.from)
+  if (r?.type !== 'choice' || !r.option) return null
+  const { map } = def.default
+  const text = Object.hasOwn(map, r.option.id) ? map[r.option.id] : undefined
+  return typeof text === 'string' && text
+    ? { text, option: r.option.label }
+    : null
+}
+
 /** O rótulo de cada `from` sem escolha, para "Escolha Clã na identidade". */
 export function missingSources(
   model: SheetModel,
