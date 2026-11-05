@@ -32,7 +32,7 @@ Regras que valem para todos: alvo tocável ≥ 44 com `.ds-pressable`; texto só
 | Grupo | Componentes |
 |---|---|
 | Fundamentos | [Pressable](#pressable-camada-de-estado) · [Icon](#icon) · [Card](#card) · [Utilitários](#utilitários-de-uijs) |
-| Ações | [Button](#button) · [IconButton](#iconbutton) · [SegmentedControl](#segmentedcontrol) · [Chip](#chip) |
+| Ações | [Button](#button) · [IconButton](#iconbutton) · [HelpButton / HelpText](#helpbutton--helptext) · [SegmentedControl](#segmentedcontrol) · [Chip](#chip) |
 | Valores | [RatingDots](#ratingdots) · [NumberField](#numberfield) · [PercentField](#percentfield) · [MarkToggle](#marktoggle) · [Choice / StateChoice](#choice--statechoice) · [Tags / Tag](#tags--tag) · [TextField / TextArea / AspectField](#textfield--textarea--aspectfield) |
 | Recursos | [Resource](#resource) · [Track / LeveledTrack](#track--leveledtrack) · [Slots](#slots) · [Clock](#clock) · [Stepper / ValueEditor](#stepper--valueeditor) |
 | Ficha | [FieldRow](#fieldrow) · [Grid / Cell / Pyramid](#grid--cell--pyramid) · [SectionHeader](#sectionheader) · [SectionTabs](#sectiontabs) · [FilterBar / Search](#filterbar--search) · [CharacterHeader](#characterheader) · [IdentityBlock](#identityblock) · [IdentityChip](#identitychip) · [Avatar](#avatar) · [SyncIndicator](#syncindicator) · [ModeBar](#modebar) · [CombatDock / DockChip](#combatdock--dockchip) · [Repeater / ListEditor](#repeater--listeditor) |
@@ -123,6 +123,29 @@ Botão só com ícone e rótulo acessível obrigatório.
 - **A11y:** web `aria-label` ("Voltar para Noites de São Paulo", "Mais opções" com `aria-haspopup="dialog"`, "Fechar", "Editar Notas"). RN `accessibilityRole="button"` + `accessibilityLabel`.
 - **Multi-sistema:** o mesmo voltar, ⋯ e editar em qualquer ficha; o rótulo usa nomes vindos dos dados (crônica, campo).
 - **Resolve:** §7, C-20.
+
+### HelpButton / HelpText
+
+O "?" da ajuda contextual (R-19, D-11): uma frase curta do template, expandida na própria linha, ao lado do que explica.
+
+- **Padrão:** *disclosure*. Sem tooltip (não existe no toque e o leitor de tela lê mal) e sem folha (a escolha já está numa folha, e uma folha sobre outra fecharia a escolha). Nada da `BottomSheet` muda: com uma ajuda aberta dentro de uma folha, o Esc continua fechando a folha, e o foco volta ao gatilho dela.
+- **API RN:**
+
+  ```ts
+  type HelpButtonProps = { subject: string; expanded: boolean; onToggle(): void; controls?: string }
+  type HelpTextProps = { id: string; text: string; expanded: boolean }
+  type Help = { subject: string; text: string }
+  type WithHelpProps = { help: Help | null; children?: ReactNode; fill?: boolean; style?; textStyle? }
+  function useHelp(): { expanded: boolean; toggle(): void; textId: string }
+  ```
+  O `WithHelp` é a composição de todo "?": [conteúdo][?] numa linha e, abaixo, a frase (`fill` estica o conteúdo e põe o "?" na ponta). O `Choice` (`help` no grupo e em cada opção) e o `TextField` (`help: Help`) já o usam. O `useHelp` com o `HelpButton` e o `HelpText` fica para quem põe a frase longe do "?" (a linha do Editar, com a frase na largura da linha).
+- **Alvo:** o do `Pressable` (44, 48 no Android), com o glifo "?" num círculo de 22. Borda `border-control`; aberto, borda e glifo `action`.
+- **A11y:** nome "Ajuda: <nome do campo ou da opção>", papel `button`, `aria-expanded` (web) e `accessibilityState.expanded` (app), `aria-controls` no web. A frase é `caption`/`ink-muted`, numa região viva **sempre montada**, vazia quando fechada (fora do fluxo, sem somar o `gap`), em que só o conteúdo muda: assim ela é anunciada ao abrir (`aria-live="polite"` no web, `accessibilityLiveRegion="polite"` no Android), e o `aria-controls` sempre aponta um elemento que existe. No iOS, `announceForAccessibility` ao abrir.
+  - **Fora do controle:** o "?" é irmão do rádio ou do botão da linha, nunca filho. Botão dentro de rádio não é aceito pelo ARIA, e no app seria um alvo dentro de outro. O nome do rádio não muda.
+  - **Teclado:** cada "?" é uma parada de Tab. No `Choice`, as setas continuam só nos rádios (o foco itinerante não passa pelos "?").
+- **Colunas do `Choice`:** com frase em alguma opção, a célula tem base de 240 e cresce (`flexBasis`, sem medir a tela): 2 colunas a partir de 480 de largura, 1 abaixo, sem salto.
+- **Onde aparece:** na criação, no Editar e na Nova ficha. Em Leitura e Jogo, as folhas de detalhe já mostram o `help`.
+- **Multi-sistema:** o mesmo "?" em qualquer template. Nó sem frase não mostra "?", então um template sem frase fica igual. O texto é sempre texto puro, nunca HTML nem link.
 
 ### SegmentedControl
 
@@ -366,8 +389,13 @@ Edita qualquer número com − e +, um passo por toque.
     valueText?: (v: number) => string; onChange: (v: number) => void
     size?: 'lg' | 'inline'; allowInput?: boolean; disabled?: boolean
     showLabel?: boolean // rótulo visível acima; padrão false
+    increase?: StepperAdvice // previsão do "+" (P05-C)
+    decrease?: StepperAdvice // previsão do "−" (P10-C); sem ela, o "−" de sempre
   }
+  type StepperAdvice = { blocked?: boolean; hint?: string | null; hintID?: string | null }
+  type StepperIncrease = StepperAdvice // o nome antigo, mantido como alias
   ```
+  `increase` e `decrease` dizem, antes do toque, o que o próximo passo faria. Com `blocked`, o botão fica com a cara de indisponível (opacidade e, no web, `aria-disabled="true"` direto no elemento, nunca `disabled`) e **continua tocável**: o toque chega a quem decide, que explica o motivo; segurar não repete. No web, `hintID` vira o `aria-describedby` do botão; no app, a dica vai ao controle ajustável e, com as duas, junta "Aumentar: … Diminuir: …".
   `showLabel` liga o rótulo visível acima do controle quando a tela não o mostra ao lado (Dados e Dificuldade da Mesa, Quantidade, XP a conceder). Ele fica `aria-hidden`: o controle já tem o nome, e não há leitura dupla.
 - **Estados:** normal, no limite, desabilitado, digitando.
 - **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta). O `aria-valuetext` vai sempre (`valueText` ou o número): sem texto, o iOS lê `now/(max−min)` como porcentagem (7 de 0 a 1000 vira "1%").

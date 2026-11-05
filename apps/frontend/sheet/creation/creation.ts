@@ -1,4 +1,5 @@
 import {
+  type CreationAdvice,
   type CreationCheck,
   type CreationChoices,
   type CreationComponent,
@@ -221,11 +222,64 @@ const fieldLabel = (model: SheetModel, path: string): string => {
   return model.fields.get(id)?.def.label ?? 'Um campo'
 }
 
+/**
+ * O rótulo do meta que dá o preço do item (o Custo da Qualidade), quando o
+ * caminho é de um item de lista com regra `item-meta`; senão null.
+ */
+function itemPriceMeta(
+  model: SheetModel,
+  path: string
+): { readonly id: string; readonly label: string } | null {
+  if (!path.includes('#')) return null
+  const id = path.replace(/^values\./, '').split('#')[0] ?? ''
+  const rule = model.template.costs?.freebie?.find(
+    r => r.rule === 'item-meta' && r.targets.includes(id)
+  )
+  const def = model.fields.get(id)?.def
+  if (!rule || def?.type !== 'list') return null
+  const m = def.item.meta?.find(x => x.id === rule.meta)
+  return m ? { id: m.id, label: m.label } : null
+}
+
+/**
+ * Os itens sem o preço (a Qualidade sem Custo) ou com o preço inválido
+ * (zero, por exemplo), contados pela ficha quando ela vem; sem a ficha, a
+ * frase junta os dois casos ("sem Custo válido"). Rascunho do time.
+ */
+function missingPriceText(
+  field: string,
+  meta: { readonly id: string; readonly label: string },
+  paths: readonly string[],
+  sheet: ResolvedSheet | undefined
+): string {
+  let absent = 0
+  let invalid = 0
+  for (const path of paths) {
+    const [list, itemId] = path.replace(/^values\./, '').split('#')
+    const r = list ? sheet?.get(list) : undefined
+    const item = r?.type === 'list' ? r.items.find(x => x.id === itemId) : null
+    const v = item?.meta?.[meta.id]
+    if (v === undefined || v === '') absent += 1
+    else invalid += 1
+  }
+  const n = paths.length
+  const items = n === 1 ? '1 item' : `${n} itens`
+  const which = n === 1 ? 'o item' : 'cada item'
+  if (sheet && invalid === 0)
+    return `${field}: ${items} sem ${meta.label}. Abra ${which} e informe o ${meta.label}.`
+  if (sheet && absent === 0)
+    return `${field}: ${items} com ${meta.label} inválido. Abra ${which} e corrija o ${meta.label}.`
+  return `${field}: ${items} sem ${meta.label} válido. Abra ${which} e informe o ${meta.label}.`
+}
+
 /** Uma frase por problema, com os rótulos do template; nunca texto da ficha. */
 export function problemText(
   model: SheetModel,
   check: CreationCheck | null,
-  p: CreationProblem
+  p: CreationProblem,
+  // A ficha mostrada: a fonte do valor inicial (P10-C) e os itens sem preço
+  // ou com preço inválido (P07-D)
+  resolved?: ResolvedSheet
 ): string {
   const group =
     check?.budgets
@@ -252,12 +306,81 @@ export function problemText(
       return `${field}: acima do limite da criação.`
     case 'CREATION_LOCKED':
       return `${field}: não sobe na criação.`
-    case 'CREATION_NOT_PURCHASABLE':
-      return `${field}: não se compra na criação.`
-    case 'CREATION_BELOW_INITIAL':
-      return `${field}: abaixo do valor inicial.`
+    case 'CREATION_NOT_PURCHASABLE': {
+      // O item de uma lista com preço por item (a Qualidade) gravado sem o
+      // meta do preço (app antigo, API direta): "não se compra" enganava
+      // (QAA-05). O que de fato não se compra (o Renome) segue igual.
+      const meta = p.paths[0] ? itemPriceMeta(model, p.paths[0]) : null
+      return meta
+        ? missingPriceText(field, meta, p.paths, resolved)
+        : `${field}: não se compra na criação.`
+    }
+    case 'CREATION_BELOW_INITIAL': {
+      const at = p.paths[0]
+      const c = at ? componentAt(check, at) : null
+      if (!c) return `${field}: abaixo do valor inicial.`
+      const source = initialSource(model, c, resolved)
+      return `${field}: abaixo de ${c.initial}, o valor inicial${source ? ` (vem de ${source})` : ''}.`
+    }
   }
 }
+
+/**
+ * Um aviso que não bloqueia (D-07, D-09), como frase: rótulos do template e
+ * números, nunca o nome que o jogador digitou. Não entra no "Faltam" da
+ * barra nem esconde o "Concluir": a conta não o lê. Rascunho do time.
+ */
+export function adviceText(model: SheetModel, a: CreationAdvice): string {
+  const def = model.fields.get(a.field)?.def
+  const label = def?.label ?? 'Um campo'
+  if (a.code === 'ADVICE_OUTSIDE') {
+    const outside =
+      def?.type === 'list' || def?.type === 'choice'
+        ? (def.recommend?.outside ?? 'fora do recomendado')
+        : 'fora do recomendado'
+    return def?.type === 'choice'
+      ? `${label}: ${outside}.`
+      : `${label}: ${a.amount} ${outside}.`
+  }
+  // A regra do aviso (uma lista pode ter mais de uma, com metas diferentes)
+  const rules = model.template.creation?.advice ?? []
+  const rule =
+    a.rule !== undefined
+      ? rules[a.rule]
+      : rules.find(r => r.targets.includes(a.field))
+  const meta =
+    def?.type === 'list' && rule
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  return meta && rule
+    ? `${label}: ${a.amount} com ${meta.label} acima de ${rule.max}.`
+    : `${label}: ${a.amount} acima do limite da criação.`
+}
+
+/**
+ * Os avisos como itens do "O que falta" (`kind: 'confirm'`): o texto e o
+ * alvo (o campo e os caminhos). O P05-D os desenha como itens tocáveis no
+ * `useCreationNotices`; até lá, o painel os mostra como texto.
+ */
+export interface AdviceNotice {
+  readonly key: string
+  readonly kind: 'confirm'
+  readonly text: string
+  readonly field: FieldId
+  readonly paths: readonly string[]
+}
+
+export const adviceNotices = (
+  model: SheetModel,
+  advice: readonly CreationAdvice[]
+): readonly AdviceNotice[] =>
+  advice.map(a => ({
+    key: `${a.code}:${a.field}:${a.rule ?? ''}`,
+    kind: 'confirm',
+    text: adviceText(model, a),
+    field: a.field,
+    paths: a.paths,
+  }))
 
 /** O botão de concluir conforme quem conclui e a aprovação (§3.4). */
 export function completeLabel(
@@ -339,6 +462,7 @@ export type RefusalCause =
   | 'ceiling' // hard-cap (Arete ≤ 3, Esfera ≤ Arete)
   | 'locked' // baseline travado (Aparência do Nosferatu)
   | 'not-purchasable' // sem preço de bônus
+  | 'initial' // só do app: o "−" abaixo do valor inicial (T-85)
   | 'other' // outro problema bloqueante da conta
 
 export interface CreationNotice {
@@ -468,7 +592,12 @@ function refusalNotice(
   if (notPurchasable)
     return {
       cause: 'not-purchasable',
-      text: problemText(model, checks.after, notPurchasable),
+      text: problemText(
+        model,
+        checks.after,
+        notPurchasable,
+        resolve(model, sheets.after)
+      ),
     }
   const before = checks.before?.freebies
   const after = checks.after?.freebies
@@ -496,6 +625,18 @@ function refusalNotice(
 }
 
 /**
+ * O toque que o `draftRefusal` avalia (T-85): os caminhos que ele mudou e,
+ * se quem chama já tem, a ficha resolvida depois dele (o store tem; sem ela,
+ * o `draftRefusal` resolve só quando precisa do texto).
+ */
+export interface DraftTouch {
+  readonly paths: readonly string[]
+  readonly resolved?: ResolvedSheet
+}
+
+const NO_TOUCH: DraftTouch = { paths: [] }
+
+/**
  * Por que uma mudança no rascunho da criação não entra, ou null. A mesma
  * avaliação parcial do "Salvar" (`checkCreationBatch`), agora a cada toque, e
  * em `basics` também o grupo que passaria do orçamento ou o traço que passaria
@@ -510,11 +651,14 @@ export function draftRefusal(
     readonly after: CreationCheck | null
   },
   input: CreationInput,
-  phase: CreationPhase
+  phase: CreationPhase,
+  touch: DraftTouch = NO_TOUCH
 ): CreationNotice | null {
   const refused = checkCreationBatch(model, sheets.before, sheets.after, input)
   if (refused)
     return refusalNotice(model, sheets, checks, refused.code, refused.problems)
+  const below = belowInitial(model, sheets.after, checks, touch)
+  if (below) return below
   if (phase !== 'basics' || !checks.after) return null
   const freebies = checks.after.freebies !== null
   for (const b of checks.after.budgets)
@@ -542,6 +686,110 @@ export function draftRefusal(
   return null
 }
 
+/**
+ * O toque que levou um caminho que ele mudou para baixo do valor inicial, ou
+ * mais para baixo (T-85). Nas duas fases. Só do app: o servidor continua
+ * aceitando salvar abaixo do inicial e recusando concluir. O problema que
+ * nasce noutro caminho (subir a Coragem com a FdV comprada acima) não é
+ * recusado aqui: o Pontos o mostra como antes.
+ */
+function belowInitial(
+  model: SheetModel,
+  after: SheetData,
+  checks: {
+    readonly before: CreationCheck | null
+    readonly after: CreationCheck | null
+  },
+  { paths, resolved }: DraftTouch
+): CreationNotice | null {
+  if (!paths.length || !checks.after) return null
+  const touched = (p: string) =>
+    paths.some(t => p === t || p.startsWith(`${t}#`))
+  const amountBefore = (p: string) =>
+    checks.before?.problems.find(
+      x => x.code === 'CREATION_BELOW_INITIAL' && x.paths.includes(p)
+    )?.amount ?? 0
+  for (const p of checks.after.problems) {
+    if (p.code !== 'CREATION_BELOW_INITIAL') continue
+    const at = p.paths.find(touched)
+    if (!at || (p.amount ?? 0) <= amountBefore(at)) continue
+    const c = componentAt(checks.after, at)
+    if (!c) continue
+    const sheet = resolved ?? resolve(model, after)
+    // O baseline travado diz o mesmo que a previsão do "−" (downAdvice)
+    return c.locked
+      ? {
+          cause: 'locked',
+          text: `${fieldLabel(model, at)}: ${lockedText(model, c, sheet)}`,
+        }
+      : {
+          cause: 'initial',
+          text: `${fieldLabel(model, at)}: ${initialText(model, c, sheet)}`,
+        }
+  }
+  return null
+}
+
+/** "na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun)." */
+function initialText(
+  model: SheetModel,
+  c: CreationComponent,
+  resolved?: ResolvedSheet
+): string {
+  const source = initialSource(model, c, resolved)
+  return `na criação, não fica abaixo de ${c.initial}${source ? ` (vem de ${source})` : ''}.`
+}
+
+/** "fica em 0 na criação (Clã: Nosferatu)." */
+const lockedText = (
+  model: SheetModel,
+  c: CreationComponent,
+  resolved?: ResolvedSheet
+): string => `fica em ${c.initial} na criação${lockReason(model, resolved, c)}.`
+
+/**
+ * De onde vem o valor inicial de um componente, pelo mesmo critério da conta
+ * (`checkCreation`, `initialOf`): o baseline que vale (a escolha da condição
+ * dele, "Clã: Nosferatu"), a base do point-buy (sem origem a citar) ou a
+ * fórmula do campo ("Coragem", "Augúrio: Ahroun"). Sem a ficha resolvida,
+ * só a fórmula, e só quando nenhum baseline ou point-buy mira o campo.
+ */
+function initialSource(
+  model: SheetModel,
+  c: CreationComponent,
+  resolved?: ResolvedSheet
+): string | null {
+  const def = model.template.creation
+  const baselines = (def?.baselines ?? []).filter(bl =>
+    bl.targets.includes(c.field)
+  )
+  const pointBuy = (def?.budgets ?? []).some(
+    b => b.rule === 'point-buy' && b.targets.includes(c.field)
+  )
+  if (!resolved)
+    return baselines.length || pointBuy ? null : startSource(model, c.field)
+  for (const bl of baselines) {
+    if (bl.when && !conditionHolds(resolved, bl.when, c.field)) continue
+    if (!bl.when) return null
+    const r = resolved.get(bl.when.field)
+    return r?.type === 'choice' && r.option
+      ? `${r.field.def.label}: ${r.option.label}`
+      : null
+  }
+  return pointBuy ? null : startSource(model, c.field, resolved)
+}
+
+/** O menor valor que o campo aceita no template (o "−" desabilitado). */
+function fieldMin(model: SheetModel, c: CreationComponent): number {
+  const def = model.fields.get(c.field)?.def
+  if (c.item !== undefined)
+    return def?.type === 'list' ? (def.item.value?.min ?? 0) : 0
+  if (def?.type === 'rating') return def.min ?? 0
+  if (def?.type === 'resource') return def.permanent?.min ?? 0
+  if (def?.type === 'number') return def.min ?? 0
+  return 0
+}
+
 /** "Prontidão: com pontos básicos, vai até 3. Acima disso, cada ponto ..." */
 function capText(
   model: SheetModel,
@@ -566,6 +814,9 @@ export interface StepAdvice {
   readonly text: string | null
   readonly cost: number | null
   readonly inline: boolean
+  // Só no "−": até onde segurar o botão desce sem o toque ser recusado (o
+  // valor inicial). Acima dele, o "−" fica livre, e a repetição para ali
+  readonly floor?: number
 }
 
 const advice = (
@@ -590,8 +841,10 @@ export function stepAdvice(
   check: CreationCheck,
   phase: CreationPhase,
   path: string,
-  resolved?: ResolvedSheet
+  resolved?: ResolvedSheet,
+  direction: StepDirection = 'up'
 ): StepAdvice | null {
+  if (direction === 'down') return downAdvice(model, check, path, resolved)
   const freebies = check.freebies
   const limits = (c: CreationComponent): StepAdvice | null => {
     if (c.locked && c.value >= c.initial)
@@ -633,6 +886,34 @@ export function stepAdvice(
         true
       )
     : advice(null, bonus(price), price, true)
+}
+
+/** Para que lado o toque vai: o "+" ou o "−". */
+export type StepDirection = 'up' | 'down'
+
+/**
+ * A previsão do "−" (T-85), com o mesmo critério da recusa (belowInitial):
+ * no valor inicial, com o inicial acima do mínimo do campo, o "−" fica com a
+ * cara de indisponível e diz de onde vem o inicial (ou que o baseline
+ * trava). Acima do inicial, livre (desfazer uma compra), com o `floor`: a
+ * repetição de segurar para no inicial.
+ */
+function downAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  path: string,
+  resolved?: ResolvedSheet
+): StepAdvice | null {
+  const c = placeOf(check, path)?.component
+  if (!c || c.initial <= fieldMin(model, c)) return null
+  if (c.value > c.initial) return { ...advice(null, null), floor: c.initial }
+  const text = c.locked
+    ? lockedText(model, c, resolved)
+    : initialText(model, c, resolved)
+  return advice(
+    c.locked ? 'locked' : 'initial',
+    text.charAt(0).toUpperCase() + text.slice(1)
+  )
 }
 
 /** O próximo ponto num grupo de orçamento: básico, teto, preço ou saldo. */
@@ -681,6 +962,95 @@ function groupAdvice(
         inline
       )
     : advice(null, bonus(price), price, inline)
+}
+
+/**
+ * O que um item novo na lista faria na conta, antes do toque (a prévia da
+ * folha "Adicionar …", P07-C §3.1): uma linha por folha, não por opção, porque
+ * o custo é o mesmo para todas as opções. Pelo grupo do orçamento da lista
+ * (básicos, depois bônus) ou pela linha de bônus por item (Custo da
+ * Qualidade, crédito do Defeito). É previsão: o toque decide, pela conta
+ * exata, com a recusa dentro da folha. Fora de qualquer conta: null.
+ */
+export function addAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  phase: CreationPhase,
+  list: FieldId
+): string | null {
+  const freebies = check.freebies
+  const g = findGroup(check, groupFor(model, [list]))
+  if (g) {
+    if (g.budget === null)
+      return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+    if (g.missing > 0)
+      return `Entra com os pontos básicos (faltam ${g.missing} de ${g.budget}).`
+    if (phase === 'basics') return basicsSpentText(g, freebies !== null)
+    if (g.price === null || !freebies)
+      return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
+    return g.measure === 'items'
+      ? `${g.label}: o próximo custa ${g.price} de bônus; ${restam(Math.max(0, freebies.remaining))}.`
+      : `${bonus(g.price)}; ${restam(Math.max(0, freebies.remaining))}.`
+  }
+  const rule = model.template.costs?.freebie?.find(r =>
+    r.targets.includes(list)
+  )
+  const def = model.fields.get(list)?.def
+  const meta =
+    rule?.meta && def?.type === 'list'
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  if (!rule || !freebies) return null
+  // O item novo nasce com o meta do catálogo, quando há (o add aplica o
+  // catalogDefaults), ou com o mínimo: com o catálogo, cada opção diz o seu
+  const fromCatalog =
+    def?.type === 'list' &&
+    (def.catalogDefaults ?? []).some(d => d.meta === rule.meta)
+  if (rule.rule === 'item-meta' && meta)
+    return fromCatalog
+      ? `Custa o ${meta.label} do item em bônus (o de cada opção); ${restam(Math.max(0, freebies.remaining))}.`
+      : `Custa o ${meta.label} do item em bônus (começa em ${meta.min ?? 0}); ${restam(Math.max(0, freebies.remaining))}.`
+  if (rule.rule === 'credit' && meta)
+    return `Devolve o ${meta.label} do item, até ${rule.max ?? 0} no total.`
+  if (rule.rule === 'flat' && rule.cost !== undefined)
+    return `${bonus(rule.cost)}; ${restam(Math.max(0, freebies.remaining))}.`
+  return null
+}
+
+/**
+ * A previsão do "+" de um meta que é preço do item (T-08): o Custo da
+ * Qualidade (`item-meta`) e o Bônus do Defeito (`credit`). Pela conta que o
+ * store tem: com o meta já mudado na folha, quem decide é o "Aplicar" (a
+ * conta exata) e depois o servidor. Meta fora dessas regras: null.
+ */
+export function metaAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  list: FieldId,
+  meta: string
+): StepAdvice | null {
+  const rule = model.template.costs?.freebie?.find(
+    r =>
+      (r.rule === 'item-meta' || r.rule === 'credit') &&
+      r.meta === meta &&
+      r.targets.includes(list)
+  )
+  const freebies = check.freebies
+  if (!rule || !freebies) return null
+  if (rule.rule === 'credit') {
+    const line = check.lines.find(l => l.id === rule.id)
+    const max = rule.max ?? 0
+    return (line?.cost ?? 0) >= max
+      ? advice(null, `+1 não devolve mais: o crédito já está em ${max}.`)
+      : advice(null, `+1 = devolve 1, até ${max}.`)
+  }
+  return freebies.remaining < 1
+    ? advice(
+        'freebies',
+        `${bonus(1)}; ${restam(Math.max(0, freebies.remaining))}.`,
+        1
+      )
+    : advice(null, `${bonus(1)}; ${restam(freebies.remaining)}.`, 1)
 }
 
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */
@@ -769,8 +1139,15 @@ export interface FreebieLedger {
   readonly total: string
 }
 
-/** "que vem de Consciência + Autocontrole": a fonte do valor de partida. */
-function startSource(model: SheetModel, field: FieldId): string | null {
+/**
+ * "que vem de Consciência + Autocontrole": a fonte do valor de partida. Com
+ * a ficha resolvida, a fórmula por escolha diz a opção ("Augúrio: Ahroun").
+ */
+function startSource(
+  model: SheetModel,
+  field: FieldId,
+  resolved?: ResolvedSheet
+): string | null {
   const def = model.fields.get(field)?.def
   const formula =
     def?.type === 'rating'
@@ -782,7 +1159,13 @@ function startSource(model: SheetModel, field: FieldId): string | null {
   const from: readonly FieldId[] = Array.isArray(formula.from)
     ? formula.from
     : [formula.from as FieldId]
-  const labels = from.map(id => model.fields.get(id)?.def.label ?? id)
+  const labels = from.map(id => {
+    const label = model.fields.get(id)?.def.label ?? id
+    const r = 'map' in formula ? resolved?.get(id) : undefined
+    return r?.type === 'choice' && r.option
+      ? `${label}: ${r.option.label}`
+      : label
+  })
   return labels.length ? labels.join(' + ') : null
 }
 

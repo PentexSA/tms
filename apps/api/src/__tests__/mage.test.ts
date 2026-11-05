@@ -87,12 +87,28 @@ describe('ficha de Mago', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('mta-m20')
-    expect(body.templateVersion).toBe('1.6.0')
+    expect(body.templateVersion).toBe('1.7.0')
     expect(body.sheet.values).toEqual({
       name: 'Otto Brandt',
       tradition: 'filhos-do-eter',
       essence: 'questionadora',
       house: 'Engenheiros Etéricos',
+    })
+  })
+
+  // U-06 (D-12): "Casa ou subgrupo" é opcional em todas as Tradições; nada
+  // exige o campo, e nenhum campo fica escondido
+  it('uma Verbena sem Casa nasce (201), e a Casa continua no template', async () => {
+    const res = await create({ name: 'Iara Lune', tradition: 'verbena' })
+    expect(res.status).toBe(201)
+    const { id } = (await res.json()) as { id: string }
+    const sheet = await as(ctx, owner, 'GET', `/characters/${id}`)
+    const body = (await sheet.json()) as {
+      sheet: { values: Record<string, unknown> }
+    }
+    expect(body.sheet.values).toEqual({
+      name: 'Iara Lune',
+      tradition: 'verbena',
     })
   })
 

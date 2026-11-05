@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 import {
   ALMOST,
   newCharacter,
+  PRIORITIES,
   plus,
   pointsChronicle,
   prepared,
@@ -175,4 +176,129 @@ test('Bônus: o custo do toque e o extrato (T-57, R-17)', async ({
   await expect(page.getByTestId('creation-ledger-total')).toContainText(
     'Gastos 14 · resta 1 de 15'
   )
+})
+
+// T-22 e T-85 (P10-C): na criação, o atual acompanha o permanente cheio; o
+// "−" no valor inicial fica com cara de indisponível, continua tocável
+// (aria-disabled, nunca disabled) e o toque diz de onde vem o inicial;
+// subir e voltar zera o contador
+const minus = (page: Page, trait: string) =>
+  page.getByRole('button', { name: `Diminuir ${trait}`, exact: true })
+
+const pressBlockedMinus = async (page: Page, trait: string) => {
+  await expect(minus(page, trait)).toHaveAttribute('aria-disabled', 'true')
+  await expect(minus(page, trait)).not.toHaveAttribute('disabled')
+  await minus(page, trait).click({ force: true })
+}
+
+test('derivados e mínimo na criação: V20 (T-22, T-85)', async ({
+  browser,
+  page,
+}) => {
+  const context = page.context()
+  const { chronicleId, user } = await pointsChronicle(browser, context)
+  const character = await newCharacter(context, user, chronicleId)
+  // Básicos completos, Coragem 3: a FdV começa em 3
+  await prepared(context, user, character.id, { ...ALMOST, stamina: 3 })
+  await page.goto(`/characters/${character.id}?mode=create`)
+  await page.getByRole('button', { name: 'Em jogo' }).click()
+
+  // O "−" no inicial: tocável, e o toque explica sem descer
+  await pressBlockedMinus(page, 'Força de Vontade permanente')
+  await expect(page.getByTestId('notice-willpower')).toContainText(
+    'Força de Vontade: na criação, não fica abaixo de 3 (vem de Coragem).'
+  )
+  await expect(
+    page.getByLabel('Força de Vontade permanente, 3', { exact: true })
+  ).toBeVisible()
+
+  // Comprar 1: o atual acompanha (4/4, não 3/4)
+  await plus(page, 'Força de Vontade permanente').click()
+  await expect(
+    page.getByLabel('Força de Vontade atual, 4', { exact: true })
+  ).toBeVisible()
+  // Voltar ao 3 zera o contador
+  await minus(page, 'Força de Vontade permanente').click()
+  await expect(page.getByText(/^Criação · 0 alterações/)).toBeVisible()
+
+  // Comprar de novo e salvar: a ficha grava 4/4
+  await plus(page, 'Força de Vontade permanente').click()
+  await page
+    .getByRole('button', { name: 'Salvar alterações', exact: true })
+    .click()
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await expect
+    .poll(async () => {
+      const got = await apiAs<{ sheet: { values: Record<string, unknown> } }>(
+        context,
+        user,
+        'GET',
+        `/characters/${character.id}`
+      )
+      return got.sheet.values.willpower
+    })
+    .toEqual({ permanent: 4, current: 4 })
+})
+
+test('derivados e mínimo na criação: W20 Ahroun Lupino (T-22, T-85)', async ({
+  browser,
+  page,
+}) => {
+  const context = page.context()
+  const desk = await browser.newContext()
+  const storyteller = await signUp(desk, 'narra_w20')
+  const chronicle = await apiAs<{ id: string }>(
+    desk,
+    storyteller,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica da matilha', systemCode: 'wta-w20' }
+  )
+  const { code } = await apiAs<{ code: string }>(
+    desk,
+    storyteller,
+    'POST',
+    `/chronicles/${chronicle.id}/invites`
+  )
+  await desk.close()
+  const user = await signUp(context, 'joga_w20')
+  await apiAs(context, user, 'POST', '/invites/accept', { code })
+  const character = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    `/chronicles/${chronicle.id}/characters`,
+    {
+      values: {
+        name: 'Uiva Longe',
+        breed: 'lupino',
+        auspice: 'ahroun',
+        tribe: 'fianna',
+      },
+    }
+  )
+  await apiAs(context, user, 'PATCH', `/characters/${character.id}/creation`, {
+    revision: 0,
+    choices: { priorities: PRIORITIES },
+  })
+  await page.goto(`/characters/${character.id}?mode=create`)
+  await page.getByRole('button', { name: 'Em jogo' }).click()
+
+  // A Fúria do Ahroun começa em 5: o "−" diz o Augúrio e não desce
+  await pressBlockedMinus(page, 'Fúria permanente')
+  await expect(page.getByTestId('notice-rage')).toContainText(
+    'Fúria: na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).'
+  )
+  await expect(
+    page.getByLabel('Fúria permanente, 5', { exact: true })
+  ).toBeVisible()
+
+  // A Gnose do Lupino (5) sobe com o atual junto
+  await plus(page, 'Gnose permanente').click()
+  await expect(page.getByLabel('Gnose atual, 6', { exact: true })).toBeVisible()
+  // E a Fúria comprada volta ao 5 sem deixar alteração
+  await plus(page, 'Fúria permanente').click()
+  await expect(page.getByLabel('Fúria atual, 6', { exact: true })).toBeVisible()
+  await minus(page, 'Fúria permanente').click()
+  await expect(page.getByText(/^Criação · 1 alteração/)).toBeVisible()
 })

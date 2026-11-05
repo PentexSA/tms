@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native'
 import {
   useFocusEffect,
   useLocalSearchParams,
@@ -101,6 +107,24 @@ describe('Nova ficha', () => {
       values: { name: 'Helena', nature: 'Arquiteto', demeanor: 'Galã' },
       clientCommandId: expect.any(String),
     })
+  })
+
+  // T-60: a lista na ordem do rótulo em português, não na do livro em inglês
+  it('as sugestões da Natureza vêm na ordem do rótulo', async () => {
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    fireEvent.press(await screen.findByTestId('suggest-nature'))
+    const list = within(screen.getByTestId('suggest-nature-list'))
+    const names = list
+      .getAllByRole('button')
+      .map(b => String(b.props.accessibilityLabel ?? ''))
+    expect(names.slice(0, 5)).toEqual([
+      'Arquiteto',
+      'Autocrata',
+      'Bon Vivant',
+      'Caçador de Emoções',
+      'Camaleão',
+    ])
+    expect(names.slice(-3)).toEqual(['Trapaceiro', 'Valentão', 'Visionário'])
   })
 
   // T-21: o erro fica fora da tela; a tela rola até o campo e o foca
@@ -220,6 +244,72 @@ describe('Nova ficha', () => {
 // L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
 // não abrir, a pessoa sabe que ela existe e não cria outra igual
 // T-29: a Nova ficha diz o modo em que a ficha vai abrir e o orçamento
+// R-19 (IA-06): na Nova ficha, o "?" do Clã (o título do grupo e cada clã) e
+// o da Natureza, com as frases do template; o nome dos rádios não muda.
+describe('Nova ficha: o "?" da ajuda', () => {
+  it('Clã e Natureza têm "?", com a frase do template', async () => {
+    const t = templateJson('vtm-v20') as {
+      fields: Record<
+        string,
+        { help?: string; options?: { id: string; help?: string }[] }
+      >
+    }
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    await screen.findByTestId('editor-name')
+    expect(screen.getByRole('radio', { name: 'Brujah' })).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Brujah' }))
+    const brujah = t.fields.clan?.options?.find(o => o.id === 'brujah')
+    expect(screen.getByText(brujah?.help ?? '-')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Clã' }))
+    expect(screen.getByText(t.fields.clan?.help ?? '-')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Ajuda: Natureza' }))
+    expect(screen.getByText(t.fields.nature?.help ?? '-')).toBeTruthy()
+    // A frase não fica mais como dica sempre visível do campo
+    expect(
+      screen.getByTestId('editor-nature').props.accessibilityHint
+    ).toBeUndefined()
+  })
+})
+
+// U-06 (D-12): no Mago, "Casa ou subgrupo" com "Opcional" e o "?" da frase;
+// uma Verbena sem Casa é criada. Nada é exigido além do Nome.
+describe('Nova ficha do Mago: Casa ou subgrupo', () => {
+  beforeEach(() => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'A Torre',
+        system: { code: 'mta-m20', name: 'Mago: A Ascensão' },
+        role: 'player',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('mta-m20')))
+  })
+
+  it('o campo diz "Opcional", tem o "?" e não é exigido', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const house = await screen.findByTestId('editor-house')
+    expect(house.props.accessibilityLabel).toBe('Casa ou subgrupo')
+    expect(house.props.placeholder).toBe('Opcional')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ajuda: Casa ou subgrupo' })
+    )
+    expect(screen.getByText(/É opcional/)).toBeTruthy()
+    fireEvent.changeText(screen.getByTestId('editor-name'), 'Iara Lune')
+    fireEvent.press(screen.getByRole('radio', { name: 'Verbena' }))
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
+      values: { name: 'Iara Lune', tradition: 'verbena' },
+      clientCommandId: expect.any(String),
+    })
+  })
+})
+
 describe('Nova ficha: modo e orçamento da crônica', () => {
   const chronicleWith = (
     creation?: { approval: boolean; defaults: unknown },

@@ -9,6 +9,7 @@ import {
   TextField,
   tokens,
   useToast,
+  WithHelp,
 } from '@tms/ui'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
@@ -49,6 +50,7 @@ import {
 } from './creation'
 import { useGuideItems } from './GuideRow'
 import { confirmNote, type GuideItem, useCreationNotices } from './guide'
+import { CREATION_HELP } from './help'
 import { CLOSED_COPY } from './nextStep'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
@@ -210,14 +212,17 @@ export function CreationPanel() {
     >
       {freebies ? <PhaseBlock /> : null}
       {freebies ? (
-        <Text
-          testID="creation-freebies"
-          color={freebies.remaining < 0 ? 'danger' : 'ink'}
-        >
-          {freebies.remaining < 0
-            ? `Bônus: ${-freebies.remaining} acima do saldo (${freebies.spent} de ${freebies.available + freebies.credit}).`
-            : `${freebiesBalance(check)}.`}
-        </Text>
+        // O "?" dos pontos de bônus fica no rótulo do saldo (R-19, P10-D §3.7)
+        <WithHelp help={CREATION_HELP.freebies} testID="freebies-help">
+          <Text
+            testID="creation-freebies"
+            color={freebies.remaining < 0 ? 'danger' : 'ink'}
+          >
+            {freebies.remaining < 0
+              ? `Bônus: ${-freebies.remaining} acima do saldo (${freebies.spent} de ${freebies.available + freebies.credit}).`
+              : `${freebiesBalance(check)}.`}
+          </Text>
+        </WithHelp>
       ) : null}
       <Ledger />
       {missing.length ? (

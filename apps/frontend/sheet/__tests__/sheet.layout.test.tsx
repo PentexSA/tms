@@ -14,7 +14,12 @@ import { Dimensions, ScrollView, StyleSheet, TextInput } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
-import { fakeServer, type LiveProps, renderLive } from '../../test/live'
+import {
+  fakeServer,
+  LIVE_ID,
+  type LiveProps,
+  renderLive,
+} from '../../test/live'
 import { sheetsDismissed, textInput } from '../../test/queries'
 import {
   json,
@@ -520,6 +525,50 @@ describe('T-59: "Em jogo" recolhido na Criação', () => {
       expect(screen.getAllByLabelText(/^Vitalidade/).length).toBeGreaterThan(0)
     }
   )
+})
+
+// T-22: comprar FdV na criação e salvar deixa o dock do Jogo cheio (4 de 4)
+describe('T-22: o dock mostra o atual que acompanhou o permanente', () => {
+  it('V20 no celular: FdV 3 → 4 na criação, salva, Jogo com 4 de 4', async () => {
+    resize(PHONE)
+    const sheet = {
+      values: { name: 'Nova', clan: 'brujah', courage: 3 },
+      specialties: {},
+    }
+    const server = fakeServer(vtm, sheet)
+    await renderLive(
+      {
+        model: vtm,
+        sheet,
+        mode: 'evolve',
+        creation: {
+          characterId: LIVE_ID,
+          chronicleId: 'c1',
+          status: 'creating',
+          info: null,
+          active: false,
+        },
+      },
+      server.post
+    )
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
+    expect(server.current().values.willpower).toEqual({
+      permanent: 4,
+      current: 4,
+    })
+    if (!screen.queryByRole('radio', { name: 'Jogo', checked: true }))
+      fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(
+      screen.getAllByLabelText(/^Força de Vontade, 4 de 4/).length
+    ).toBeGreaterThan(0)
+  })
 })
 
 describe('T-27 (parte 1): no celular, os controles de modo rolam com a ficha', () => {

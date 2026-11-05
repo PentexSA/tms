@@ -99,3 +99,21 @@ export async function storeTemplate(
     .execute()
   return result('published')
 }
+
+/**
+ * Grava os templates do produto (os arquivos de design/templates), na ordem
+ * de PRODUCT_TEMPLATES, recusando a versão já gravada com outro conteúdo. É o
+ * corpo das migrations que publicam uma versão nova do produto (a 0023 e as
+ * seguintes; a 0020, já aplicada, fica com o próprio laço, igual a este).
+ * Não valida: a validação do contrato (schema, validateTemplate e
+ * publicationIssues) roda na API e nos testes, sobre estes mesmos arquivos.
+ */
+export async function publishProductTemplates(db: Kysely<DB>): Promise<void> {
+  for (const system of PRODUCT_TEMPLATES) {
+    const r = await storeTemplate(db, productTemplate(system))
+    if (r.status === 'conflict')
+      throw new Error(
+        `${r.system}@${r.version} já está no banco com outro conteúdo: suba o templateVersion`
+      )
+  }
+}

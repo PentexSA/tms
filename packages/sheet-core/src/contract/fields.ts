@@ -53,6 +53,42 @@ export interface ChoiceMapRef {
 // campo, então acompanha as fontes (Humanidade = Consciência + Autocontrole).
 export type DefaultFormula = number | DeriveRef | ChoiceMapRef
 
+/**
+ * Texto inicial por opção de um `choice` (a Fraqueza pelo Clã). Como todo
+ * `default`, vale enquanto a ficha não grava o campo; o texto gravado,
+ * inclusive vazio, vence. Opção sem entrada: vazio.
+ */
+export interface TextChoiceDefault {
+  readonly from: FieldId
+  readonly map: Readonly<Record<string, string>>
+}
+
+/** Uma fonte de recomendação: o `choice` da identidade e o selo dela. */
+export interface RecommendSource {
+  readonly from: FieldId
+  // Texto do selo ("do clã"), até 24 caracteres.
+  readonly label: string
+  // Opção do `from` → nomes do catálogo (lista) ou ids de opção (choice).
+  readonly map: Readonly<Record<string, readonly string[]>>
+}
+
+/**
+ * O que a identidade recomenda numa lista ou num `choice` (Disciplinas do
+ * clã, Esfera da Tradição). Só recomenda: não muda preço nem conta.
+ */
+export interface Recommend {
+  // O que se diz do que fica fora ("fora do clã"), até 60 caracteres.
+  readonly outside: string
+  readonly by: readonly RecommendSource[]
+}
+
+/** O meta inicial de nomes do catálogo (o Posto de cada Dom). */
+export interface CatalogDefault {
+  readonly meta: string
+  readonly value: number
+  readonly items: readonly string[]
+}
+
 export interface ActionParams {
   readonly field?: FieldId
   readonly amount?: number
@@ -202,6 +238,8 @@ export interface StateOption {
   readonly label: string
   readonly hint?: string
   readonly note?: string
+  // Frase curta de ajuda (até 200, sem link), escrita pelo time.
+  readonly help?: string
   readonly modifiers?: readonly StateModifier[]
 }
 
@@ -229,11 +267,15 @@ export interface TextField extends FieldBase<'text'> {
   // Sugestões para escolher com um toque (os Arquétipos do livro). O texto
   // continua livre: a sugestão só preenche o campo.
   readonly suggestions?: readonly string[]
+  // Frase curta de ajuda por sugestão (R-19), ao lado da lista
+  readonly suggestionHelp?: Readonly<Record<string, string>>
+  readonly default?: TextChoiceDefault
 }
 
 export interface LongTextField extends FieldBase<'longText'> {
   readonly maxLength?: number
   readonly placeholder?: string
+  readonly default?: TextChoiceDefault
 }
 
 export interface ChoiceOption {
@@ -241,11 +283,14 @@ export interface ChoiceOption {
   readonly label: string
   readonly meta?: string
   readonly glyphParam?: number
+  // Frase curta de ajuda (até 200, sem link), escrita pelo time.
+  readonly help?: string
 }
 
 export interface ChoiceField extends FieldBase<'choice'> {
   readonly glyph?: GlyphName
   readonly options: readonly ChoiceOption[]
+  readonly recommend?: Recommend
 }
 
 export interface TagOption {
@@ -283,6 +328,7 @@ export interface ListFixedItem {
   readonly id: string
   readonly label: string
   readonly meta?: string
+  readonly help?: string
 }
 
 export interface ListField extends FieldBase<'list'> {
@@ -290,6 +336,10 @@ export interface ListField extends FieldBase<'list'> {
   readonly item: ListItemSchema
   // Só nomes: descrições protegidas não entram no template (§12).
   readonly catalog?: readonly string[]
+  readonly catalogDefaults?: readonly CatalogDefault[]
+  // Frase curta de ajuda por nome do catálogo (R-19), ao lado da lista
+  readonly catalogHelp?: Readonly<Record<string, string>>
+  readonly recommend?: Recommend
   readonly fixed?: readonly ListFixedItem[]
   readonly searchable?: boolean
   readonly density?: 'regular' | 'compact'

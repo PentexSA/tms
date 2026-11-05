@@ -140,6 +140,8 @@ export interface ResolvedMark extends Base<'mark'> {
 
 export interface ResolvedText extends Base<'text' | 'longText'> {
   readonly value: string
+  // O valor é o texto do `default` por opção (a ficha não gravou o campo).
+  readonly defaulted: boolean
 }
 
 export interface ResolvedChoice extends Base<'choice'> {
@@ -479,10 +481,21 @@ export function resolve(
       case 'text':
       case 'longText': {
         const v = raw(id)
+        // O valor gravado, inclusive vazio, vence; sem ele, o texto da opção
+        // do `choice` (a Fraqueza do Clã), como todo `default` (§3)
+        if (typeof v === 'string' || !d.default)
+          return {
+            ...base,
+            type: d.type,
+            value: typeof v === 'string' ? v : '',
+            defaulted: false,
+          } as ResolvedText
+        const t = get(d.default.map, raw(d.default.from))
         return {
           ...base,
           type: d.type,
-          value: typeof v === 'string' ? v : '',
+          value: typeof t === 'string' ? t : '',
+          defaulted: typeof t === 'string',
         } as ResolvedText
       }
       case 'choice': {

@@ -6,6 +6,7 @@ import {
 } from '@tms/sheet-core'
 import {
   Button,
+  type Help,
   hitTarget,
   Pressable,
   Text,
@@ -26,9 +27,9 @@ import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
-import { AnchorHeader } from './AnchorHeader'
 import { useAnchor } from './anchor'
 import { ChipFlow } from './ChipFlow'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
 import { StripScope } from './groupTabsState'
 import { echoesSection, HeadedList, titledList } from './headedList'
@@ -141,6 +142,12 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             g.fieldIds,
             header ? g.title : echo ? section.def.title : null
           )
+          // A frase do grupo e, no bloco que o título nomeia (T-58), a da
+          // lista: com as duas, o "?" mostra as duas (blockHelp)
+          const listDef = headed ? model.fields.get(headed)?.def : undefined
+          const draft = isDraftMode(mode)
+          const groupText = draft ? g.help : null
+          const listText = draft ? listDef?.help : null
           return (
             <GroupBlock
               key={g.id}
@@ -155,8 +162,28 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
                   : null
               }
               title={header ? g.title : null}
+              help={header ? blockHelp(g.title, groupText, listText) : null}
+              helpTestID={`group-help-${g.id}`}
               right={<CreationCounter fieldIds={g.fieldIds} items={headed} />}
             >
+              {header ? null : g.title && !echo ? (
+                // Com abas, o "?" vai no topo do conteúdo da aba
+                <GroupHelpLine
+                  help={blockHelp(g.title, groupText, null)}
+                  testID={`group-help-${g.id}`}
+                />
+              ) : echo ? (
+                // O título da seção nomeia o bloco: o "?" vem logo abaixo, com
+                // a frase do grupo e a da lista
+                <GroupHelpLine
+                  help={blockHelp(
+                    listDef?.label ?? section.def.title,
+                    groupText,
+                    listText
+                  )}
+                  testID={`group-help-${g.id}`}
+                />
+              ) : null}
               {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
               {titled || tabs.inStrip ? null : (
                 <CreationCounter fieldIds={g.fieldIds} line />
@@ -195,6 +222,8 @@ function GroupBlock({
   style,
   anchor,
   title,
+  help,
+  helpTestID,
   right,
   children,
 }: {
@@ -204,6 +233,9 @@ function GroupBlock({
   // O grupo como âncora do "ir ao grupo" (P05-D); o título recebe o foco
   readonly anchor: { readonly id: string; readonly parent: string } | null
   readonly title: string | null
+  // O "?" do título: a frase do grupo e a da lista que ele nomeia (R-19)
+  readonly help: Help | null
+  readonly helpTestID?: string
   // O contador ao lado do título
   readonly right: ReactNode
   readonly children: ReactNode
@@ -216,11 +248,12 @@ function GroupBlock({
       <View style={style} onLayout={onLayout}>
         {title ? (
           <View style={styles.title}>
-            <AnchorHeader
+            <GroupTitle
               title={title}
-              level="group"
+              help={help}
               right={right}
               target={target}
+              testID={helpTestID}
             />
           </View>
         ) : null}

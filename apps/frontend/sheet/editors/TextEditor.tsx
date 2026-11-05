@@ -1,6 +1,7 @@
 import { TextArea, TextField, tokens } from '@tms/ui'
 import { Platform, StyleSheet, View } from 'react-native'
 import { nextField } from '../../lib/keyboard'
+import { fieldHelp } from '../evolve/help'
 import { properNameInput } from './properName'
 import { SuggestionPicker } from './Suggestions'
 import type { EditorProps } from './types'
@@ -47,7 +48,8 @@ export function TextEditor({
       onChangeText={onChange}
       maxLength={max}
       error={error}
-      hint={def.help}
+      // A frase do template é ajuda (o "?", R-19), não dica sempre visível
+      help={fieldHelp(def)}
       placeholder={
         def.type === 'text' || def.type === 'longText'
           ? def.placeholder
@@ -76,6 +78,7 @@ export function TextEditor({
         options={suggestions}
         value={text}
         onPick={onChange}
+        help={def.type === 'text' ? def.suggestionHelp : undefined}
         testID={`suggest-${id}`}
       />
     </View>

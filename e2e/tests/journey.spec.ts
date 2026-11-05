@@ -83,9 +83,11 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   // 4. A ficha pelo formulário gerado do template
   await page.getByRole('button', { name: 'Nova ficha' }).click()
   await page.getByLabel('Nome (obrigatório)').fill('Helena Varga')
-  await page.getByLabel('Conceito').fill('Arquivista da Capela')
+  await page
+    .getByLabel('Conceito', { exact: true })
+    .fill('Arquivista da Capela')
   await page.getByRole('radio', { name: 'Tremere' }).click()
-  await page.getByLabel('Senhor').fill('Ana Bathory')
+  await page.getByLabel('Senhor', { exact: true }).fill('Ana Bathory')
   await page.getByLabel('Natureza', { exact: true }).fill('Arquiteta')
   await page.getByLabel('Comportamento', { exact: true }).fill('Conformista')
   await page.getByRole('button', { name: 'Criar ficha' }).click()
@@ -112,7 +114,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('tab', { name: 'Vantagens' }).click()
   await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
   await page.getByLabel('Buscar Disciplina').fill('tauma')
-  await page.getByRole('button', { name: 'Taumaturgia', exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Taumaturgia, do clã', exact: true })
+    .click()
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('rebanho')
   await page.getByRole('button', { name: 'Rebanho', exact: true }).click()
@@ -121,10 +125,11 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('gera')
   await page.getByRole('button', { name: 'Geração', exact: true }).click()
-  await page.getByRole('button', { name: /^Geração, 1 de 5/ }).click()
-  for (let i = 0; i < 4; i++)
-    await stepper(page, 'Aumentar Geração, valor').click()
-  await page.getByRole('button', { name: 'Aplicar' }).click()
+  // R-25: o valor sobe na própria linha, sem abrir a folha do item
+  for (let i = 0; i < 4; i++) await stepper(page, 'Aumentar Geração').click()
+  await expect(
+    page.getByRole('button', { name: /^Geração, 5 de 5/ })
+  ).toBeVisible()
   await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
   await page

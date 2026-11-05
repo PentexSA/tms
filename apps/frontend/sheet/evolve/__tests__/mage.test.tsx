@@ -4,8 +4,9 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native'
-import { example, modelOf } from '../../../test/fixtures'
-import { fakeServer, renderLive } from '../../../test/live'
+import { compileTemplate } from '@tms/sheet-core'
+import { example, modelOf, templateWithIdentity } from '../../../test/fixtures'
+import { fakeServer, LIVE_ID, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
 // v1, Etapa 5: o teto não destrutivo (Esferas ≤ Arete), o selo da afinidade
@@ -93,6 +94,57 @@ describe('afinidade', () => {
   })
 })
 
+describe('R-26: a Esfera de afinidade pela Tradição', () => {
+  const m20 = compileTemplate(templateWithIdentity('mta-m20'))
+  const open = async (values: Record<string, unknown>) => {
+    const sheet = { values: { name: 'Nova', ...values }, specialties: {} }
+    await renderLive(
+      { model: m20, sheet, mode: 'evolve' },
+      fakeServer(m20, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+  }
+
+  it('Verbena: as da Tradição vêm primeiro, com "da Tradição" no nome do rádio', async () => {
+    await open({ tradition: 'verbena' })
+    fireEvent.press(
+      screen.getByRole('button', { name: /^Esfera de afinidade/ })
+    )
+    // Os rádios da folha (fora os do seletor de modo, Jogo e Editar)
+    const radios = screen
+      .getAllByRole('radio')
+      .map(r => r.props.accessibilityLabel as string)
+      .filter(l => !['Jogo', 'Editar', 'Leitura'].includes(l))
+    expect(radios.slice(0, 2)).toEqual([
+      'Forças, da Tradição',
+      'Vida, da Tradição',
+    ])
+    expect(radios).toContain('Tempo')
+  })
+
+  it('na criação, a escolha fora da Tradição avisa sob o valor, sem bloquear', async () => {
+    await open({ tradition: 'verbena', affinity: 'time' })
+    expect(screen.getByTestId('identity-affinity')).toHaveTextContent(
+      'fora da Tradição: confirme com o narrador'
+    )
+  })
+
+  it('trocar a Tradição com a Esfera na tela atualiza o aviso (code review)', async () => {
+    await open({ tradition: 'verbena', affinity: 'time' })
+    expect(screen.getByTestId('identity-affinity')).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Tradição/ }))
+    fireEvent.press(screen.getByRole('radio', { name: 'Culto do Êxtase' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.queryByTestId('identity-affinity')).toBeNull()
+  })
+
+  it('dentro da Tradição, ou sem Tradição, nada avisa', async () => {
+    await open({ tradition: 'verbena', affinity: 'life' })
+    expect(screen.queryByTestId('identity-affinity')).toBeNull()
+  })
+})
+
 describe('rotinas (lista sem valor)', () => {
   it('adiciona pelo nome, sem stepper, e o lote leva só id e nome', async () => {
     const server = await evolveSpheres()
@@ -109,5 +161,46 @@ describe('rotinas (lista sem valor)', () => {
       ...(otto().values.rotes as unknown[]),
       { id: 'i3', name: 'Escudo de estática' },
     ])
+  })
+})
+
+// U-05: a roda segue o Avatar do rascunho, sem salvar. Não reproduzido no
+// código (P10-C §3.2): o teste prende o comportamento
+describe('a roda do Mago sobre o rascunho (U-05)', () => {
+  it('Avatar 3 pela folha, sem salvar: Quintessência 3', async () => {
+    const sheet = { values: { name: 'Nova' }, specialties: {} }
+    const { store } = await renderLive(
+      {
+        model,
+        sheet,
+        mode: 'evolve',
+        creation: {
+          characterId: LIVE_ID,
+          chronicleId: 'c1',
+          status: 'creating',
+          info: null,
+          active: false,
+        },
+      },
+      fakeServer(model, sheet).post
+    )
+    const wheel = () => screen.getAllByLabelText(/^Quintessência e Paradoxo/)
+    expect(wheel()[0]?.props.accessibilityLabel).toMatch(/Quintessência 0/)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Antecedente' })
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Avatar' }))
+    // R-25 (P07-D): o valor sobe na linha, sem a folha do item
+    for (let i = 0; i < 2; i++)
+      fireEvent(
+        screen.getByRole('adjustable', { name: 'Avatar' }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    // Nada salvo: o rascunho é que move a roda
+    expect(store().getState().pending).toEqual([])
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    expect(wheel()[0]?.props.accessibilityLabel).toMatch(/Quintessência 3/)
   })
 })

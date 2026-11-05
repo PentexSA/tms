@@ -398,6 +398,63 @@ describe('Stepper', () => {
     expect(onChange).toHaveBeenCalledWith(7)
   })
 
+  // Achado 3 do /code-review (P10-C): segurar o "−" acima do valor inicial
+  // descia até o mínimo, e o lote único era recusado inteiro; com o `stop`,
+  // a repetição para no inicial e grava a descida que entra
+  it('segurar para no `stop` da previsão e grava só até ali', () => {
+    const { onChange } = renderStepper({ value: 8, decrease: { stop: 5 } })
+    const dec = screen.getByTestId('stepper-dec', {
+      includeHiddenElements: true,
+    })
+    fireEvent(dec, 'longPress')
+    act(() => {
+      jest.advanceTimersByTime(10 * 100)
+    })
+    expect(screen.getByText('5')).toBeTruthy()
+    fireEvent(dec, 'pressOut')
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(5)
+  })
+
+  it('o `stop` do "+" vale igual', () => {
+    const { onChange } = renderStepper({ value: 2, increase: { stop: 4 } })
+    const inc = screen.getByTestId('stepper-inc', {
+      includeHiddenElements: true,
+    })
+    fireEvent(inc, 'longPress')
+    act(() => {
+      jest.advanceTimersByTime(10 * 100)
+    })
+    fireEvent(inc, 'pressOut')
+    expect(onChange).toHaveBeenCalledWith(4)
+  })
+
+  it('sem `stop`, segurar o "−" desce como antes', () => {
+    const { onChange } = renderStepper({ value: 8 })
+    const dec = screen.getByTestId('stepper-dec', {
+      includeHiddenElements: true,
+    })
+    fireEvent(dec, 'longPress')
+    act(() => {
+      jest.advanceTimersByTime(4 * 100)
+    })
+    fireEvent(dec, 'pressOut')
+    expect(onChange).toHaveBeenCalledWith(3)
+  })
+
+  it('já abaixo do `stop`, segurar não volta para cima', () => {
+    const { onChange } = renderStepper({ value: 3, decrease: { stop: 5 } })
+    const dec = screen.getByTestId('stepper-dec', {
+      includeHiddenElements: true,
+    })
+    fireEvent(dec, 'longPress')
+    act(() => {
+      jest.advanceTimersByTime(5 * 100)
+    })
+    fireEvent(dec, 'pressOut')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('desabilitado ignora as ações', () => {
     const { el, onChange } = renderStepper({ disabled: true })
     fireEvent(el, 'accessibilityAction', {

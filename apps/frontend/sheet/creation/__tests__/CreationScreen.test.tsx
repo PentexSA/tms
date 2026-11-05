@@ -7,15 +7,16 @@ import {
   within,
 } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
+import { Stepper } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import {
   AccessibilityInfo,
   Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
 } from 'react-native'
-
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { modelOf, templateJson } from '../../../test/fixtures'
@@ -30,6 +31,7 @@ import {
 import { SheetScreen } from '../../SheetScreen'
 import { resetBonusSeenMemory } from '../bonusSeen'
 import * as guideModule from '../guide'
+import { CREATION_HELP } from '../help'
 
 // A prioridade escolhida no próprio grupo (Físicos: 7 · 5 · 3) e a trava a
 // cada toque: em Pontos básicos, o grupo cheio não aceita o próximo ponto;
@@ -231,6 +233,33 @@ describe('prioridades no grupo', () => {
   })
 })
 
+// R-19 (P10-D §3.7): "Prioridade" e "pontos de bônus" são nomes do app para
+// as regras do motor; a frase vem do app, não do template.
+describe('o "?" da Prioridade e dos pontos de bônus (R-19)', () => {
+  it('"Prioridade" tem "Ajuda: Prioridade", com a frase genérica', async () => {
+    await open()
+    const help = screen.getByTestId('priority-help-physical')
+    expect(help.props.accessibilityLabel).toBe('Ajuda: Prioridade')
+    expect(screen.queryByText(CREATION_HELP.priority.text)).toBeNull()
+    fireEvent.press(help)
+    expect(screen.getByText(CREATION_HELP.priority.text)).toBeTruthy()
+    // A frase não diz número: os valores vêm do template
+    expect(CREATION_HELP.priority.text).not.toMatch(/\d/)
+  })
+
+  it('o saldo dos pontos de bônus tem "Ajuda: pontos de bônus"', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    tab('Pontos')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ajuda: pontos de bônus' })
+    )
+    expect(screen.getByText(CREATION_HELP.freebies.text)).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies').props.children).toBe(
+      'Bônus: restam 15 de 15.'
+    )
+  })
+})
+
 describe('prioridades na tela larga', () => {
   it('cada coluna de Atributos tem a própria escolha', async () => {
     Dimensions.set({ window: TABLET, screen: TABLET })
@@ -388,6 +417,85 @@ describe('"+" com a previsão da conta', () => {
       screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
         .props.accessibilityHint
     ).toBe('+1 = 1 bônus')
+  })
+})
+
+// T-85: o "−" no valor inicial tem a cara de indisponível, continua
+// tocável, e o toque diz de onde vem o inicial sem descer
+describe('"−" no valor inicial', () => {
+  it('FdV na Coragem 3: a dica junta os dois lados, e o "−" não desce', async () => {
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const control = () =>
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+    expect(control().props.accessibilityHint).toBe(
+      'Aumentar: +1 = 1 bônus. Diminuir: Na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(screen.getByTestId('notice-willpower')).toHaveTextContent(
+      'Força de Vontade: na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    // Comprar 1 e voltar deixa o "−" livre no 4 e zera o contador
+    step('Força de Vontade permanente')
+    expect(control()).toHaveAccessibilityValue({ now: 4 })
+    expect(control().props.accessibilityHint).toBe('+1 = 1 bônus')
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    expect(screen.getByText(/0 alterações/)).toBeTruthy()
+  })
+})
+
+// Achados 3 e 6 do /code-review (P10-C): acima do inicial, segurar o "−"
+// para no inicial; no web, o "−" bloqueado aponta a própria descrição, e o
+// aviso do "−" não vira a descrição do "+"
+describe('"−" no valor inicial: segurar e descrição', () => {
+  const realOS = Platform.OS
+  const setOS = (os: string) =>
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+  afterEach(() => setOS(realOS))
+
+  it('no app, o "−" acima do inicial leva o stop do inicial', async () => {
+    await open(PRIORITIES, {
+      courage: 3,
+      willpower: { permanent: 6, current: 6 },
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const steppers = screen.UNSAFE_getAllByType(Stepper)
+    const row = steppers.find(
+      x => x.props.label === 'Força de Vontade permanente'
+    )
+    expect(row?.props.decrease).toMatchObject({ blocked: false, stop: 3 })
+  })
+
+  it('no web, o "−" bloqueado sem aviso aponta a descrição dele', async () => {
+    setOS('web')
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const less = () =>
+      screen.getByRole('button', {
+        name: 'Diminuir Força de Vontade permanente',
+      })
+    const more = () =>
+      screen.getByRole('button', {
+        name: 'Aumentar Força de Vontade permanente',
+      })
+    expect(less().props['aria-describedby']).toBe('advice-down-willpower')
+    expect(
+      screen.getByTestId('advice-down-willpower', {
+        includeHiddenElements: true,
+      })
+    ).toHaveTextContent('Na criação, não fica abaixo de 3 (vem de Coragem).')
+    // O toque recusado abre o aviso do "−": ele passa a descrevê-lo, e o
+    // "+" não aponta o aviso que não é dele
+    fireEvent.press(less())
+    expect(screen.getByTestId('notice-willpower')).toBeTruthy()
+    expect(less().props['aria-describedby']).toBe('notice-willpower')
+    expect(more().props['aria-describedby']).not.toBe('notice-willpower')
   })
 })
 

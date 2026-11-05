@@ -29,6 +29,92 @@ export const templateJson = (system: string): Json =>
 export const modelOf = (system: string): SheetModel =>
   compileTemplate(templates[system])
 
+// Dons fictícios (P07-D): o catálogo do W20 é do time e espera a licença,
+// então o teste usa nomes inventados, com Posto e recomendação
+export const GIFTS = {
+  breed: 'Faro do Asfalto',
+  auspice: 'Grito de Alerta',
+  tribe: 'Voz da Matilha',
+  rank2: 'Passo de Neblina',
+  other: 'Pele de Pedra',
+} as const
+
+/**
+ * O template com `recommend`, `catalogDefaults` e `creation.advice` de
+ * teste: as Disciplinas do Brujah (as mesmas do XP do template), os Dons
+ * fictícios do Lupino Ahroun Fianna e as Esferas da Verbena. Igual antes e
+ * depois de o conteúdo do time entrar nos templates do produto.
+ */
+export function templateWithIdentity(system: string): Json {
+  const t = templateJson(system)
+  const fields = t.fields as Record<string, Json>
+  if (system === 'vtm-v20' && fields.disciplines)
+    fields.disciplines.recommend = {
+      outside: 'fora do clã',
+      by: [
+        {
+          from: 'clan',
+          label: 'do clã',
+          map: {
+            brujah: ['Rapidez', 'Potência', 'Presença'],
+            tremere: ['Auspícios', 'Dominação', 'Taumaturgia'],
+          },
+        },
+      ],
+    }
+  // Resumos fictícios: os da Fraqueza do produto são escritos pelo time
+  if (system === 'vtm-v20' && fields.weakness)
+    fields.weakness.default = {
+      from: 'clan',
+      map: {
+        brujah: 'Resumo fictício de teste A.',
+        toreador: 'Resumo fictício de teste B.',
+      },
+    }
+  if (system === 'wta-w20' && fields.gifts) {
+    fields.gifts.catalog = Object.values(GIFTS)
+    fields.gifts.catalogDefaults = [
+      {
+        meta: 'rank',
+        value: 1,
+        items: [GIFTS.breed, GIFTS.auspice, GIFTS.tribe],
+      },
+      { meta: 'rank', value: 2, items: [GIFTS.rank2] },
+    ]
+    fields.gifts.recommend = {
+      outside: 'fora da Raça, do Augúrio e da Tribo',
+      by: [
+        { from: 'breed', label: 'da Raça', map: { lupino: [GIFTS.breed] } },
+        {
+          from: 'auspice',
+          label: 'do Augúrio',
+          map: { ahroun: [GIFTS.auspice] },
+        },
+        {
+          from: 'tribe',
+          label: 'da Tribo',
+          map: { fianna: [GIFTS.tribe, GIFTS.breed] },
+        },
+      ],
+    }
+    ;(t.creation as Json).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+    ]
+  }
+  if (system === 'mta-m20' && fields.affinity)
+    fields.affinity.recommend = {
+      outside: 'fora da Tradição',
+      by: [
+        {
+          from: 'tradition',
+          label: 'da Tradição',
+          map: { verbena: ['life', 'forces'] },
+        },
+      ],
+    }
+  return t
+}
+
 export function example(id: string) {
   const c = examples.find(x => x.id === id)
   if (!c) throw new Error(`fixture ausente: ${id}`)
