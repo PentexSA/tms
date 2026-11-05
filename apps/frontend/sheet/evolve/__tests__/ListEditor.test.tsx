@@ -1,6 +1,11 @@
 import { fireEvent, screen, within } from '@testing-library/react-native'
-import type { ListItem } from '@tms/sheet-core'
-import { example, modelOf } from '../../../test/fixtures'
+import { compileTemplate, type ListItem } from '@tms/sheet-core'
+import {
+  example,
+  GIFTS,
+  modelOf,
+  templateWithIdentity,
+} from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
@@ -30,7 +35,7 @@ describe('ListEditor', () => {
     )
     fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'auspi')
     expect(
-      screen.getByRole('button', { name: 'Auspícios, já na ficha' })
+      screen.getByRole('button', { name: 'Auspícios, do clã, já na ficha' })
     ).toBeDisabled()
     fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'fortit')
     fireEvent.press(screen.getByRole('button', { name: 'Fortitude' }))
@@ -81,18 +86,22 @@ describe('ListEditor', () => {
     expect(disciplines()?.at(-1)?.name).toBe('Obtenebração antiga')
   })
 
-  it('o item: valor, especialização e notas, num lote só ao salvar', async () => {
+  it('o item: valor na linha, especialização e notas na folha, num lote só ao salvar', async () => {
     const { disciplines } = await helenaInEvolve()
-    fireEvent.press(
-      screen.getByRole('button', {
-        name: 'Taumaturgia, 3 de 5, especialização Trilha do Sangue',
-      })
-    )
+    // R-25: o valor sobe na própria linha, sem abrir a folha
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Taumaturgia, valor' }),
+      screen.getByRole('adjustable', { name: 'Taumaturgia' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
+    expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Taumaturgia, 4 de 5, especialização Trilha do Sangue, do clã',
+      })
+    )
+    // A folha fica com nome, especialização e notas: o Valor saiu dela
+    expect(screen.queryByRole('adjustable', { name: /valor/ })).toBeNull()
     fireEvent.changeText(
       screen.getByLabelText('Especialização'),
       'Trilha da Chama'
@@ -108,10 +117,118 @@ describe('ListEditor', () => {
     expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
   })
 
+  it('R-25: o "−" desce na linha; o item fica com 0, e tirar é pela folha', async () => {
+    const { disciplines } = await helenaInEvolve()
+    const auspex = () => screen.getByRole('adjustable', { name: 'Auspícios' })
+    for (const _ of [1, 2])
+      fireEvent(auspex(), 'accessibilityAction', {
+        nativeEvent: { actionName: 'decrement' },
+      })
+    expect(disciplines()?.find(d => d.name === 'Auspícios')?.value).toBe(0)
+    expect(
+      screen.getByRole('button', { name: 'Auspícios, 0 de 5, do clã' })
+    ).toBeTruthy()
+    // No mínimo, o "−" não desce mais
+    fireEvent(auspex(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(disciplines()?.find(d => d.name === 'Auspícios')?.value).toBe(0)
+  })
+
+  it('R-25: a linha não aninha botões, e o nome abre a folha com a dica', async () => {
+    await helenaInEvolve()
+    const row = within(screen.getByTestId('item-disciplines-d2'))
+    const name = row.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
+    expect(name.props.accessibilityHint).toBe(
+      'Abre o item: nome, especialização e notas'
+    )
+    expect(within(name).queryByRole('adjustable')).toBeNull()
+    expect(row.getByRole('adjustable', { name: 'Auspícios' })).toBeTruthy()
+  })
+
+  it('R-25: lista sem valor (Qualidades) continua com a linha que abre a folha, sem −/+', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: {
+        ...helena.values,
+        merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+      },
+    }
+    await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const merits = within(screen.getByTestId('editor-merits'))
+    expect(merits.queryByRole('adjustable')).toBeNull()
+    expect(merits.getByRole('button', { name: /^Ambidestro/ })).toBeTruthy()
+  })
+
+  it('R-25: ficha ativa, dona: o −/+ da linha fica desabilitado com "Peça ao narrador."', async () => {
+    const helena = example('helena').sheet
+    await renderLive(
+      {
+        model: vtm,
+        sheet: helena,
+        mode: 'evolve',
+        lifecycle: { status: 'active', locked: false, member: true },
+      },
+      fakeServer(vtm, helena).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const disciplines = within(screen.getByTestId('editor-disciplines'))
+    expect(
+      disciplines.getByRole('adjustable', { name: 'Auspícios' }).props[
+        'aria-disabled'
+      ]
+    ).toBe(true)
+    expect(disciplines.getByText('Peça ao narrador.')).toBeTruthy()
+    // O nome continua abrindo a folha (nome e notas seguem editáveis)
+    fireEvent.press(
+      disciplines.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
+    )
+    expect(screen.getByTestId('item-sheet-disciplines')).toBeTruthy()
+  })
+
+  it('nome repetido sem catálogo: "Já há", o Enter explica e "Adicionar outro" repete', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: {
+        ...helena.values,
+        merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+      },
+    }
+    const { store } = await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'ambidestro')
+    expect(screen.getByTestId('add-repeated')).toHaveTextContent(
+      'Já há “ambidestro” na ficha.'
+    )
+    // O Enter não repete sem querer
+    fireEvent(textInput('Nome'), 'submitEditing', {
+      nativeEvent: { text: 'ambidestro' },
+    })
+    expect(store().getState().draftEvents()).toEqual([])
+    expect(screen.getByTestId('add-sheet-merits')).toBeTruthy()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar outro “ambidestro”' })
+    )
+    const merits = store().getState().draftEvents()[0]?.to as ListItem[]
+    expect(merits.map(m => m.name)).toEqual(['Ambidestro', 'ambidestro'])
+  })
+
   it('remover pede confirmação', async () => {
     const { disciplines } = await helenaInEvolve()
     const open = () =>
-      fireEvent.press(screen.getByRole('button', { name: 'Auspícios, 2 de 5' }))
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
+      )
     open()
     fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
     expect(screen.getByText('Remover Auspícios?')).toBeTruthy()
@@ -126,7 +243,7 @@ describe('ListEditor', () => {
       'Dominação',
     ])
     expect(
-      screen.queryByRole('button', { name: 'Auspícios, 2 de 5' })
+      screen.queryByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
     ).toBeNull()
   })
 
@@ -159,7 +276,9 @@ describe('ListEditor', () => {
 
   it('renomear o item; o campo de nome respeita o limite do validador', async () => {
     const { disciplines } = await helenaInEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
     const name = textInput('Nome')
     expect(name.props.maxLength).toBe(80)
     fireEvent.changeText(name, ' Dominação Plena ')
@@ -343,6 +462,214 @@ describe('T-62: Enter e "✓" adicionam', () => {
   })
 })
 
+describe('R-26 e T-24: o que a identidade recomenda', () => {
+  const w20 = compileTemplate(templateWithIdentity('wta-w20'))
+  const v20 = compileTemplate(templateWithIdentity('vtm-v20'))
+  const render = async (
+    model: typeof w20,
+    values: Record<string, unknown>,
+    tab = 'Vantagens'
+  ) => {
+    const sheet = { values: { name: 'Nova', ...values }, specialties: {} }
+    const live = await renderLive(
+      { model, sheet, mode: 'evolve' },
+      fakeServer(model, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: tab }))
+    return live
+  }
+  const gifts = (store: () => { getState(): { draftEvents(): unknown[] } }) =>
+    (store().getState().draftEvents()[0] as { to?: ListItem[] } | undefined)?.to
+
+  it('Lupino Ahroun Fianna: os três blocos com a fonte, os selos e o Posto; o resto pela busca', async () => {
+    await render(w20, { breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    const sheet = within(screen.getByTestId('add-sheet-gifts'))
+    const titles = sheet
+      .getAllByRole('header')
+      .map(h => h.props.children)
+      .filter(t => t !== 'Adicionar Dom')
+    expect(titles).toEqual([
+      'Da Raça · Lupino',
+      'Do Augúrio · Ahroun',
+      'Da Tribo · Fianna',
+      'Outras',
+    ])
+    // O nome em duas fontes aparece uma vez, com os dois selos
+    expect(
+      sheet.getByRole('button', {
+        name: `${GIFTS.breed}, Posto 1, da Raça, da Tribo`,
+      })
+    ).toBeTruthy()
+    // Catálogo pequeno no teste: "Outras" mostra o resto (o limite é 40)
+    expect(
+      within(screen.getByTestId('add-block-others')).getByRole('button', {
+        name: GIFTS.other,
+      })
+    ).toBeTruthy()
+  })
+
+  it('catálogo grande: sem busca, só as recomendadas, e o resto pela busca', async () => {
+    const t = templateWithIdentity('wta-w20')
+    const gifts = (t.fields as Record<string, Record<string, unknown>>).gifts
+    if (gifts)
+      gifts.catalog = [
+        ...(gifts.catalog as string[]),
+        ...Array.from({ length: 40 }, (_, i) => `Dom Fictício ${i + 1}`),
+      ]
+    await render(compileTemplate(t), { breed: 'lupino' })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    const sheet = within(screen.getByTestId('add-sheet-gifts'))
+    expect(screen.queryByTestId('add-block-others')).toBeNull()
+    expect(
+      sheet.getByText('Busque pelo nome para ver o restante da lista.')
+    ).toBeTruthy()
+    expect(sheet.queryByRole('button', { name: /^Dom Fictício/ })).toBeNull()
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'fictício 12')
+    expect(sheet.getByRole('button', { name: 'Dom Fictício 12' })).toBeTruthy()
+  })
+
+  it('a busca acha o Dom de outra fonte e o texto livre continua', async () => {
+    const { store } = await render(w20, {
+      breed: 'lupino',
+      auspice: 'ahroun',
+      tribe: 'fianna',
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'pedra')
+    expect(screen.getByRole('button', { name: `${GIFTS.other}` })).toBeTruthy()
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'Uivo Inventado')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Uivo Inventado”' })
+    )
+    // O texto livre nasce com o mínimo do Posto (sem entrada no catálogo)
+    expect(gifts(store)?.at(-1)).toEqual({
+      id: 'i1',
+      name: 'Uivo Inventado',
+      meta: { rank: 1 },
+    })
+  })
+
+  it('o nome do catálogo nasce com o Posto do catálogo (catalogDefaults)', async () => {
+    const { store } = await render(w20, { breed: 'lupino' })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'neblina')
+    fireEvent.press(
+      screen.getByRole('button', { name: `${GIFTS.rank2}, Posto 2` })
+    )
+    expect(gifts(store)?.at(-1)).toEqual({
+      id: 'i1',
+      name: GIFTS.rank2,
+      meta: { rank: 2 },
+    })
+  })
+
+  it('sem Clã: lista neutra e a frase de escolher na identidade', async () => {
+    await render(v20, {})
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(
+      sheet.getByText('Escolha Clã na identidade para ver as recomendações.')
+    ).toBeTruthy()
+    expect(sheet.queryByRole('header', { name: 'Do clã' })).toBeNull()
+    expect(sheet.queryByRole('button', { name: /do clã/ })).toBeNull()
+  })
+
+  it('trocar o Clã com a lista na tela atualiza o selo e a folha (code review)', async () => {
+    await render(v20, {
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: 'Potência', value: 1 }],
+    })
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5, do clã' })
+    ).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Clã/ }))
+    fireEvent.press(screen.getByRole('radio', { name: 'Tremere' }))
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'fora do clã: confirme com o narrador'
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const clan = within(screen.getByTestId('add-block-by-clan'))
+    expect(
+      clan.getAllByRole('button').map(b => b.props.accessibilityLabel)
+    ).toEqual(['Auspícios, do clã', 'Dominação, do clã', 'Taumaturgia, do clã'])
+  })
+
+  it('o nome gravado sem acento ou com outra caixa leva o selo do catálogo', async () => {
+    await render(v20, {
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: 'potencia', value: 1 }],
+    })
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'do clã'
+    )
+    expect(screen.getByTestId('identity-disciplines-d1')).not.toHaveTextContent(
+      /fora/
+    )
+  })
+
+  it('com uma fonte sem escolha: nada "fora" e a frase diz qual falta', async () => {
+    await render(w20, {
+      breed: 'lupino',
+      gifts: [{ id: 'g1', name: GIFTS.other, meta: { rank: 1 } }],
+    })
+    expect(screen.queryByTestId('identity-gifts-g1')).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    const sheet = within(screen.getByTestId('add-sheet-gifts'))
+    expect(
+      sheet.getByText(
+        'Escolha Augúrio ou Tribo na identidade para ver as recomendações.'
+      )
+    ).toBeTruthy()
+    expect(sheet.getByRole('header', { name: 'Da Raça · Lupino' })).toBeTruthy()
+  })
+
+  it('Caitiff (sem entrada no mapa): nenhum selo e nenhum "fora"', async () => {
+    await render(v20, {
+      clan: 'caitiff',
+      disciplines: [{ id: 'd1', name: 'Dominação', value: 1 }],
+    })
+    expect(screen.queryByTestId('identity-disciplines-d1')).toBeNull()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(sheet.queryByRole('header', { name: 'Do clã' })).toBeNull()
+    expect(sheet.queryByText(/Escolha/)).toBeNull()
+  })
+
+  it('ficha ativa (não é criação): o selo fica, o "fora" e o Posto não aparecem', async () => {
+    const sheet = {
+      values: {
+        name: 'Ativa',
+        breed: 'lupino',
+        gifts: [{ id: 'g1', name: GIFTS.other, meta: { rank: 3 } }],
+      },
+      specialties: {},
+    }
+    await renderLive(
+      {
+        model: w20,
+        sheet,
+        mode: 'evolve',
+        lifecycle: { status: 'active', locked: false, member: true },
+      },
+      fakeServer(w20, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.queryByTestId('identity-gifts-g1')).toBeNull()
+  })
+})
+
 describe('outros sistemas, o mesmo editor', () => {
   it('D&D: ataque com meta numérica e de texto', async () => {
     const c = example('lia')
@@ -387,13 +714,14 @@ describe('outros sistemas, o mesmo editor', () => {
     expect(
       resonance.getByRole('button', { name: 'Entrópica, 0 de 5' })
     ).toBeTruthy()
-    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
-    fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
+    // Os pontos sobem na linha; o descritor muda na folha
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Entrópica, valor' }),
+      resonance.getByRole('adjustable', { name: 'Entrópica' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
+    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
+    fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
     const items = store().getState().draftEvents()[0]?.to as ListItem[]
     expect(items).toEqual([

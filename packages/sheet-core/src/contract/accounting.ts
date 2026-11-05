@@ -1,4 +1,4 @@
-import type { CapRule } from '../registry'
+import type { CapRule, CreationAdviceName } from '../registry'
 import type { FieldId } from './fields'
 
 // Contabilização da criação e da evolução (design/templates/README.md §14,
@@ -85,6 +85,18 @@ export interface CreationBaseline {
   readonly when?: AccountingCondition
 }
 
+/**
+ * Aviso da criação que não bloqueia (D-07): `item-meta-max` avisa os itens
+ * com o meta acima de `max` (Dom acima do Posto 1). Fica fora da conta:
+ * `checkCreation`, `complete` e o servidor não o leem.
+ */
+export interface CreationAdviceRule {
+  readonly rule: CreationAdviceName
+  readonly targets: readonly FieldId[]
+  readonly meta: string
+  readonly max: number
+}
+
 export interface CreationDef {
   // Saldo de pontos de bônus.
   readonly freebies?: number
@@ -94,6 +106,7 @@ export interface CreationDef {
   // Campos de evolução que a criação não contabiliza (fail secure: o que não
   // está em nenhuma conta nem aqui não sobe na criação por pontos).
   readonly untracked?: readonly FieldId[]
+  readonly advice?: readonly CreationAdviceRule[]
 }
 
 /**

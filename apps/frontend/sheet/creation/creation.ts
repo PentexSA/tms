@@ -1,4 +1,5 @@
 import {
+  type CreationAdvice,
   type CreationCheck,
   type CreationChoices,
   type CreationComponent,
@@ -221,11 +222,63 @@ const fieldLabel = (model: SheetModel, path: string): string => {
   return model.fields.get(id)?.def.label ?? 'Um campo'
 }
 
+/**
+ * O rótulo do meta que dá o preço do item (o Custo da Qualidade), quando o
+ * caminho é de um item de lista com regra `item-meta`; senão null.
+ */
+function itemPriceMeta(
+  model: SheetModel,
+  path: string
+): { readonly id: string; readonly label: string } | null {
+  if (!path.includes('#')) return null
+  const id = path.replace(/^values\./, '').split('#')[0] ?? ''
+  const rule = model.template.costs?.freebie?.find(
+    r => r.rule === 'item-meta' && r.targets.includes(id)
+  )
+  const def = model.fields.get(id)?.def
+  if (!rule || def?.type !== 'list') return null
+  const m = def.item.meta?.find(x => x.id === rule.meta)
+  return m ? { id: m.id, label: m.label } : null
+}
+
+/**
+ * Os itens sem o preço (a Qualidade sem Custo) ou com o preço inválido
+ * (zero, por exemplo), contados pela ficha quando ela vem; sem a ficha, a
+ * frase junta os dois casos ("sem Custo válido"). Rascunho do time.
+ */
+function missingPriceText(
+  field: string,
+  meta: { readonly id: string; readonly label: string },
+  paths: readonly string[],
+  sheet: ResolvedSheet | undefined
+): string {
+  let absent = 0
+  let invalid = 0
+  for (const path of paths) {
+    const [list, itemId] = path.replace(/^values\./, '').split('#')
+    const r = list ? sheet?.get(list) : undefined
+    const item = r?.type === 'list' ? r.items.find(x => x.id === itemId) : null
+    const v = item?.meta?.[meta.id]
+    if (v === undefined || v === '') absent += 1
+    else invalid += 1
+  }
+  const n = paths.length
+  const items = n === 1 ? '1 item' : `${n} itens`
+  const which = n === 1 ? 'o item' : 'cada item'
+  if (sheet && invalid === 0)
+    return `${field}: ${items} sem ${meta.label}. Abra ${which} e informe o ${meta.label}.`
+  if (sheet && absent === 0)
+    return `${field}: ${items} com ${meta.label} inválido. Abra ${which} e corrija o ${meta.label}.`
+  return `${field}: ${items} sem ${meta.label} válido. Abra ${which} e informe o ${meta.label}.`
+}
+
 /** Uma frase por problema, com os rótulos do template; nunca texto da ficha. */
 export function problemText(
   model: SheetModel,
   check: CreationCheck | null,
   p: CreationProblem,
+  // A ficha mostrada: a fonte do valor inicial (P10-C) e os itens sem preço
+  // ou com preço inválido (P07-D)
   resolved?: ResolvedSheet
 ): string {
   const group =
@@ -253,8 +306,15 @@ export function problemText(
       return `${field}: acima do limite da criação.`
     case 'CREATION_LOCKED':
       return `${field}: não sobe na criação.`
-    case 'CREATION_NOT_PURCHASABLE':
-      return `${field}: não se compra na criação.`
+    case 'CREATION_NOT_PURCHASABLE': {
+      // O item de uma lista com preço por item (a Qualidade) gravado sem o
+      // meta do preço (app antigo, API direta): "não se compra" enganava
+      // (QAA-05). O que de fato não se compra (o Renome) segue igual.
+      const meta = p.paths[0] ? itemPriceMeta(model, p.paths[0]) : null
+      return meta
+        ? missingPriceText(field, meta, p.paths, resolved)
+        : `${field}: não se compra na criação.`
+    }
     case 'CREATION_BELOW_INITIAL': {
       const at = p.paths[0]
       const c = at ? componentAt(check, at) : null
@@ -264,6 +324,63 @@ export function problemText(
     }
   }
 }
+
+/**
+ * Um aviso que não bloqueia (D-07, D-09), como frase: rótulos do template e
+ * números, nunca o nome que o jogador digitou. Não entra no "Faltam" da
+ * barra nem esconde o "Concluir": a conta não o lê. Rascunho do time.
+ */
+export function adviceText(model: SheetModel, a: CreationAdvice): string {
+  const def = model.fields.get(a.field)?.def
+  const label = def?.label ?? 'Um campo'
+  if (a.code === 'ADVICE_OUTSIDE') {
+    const outside =
+      def?.type === 'list' || def?.type === 'choice'
+        ? (def.recommend?.outside ?? 'fora do recomendado')
+        : 'fora do recomendado'
+    return def?.type === 'choice'
+      ? `${label}: ${outside}.`
+      : `${label}: ${a.amount} ${outside}.`
+  }
+  // A regra do aviso (uma lista pode ter mais de uma, com metas diferentes)
+  const rules = model.template.creation?.advice ?? []
+  const rule =
+    a.rule !== undefined
+      ? rules[a.rule]
+      : rules.find(r => r.targets.includes(a.field))
+  const meta =
+    def?.type === 'list' && rule
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  return meta && rule
+    ? `${label}: ${a.amount} com ${meta.label} acima de ${rule.max}.`
+    : `${label}: ${a.amount} acima do limite da criação.`
+}
+
+/**
+ * Os avisos como itens do "O que falta" (`kind: 'confirm'`): o texto e o
+ * alvo (o campo e os caminhos). O P05-D os desenha como itens tocáveis no
+ * `useCreationNotices`; até lá, o painel os mostra como texto.
+ */
+export interface AdviceNotice {
+  readonly key: string
+  readonly kind: 'confirm'
+  readonly text: string
+  readonly field: FieldId
+  readonly paths: readonly string[]
+}
+
+export const adviceNotices = (
+  model: SheetModel,
+  advice: readonly CreationAdvice[]
+): readonly AdviceNotice[] =>
+  advice.map(a => ({
+    key: `${a.code}:${a.field}:${a.rule ?? ''}`,
+    kind: 'confirm',
+    text: adviceText(model, a),
+    field: a.field,
+    paths: a.paths,
+  }))
 
 /** O botão de concluir conforme quem conclui e a aprovação (§3.4). */
 export function completeLabel(
@@ -475,7 +592,12 @@ function refusalNotice(
   if (notPurchasable)
     return {
       cause: 'not-purchasable',
-      text: problemText(model, checks.after, notPurchasable),
+      text: problemText(
+        model,
+        checks.after,
+        notPurchasable,
+        resolve(model, sheets.after)
+      ),
     }
   const before = checks.before?.freebies
   const after = checks.after?.freebies
@@ -840,6 +962,95 @@ function groupAdvice(
         inline
       )
     : advice(null, bonus(price), price, inline)
+}
+
+/**
+ * O que um item novo na lista faria na conta, antes do toque (a prévia da
+ * folha "Adicionar …", P07-C §3.1): uma linha por folha, não por opção, porque
+ * o custo é o mesmo para todas as opções. Pelo grupo do orçamento da lista
+ * (básicos, depois bônus) ou pela linha de bônus por item (Custo da
+ * Qualidade, crédito do Defeito). É previsão: o toque decide, pela conta
+ * exata, com a recusa dentro da folha. Fora de qualquer conta: null.
+ */
+export function addAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  phase: CreationPhase,
+  list: FieldId
+): string | null {
+  const freebies = check.freebies
+  const g = findGroup(check, groupFor(model, [list]))
+  if (g) {
+    if (g.budget === null)
+      return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
+    if (g.missing > 0)
+      return `Entra com os pontos básicos (faltam ${g.missing} de ${g.budget}).`
+    if (phase === 'basics') return basicsSpentText(g, freebies !== null)
+    if (g.price === null || !freebies)
+      return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
+    return g.measure === 'items'
+      ? `${g.label}: o próximo custa ${g.price} de bônus; ${restam(Math.max(0, freebies.remaining))}.`
+      : `${bonus(g.price)}; ${restam(Math.max(0, freebies.remaining))}.`
+  }
+  const rule = model.template.costs?.freebie?.find(r =>
+    r.targets.includes(list)
+  )
+  const def = model.fields.get(list)?.def
+  const meta =
+    rule?.meta && def?.type === 'list'
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  if (!rule || !freebies) return null
+  // O item novo nasce com o meta do catálogo, quando há (o add aplica o
+  // catalogDefaults), ou com o mínimo: com o catálogo, cada opção diz o seu
+  const fromCatalog =
+    def?.type === 'list' &&
+    (def.catalogDefaults ?? []).some(d => d.meta === rule.meta)
+  if (rule.rule === 'item-meta' && meta)
+    return fromCatalog
+      ? `Custa o ${meta.label} do item em bônus (o de cada opção); ${restam(Math.max(0, freebies.remaining))}.`
+      : `Custa o ${meta.label} do item em bônus (começa em ${meta.min ?? 0}); ${restam(Math.max(0, freebies.remaining))}.`
+  if (rule.rule === 'credit' && meta)
+    return `Devolve o ${meta.label} do item, até ${rule.max ?? 0} no total.`
+  if (rule.rule === 'flat' && rule.cost !== undefined)
+    return `${bonus(rule.cost)}; ${restam(Math.max(0, freebies.remaining))}.`
+  return null
+}
+
+/**
+ * A previsão do "+" de um meta que é preço do item (T-08): o Custo da
+ * Qualidade (`item-meta`) e o Bônus do Defeito (`credit`). Pela conta que o
+ * store tem: com o meta já mudado na folha, quem decide é o "Aplicar" (a
+ * conta exata) e depois o servidor. Meta fora dessas regras: null.
+ */
+export function metaAdvice(
+  model: SheetModel,
+  check: CreationCheck,
+  list: FieldId,
+  meta: string
+): StepAdvice | null {
+  const rule = model.template.costs?.freebie?.find(
+    r =>
+      (r.rule === 'item-meta' || r.rule === 'credit') &&
+      r.meta === meta &&
+      r.targets.includes(list)
+  )
+  const freebies = check.freebies
+  if (!rule || !freebies) return null
+  if (rule.rule === 'credit') {
+    const line = check.lines.find(l => l.id === rule.id)
+    const max = rule.max ?? 0
+    return (line?.cost ?? 0) >= max
+      ? advice(null, `+1 não devolve mais: o crédito já está em ${max}.`)
+      : advice(null, `+1 = devolve 1, até ${max}.`)
+  }
+  return freebies.remaining < 1
+    ? advice(
+        'freebies',
+        `${bonus(1)}; ${restam(Math.max(0, freebies.remaining))}.`,
+        1
+      )
+    : advice(null, `${bonus(1)}; ${restam(freebies.remaining)}.`, 1)
 }
 
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */

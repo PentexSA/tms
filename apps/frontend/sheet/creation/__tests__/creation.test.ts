@@ -10,6 +10,8 @@ import {
 } from '@tms/sheet-core'
 import { modelOf, templateJson } from '../../../test/fixtures'
 import {
+  addAdvice,
+  adviceNotices,
   basicsClosed,
   basicsDone,
   type CreationPhase,
@@ -322,13 +324,14 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     ).toEqual({ cause: 'ceiling', text: 'Arete: na criação, vai até 3.' })
   })
 
-  it('o que não se compra continua com a frase de hoje', () => {
+  // T-08 (QAA-05): a Qualidade sem Custo não é "não se compra"
+  it('Qualidade sem Custo: a recusa diz que falta o Custo, com a mesma causa', () => {
     const merits = [{ id: 'm1', name: 'Q' }]
     expect(
       refusalOf(COMPLETE, { ...COMPLETE, merits }, { phase: 'freebies' })
     ).toEqual({
       cause: 'not-purchasable',
-      text: 'Qualidades: não se compra na criação.',
+      text: 'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.',
     })
   })
 
@@ -812,6 +815,181 @@ describe('previsão e motivo: casos de borda', () => {
     })
     // A outra Esfera não é a da afinidade: compra normal
     expect(touch('sphereB')).toBeNull()
+  })
+})
+
+// P07-D (T-08): a Qualidade gravada sem Custo não é "não se compra"; o
+// Renome, que de fato não se compra, segue com a frase de antes
+const WOD_PRIORITIES: CreationChoices = {
+  priorities: {
+    attributes: ['physical', 'social', 'mental'],
+    abilities: ['talents', 'skills', 'knowledges'],
+  },
+}
+
+describe('problemText: a Qualidade sem Custo', () => {
+  const vtm = modelOf('vtm-v20')
+  const wta = modelOf('wta-w20')
+  const input = (m: SheetModel) => ({
+    config: effectiveCreationConfig(m),
+    choices: WOD_PRIORITIES,
+  })
+
+  const merits = (items: unknown[]) =>
+    ({ values: { merits: items } }) as SheetData
+  const textOf = (sheet: SheetData, withSheet = true) => {
+    const check = checkCreation(vtm, sheet, input(vtm))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    if (!p) throw new Error('sem o problema')
+    return problemText(
+      vtm,
+      check,
+      p,
+      withSheet ? resolve(vtm, sheet) : undefined
+    )
+  }
+
+  it('conta os itens e separa "sem Custo" de "Custo inválido" (code review)', () => {
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]))).toBe(
+      'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.'
+    )
+    expect(
+      textOf(
+        merits([
+          { id: 'm1', name: 'A' },
+          { id: 'm2', name: 'B' },
+        ])
+      )
+    ).toBe('Qualidades: 2 itens sem Custo. Abra cada item e informe o Custo.')
+    expect(textOf(merits([{ id: 'm1', name: 'A', meta: { cost: 0 } }]))).toBe(
+      'Qualidades: 1 item com Custo inválido. Abra o item e corrija o Custo.'
+    )
+    // Os dois casos juntos, ou sem a ficha: "sem Custo válido"
+    const both = merits([
+      { id: 'm1', name: 'A' },
+      { id: 'm2', name: 'B', meta: { cost: 0 } },
+    ])
+    expect(textOf(both)).toBe(
+      'Qualidades: 2 itens sem Custo válido. Abra cada item e informe o Custo.'
+    )
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]), false)).toBe(
+      'Qualidades: 1 item sem Custo válido. Abra o item e informe o Custo.'
+    )
+  })
+
+  it('Renome acima do inicial: "não se compra na criação", como antes', () => {
+    const sheet = {
+      values: { glory: { permanent: 2, current: 2 } },
+    } as SheetData
+    const check = checkCreation(wta, sheet, input(wta))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    expect(p).toBeDefined()
+    if (p) expect(problemText(wta, check, p)).toMatch(/não se compra/)
+  })
+})
+
+describe('addAdvice: a prévia do item novo', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = {
+    config: effectiveCreationConfig(vtm),
+    choices: WOD_PRIORITIES,
+  }
+  const at = (values: Record<string, unknown>) =>
+    checkCreation(vtm, { values } as SheetData, input)
+  const one = (n: string) => [{ id: n, name: n, value: 1 }]
+
+  it('Disciplinas com básicos: entra com os pontos básicos', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'disciplines')).toBe(
+      'Entra com os pontos básicos (faltam 3 de 3).'
+    )
+  })
+
+  it('grupo cheio: em Pontos básicos, o motivo; em bônus, o preço e o saldo', () => {
+    const full = at({
+      disciplines: [...one('a'), ...one('b'), ...one('c')],
+    })
+    expect(addAdvice(vtm, full, 'basics', 'disciplines')).toMatch(
+      /Disciplinas: os 3 pontos básicos já foram usados/
+    )
+    expect(addAdvice(vtm, full, 'freebies', 'disciplines')).toBe(
+      '+1 = 7 bônus; restam 15.'
+    )
+  })
+
+  it('Qualidade: o Custo do item em bônus; Defeito: o crédito até 7', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (começa em 1); restam 15.'
+    )
+    expect(addAdvice(vtm, at({}), 'basics', 'flaws')).toBe(
+      'Devolve o Bônus do item, até 7 no total.'
+    )
+  })
+
+  it('lista fora de qualquer conta: nada', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
+  })
+
+  it('com o Custo no catálogo, a prévia não promete o mínimo (code review)', () => {
+    const t = templateJson('vtm-v20')
+    const fields = t.fields as Record<string, Record<string, unknown>>
+    if (fields.merits) {
+      fields.merits.catalog = ['Qualidade A']
+      fields.merits.catalogDefaults = [
+        { meta: 'cost', value: 3, items: ['Qualidade A'] },
+      ]
+    }
+    const m = compileTemplate(t)
+    const check = checkCreation(m, { values: {} } as SheetData, {
+      config: effectiveCreationConfig(m),
+      choices: WOD_PRIORITIES,
+    })
+    expect(addAdvice(m, check, 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
+    )
+  })
+})
+
+describe('adviceNotices: duas regras na mesma lista (code review)', () => {
+  it('a chave e o texto vêm da regra de cada aviso', () => {
+    const t = templateJson('wta-w20')
+    const gifts = (t.fields as Record<string, Record<string, unknown>>)
+      .gifts as { item: { meta: unknown[] } }
+    gifts.item.meta.push({
+      id: 'cost',
+      type: 'number',
+      label: 'Custo',
+      min: 0,
+      max: 5,
+    })
+    ;(t.creation as Record<string, unknown>).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'cost', max: 2 },
+    ]
+    const m = compileTemplate(t)
+    const notices = adviceNotices(m, [
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 0,
+      },
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 1,
+      },
+    ])
+    expect(notices.map(n => n.key)).toEqual([
+      'ADVICE_ABOVE_LEVEL:gifts:0',
+      'ADVICE_ABOVE_LEVEL:gifts:1',
+    ])
+    expect(notices.map(n => n.text)).toEqual([
+      'Dons: 1 com Posto acima de 1.',
+      'Dons: 1 com Custo acima de 2.',
+    ])
   })
 })
 

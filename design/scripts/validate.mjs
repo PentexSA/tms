@@ -42,6 +42,8 @@ export const REGISTRY = {
   budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
   capRules: ['creation-cap', 'hard-cap'],
   costRules: ['flat', 'per-current', 'item-meta', 'credit'],
+  // Avisos da criação que não bloqueiam (README §14, creation.advice)
+  creationAdvice: ['item-meta-max'],
   optionEffects: ['flag', 'choice', 'bounded-number'],
 }
 
@@ -61,11 +63,11 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions'],
-    longText: ['maxLength', 'placeholder'],
-    choice: ['options', 'glyph'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    longText: ['maxLength', 'placeholder', 'default'],
+    choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
-    list: ['itemLabel', 'item', 'catalog', 'searchable', 'density', 'fixed', 'rollAs'],
+    list: ['itemLabel', 'item', 'catalog', 'catalogDefaults', 'recommend', 'searchable', 'density', 'fixed', 'rollAs'],
   },
   section: ['id', 'zone', 'title', 'layout', 'groups', 'fields', 'filter', 'searchable', 'groupTabs', 'badge', 'permissions', 'pinTop', 'columns', 'minColWidth', 'collapsed'],
   roll: ['model', 'label', 'die', 'dice', 'slots', 'difficulty', 'penalty', 'specialty', 'boosts', 'presets', 'advantage', 'target', 'conditions', 'bonusDice', 'ladder'],
@@ -184,7 +186,8 @@ function targetKind(f) {
 }
 
 const ACCOUNTING_KEYS = {
-  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked'],
+  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked', 'advice'],
+  advice: ['rule', 'targets', 'meta', 'max'],
   budget: {
     'priority-budget': ['id', 'label', 'rule', 'budgets', 'groups'],
     'fixed-budget': ['id', 'label', 'rule', 'budget', 'targets'],
@@ -535,6 +538,25 @@ function checkAccounting(t, c) {
       else if (tracked(id))
         err('creation.untracked', `campo '${id}' já está na conta da criação`)
     }
+  // Avisos que não bloqueiam (D-07): o meta numérico de itens de lista
+  const advice = creation.advice === undefined ? [] : objs('creation.advice', creation.advice, 20)
+  for (const [i, a] of advice.entries()) {
+    const p = `creation.advice.${i}`
+    keys(p, a, ACCOUNTING_KEYS.advice)
+    if (!REGISTRY.creationAdvice.includes(a.rule)) err(`${p}.rule`, `regra '${a.rule}' fora da lista fechada`)
+    let min = -NUM_LIMIT
+    let max = NUM_LIMIT
+    for (const id of targets(`${p}.targets`, a.targets, ['items'])) {
+      const m = asArray(rec(field(id)?.item)?.meta).map(rec).find(x => x?.id === a.meta)
+      if (m?.type !== 'number') {
+        err(`${p}.meta`, `'${id}' não tem meta numérico '${a.meta}'`)
+        continue
+      }
+      if (typeof m.min === 'number') min = Math.max(min, m.min)
+      if (typeof m.max === 'number') max = Math.min(max, m.max)
+    }
+    required(`${p}.max`, a.max, min, max)
+  }
 }
 
 export function validateTemplate(t, palette) {
@@ -581,6 +603,48 @@ export function validateTemplate(t, palette) {
     }
   }
   const accentOk = v => v === 'accent-neutral' || palette.includes(v)
+  const field = id => (has(id) ? rec(fields[id]) : undefined)
+  // Lista opcional de objetos: ausente vale vazia; item que não é objeto é erro e fica de fora
+  const objsOf = (path, v) => {
+    if (v == null) return []
+    if (!Array.isArray(v)) { err(path, 'precisa ser lista'); return [] }
+    return v.flatMap((x, i) => { if (isObj(x)) return [x]; err(`${path}.${i}`, 'precisa ser objeto'); return [] })
+  }
+  // Mapa de opção de um choice: chaves que existem, de 1 a 100 entradas
+  const optionMap = (path, from, map) => {
+    const choice = field(from)
+    if (choice?.type !== 'choice') { err(`${path}.from`, `campo '${from}' não é um choice`); return [] }
+    const m = rec(map)
+    if (!m) { err(`${path}.map`, 'precisa ser objeto'); return [] }
+    const entries = Object.entries(m)
+    if (!entries.length || entries.length > 100) err(`${path}.map`, 'de 1 a 100 opções')
+    const options = asArray(choice.options).map(o => rec(o)?.id)
+    for (const [k] of entries) if (!options.includes(k)) err(`${path}.map.${k}`, `opção '${k}' não existe em '${from}'`)
+    return entries.slice(0, 100)
+  }
+  // `recommend` (lista ou choice): nomes do catálogo ou ids de opção do campo
+  const recommend = (p, f) => {
+    if (f.recommend == null) return
+    const path = `${p}.recommend`
+    keys(path, f.recommend, ['outside', 'by'])
+    const r = rec(f.recommend)
+    if (!r) return
+    text(`${path}.outside`, r.outside, 60)
+    const by = objsOf(`${path}.by`, r.by)
+    if (!by.length || by.length > 4) err(`${path}.by`, 'de 1 a 4 fontes')
+    const allowed = f.type === 'list' ? asArray(f.catalog) : asArray(f.options).map(o => rec(o)?.id)
+    for (const [i, s] of by.slice(0, 4).entries()) {
+      const sp = `${path}.by.${i}`
+      keys(sp, s, ['from', 'label', 'map'])
+      text(`${sp}.label`, s.label, 24)
+      for (const [k, names] of optionMap(sp, s.from, s.map)) {
+        if (!Array.isArray(names) || !names.length || names.length > 200) { err(`${sp}.map.${k}`, 'lista de 1 a 200 entradas'); continue }
+        if (new Set(names).size !== names.length) err(`${sp}.map.${k}`, 'entrada repetida')
+        for (const n of names)
+          if (!allowed.includes(n)) err(`${sp}.map.${k}`, f.type === 'list' ? `'${n}' não está no catálogo` : `opção '${n}' não existe`)
+      }
+    }
+  }
 
   // Toda string do template, em qualquer profundidade, é texto puro e limitada.
   const walk = (path, v, depth = 0) => {
@@ -627,7 +691,21 @@ export function validateTemplate(t, palette) {
       }
     }
     if (f.type === 'rating') formula(`${p}.default`, f.default, f.min ?? 0, f.max ?? 10)
-    else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
+    else if (f.type === 'text' || f.type === 'longText') {
+      // Texto por opção de um choice (a Fraqueza pelo Clã), uma linha cada
+      if (f.default != null) {
+        const d = rec(f.default)
+        if (!d) err(`${p}.default`, 'precisa ser objeto { from, map }')
+        else {
+          keys(`${p}.default`, d, ['from', 'map'])
+          const max = Math.min(typeof f.maxLength === 'number' ? f.maxLength : f.type === 'text' ? 200 : 4000, 400)
+          for (const [k, v] of optionMap(`${p}.default`, d.from, d.map)) {
+            text(`${p}.default.map.${k}`, v, max)
+            if (typeof v === 'string' && /[\t\n\r]/.test(v)) err(`${p}.default.map.${k}`, 'uma linha só')
+          }
+        }
+      }
+    } else if (f.default != null) num(`${p}.default`, f.default, f.min ?? (f.type === 'rating' ? 0 : -NUM_LIMIT), f.max ?? (f.type === 'rating' ? 10 : NUM_LIMIT))
     if (f.spendLabel) text(`${p}.spendLabel`, f.spendLabel, 24)
     if (f.gainLabel) text(`${p}.gainLabel`, f.gainLabel, 24)
     if (f.type === 'rating') {
@@ -714,6 +792,7 @@ export function validateTemplate(t, palette) {
       if (!own(t.markStates, f.states)) err(`${p}.states`, `conjunto '${f.states}' não declarado em markStates`)
       if (f.bonus) { oneOf(`${p}.bonus.derive`, f.bonus.derive, REGISTRY.derive, 'derive'); if (!has(f.bonus.ability)) err(`${p}.bonus.ability`, 'campo não existe') }
     }
+    if (f.type === 'choice' || f.type === 'list') recommend(p, f)
     if (['choice', 'tags'].includes(f.type)) {
       for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label) }
       for (const o of f.options ?? []) if (o.roll) oneOf(`${p}.options.${o.id}.roll`, o.roll, REGISTRY.conditionRoll, 'roll')
@@ -723,6 +802,31 @@ export function validateTemplate(t, palette) {
       for (const c of f.catalog ?? []) text(`${p}.catalog`, c, 80)
       for (const m of f.item?.meta ?? []) text(`${p}.item.meta.${m.id}.label`, m.label)
       if (f.item?.value) { num(`${p}.item.value.min`, f.item.value.min, 0, 10); num(`${p}.item.value.max`, f.item.value.max, 1, 10) }
+      // O meta inicial de nomes do catálogo (o Posto de cada Dom)
+      if (f.catalogDefaults != null) {
+        const defaults = objsOf(`${p}.catalogDefaults`, f.catalogDefaults)
+        if (!defaults.length || defaults.length > 10) err(`${p}.catalogDefaults`, 'de 1 a 10 entradas')
+        const catalog = asArray(f.catalog)
+        const metas = asArray(rec(f.item)?.meta).map(rec)
+        const seen = new Map()
+        for (const [i, d] of defaults.slice(0, 10).entries()) {
+          const dp = `${p}.catalogDefaults.${i}`
+          keys(dp, d, ['meta', 'value', 'items'])
+          const m = metas.find(x => x?.id === d.meta)
+          if (m?.type !== 'number') { err(`${dp}.meta`, `meta numérico '${d.meta}' não existe no item`); continue }
+          if (d.value == null) err(`${dp}.value`, 'obrigatório')
+          else num(`${dp}.value`, d.value, typeof m.min === 'number' ? m.min : -NUM_LIMIT, typeof m.max === 'number' ? m.max : NUM_LIMIT)
+          const names = d.items
+          if (!Array.isArray(names) || !names.length || names.length > 200) { err(`${dp}.items`, 'lista de 1 a 200 nomes'); continue }
+          const done = seen.get(d.meta) ?? new Set()
+          seen.set(d.meta, done)
+          for (const n of names) {
+            if (!catalog.includes(n)) err(`${dp}.items`, `'${n}' não está no catálogo`)
+            if (done.has(n)) err(`${dp}.items`, `'${n}' já tem valor de '${d.meta}'`)
+            done.add(n)
+          }
+        }
+      }
     }
   }
 

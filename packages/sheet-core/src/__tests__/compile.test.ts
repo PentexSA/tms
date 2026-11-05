@@ -301,6 +301,18 @@ describe('withValueDeps', () => {
       new Set(['hitDice', 'level', 'initiative', 'dex'])
     )
   })
+
+  it('o texto por opção (a Fraqueza) leva o choice de que depende', () => {
+    const t = vtm()
+    const fields = t.fields as Record<string, Record<string, unknown>>
+    if (fields.weakness)
+      fields.weakness.default = { from: 'clan', map: { brujah: 'Resumo.' } }
+    const template = compileTemplate(t).template
+
+    expect(withValueDeps(template, ['weakness'])).toEqual(
+      new Set(['weakness', 'clan'])
+    )
+  })
 })
 
 describe('compileTemplate: fail secure', () => {

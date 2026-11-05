@@ -6,7 +6,12 @@ import { AccessibilityInfo, Dimensions } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
-import { modelOf, templateJson } from '../../../test/fixtures'
+import {
+  GIFTS,
+  modelOf,
+  templateJson,
+  templateWithIdentity,
+} from '../../../test/fixtures'
 import { textInput } from '../../../test/queries'
 import {
   json,
@@ -71,6 +76,8 @@ const PRIORITIES = {
 interface Options {
   readonly system?: 'vtm-v20' | 'wta-w20' | 'mta-m20'
   readonly mode?: 'points' | 'free'
+  // O template com `recommend` e `creation.advice` de teste (P07-D)
+  readonly identity?: boolean
 }
 
 const character = (
@@ -114,8 +121,9 @@ const character = (
 
 async function open(values?: Record<string, unknown>, options: Options = {}) {
   calls.characterGet.mockResolvedValue(character(values, options))
+  const system = options.system ?? 'vtm-v20'
   calls.templateGet.mockResolvedValue(
-    ok(templateJson(options.system ?? 'vtm-v20'))
+    ok(options.identity ? templateWithIdentity(system) : templateJson(system))
   )
   const { session } = testSession(
     () => json(200, tokens()),
@@ -216,28 +224,49 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
     expect(alertsIn('editor-disciplines')).toHaveLength(0)
     // Fechar apaga o aviso do store: a folha do item não o herda
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
     expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
   })
 
-  it('editor de Disciplina: + e Aplicar acima dos básicos avisa acima do Aplicar; o − apaga; com 1, Aplicar fecha', async () => {
+  it('R-25: o "+" da linha acima dos básicos avisa sob a linha tocada, sem folha; o "−" apaga', async () => {
     await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
-    const stepper = { name: 'Dominação, valor' }
-    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
-      nativeEvent: { actionName: 'increment' },
-    })
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
-      /Disciplinas/
-    )
-    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
-      nativeEvent: { actionName: 'decrement' },
-    })
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    const row = (id: string) => `item-disciplines-${id}`
+    step('Dominação')
+    // Nenhuma folha abre: o aviso fica na linha tocada, não nas outras
     expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
+    expect(alertsIn(row('d3'))).toHaveLength(1)
+    expect(alertsIn(row('d3'))[0]).toHaveTextContent(/Disciplinas/)
+    expect(
+      within(screen.getByTestId(row('d3'))).getByTestId('notice-disciplines-d3')
+    ).toBeTruthy()
+    expect(alertsIn(row('d1'))).toHaveLength(0)
+    expect(alertsIn(row('d2'))).toHaveLength(0)
+    // O valor não mudou; o "−" é aceito e apaga o aviso
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    ).toBeTruthy()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Dominação' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    expect(alertsIn(row('d3'))).toHaveLength(0)
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 0 de 5, do clã' })
+    ).toBeTruthy()
+  })
+
+  it('a recusa do −/+ da linha não vai para a folha do item', async () => {
+    await open(THREE)
+    step('Dominação')
+    expect(alertsIn('item-disciplines-d3')).toHaveLength(1)
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
+    expect(alertsIn('item-disciplines-d3')).toHaveLength(0)
   })
 
   it('tirar o Defeito cujo crédito foi gasto: a frase aparece sob "Remover Inimigo?"', async () => {
@@ -260,26 +289,18 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     ).toBeTruthy()
   })
 
-  it('o "+" do Valor avisa antes do toque; com o Valor já mudado na folha, a previsão sai (R-20)', async () => {
+  it('o "+" da linha avisa antes do toque e continua tocável (R-20)', async () => {
     await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
-    const stepper = () =>
-      screen.getByRole('adjustable', { name: 'Dominação, valor' })
-    // Grupo cheio em Pontos básicos: o motivo antes do toque, na dica e escrito
+    const stepper = () => screen.getByRole('adjustable', { name: 'Dominação' })
+    // Grupo cheio em Pontos básicos: o motivo antes do toque, na dica
     expect(stepper().props.accessibilityHint).toMatch(/Disciplinas/)
-    expect(screen.getByTestId('advice-disciplines-d3')).toHaveTextContent(
-      /Disciplinas/
-    )
-    // O "+" continua tocável: o toque passa pela conta exata
-    fireEvent(stepper(), 'accessibilityAction', {
-      nativeEvent: { actionName: 'increment' },
-    })
-    expect(stepper().props.accessibilityHint).toBeUndefined()
+    // O cabeçalho do grupo já diz "3/3": a linha não repete o motivo
     expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    // Recusado: o aviso fala pelo motivo, sem a previsão repetida
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
+    // Outra Disciplina, a mesma previsão (a conta é do grupo)
+    expect(
+      screen.getByRole('adjustable', { name: 'Taumaturgia' }).props
+        .accessibilityHint
+    ).toMatch(/Disciplinas/)
   })
 
   it('item sem Valor (Dons do W20): nenhuma previsão de "+" na folha', async () => {
@@ -312,7 +333,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(screen.getByTestId('notice-stamina')).toBeTruthy()
   })
 
-  it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
+  it('com saldo, o "+" da linha mostra o custo em bônus', async () => {
     await open(THREE)
     tab('Pontos')
     fireEvent.press(
@@ -320,28 +341,33 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     )
     tab('Ficha')
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
     expect(
-      screen.getByRole('adjustable', { name: 'Dominação, valor' }).props
+      screen.getByRole('adjustable', { name: 'Dominação' }).props
         .accessibilityHint
     ).toMatch(/bônus/)
+    // Pago com bônus, o ponto entra pela linha
+    step('Dominação')
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 2 de 5, do clã' })
+    ).toBeTruthy()
   })
 
   it('a recusa do Aplicar não aparece sob "Remover X?"', async () => {
-    await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: /^Sono Leve/ }))
+    // Custo 7 → 8 sem saldo: o Aplicar é recusado
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Dominação, valor' }),
+      screen.getByRole('adjustable', { name: 'Sono Leve, Custo' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    expect(alertsIn('item-sheet-merits')).toHaveLength(1)
     fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
-    // Só o "Remover Dominação?"; nada da recusa anterior
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
-      'Remover Dominação?'
+    // Só o "Remover Sono Leve?"; nada da recusa anterior
+    expect(alertsIn('item-sheet-merits')).toHaveLength(1)
+    expect(alertsIn('item-sheet-merits')[0]).toHaveTextContent(
+      'Remover Sono Leve?'
     )
   })
 
@@ -379,6 +405,182 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     )
     // É o erro do próprio campo, não uma frase solta ao lado dele
     expect(screen.queryByTestId('notice-disciplines')).toBeNull()
+  })
+})
+
+describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
+  it('"Adicionar Qualidade" diz o custo e o saldo antes do toque', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(
+      /Custa o Custo do item em bônus \(começa em 1\); restam 15\./
+    )
+  })
+
+  it('sem saldo: "restam 0", e o toque continua dando a recusa na folha', async () => {
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(/restam 0/)
+    fireEvent.changeText(textInput('Nome'), 'Ambidestro')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
+    )
+    expect(alertsIn('add-sheet-merits')).toHaveLength(1)
+  })
+
+  it('"Adicionar Disciplina": os básicos que faltam, ou o motivo com o grupo cheio', async () => {
+    await open()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    expect(screen.getByTestId('add-preview')).toHaveTextContent(
+      /Entra com os pontos básicos \(faltam 3 de 3\)\./
+    )
+  })
+
+  it('fora da Criação (Editar), sem prévia', async () => {
+    await open({}, { mode: 'free' })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    expect(screen.queryByTestId('add-preview')).toBeNull()
+  })
+})
+
+describe('T-08: a previsão do "+" do Custo e do Bônus na folha do item', () => {
+  it('com saldo, o "+" do Custo diz o preço e o saldo, escrito e na dica', async () => {
+    await open({
+      merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+    })
+    fireEvent.press(screen.getByRole('button', { name: /^Ambidestro/ }))
+    const plus = screen.getByRole('adjustable', { name: 'Ambidestro, Custo' })
+    expect(plus.props.accessibilityHint).toMatch(/\+1 = 1 bônus; restam 14/)
+    expect(plus.props['aria-disabled']).toBe(false)
+    expect(screen.getByTestId('advice-merits-m1-cost')).toHaveTextContent(
+      /restam 14/
+    )
+    // Com o Custo mudado na folha, a previsão sai: o Aplicar decide
+    fireEvent(plus, 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    expect(screen.queryByTestId('advice-merits-m1-cost')).toBeNull()
+  })
+
+  it('sem saldo, o "+" do Custo diz o motivo e continua tocável', async () => {
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: /^Sono Leve/ }))
+    const plus = screen.getByRole('adjustable', { name: 'Sono Leve, Custo' })
+    // No app, o controle ajustável não fica desabilitado: o toque decide (o
+    // "+" com cara de indisponível e aria-disabled é do web, no E2E)
+    expect(plus.props['aria-disabled']).toBe(false)
+    expect(plus.props.accessibilityHint).toMatch(/restam 0/)
+    expect(screen.getByTestId('advice-merits-m2-cost')).toHaveTextContent(
+      /restam 0/
+    )
+  })
+
+  it('o "+" do Bônus do Defeito diz que devolve, até 7', async () => {
+    await open({ flaws: [{ id: 'f1', name: 'Inimigo', meta: { bonus: 2 } }] })
+    fireEvent.press(screen.getByRole('button', { name: /^Inimigo/ }))
+    expect(screen.getByTestId('advice-flaws-f1-bonus')).toHaveTextContent(
+      '+1 = devolve 1, até 7.'
+    )
+  })
+})
+
+describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
+  it('Brujah: "Do clã" com as 3 e "Outras" com as 14; Dominação entra e a linha avisa, sem bloquear', async () => {
+    await open({ clan: 'brujah' }, { identity: true })
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(sheet.getByRole('header', { name: 'Do clã' })).toBeTruthy()
+    expect(sheet.getByRole('header', { name: 'Outras' })).toBeTruthy()
+    const clan = within(screen.getByTestId('add-block-by-clan'))
+    expect(
+      clan
+        .getAllByRole('button', { name: /, do clã$/ })
+        .map(b => b.props.accessibilityLabel)
+    ).toEqual(['Potência, do clã', 'Presença, do clã', 'Rapidez, do clã'])
+    expect(
+      within(screen.getByTestId('add-block-others')).getAllByRole('button')
+    ).toHaveLength(14)
+    fireEvent.press(sheet.getByRole('button', { name: 'Dominação' }))
+    // Entrou (nada bloqueia) e a linha diz o "fora", só na criação
+    expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
+    const line = screen.getByTestId('identity-disciplines-i1')
+    expect(line).toHaveTextContent('fora do clã: confirme com o narrador')
+    // O "O que falta" ganha o aviso, sem virar problema
+    tab('Pontos')
+    expect(screen.getByTestId('creation-notices')).toHaveTextContent(
+      /Disciplinas: 1 fora do clã\./
+    )
+    expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
+      /fora do clã/
+    )
+  })
+
+  it('a Disciplina do clã leva o selo na linha e no nome acessível', async () => {
+    await open(
+      {
+        clan: 'brujah',
+        disciplines: [{ id: 'd1', name: 'Potência', value: 1 }],
+      },
+      { identity: true }
+    )
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5, do clã' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'do clã'
+    )
+    expect(screen.getByTestId('identity-disciplines-d1')).not.toHaveTextContent(
+      /fora/
+    )
+  })
+})
+
+describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
+  const LUPINO = { breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' }
+
+  it('Dom de Posto 2 do catálogo entra com Posto 2; a linha e o "O que falta" avisam; o "Concluir" não muda', async () => {
+    await open(LUPINO, { system: 'wta-w20', identity: true })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'neblina')
+    fireEvent.press(
+      screen.getByRole('button', { name: `${GIFTS.rank2}, Posto 2` })
+    )
+    const row = screen.getByRole('button', { name: /^Passo de Neblina/ })
+    expect(row.props.accessibilityLabel).toMatch(/Posto 2/)
+    expect(screen.getByTestId('identity-gifts-i1')).toHaveTextContent(
+      /Posto 2: na criação, vai até 1\. Confirme com o narrador\./
+    )
+    expect(screen.getByTestId('identity-gifts-i1')).toHaveTextContent(
+      /fora da Raça, do Augúrio e da Tribo: confirme com o narrador/
+    )
+    tab('Pontos')
+    const advice = screen.getByTestId('creation-notices')
+    expect(advice).toHaveTextContent(/Dons: 1 com Posto acima de 1\./)
+    expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
+      /Posto/
+    )
+  })
+
+  it('o Dom recomendado de Posto 1 não avisa', async () => {
+    await open(
+      {
+        ...LUPINO,
+        gifts: [{ id: 'g1', name: GIFTS.tribe, meta: { rank: 1 } }],
+      },
+      { system: 'wta-w20', identity: true }
+    )
+    expect(screen.getByTestId('identity-gifts-g1')).toHaveTextContent(
+      'da Tribo'
+    )
+    expect(screen.getByTestId('identity-gifts-g1')).not.toHaveTextContent(
+      /confirme/
+    )
+    tab('Pontos')
+    expect(screen.queryByTestId('creation-notices')).toBeNull()
   })
 })
 

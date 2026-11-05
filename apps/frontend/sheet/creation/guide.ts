@@ -8,7 +8,11 @@ import {
   type RoleName,
   type SheetModel,
 } from '@tms/sheet-core'
-import { problemText } from './creation'
+import { useMemo } from 'react'
+import { useSheet } from '../context'
+import { useCreation } from './CreationContext'
+import { type AdviceNotice, problemText } from './creation'
+import { useCreationAdvice } from './useCreationAdvice'
 
 // O guia da criação (D-05, R-18): o "O que falta" como itens que levam ao
 // grupo, para a barra ("Faltam: Virtudes 7 · e mais 2") e para a aba Pontos.
@@ -274,16 +278,44 @@ export function fitGuide(
   return { shown, more: items.length - shown.length }
 }
 
-const NONE: readonly GuideItem[] = Object.freeze([])
+/**
+ * Os avisos do P07-D como itens do guia: o texto do `adviceText`, o rótulo
+ * do campo como texto curto e o alvo do campo (o item da lista, quando o
+ * aviso tem um caminho só). Só rótulos do template e números.
+ */
+export function noticeItems(
+  model: SheetModel,
+  roles: ReadonlySet<RoleName>,
+  notices: readonly AdviceNotice[]
+): readonly GuideItem[] {
+  return notices.map(n => ({
+    key: n.key,
+    kind: 'confirm',
+    short: fieldLabel(model, n.field),
+    text: n.text,
+    target: targetOf(
+      model,
+      roles,
+      n.field,
+      n.paths.length === 1 ? (n.paths[0] ?? null) : null
+    ),
+  }))
+}
 
 /**
- * Os avisos que não bloqueiam (kind `confirm`): "confirme com o narrador"
- * (D-07, D-09). O P07-D implementa; até lá, nenhum. Eles aparecem na aba
+ * Os avisos que não bloqueiam (kind `confirm`): Dom acima do Posto 1,
+ * Disciplina fora do clã, Esfera fora da Tradição (D-07, D-09; o
+ * `creationAdvice` do core, pelo `useCreationAdvice`). Eles aparecem na aba
  * Pontos ("Para confirmar com o narrador") e na confirmação de concluir,
- * nunca no "Faltam" da barra.
+ * nunca no "Faltam" da barra. Só com a ficha em criação.
  */
 export function useCreationNotices(): readonly GuideItem[] {
-  return NONE
+  const { model, roles } = useSheet()
+  const notices = useCreationAdvice(useCreation()?.status === 'creating')
+  return useMemo(
+    () => noticeItems(model, roles, notices),
+    [model, roles, notices]
+  )
 }
 
 /** "1 item para confirmar com o narrador; veja em Pontos." */
