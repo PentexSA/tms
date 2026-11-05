@@ -12,6 +12,8 @@ import { drawsEditor } from '../FieldSlot'
 import type { FieldEntry } from '../store/sheetStore'
 import { useCreation } from './CreationContext'
 import { counterSpoken, counterText, findGroup, groupFor } from './creation'
+import { CREATION_HELP } from './help'
+import { InlineHelp } from './InlineHelp'
 import { RadioChips } from './RadioChips'
 import { usePriorityChoice } from './usePriorityChoice'
 
@@ -58,9 +60,16 @@ export function CreationCounter({
   const over = group.budget !== null && group.extra > 0
   const counter =
     pickable && group.budget === null ? (
-      <Text variant="caption" color="action">
-        Prioridade
-      </Text>
+      <InlineHelp
+        subject={CREATION_HELP.priority.subject}
+        text={CREATION_HELP.priority.text}
+        testID={`priority-help-${group.id}`}
+        narrow={!line}
+      >
+        <Text variant="caption" color="action">
+          Prioridade
+        </Text>
+      </InlineHelp>
     ) : (
       <Text
         variant="caption"

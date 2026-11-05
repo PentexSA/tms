@@ -28,6 +28,7 @@ import {
   tokens,
 } from '../../../test/session'
 import { SheetScreen } from '../../SheetScreen'
+import { CREATION_HELP } from '../help'
 
 // A prioridade escolhida no próprio grupo (Físicos: 7 · 5 · 3) e a trava a
 // cada toque: em Pontos básicos, o grupo cheio não aceita o próximo ponto;
@@ -224,6 +225,33 @@ describe('prioridades no grupo', () => {
     expect(
       screen.getByRole('radio', { name: 'Físicos, Secundária, 5 pontos' })
     ).not.toBeChecked()
+  })
+})
+
+// R-19 (P10-D §3.7): "Prioridade" e "pontos de bônus" são nomes do app para
+// as regras do motor; a frase vem do app, não do template.
+describe('o "?" da Prioridade e dos pontos de bônus (R-19)', () => {
+  it('"Prioridade" tem "Ajuda: Prioridade", com a frase genérica', async () => {
+    await open()
+    const help = screen.getByTestId('priority-help-physical')
+    expect(help.props.accessibilityLabel).toBe('Ajuda: Prioridade')
+    expect(screen.queryByText(CREATION_HELP.priority.text)).toBeNull()
+    fireEvent.press(help)
+    expect(screen.getByText(CREATION_HELP.priority.text)).toBeTruthy()
+    // A frase não diz número: os valores vêm do template
+    expect(CREATION_HELP.priority.text).not.toMatch(/\d/)
+  })
+
+  it('o saldo dos pontos de bônus tem "Ajuda: pontos de bônus"', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    tab('Orçamento')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ajuda: pontos de bônus' })
+    )
+    expect(screen.getByText(CREATION_HELP.freebies.text)).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies').props.children).toBe(
+      'Bônus: restam 15 de 15.'
+    )
   })
 })
 
