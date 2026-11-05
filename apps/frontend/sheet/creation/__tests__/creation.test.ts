@@ -10,6 +10,8 @@ import {
 } from '@tms/sheet-core'
 import { modelOf } from '../../../test/fixtures'
 import {
+  basicsClosed,
+  basicsDone,
   type CreationPhase,
   completeLabel,
   completionFreebies,
@@ -809,5 +811,64 @@ describe('previsão e motivo: casos de borda', () => {
     })
     // A outra Esfera não é a da afinidade: compra normal
     expect(touch('sphereB')).toBeNull()
+  })
+})
+
+// P05-D (/code-review 8): a fase em texto e a folha de bônus usam a mesma
+// regra dos básicos; o `basicsDone` só soma o saldo de bônus
+describe('basicsClosed × basicsDone', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = {
+    config: effectiveCreationConfig(vtm),
+    choices: {
+      priorities: {
+        attributes: ['physical', 'social', 'mental'],
+        abilities: ['talents', 'skills', 'knowledges'],
+      },
+    },
+  }
+  it('sem prioridade ou com básico sobrando, nenhum dos dois', () => {
+    const open = checkCreation(vtm, { values: {}, specialties: {} }, input)
+    expect(basicsClosed(open)).toBe(false)
+    expect(basicsDone(open)).toBe(false)
+    expect(basicsClosed(null)).toBe(false)
+  })
+  it('básicos fechados: os dois; sem saldo de bônus, só o basicsClosed', () => {
+    const closed = {
+      ...checkCreation(vtm, { values: {}, specialties: {} }, input),
+      budgets: [
+        {
+          id: 'b',
+          label: 'B',
+          rule: 'fixed-budget' as const,
+          priorities: null,
+          groups: [
+            {
+              id: 'g',
+              label: 'G',
+              budget: 3,
+              measure: 'points' as const,
+              invested: 3,
+              eligible: 3,
+              basic: 3,
+              missing: 0,
+              extra: 0,
+              price: 1,
+              freebieCost: 0,
+              components: [],
+            },
+          ],
+        },
+      ],
+      freebies: { available: 15, credit: 0, spent: 0, remaining: 15 },
+    }
+    expect(basicsClosed(closed)).toBe(true)
+    expect(basicsDone(closed)).toBe(true)
+    const spent = {
+      ...closed,
+      freebies: { available: 15, credit: 0, spent: 15, remaining: 0 },
+    }
+    expect(basicsClosed(spent)).toBe(true)
+    expect(basicsDone(spent)).toBe(false)
   })
 })

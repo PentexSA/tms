@@ -600,7 +600,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     )
     await session.restore()
     renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-    await screen.findByRole('tab', { name: 'Orçamento' })
+    await screen.findByRole('tab', { name: 'Pontos' })
   }
   const nav = () => within(screen.getByTestId('sheet-nav'))
   const layout = (testID: string, y: number, height = 400) =>
@@ -623,7 +623,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     const sticky = scroll.props.stickyHeaderIndices as number[]
     expect(children[sticky[0]!]!.key).toBe('nav')
     // No topo da zona: os Atributos
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeTruthy()
     expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
     expect(nav().getByTestId('counter-physical')).toBeTruthy()
     // O corpo não repete a barra
@@ -648,7 +648,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     // De volta ao topo: os Atributos, com a escolha das Habilidades guardada
     scrollTo(0)
     expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
-    // "Orçamento" a um toque, sem voltar ao topo; o painel novo começa logo
+    // "Pontos" a um toque, sem voltar ao topo; o painel novo começa logo
     // abaixo da faixa (600 − 120), não no fim de um conteúdo mais curto
     scrollTo(1450)
     const scrollView = screen
@@ -657,8 +657,8 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
       scrollTo: (o: object) => void
     }
     const scrollToSpy = jest.spyOn(scrollView, 'scrollTo')
-    fireEvent.press(nav().getByRole('tab', { name: 'Orçamento' }))
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+    fireEvent.press(nav().getByRole('tab', { name: 'Pontos' }))
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeSelected()
     expect(scrollToSpy).toHaveBeenCalledWith({ y: 480, animated: false })
     // No topo, trocar de aba não rola
     scrollToSpy.mockClear()
@@ -670,7 +670,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
   it('a 750: as abas da zona continuam fixas; sub-abas não há', async () => {
     resize(TABLET)
     await openCreation()
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeTruthy()
     expect(nav().queryByLabelText(/^Grupos de/)).toBeNull()
     expect(screen.queryByTestId('group-tabs-attributes')).toBeNull()
   })

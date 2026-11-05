@@ -32,6 +32,8 @@ export function useNextStep(): {
   const { roles, store } = useSheet()
   const dirty = useSheetSelector(s => (s.draft?.size ?? 0) > 0)
   const queued = useSheetSelector(s => s.pending.length > 0)
+  // A conta fechou no rascunho local (a mesma regra do "Concluir")
+  const closed = useSheetSelector(s => s.check?.complete === true)
   const toast = useToast()
   const ready = useReadyCreation(
     creation?.characterId ?? '',
@@ -41,6 +43,7 @@ export function useNextStep(): {
   const info = creation?.info ?? null
   const creating = creation?.status === 'creating' && info !== null
   const by = readerOf(roles)
+  const points = creating && info?.mode === 'points'
 
   useEffect(() => {
     if (!waiting) return
@@ -72,6 +75,7 @@ export function useNextStep(): {
     mode: info.mode,
     approval: info.approval,
     marker: markerOf(info),
+    closed: points && closed,
   })
   // Só o dono jogador, na criação livre, antes de avisar
   const canAnnounce = by === 'owner' && info.mode === 'free' && !info.ready

@@ -32,7 +32,7 @@ export function DraftNoticeText({
       {notice.action === 'budget' && openBudget ? (
         <View style={styles.action}>
           <Button
-            title="Ver orçamento"
+            title="Ver Pontos"
             variant="ghost"
             onPress={openBudget}
             testID={`notice-${field}-budget`}

@@ -11,7 +11,7 @@ import {
 // A faixa de navegação fixa da ficha (T-27, parte 2; DS: SectionTabs). Fica
 // presa no topo da rolagem (stickyHeaderIndices): as abas da zona ("Partes
 // da ficha") em todos os tamanhos e, no celular, as sub-abas e o contador
-// da seção com grupos que está no topo da tela. Assim "Orçamento", as
+// da seção com grupos que está no topo da tela. Assim "Pontos", as
 // sub-abas e o contador ficam sempre a um toque, sem voltar ao topo.
 //
 // Leitor de tela e teclado: a faixa vem antes do conteúdo; as sub-abas

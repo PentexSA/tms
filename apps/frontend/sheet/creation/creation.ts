@@ -345,7 +345,7 @@ export interface CreationNotice {
   readonly cause: RefusalCause
   // Só rótulos do template e números da conta; nunca texto da ficha
   readonly text: string
-  // "Ver orçamento" (T-07): leva à aba onde a fase é escolhida
+  // "Ver Pontos" (T-07): leva à aba onde a fase é escolhida
   readonly action?: 'budget'
 }
 
@@ -884,7 +884,16 @@ export function freebieLedger(
  */
 export function basicsDone(check: CreationCheck | null): boolean {
   if (!check?.freebies || check.freebies.remaining <= 0) return false
-  const groups = check.budgets.flatMap(b => b.groups)
+  return basicsClosed(check)
+}
+
+/**
+ * Todos os grupos com prioridade e sem ponto básico sobrando, com ou sem
+ * bônus a gastar (a fase em texto, P05-D). O `basicsDone` é este mais o
+ * saldo de bônus.
+ */
+export function basicsClosed(check: CreationCheck | null): boolean {
+  const groups = check?.budgets.flatMap(b => b.groups) ?? []
   return (
     groups.length > 0 && groups.every(g => g.budget !== null && g.missing === 0)
   )

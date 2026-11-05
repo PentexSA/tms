@@ -17,7 +17,7 @@ import { apiAs, signUp } from '../support/users'
 //
 // Crônica vtm-v20 no padrão do template (por pontos, aprovação desligada),
 // contas fictícias. A 390 px, os grupos de Atributos e de Habilidades viram
-// abas (groupTabs.tsx), e a conta fica na aba Orçamento.
+// abas (groupTabs.tsx), e a conta fica na aba Pontos.
 
 test.use({ viewport: { width: 390, height: 844 } })
 
@@ -113,7 +113,7 @@ test('Bônus: com os básicos completos, o saldo diz o que resta (T-18)', async 
   await plus(page, 'Vigor').click()
   await page.getByRole('button', { name: 'Entendi' }).click()
   await expect(page.getByText(/Bônus: restam 15 de 15/)).toBeVisible()
-  await tab(page, 'Orçamento')
+  await tab(page, 'Pontos')
   await expect(page.getByTestId('creation-ready')).toContainText(
     'restam 15 de bônus'
   )
@@ -167,7 +167,7 @@ test('Bônus: o custo do toque e o extrato (T-57, R-17)', async ({
     '+1 = 1 bônus'
   )
 
-  await tab(page, 'Orçamento')
+  await tab(page, 'Pontos')
   const ledger = page.getByTestId('creation-ledger')
   await expect(ledger).toContainText('Atributos › Físicos: 2 × 5 = 10')
   await expect(ledger).toContainText('Força de Vontade: 2 × 1 = 2')
