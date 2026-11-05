@@ -65,9 +65,9 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
   await page.getByRole('button', { name: 'Entrar na crônica' }).click()
   await page.getByRole('button', { name: 'Nova ficha' }).click()
   await page.getByLabel('Nome (obrigatório)').fill('Otto Brandt')
-  await page.getByLabel('Natureza').fill('Inovador')
-  await page.getByLabel('Comportamento').fill('Excêntrico')
-  await page.getByLabel('Conceito').fill('Engenheiro de rádio')
+  await page.getByLabel('Natureza', { exact: true }).fill('Inovador')
+  await page.getByLabel('Comportamento', { exact: true }).fill('Excêntrico')
+  await page.getByLabel('Conceito', { exact: true }).fill('Engenheiro de rádio')
   await page.getByRole('radio', { name: 'Sociedade do Éter' }).click()
   await page.getByRole('radio', { name: 'Essência Questionadora' }).click()
   await page
