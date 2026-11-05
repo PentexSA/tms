@@ -417,3 +417,25 @@ describe('compileTemplate: memo e imutabilidade', () => {
     expect(model.fields.size).toBeGreaterThan(0)
   })
 })
+
+// U-06 (D-12): a Casa do Mago é "Casa ou subgrupo", opcional, em todas as
+// Tradições: o rótulo, o placeholder e a frase mudam; o campo, não.
+describe('compileTemplate: a Casa do Mago', () => {
+  const house = compileTemplate(mta()).fields.get('house')?.def
+
+  it('"Casa ou subgrupo", com "Opcional" e a frase de ajuda', () => {
+    expect(house).toMatchObject({
+      type: 'text',
+      label: 'Casa ou subgrupo',
+      maxLength: 60,
+      placeholder: 'Opcional',
+    })
+    expect(house?.help).toContain('opcional')
+  })
+
+  it('continua na identidade, ao lado da Tradição, para qualquer Tradição', () => {
+    const t = mta()
+    const columns = (t.identity as { columns?: string[][] }).columns ?? []
+    expect(columns.flat()).toContain('house')
+  })
+})

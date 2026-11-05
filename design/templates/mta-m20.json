@@ -64,7 +64,13 @@
         { "id": "questionadora", "label": "Essência Questionadora" }
       ]
     },
-    "house": { "type": "text", "label": "Casa", "maxLength": 60 },
+    "house": {
+      "type": "text",
+      "label": "Casa ou subgrupo",
+      "maxLength": 60,
+      "placeholder": "Opcional",
+      "help": "Uma facção dentro da Tradição. É opcional: deixe em branco se a Tradição não tiver uma ou se o personagem não fizer parte."
+    },
     "nature": { "type": "text", "label": "Natureza", "maxLength": 40 },
     "demeanor": { "type": "text", "label": "Comportamento", "maxLength": 40 },
     "quote": { "type": "text", "label": "Citação", "maxLength": 160 },

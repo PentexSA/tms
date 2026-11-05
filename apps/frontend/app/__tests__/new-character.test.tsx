@@ -220,6 +220,45 @@ describe('Nova ficha', () => {
 // L-03: criar confirma "Ficha criada." antes de abrir a ficha; se a ficha
 // não abrir, a pessoa sabe que ela existe e não cria outra igual
 // T-29: a Nova ficha diz o modo em que a ficha vai abrir e o orçamento
+// U-06 (D-12): no Mago, "Casa ou subgrupo" com "Opcional" e o "?" da frase;
+// uma Verbena sem Casa é criada. Nada é exigido além do Nome.
+describe('Nova ficha do Mago: Casa ou subgrupo', () => {
+  beforeEach(() => {
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE,
+        name: 'A Torre',
+        system: { code: 'mta-m20', name: 'Mago: A Ascensão' },
+        role: 'player',
+        storyteller: { id: 'u1', username: 'ana' },
+        members: [],
+      })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('mta-m20')))
+  })
+
+  it('o campo diz "Opcional", tem o "?" e não é exigido', async () => {
+    calls.chronicle.charactersPost.mockResolvedValue(ok({ id: 'ch1' }))
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const house = await screen.findByTestId('editor-house')
+    expect(house.props.accessibilityLabel).toBe('Casa ou subgrupo')
+    expect(house.props.placeholder).toBe('Opcional')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Ajuda: Casa ou subgrupo' })
+    )
+    expect(screen.getByText(/É opcional/)).toBeTruthy()
+    fireEvent.changeText(screen.getByTestId('editor-name'), 'Iara Lune')
+    fireEvent.press(screen.getByRole('radio', { name: 'Verbena' }))
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar ficha' }))
+    })
+    expect(calls.chronicle.charactersPost).toHaveBeenCalledWith({
+      values: { name: 'Iara Lune', tradition: 'verbena' },
+      clientCommandId: expect.any(String),
+    })
+  })
+})
+
 describe('Nova ficha: modo e orçamento da crônica', () => {
   const chronicleWith = (
     creation?: { approval: boolean; defaults: unknown },

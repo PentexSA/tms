@@ -96,6 +96,22 @@ describe('ficha de Mago', () => {
     })
   })
 
+  // U-06 (D-12): "Casa ou subgrupo" é opcional em todas as Tradições; nada
+  // exige o campo, e nenhum campo fica escondido
+  it('uma Verbena sem Casa nasce (201), e a Casa continua no template', async () => {
+    const res = await create({ name: 'Iara Lune', tradition: 'verbena' })
+    expect(res.status).toBe(201)
+    const { id } = (await res.json()) as { id: string }
+    const sheet = await as(ctx, owner, 'GET', `/characters/${id}`)
+    const body = (await sheet.json()) as {
+      sheet: { values: Record<string, unknown> }
+    }
+    expect(body.sheet.values).toEqual({
+      name: 'Iara Lune',
+      tradition: 'verbena',
+    })
+  })
+
   it('Esfera, Arete ou roda na criação: 422', async () => {
     for (const values of [
       { name: 'X', forces: 2 },
