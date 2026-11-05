@@ -208,6 +208,7 @@ export function CreationPanel() {
     <View
       style={styles.panel}
       testID="creation-panel"
+      ref={panel.layoutRef as never}
       onLayout={panel.onLayout}
     >
       {freebies ? <PhaseBlock /> : null}
@@ -274,9 +275,12 @@ function GuideList({
   readonly testID: string
 }) {
   const goTo = useGuideNav()
-  const { onLayout, target } = useAnchor(anchor, { parent: 'creation-panel' })
+  const { onLayout, layoutRef, target } = useAnchor(anchor, {
+    parent: 'creation-panel',
+  })
   return (
     <View
+      ref={layoutRef as never}
       style={styles.block}
       accessibilityLabel={label}
       testID={testID}
@@ -311,7 +315,7 @@ function GuideList({
  * bônus quando os básicos fecham. Rascunho do time, para revisão.
  */
 function PhaseBlock() {
-  const { store } = useSheet()
+  const { store, mode } = useSheet()
   const phase = useSheetSelector(s => s.creationPhase)
   // Todos os grupos com prioridade e sem básico sobrando
   // Sem o saldo do `basicsDone`: com os básicos fechados, voltar a eles não
@@ -329,7 +333,9 @@ function PhaseBlock() {
           ? 'Cada grupo trava quando os pontos básicos acabam. Quando todos fecharem, a fase passa sozinha para os pontos de bônus.'
           : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
       </Text>
-      {basics || !closed ? (
+      {/* A troca só para quem edita a criação: em Leitura (o narrador na
+          ficha alheia, T-33), nada fica editável, e a fase é só texto */}
+      {mode === 'create' && (basics || !closed) ? (
         <View style={styles.phaseAction}>
           <Button
             title={
@@ -353,15 +359,17 @@ function Ledger() {
   const check = useSheetSelector(s => s.check)
   const ledger = freebieLedger(model, check)
   // Sem extrato, sem âncora: o id nulo tira a posição velha do mapa
-  const { onLayout, target } = useAnchor(ledger ? 'creation-ledger' : null, {
-    parent: 'creation-panel',
-  })
+  const { onLayout, layoutRef, target } = useAnchor(
+    ledger ? 'creation-ledger' : null,
+    { parent: 'creation-panel' }
+  )
   if (!ledger) return null
   return (
     <View
       style={styles.block}
       accessibilityLabel="Onde foram os bônus"
       testID="creation-ledger"
+      ref={layoutRef as never}
       onLayout={onLayout}
     >
       <AnchorHeader title="Onde foram os bônus" level="group" target={target} />

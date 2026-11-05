@@ -74,6 +74,14 @@ export interface GroupTabsStore {
   readonly onJump: (
     listener: (y: number, focus: (() => void) | null) => void
   ) => () => void
+  /**
+   * Quem mede a própria posição de novo quando o conteúdo da rolagem muda de
+   * tamanho (A3: no web, o onLayout só dispara quando o tamanho da vista
+   * muda, não quando ela desce porque algo acima cresceu).
+   */
+  readonly onRemeasure: (measure: () => void) => () => void
+  /** Remede todas as posições (o conteúdo da rolagem mudou de tamanho). */
+  readonly remeasure: () => void
 }
 
 /** O `parent` das âncoras medidas direto na rolagem (o "Em jogo"). */
@@ -142,6 +150,7 @@ export function createGroupTabsStore(): GroupTabsStore {
   let scroll = 0
   let currentId: string | null = null
   const anchors = new Map<string, AnchorNode>()
+  const measurers = new Set<() => void>()
   const jumpListeners = new Set<
     (y: number, focus: (() => void) | null) => void
   >()
@@ -283,6 +292,13 @@ export function createGroupTabsStore(): GroupTabsStore {
     onJump(listener) {
       jumpListeners.add(listener)
       return () => jumpListeners.delete(listener)
+    },
+    onRemeasure(measure) {
+      measurers.add(measure)
+      return () => measurers.delete(measure)
+    },
+    remeasure() {
+      for (const measure of [...measurers]) measure()
     },
   }
 }

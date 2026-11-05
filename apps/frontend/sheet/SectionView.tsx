@@ -26,21 +26,24 @@ export function SectionView({
   const inPanel = useContext(StripScope)
   // O "ir ao grupo" (P05-D): toda seção do painel diz onde começa, e o
   // título recebe o foco
-  const anchor = useAnchor(inPanel ? section.id : null)
+  // Com sub-abas, a seção diz onde começa: a faixa fixa mostra as abas da
+  // seção que está no topo da tela (T-27). A mesma medida vale para a
+  // âncora, e no web é refeita quando algo acima cresce (A3)
+  const reportsPlace = Boolean(
+    shared?.strip && inPanel && section.def.groupTabs
+  )
+  const store = shared?.store
+  const anchor = useAnchor(inPanel ? section.id : null, {
+    onY: reportsPlace && store ? y => store.sectionAt(section.id, y) : null,
+  })
   if (!canReadSection(model, section.id, roles)) return null
   const Layout = layoutFor(section.def.layout)
-  // Com sub-abas, a seção diz onde começa: a faixa fixa mostra as abas da
-  // seção que está no topo da tela (T-27)
-  const reportsPlace = shared?.strip && inPanel && section.def.groupTabs
   return (
     <View
+      ref={anchor.layoutRef as never}
       style={styles.section}
       testID={`section-${section.id}`}
-      onLayout={e => {
-        if (reportsPlace)
-          shared.store.sectionAt(section.id, e.nativeEvent.layout.y)
-        anchor.onLayout?.(e)
-      }}
+      onLayout={anchor.onLayout}
     >
       {/* Sem título (a zona de uma seção só), a rolagem basta */}
       {hideTitle ? null : (
