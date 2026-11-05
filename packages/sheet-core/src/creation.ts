@@ -847,6 +847,24 @@ export function creationFreeze(
   return out
 }
 
+/**
+ * O valor gravado equivalente a não gravar nada no campo: resolve a ficha sem
+ * ele e devolve o `stored` do resultado. É o mesmo cálculo do
+ * `creationFreeze` para os campos com fórmula, e serve ao app para saber que
+ * um campo voltou ao valor de partida (o contador de alterações volta a
+ * zero). `undefined` quando o campo não existe no modelo.
+ */
+export function defaultStored(
+  model: SheetModel,
+  sheet: SheetData | unknown,
+  id: FieldId
+): unknown {
+  if (!model.fields.has(id)) return undefined
+  const blank = resolve(model, withoutValue(sheetData(sheet), id))
+  const resolved = blank.get(id)
+  return resolved ? stored(resolved, blank) : undefined
+}
+
 // Metadados de criação gravados na ficha (`characters.creation`, doc/plano-v4.md
 // §3.4): as escolhas do jogador, o ajuste do narrador (uma camada da
 // configuração, já com o padrão da crônica de quando a ficha nasceu), o
