@@ -60,53 +60,54 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
         testID={`editor-${resolved.id}`}
       >
         {wrapped => (
-          <Pressable
-            testID={`editor-${resolved.id}`}
-            accessibilityRole="button"
-            {...fieldA11y(def.label, label)}
-            accessibilityHint="Abre as opções"
-            onPress={() => {
-              setError(null)
-              setOpen(true)
-            }}
+          <View
             style={
               wrapped
-                ? helpRowInner
+                ? styles.column
                 : [
-                    styles.row,
+                    styles.box,
+                    styles.column,
                     compact && styles.compact,
                     { borderBottomColor: colors.borderSubtle },
                   ]
             }
           >
-            <View style={styles.text}>
-              <Text variant="fieldLabel">{def.label}</Text>
-              <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
-              {outside ? (
-                <Text
-                  variant="caption"
-                  color="inkMuted"
-                  testID={`identity-${resolved.id}`}
-                >
-                  {outside}
+            <Pressable
+              testID={`editor-${resolved.id}`}
+              accessibilityRole="button"
+              {...fieldA11y(def.label, label)}
+              accessibilityHint="Abre as opções"
+              onPress={() => {
+                setError(null)
+                setOpen(true)
+              }}
+              style={helpRowInner}
+            >
+              <View style={styles.text}>
+                <Text variant="fieldLabel">{def.label}</Text>
+                <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
+              </View>
+              {compact ? null : (
+                <Text variant="caption" color="action">
+                  Trocar
                 </Text>
-              ) : null}
-              {issue ? (
-                <Text
-                  variant="caption"
-                  color="danger"
-                  accessibilityRole="alert"
-                >
-                  {issue}
-                </Text>
-              ) : null}
-            </View>
-            {compact ? null : (
-              <Text variant="caption" color="action">
-                Trocar
+              )}
+            </Pressable>
+            {outside ? (
+              <Text
+                variant="caption"
+                color="inkMuted"
+                testID={`identity-${resolved.id}`}
+              >
+                {outside}
               </Text>
-            )}
-          </Pressable>
+            ) : null}
+            {issue ? (
+              <Text variant="caption" color="danger" accessibilityRole="alert">
+                {issue}
+              </Text>
+            ) : null}
+          </View>
         )}
       </HelpRow>
       <BottomSheet
@@ -146,16 +147,16 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
 }
 
 const styles = StyleSheet.create({
-  row: {
+  // A caixa da linha sem o "?": a borda e o respiro (com o "?", são do
+  // HelpRow). O botão fica só com o rótulo e o valor; o aviso e o erro vêm
+  // depois, como texto à parte, para o leitor de tela lê-los (A4)
+  box: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.space[3],
-    minHeight: tokens.size.rowMin,
     paddingVertical: tokens.space[2],
     paddingHorizontal: tokens.layout.gutter,
     borderBottomWidth: tokens.borderWidth.hair,
   },
+  column: { flex: 1, gap: tokens.space['0.5'] },
   compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
 })

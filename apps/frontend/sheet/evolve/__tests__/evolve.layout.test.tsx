@@ -137,6 +137,16 @@ describe('T-10: Enter aplica na folha de uma linha', () => {
       fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     }
 
+    it('A4: "Resumo de …" é texto à parte, fora do botão da Fraqueza', async () => {
+      await open()
+      const button = row()
+      expect(button.props.accessibilityRole).toBe('button')
+      expect(within(button).queryByTestId('default-weakness')).toBeNull()
+      expect(screen.getByTestId('default-weakness')).toHaveTextContent(
+        /Resumo de Brujah/
+      )
+    })
+
     it('Brujah mostra o resumo; trocar para Toreador mostra o outro; nada é gravado', async () => {
       const { store } = await open()
       expect(row()).toHaveTextContent(/Resumo fictício de teste A\./)
