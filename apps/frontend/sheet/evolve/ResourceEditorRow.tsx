@@ -1,6 +1,7 @@
-import { stored } from '@tms/sheet-core'
+import { editResource, type ResourcePart } from '@tms/sheet-core'
 import { Stepper, type StepperIncrease, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
+import { useCreation } from '../creation/CreationContext'
 import type { FieldViewProps } from '../views/types'
 import { EditorShell } from './EditorShell'
 import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
@@ -10,7 +11,11 @@ import { useRowFeedback } from './useRowFeedback'
 // D&D, Sanidade inicial) e o atual. O jogo do dia a dia (gastar, recuperar)
 // fica no modo Jogo; aqui é a montagem da ficha.
 
-export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
+// Na criação (creating ou pending), o atual cheio acompanha o permanente
+// (T-22). Sem provedor (prévias, Mesa) ou com a ficha concluída, o de antes.
+const FOLLOWS = new Set(['creating', 'pending'])
+
+export function ResourceEditorRow({ resolved }: FieldViewProps) {
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   // O permanente e o máximo são evolução; o atual, jogo (doc/plano-v3.md, Etapa 4)
@@ -19,13 +24,13 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
   // A recusa do toque mora no store e some quando a causa some (T-55); na
   // criação, o custo do próximo ponto do permanente (FdV, R-17)
   const feedback = useRowFeedback(`values.${resolved.id}`, resolved.id)
+  const status = useCreation()?.status
+  const follow = status !== undefined && FOLLOWS.has(status)
   if (resolved.type !== 'resource') return null
   const r = resolved
   const def = r.field.def
-  const base = stored(r, sheet) as Record<string, number>
-  const write = (patch: Record<string, number>) => {
-    set(`values.${r.id}`, { ...base, ...patch })
-  }
+  const write = (part: ResourcePart, n: number) =>
+    set(`values.${r.id}`, editResource(r, part, n, { follow }))
   const capped = !def.tempUncapped && !def.overMax
   const rows: {
     key: string
@@ -44,13 +49,9 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
       value: r.permanent,
       min: def.permanent.min,
       max: def.permanent.max,
-      // Baixar o permanente leva o atual junto (o permanente limita o atual)
-      onChange: n =>
-        write(
-          capped && r.current > n
-            ? { permanent: n, current: n }
-            : { permanent: n }
-        ),
+      // Baixar o permanente leva o atual junto (o permanente limita o atual);
+      // na criação, o atual cheio também sobe junto
+      onChange: n => write('permanent', n),
       blocked: advance,
       increase: feedback.increase,
     })
@@ -63,8 +64,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
       value: r.max,
       min: 0,
       max: 9999,
-      onChange: n =>
-        write(capped && r.current > n ? { max: n, current: n } : { max: n }),
+      onChange: n => write('max', n),
       blocked: advance,
     })
   rows.push({
@@ -73,7 +73,7 @@ export function ResourceEditorRow({ resolved, sheet }: FieldViewProps) {
     value: r.current,
     min: 0,
     max: capped ? (r.cap ?? r.shownMax ?? 9999) : 9999,
-    onChange: n => write({ current: n }),
+    onChange: n => write('current', n),
     blocked: play,
   })
   // A nota do que está desabilitado, uma vez só

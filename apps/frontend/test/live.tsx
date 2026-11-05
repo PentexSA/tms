@@ -6,6 +6,10 @@ import {
   type SheetModel,
 } from '@tms/sheet-core'
 import { useEffect, useState } from 'react'
+import {
+  CreationContext,
+  type CreationContextValue,
+} from '../sheet/creation/CreationContext'
 import { LifecycleContext, type SheetLifecycle } from '../sheet/policy'
 import { SheetView } from '../sheet/SheetView'
 import { createSheetStore, type SheetStore } from '../sheet/store/sheetStore'
@@ -32,6 +36,8 @@ export interface LiveProps {
   readonly mode?: SheetMode
   // Estado da ficha (v3): sem ele, `creating`, o comportamento de antes
   readonly lifecycle?: SheetLifecycle
+  // O que a tela sabe da criação; sem ele, nenhum provedor (o de antes)
+  readonly creation?: CreationContextValue
   readonly onStore?: (store: SheetStore) => void
 }
 
@@ -41,6 +47,7 @@ export function Live({
   roles = ['owner'],
   mode,
   lifecycle,
+  creation,
   onStore,
 }: LiveProps) {
   const sync = useSync()
@@ -59,7 +66,14 @@ export function Live({
   })
   useEffect(() => sync.register(LIVE_ID, store), [sync, store])
   onStore?.(store)
-  const view = <SheetView store={store} editable />
+  const sheetView = <SheetView store={store} editable />
+  const view = creation ? (
+    <CreationContext.Provider value={creation}>
+      {sheetView}
+    </CreationContext.Provider>
+  ) : (
+    sheetView
+  )
   return lifecycle ? (
     <LifecycleContext.Provider value={lifecycle}>
       {view}
