@@ -226,7 +226,10 @@ const fieldLabel = (model: SheetModel, path: string): string => {
  * O rótulo do meta que dá o preço do item (o Custo da Qualidade), quando o
  * caminho é de um item de lista com regra `item-meta`; senão null.
  */
-function itemPriceMeta(model: SheetModel, path: string): string | null {
+function itemPriceMeta(
+  model: SheetModel,
+  path: string
+): { readonly id: string; readonly label: string } | null {
   if (!path.includes('#')) return null
   const id = path.replace(/^values\./, '').split('#')[0] ?? ''
   const rule = model.template.costs?.freebie?.find(
@@ -234,14 +237,48 @@ function itemPriceMeta(model: SheetModel, path: string): string | null {
   )
   const def = model.fields.get(id)?.def
   if (!rule || def?.type !== 'list') return null
-  return def.item.meta?.find(m => m.id === rule.meta)?.label ?? null
+  const m = def.item.meta?.find(x => x.id === rule.meta)
+  return m ? { id: m.id, label: m.label } : null
+}
+
+/**
+ * Os itens sem o preço (a Qualidade sem Custo) ou com o preço inválido
+ * (zero, por exemplo), contados pela ficha quando ela vem; sem a ficha, a
+ * frase junta os dois casos ("sem Custo válido"). Rascunho do time.
+ */
+function missingPriceText(
+  field: string,
+  meta: { readonly id: string; readonly label: string },
+  paths: readonly string[],
+  sheet: ResolvedSheet | undefined
+): string {
+  let absent = 0
+  let invalid = 0
+  for (const path of paths) {
+    const [list, itemId] = path.replace(/^values\./, '').split('#')
+    const r = list ? sheet?.get(list) : undefined
+    const item = r?.type === 'list' ? r.items.find(x => x.id === itemId) : null
+    const v = item?.meta?.[meta.id]
+    if (v === undefined || v === '') absent += 1
+    else invalid += 1
+  }
+  const n = paths.length
+  const items = n === 1 ? '1 item' : `${n} itens`
+  const which = n === 1 ? 'o item' : 'cada item'
+  if (sheet && invalid === 0)
+    return `${field}: ${items} sem ${meta.label}. Abra ${which} e informe o ${meta.label}.`
+  if (sheet && absent === 0)
+    return `${field}: ${items} com ${meta.label} inválido. Abra ${which} e corrija o ${meta.label}.`
+  return `${field}: ${items} sem ${meta.label} válido. Abra ${which} e informe o ${meta.label}.`
 }
 
 /** Uma frase por problema, com os rótulos do template; nunca texto da ficha. */
 export function problemText(
   model: SheetModel,
   check: CreationCheck | null,
-  p: CreationProblem
+  p: CreationProblem,
+  // A ficha mostrada: conta os itens sem preço e os com preço inválido
+  sheet?: ResolvedSheet
 ): string {
   const group =
     check?.budgets
@@ -274,7 +311,7 @@ export function problemText(
       // (QAA-05). O que de fato não se compra (o Renome) segue igual.
       const meta = p.paths[0] ? itemPriceMeta(model, p.paths[0]) : null
       return meta
-        ? `${field}: um item está sem ${meta}. Abra o item e informe o ${meta}.`
+        ? missingPriceText(field, meta, p.paths, sheet)
         : `${field}: não se compra na criação.`
     }
     case 'CREATION_BELOW_INITIAL':
@@ -299,9 +336,12 @@ export function adviceText(model: SheetModel, a: CreationAdvice): string {
       ? `${label}: ${outside}.`
       : `${label}: ${a.amount} ${outside}.`
   }
-  const rule = model.template.creation?.advice?.find(r =>
-    r.targets.includes(a.field)
-  )
+  // A regra do aviso (uma lista pode ter mais de uma, com metas diferentes)
+  const rules = model.template.creation?.advice ?? []
+  const rule =
+    a.rule !== undefined
+      ? rules[a.rule]
+      : rules.find(r => r.targets.includes(a.field))
   const meta =
     def?.type === 'list' && rule
       ? def.item.meta?.find(m => m.id === rule.meta)
@@ -329,7 +369,7 @@ export const adviceNotices = (
   advice: readonly CreationAdvice[]
 ): readonly AdviceNotice[] =>
   advice.map(a => ({
-    key: `${a.code}:${a.field}`,
+    key: `${a.code}:${a.field}:${a.rule ?? ''}`,
     kind: 'confirm',
     text: adviceText(model, a),
     field: a.field,
@@ -545,7 +585,12 @@ function refusalNotice(
   if (notPurchasable)
     return {
       cause: 'not-purchasable',
-      text: problemText(model, checks.after, notPurchasable),
+      text: problemText(
+        model,
+        checks.after,
+        notPurchasable,
+        resolve(model, sheets.after)
+      ),
     }
   const before = checks.before?.freebies
   const after = checks.after?.freebies
@@ -797,8 +842,15 @@ export function addAdvice(
       ? def.item.meta?.find(m => m.id === rule.meta)
       : undefined
   if (!rule || !freebies) return null
+  // O item novo nasce com o meta do catálogo, quando há (o add aplica o
+  // catalogDefaults), ou com o mínimo: com o catálogo, cada opção diz o seu
+  const fromCatalog =
+    def?.type === 'list' &&
+    (def.catalogDefaults ?? []).some(d => d.meta === rule.meta)
   if (rule.rule === 'item-meta' && meta)
-    return `Custa o ${meta.label} do item em bônus (começa em ${meta.min ?? 0}); ${restam(Math.max(0, freebies.remaining))}.`
+    return fromCatalog
+      ? `Custa o ${meta.label} do item em bônus (o de cada opção); ${restam(Math.max(0, freebies.remaining))}.`
+      : `Custa o ${meta.label} do item em bônus (começa em ${meta.min ?? 0}); ${restam(Math.max(0, freebies.remaining))}.`
   if (rule.rule === 'credit' && meta)
     return `Devolve o ${meta.label} do item, até ${rule.max ?? 0} no total.`
   if (rule.rule === 'flat' && rule.cost !== undefined)

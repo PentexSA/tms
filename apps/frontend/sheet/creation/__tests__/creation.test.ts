@@ -8,9 +8,10 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
-import { modelOf } from '../../../test/fixtures'
+import { modelOf, templateJson } from '../../../test/fixtures'
 import {
   addAdvice,
+  adviceNotices,
   type CreationPhase,
   completeLabel,
   completionFreebies,
@@ -328,7 +329,7 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
       refusalOf(COMPLETE, { ...COMPLETE, merits }, { phase: 'freebies' })
     ).toEqual({
       cause: 'not-purchasable',
-      text: 'Qualidades: um item está sem Custo. Abra o item e informe o Custo.',
+      text: 'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.',
     })
   })
 
@@ -832,17 +833,46 @@ describe('problemText: a Qualidade sem Custo', () => {
     choices: WOD_PRIORITIES,
   })
 
-  it('item de Qualidade sem Custo: "um item está sem Custo"', () => {
-    const sheet = {
-      values: { merits: [{ id: 'm1', name: 'Ambidestro' }] },
-    } as SheetData
+  const merits = (items: unknown[]) =>
+    ({ values: { merits: items } }) as SheetData
+  const textOf = (sheet: SheetData, withSheet = true) => {
     const check = checkCreation(vtm, sheet, input(vtm))
     const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
-    expect(p).toBeDefined()
-    if (p)
-      expect(problemText(vtm, check, p)).toBe(
-        'Qualidades: um item está sem Custo. Abra o item e informe o Custo.'
+    if (!p) throw new Error('sem o problema')
+    return problemText(
+      vtm,
+      check,
+      p,
+      withSheet ? resolve(vtm, sheet) : undefined
+    )
+  }
+
+  it('conta os itens e separa "sem Custo" de "Custo inválido" (code review)', () => {
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]))).toBe(
+      'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.'
+    )
+    expect(
+      textOf(
+        merits([
+          { id: 'm1', name: 'A' },
+          { id: 'm2', name: 'B' },
+        ])
       )
+    ).toBe('Qualidades: 2 itens sem Custo. Abra cada item e informe o Custo.')
+    expect(textOf(merits([{ id: 'm1', name: 'A', meta: { cost: 0 } }]))).toBe(
+      'Qualidades: 1 item com Custo inválido. Abra o item e corrija o Custo.'
+    )
+    // Os dois casos juntos, ou sem a ficha: "sem Custo válido"
+    const both = merits([
+      { id: 'm1', name: 'A' },
+      { id: 'm2', name: 'B', meta: { cost: 0 } },
+    ])
+    expect(textOf(both)).toBe(
+      'Qualidades: 2 itens sem Custo válido. Abra cada item e informe o Custo.'
+    )
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]), false)).toBe(
+      'Qualidades: 1 item sem Custo válido. Abra o item e informe o Custo.'
+    )
   })
 
   it('Renome acima do inicial: "não se compra na criação", como antes', () => {
@@ -895,5 +925,68 @@ describe('addAdvice: a prévia do item novo', () => {
 
   it('lista fora de qualquer conta: nada', () => {
     expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
+  })
+
+  it('com o Custo no catálogo, a prévia não promete o mínimo (code review)', () => {
+    const t = templateJson('vtm-v20')
+    const fields = t.fields as Record<string, Record<string, unknown>>
+    if (fields.merits) {
+      fields.merits.catalog = ['Qualidade A']
+      fields.merits.catalogDefaults = [
+        { meta: 'cost', value: 3, items: ['Qualidade A'] },
+      ]
+    }
+    const m = compileTemplate(t)
+    const check = checkCreation(m, { values: {} } as SheetData, {
+      config: effectiveCreationConfig(m),
+      choices: WOD_PRIORITIES,
+    })
+    expect(addAdvice(m, check, 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
+    )
+  })
+})
+
+describe('adviceNotices: duas regras na mesma lista (code review)', () => {
+  it('a chave e o texto vêm da regra de cada aviso', () => {
+    const t = templateJson('wta-w20')
+    const gifts = (t.fields as Record<string, Record<string, unknown>>)
+      .gifts as { item: { meta: unknown[] } }
+    gifts.item.meta.push({
+      id: 'cost',
+      type: 'number',
+      label: 'Custo',
+      min: 0,
+      max: 5,
+    })
+    ;(t.creation as Record<string, unknown>).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'cost', max: 2 },
+    ]
+    const m = compileTemplate(t)
+    const notices = adviceNotices(m, [
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 0,
+      },
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 1,
+      },
+    ])
+    expect(notices.map(n => n.key)).toEqual([
+      'ADVICE_ABOVE_LEVEL:gifts:0',
+      'ADVICE_ABOVE_LEVEL:gifts:1',
+    ])
+    expect(notices.map(n => n.text)).toEqual([
+      'Dons: 1 com Posto acima de 1.',
+      'Dons: 1 com Custo acima de 2.',
+    ])
   })
 })
