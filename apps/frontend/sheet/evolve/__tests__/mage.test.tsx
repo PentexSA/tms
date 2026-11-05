@@ -5,7 +5,7 @@ import {
   within,
 } from '@testing-library/react-native'
 import { example, modelOf } from '../../../test/fixtures'
-import { fakeServer, renderLive } from '../../../test/live'
+import { fakeServer, LIVE_ID, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
 // v1, Etapa 5: o teto não destrutivo (Esferas ≤ Arete), o selo da afinidade
@@ -109,5 +109,47 @@ describe('rotinas (lista sem valor)', () => {
       ...(otto().values.rotes as unknown[]),
       { id: 'i3', name: 'Escudo de estática' },
     ])
+  })
+})
+
+// U-05: a roda segue o Avatar do rascunho, sem salvar. Não reproduzido no
+// código (P10-C §3.2): o teste prende o comportamento
+describe('a roda do Mago sobre o rascunho (U-05)', () => {
+  it('Avatar 3 pela folha, sem salvar: Quintessência 3', async () => {
+    const sheet = { values: { name: 'Nova' }, specialties: {} }
+    const { store } = await renderLive(
+      {
+        model,
+        sheet,
+        mode: 'evolve',
+        creation: {
+          characterId: LIVE_ID,
+          chronicleId: 'c1',
+          status: 'creating',
+          info: null,
+          active: false,
+        },
+      },
+      fakeServer(model, sheet).post
+    )
+    const wheel = () => screen.getAllByLabelText(/^Quintessência e Paradoxo/)
+    expect(wheel()[0]?.props.accessibilityLabel).toMatch(/Quintessência 0/)
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Antecedente' })
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Avatar' }))
+    fireEvent.press(screen.getByRole('button', { name: /^Avatar, 1 de 5/ }))
+    for (let i = 0; i < 2; i++)
+      fireEvent(
+        screen.getByRole('adjustable', { name: 'Avatar, valor' }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    // Nada salvo: o rascunho é que move a roda
+    expect(store().getState().pending).toEqual([])
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    expect(wheel()[0]?.props.accessibilityLabel).toMatch(/Quintessência 3/)
   })
 })
