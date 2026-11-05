@@ -8,8 +8,12 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
-import { modelOf } from '../../../test/fixtures'
+import { modelOf, templateJson } from '../../../test/fixtures'
 import {
+  addAdvice,
+  adviceNotices,
+  basicsClosed,
+  basicsDone,
   type CreationPhase,
   completeLabel,
   completionFreebies,
@@ -25,6 +29,7 @@ import {
   freebiesNotes,
   groupFor,
   priorityNote,
+  problemText,
   reorder,
   stepAdvice,
 } from '../creation'
@@ -319,13 +324,14 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     ).toEqual({ cause: 'ceiling', text: 'Arete: na criação, vai até 3.' })
   })
 
-  it('o que não se compra continua com a frase de hoje', () => {
+  // T-08 (QAA-05): a Qualidade sem Custo não é "não se compra"
+  it('Qualidade sem Custo: a recusa diz que falta o Custo, com a mesma causa', () => {
     const merits = [{ id: 'm1', name: 'Q' }]
     expect(
       refusalOf(COMPLETE, { ...COMPLETE, merits }, { phase: 'freebies' })
     ).toEqual({
       cause: 'not-purchasable',
-      text: 'Qualidades: não se compra na criação.',
+      text: 'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.',
     })
   })
 
@@ -809,5 +815,537 @@ describe('previsão e motivo: casos de borda', () => {
     })
     // A outra Esfera não é a da afinidade: compra normal
     expect(touch('sphereB')).toBeNull()
+  })
+})
+
+// P07-D (T-08): a Qualidade gravada sem Custo não é "não se compra"; o
+// Renome, que de fato não se compra, segue com a frase de antes
+const WOD_PRIORITIES: CreationChoices = {
+  priorities: {
+    attributes: ['physical', 'social', 'mental'],
+    abilities: ['talents', 'skills', 'knowledges'],
+  },
+}
+
+describe('problemText: a Qualidade sem Custo', () => {
+  const vtm = modelOf('vtm-v20')
+  const wta = modelOf('wta-w20')
+  const input = (m: SheetModel) => ({
+    config: effectiveCreationConfig(m),
+    choices: WOD_PRIORITIES,
+  })
+
+  const merits = (items: unknown[]) =>
+    ({ values: { merits: items } }) as SheetData
+  const textOf = (sheet: SheetData, withSheet = true) => {
+    const check = checkCreation(vtm, sheet, input(vtm))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    if (!p) throw new Error('sem o problema')
+    return problemText(
+      vtm,
+      check,
+      p,
+      withSheet ? resolve(vtm, sheet) : undefined
+    )
+  }
+
+  it('conta os itens e separa "sem Custo" de "Custo inválido" (code review)', () => {
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]))).toBe(
+      'Qualidades: 1 item sem Custo. Abra o item e informe o Custo.'
+    )
+    expect(
+      textOf(
+        merits([
+          { id: 'm1', name: 'A' },
+          { id: 'm2', name: 'B' },
+        ])
+      )
+    ).toBe('Qualidades: 2 itens sem Custo. Abra cada item e informe o Custo.')
+    expect(textOf(merits([{ id: 'm1', name: 'A', meta: { cost: 0 } }]))).toBe(
+      'Qualidades: 1 item com Custo inválido. Abra o item e corrija o Custo.'
+    )
+    // Os dois casos juntos, ou sem a ficha: "sem Custo válido"
+    const both = merits([
+      { id: 'm1', name: 'A' },
+      { id: 'm2', name: 'B', meta: { cost: 0 } },
+    ])
+    expect(textOf(both)).toBe(
+      'Qualidades: 2 itens sem Custo válido. Abra cada item e informe o Custo.'
+    )
+    expect(textOf(merits([{ id: 'm1', name: 'A' }]), false)).toBe(
+      'Qualidades: 1 item sem Custo válido. Abra o item e informe o Custo.'
+    )
+  })
+
+  it('Renome acima do inicial: "não se compra na criação", como antes', () => {
+    const sheet = {
+      values: { glory: { permanent: 2, current: 2 } },
+    } as SheetData
+    const check = checkCreation(wta, sheet, input(wta))
+    const p = check.problems.find(x => x.code === 'CREATION_NOT_PURCHASABLE')
+    expect(p).toBeDefined()
+    if (p) expect(problemText(wta, check, p)).toMatch(/não se compra/)
+  })
+})
+
+describe('addAdvice: a prévia do item novo', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = {
+    config: effectiveCreationConfig(vtm),
+    choices: WOD_PRIORITIES,
+  }
+  const at = (values: Record<string, unknown>) =>
+    checkCreation(vtm, { values } as SheetData, input)
+  const one = (n: string) => [{ id: n, name: n, value: 1 }]
+
+  it('Disciplinas com básicos: entra com os pontos básicos', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'disciplines')).toBe(
+      'Entra com os pontos básicos (faltam 3 de 3).'
+    )
+  })
+
+  it('grupo cheio: em Pontos básicos, o motivo; em bônus, o preço e o saldo', () => {
+    const full = at({
+      disciplines: [...one('a'), ...one('b'), ...one('c')],
+    })
+    expect(addAdvice(vtm, full, 'basics', 'disciplines')).toMatch(
+      /Disciplinas: os 3 pontos básicos já foram usados/
+    )
+    expect(addAdvice(vtm, full, 'freebies', 'disciplines')).toBe(
+      '+1 = 7 bônus; restam 15.'
+    )
+  })
+
+  it('Qualidade: o Custo do item em bônus; Defeito: o crédito até 7', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (começa em 1); restam 15.'
+    )
+    expect(addAdvice(vtm, at({}), 'basics', 'flaws')).toBe(
+      'Devolve o Bônus do item, até 7 no total.'
+    )
+  })
+
+  it('lista fora de qualquer conta: nada', () => {
+    expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
+  })
+
+  it('com o Custo no catálogo, a prévia não promete o mínimo (code review)', () => {
+    const t = templateJson('vtm-v20')
+    const fields = t.fields as Record<string, Record<string, unknown>>
+    if (fields.merits) {
+      fields.merits.catalog = ['Qualidade A']
+      fields.merits.catalogDefaults = [
+        { meta: 'cost', value: 3, items: ['Qualidade A'] },
+      ]
+    }
+    const m = compileTemplate(t)
+    const check = checkCreation(m, { values: {} } as SheetData, {
+      config: effectiveCreationConfig(m),
+      choices: WOD_PRIORITIES,
+    })
+    expect(addAdvice(m, check, 'basics', 'merits')).toBe(
+      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
+    )
+  })
+})
+
+describe('adviceNotices: duas regras na mesma lista (code review)', () => {
+  it('a chave e o texto vêm da regra de cada aviso', () => {
+    const t = templateJson('wta-w20')
+    const gifts = (t.fields as Record<string, Record<string, unknown>>)
+      .gifts as { item: { meta: unknown[] } }
+    gifts.item.meta.push({
+      id: 'cost',
+      type: 'number',
+      label: 'Custo',
+      min: 0,
+      max: 5,
+    })
+    ;(t.creation as Record<string, unknown>).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'cost', max: 2 },
+    ]
+    const m = compileTemplate(t)
+    const notices = adviceNotices(m, [
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 0,
+      },
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['x'],
+        amount: 1,
+        rule: 1,
+      },
+    ])
+    expect(notices.map(n => n.key)).toEqual([
+      'ADVICE_ABOVE_LEVEL:gifts:0',
+      'ADVICE_ABOVE_LEVEL:gifts:1',
+    ])
+    expect(notices.map(n => n.text)).toEqual([
+      'Dons: 1 com Posto acima de 1.',
+      'Dons: 1 com Custo acima de 2.',
+    ])
+  })
+})
+
+// T-85: o "−" no valor inicial. A previsão diz de onde vem o inicial, o toque
+// que desce é recusado só no app, e o texto do problema diz o número.
+describe('o "−" no valor inicial (T-85)', () => {
+  const WOD: CreationChoices = {
+    priorities: {
+      attributes: ['physical', 'social', 'mental'],
+      abilities: ['talents', 'skills', 'knowledges'],
+    },
+  }
+  const w20 = modelOf('wta-w20')
+  const v20 = modelOf('vtm-v20')
+  const m20 = modelOf('mta-m20')
+  const AHROUN = {
+    name: 'Lupa',
+    breed: 'lupino',
+    auspice: 'ahroun',
+    tribe: 'fianna',
+  }
+  const checkOf = (m: SheetModel, values: Record<string, unknown>) =>
+    checkCreation(
+      m,
+      { values },
+      { config: effectiveCreationConfig(m), choices: WOD }
+    )
+  const down = (m: SheetModel, values: Record<string, unknown>, path: string) =>
+    stepAdvice(
+      m,
+      checkOf(m, values),
+      'freebies',
+      path,
+      resolve(m, { values }),
+      'down'
+    )
+
+  it('Ahroun em 5: o "−" da Fúria trava e diz o Augúrio; em 6, livre', () => {
+    expect(down(w20, AHROUN, 'values.rage')).toEqual({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).',
+      cost: null,
+      inline: false,
+    })
+    expect(
+      down(
+        w20,
+        { ...AHROUN, rage: { permanent: 6, current: 6 } },
+        'values.rage'
+      )
+      // em 6, livre; segurar para no 5 (o floor)
+    ).toEqual({
+      blocked: null,
+      text: null,
+      cost: null,
+      inline: false,
+      floor: 5,
+    })
+    // o "+" continua com a previsão de sempre
+    expect(
+      stepAdvice(w20, checkOf(w20, AHROUN), 'freebies', 'values.rage')
+    ).not.toMatchObject({ blocked: 'initial' })
+  })
+
+  it('V20: a FdV na Coragem diz a Coragem; M20: a FdV fixa, sem origem', () => {
+    expect(
+      down(v20, { name: 'A', clan: 'brujah', courage: 3 }, 'values.willpower')
+    ).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 3 (vem de Coragem).',
+    })
+    expect(down(m20, { name: 'C' }, 'values.willpower')).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 5.',
+    })
+  })
+
+  it('no mínimo do campo ou com baseline travado, nada a prever', () => {
+    // Coragem 1: a FdV 1 já é o mínimo do template
+    expect(
+      down(v20, { name: 'A', clan: 'brujah', courage: 1 }, 'values.willpower')
+    ).toBeNull()
+    // Nosferatu: a Aparência 0 é baseline travado
+    expect(
+      down(v20, { name: 'A', clan: 'nosferatu' }, 'values.appearance')
+    ).toBeNull()
+    // fora da conta
+    expect(down(v20, { name: 'A' }, 'values.name')).toBeNull()
+  })
+
+  const refuse = (
+    m: SheetModel,
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    paths: string[],
+    phase: CreationPhase = 'freebies'
+  ) => {
+    const input = { config: effectiveCreationConfig(m), choices: WOD }
+    const sheets = {
+      before: { values: before } as SheetData,
+      after: { values: after } as SheetData,
+    }
+    return draftRefusal(
+      m,
+      sheets,
+      {
+        before: checkCreation(m, sheets.before, input),
+        after: checkCreation(m, sheets.after, input),
+      },
+      input,
+      phase,
+      { paths }
+    )
+  }
+
+  it('o toque que desce abaixo do inicial é recusado, com o número e a origem', () => {
+    const lower = { ...AHROUN, rage: { permanent: 4, current: 4 } }
+    expect(refuse(w20, AHROUN, lower, ['values.rage'])).toEqual({
+      cause: 'initial',
+      text: 'Fúria: na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).',
+    })
+    // nas duas fases: em Básicos também
+    expect(refuse(w20, AHROUN, lower, ['values.rage'], 'basics')?.cause).toBe(
+      'initial'
+    )
+  })
+
+  it('o problema que nasce noutro caminho não é recusado', () => {
+    const v = { name: 'A', clan: 'brujah', courage: 2 }
+    const bought = { ...v, willpower: { permanent: 3, current: 3 } }
+    // a Coragem sobe e a FdV comprada fica abaixo do inicial novo
+    expect(
+      refuse(v20, bought, { ...bought, courage: 4 }, ['values.courage'])
+    ).toBeNull()
+    // trocar o Augúrio também não
+    const four = { permanent: 4, current: 4 }
+    expect(
+      refuse(
+        w20,
+        { ...AHROUN, auspice: 'galliard', rage: four },
+        { ...AHROUN, rage: four },
+        ['values.auspice']
+      )
+    ).toBeNull()
+    // sem os caminhos do toque (quem chama sem eles), o de antes
+    expect(refuse(w20, AHROUN, { ...AHROUN, rage: four }, [])).toBeNull()
+  })
+
+  it('o texto do problema diz o número e, com a ficha, a opção', () => {
+    const values = { ...AHROUN, rage: { permanent: 4, current: 4 } }
+    const check = checkOf(w20, values)
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (!p) throw new Error('sem o problema')
+    expect(problemText(w20, check, p, resolve(w20, { values }))).toBe(
+      'Fúria: abaixo de 5, o valor inicial (vem de Augúrio: Ahroun).'
+    )
+    expect(problemText(w20, check, p)).toBe(
+      'Fúria: abaixo de 5, o valor inicial (vem de Augúrio).'
+    )
+    expect(problemText(w20, null, p)).toBe('Fúria: abaixo do valor inicial.')
+  })
+})
+
+// Achados 2 e 4 do /code-review: a previsão do "−" e a recusa concordam no
+// baseline travado, e o "(vem de …)" cita a origem certa do inicial (o
+// baseline que vale, não a fórmula do campo). Template de teste: o V20 com
+// dois baselines na FdV, que tem fórmula (Coragem).
+describe('o "−" no inicial: baseline e origem (achados 2 e 4)', () => {
+  const WOD: CreationChoices = {
+    priorities: {
+      attributes: ['physical', 'social', 'mental'],
+      abilities: ['talents', 'skills', 'knowledges'],
+    },
+  }
+  const t = JSON.parse(JSON.stringify(templateJson('vtm-v20')))
+  t.creation.baselines = [
+    ...t.creation.baselines,
+    {
+      targets: ['willpower'],
+      value: 4,
+      locked: true,
+      when: { field: 'clan', in: ['ventrue'] },
+    },
+    {
+      targets: ['willpower'],
+      value: 3,
+      when: { field: 'clan', in: ['brujah'] },
+    },
+  ]
+  const m = compileTemplate(t)
+  const input = { config: effectiveCreationConfig(m), choices: WOD }
+  const checkOf = (values: Record<string, unknown>) =>
+    checkCreation(m, { values }, input)
+  const down = (values: Record<string, unknown>) =>
+    stepAdvice(
+      m,
+      checkOf(values),
+      'freebies',
+      'values.willpower',
+      resolve(m, { values }),
+      'down'
+    )
+  const refuse = (
+    before: Record<string, unknown>,
+    after: Record<string, unknown>
+  ) => {
+    const sheets = {
+      before: { values: before } as SheetData,
+      after: { values: after } as SheetData,
+    }
+    return draftRefusal(
+      m,
+      sheets,
+      {
+        before: checkCreation(m, sheets.before, input),
+        after: checkCreation(m, sheets.after, input),
+      },
+      input,
+      'freebies',
+      { paths: ['values.willpower'] }
+    )
+  }
+
+  it('baseline travado acima do mínimo: a previsão e a recusa dizem o mesmo', () => {
+    const v = {
+      name: 'V',
+      clan: 'ventrue',
+      courage: 1,
+      willpower: { permanent: 4, current: 4 },
+    }
+    expect(down(v)).toMatchObject({
+      blocked: 'locked',
+      text: 'Fica em 4 na criação (Clã: Ventrue).',
+    })
+    expect(
+      refuse(v, { ...v, willpower: { permanent: 3, current: 3 } })
+    ).toEqual({
+      cause: 'locked',
+      text: 'Força de Vontade: fica em 4 na criação (Clã: Ventrue).',
+    })
+  })
+
+  it('o inicial do baseline cita a escolha dele, não a fórmula', () => {
+    // Coragem 1, mas o inicial é o 3 do baseline do Brujah
+    const v = { name: 'B', clan: 'brujah', courage: 1 }
+    expect(down(v)).toMatchObject({
+      blocked: 'initial',
+      text: 'Na criação, não fica abaixo de 3 (vem de Clã: Brujah).',
+    })
+    const lower = { ...v, willpower: { permanent: 2, current: 2 } }
+    const check = checkOf(lower)
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (!p) throw new Error('sem o problema')
+    expect(problemText(m, check, p, resolve(m, { values: lower }))).toBe(
+      'Força de Vontade: abaixo de 3, o valor inicial (vem de Clã: Brujah).'
+    )
+    // Sem a ficha, não dá para saber qual baseline vale: sem "vem de"
+    expect(problemText(m, check, p)).toBe(
+      'Força de Vontade: abaixo de 3, o valor inicial.'
+    )
+  })
+
+  it('baseline sem condição ou base de point-buy: sem "vem de"', () => {
+    const plain = JSON.parse(JSON.stringify(templateJson('vtm-v20')))
+    plain.creation.baselines = [{ targets: ['willpower'], value: 2 }]
+    const pm = compileTemplate(plain)
+    const values = { name: 'P', clan: 'brujah', courage: 1 }
+    expect(
+      stepAdvice(
+        pm,
+        checkCreation(
+          pm,
+          { values },
+          {
+            config: effectiveCreationConfig(pm),
+            choices: WOD,
+          }
+        ),
+        'freebies',
+        'values.willpower',
+        resolve(pm, { values }),
+        'down'
+      )
+    ).toMatchObject({ text: 'Na criação, não fica abaixo de 2.' })
+    const dnd = modelOf('dnd5e-2014')
+    const at = dnd.template.creation?.budgets.find(b => b.rule === 'point-buy')
+    if (!at || at.rule !== 'point-buy') throw new Error('sem point-buy')
+    const id = at.targets[0] as string
+    const check = checkCreation(
+      dnd,
+      { values: { name: 'D', [id]: at.base - 1 } },
+      { config: effectiveCreationConfig(dnd), choices: {} }
+    )
+    const p = check.problems.find(x => x.code === 'CREATION_BELOW_INITIAL')
+    if (p)
+      expect(
+        problemText(dnd, check, p, resolve(dnd, { values: {} }))
+      ).not.toContain('vem de')
+  })
+})
+
+// P05-D (/code-review 8): a fase em texto e a folha de bônus usam a mesma
+// regra dos básicos; o `basicsDone` só soma o saldo de bônus
+describe('basicsClosed × basicsDone', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = {
+    config: effectiveCreationConfig(vtm),
+    choices: {
+      priorities: {
+        attributes: ['physical', 'social', 'mental'],
+        abilities: ['talents', 'skills', 'knowledges'],
+      },
+    },
+  }
+  it('sem prioridade ou com básico sobrando, nenhum dos dois', () => {
+    const open = checkCreation(vtm, { values: {}, specialties: {} }, input)
+    expect(basicsClosed(open)).toBe(false)
+    expect(basicsDone(open)).toBe(false)
+    expect(basicsClosed(null)).toBe(false)
+  })
+  it('básicos fechados: os dois; sem saldo de bônus, só o basicsClosed', () => {
+    const closed = {
+      ...checkCreation(vtm, { values: {}, specialties: {} }, input),
+      budgets: [
+        {
+          id: 'b',
+          label: 'B',
+          rule: 'fixed-budget' as const,
+          priorities: null,
+          groups: [
+            {
+              id: 'g',
+              label: 'G',
+              budget: 3,
+              measure: 'points' as const,
+              invested: 3,
+              eligible: 3,
+              basic: 3,
+              missing: 0,
+              extra: 0,
+              price: 1,
+              freebieCost: 0,
+              components: [],
+            },
+          ],
+        },
+      ],
+      freebies: { available: 15, credit: 0, spent: 0, remaining: 15 },
+    }
+    expect(basicsClosed(closed)).toBe(true)
+    expect(basicsDone(closed)).toBe(true)
+    const spent = {
+      ...closed,
+      freebies: { available: 15, credit: 0, spent: 15, remaining: 0 },
+    }
+    expect(basicsClosed(spent)).toBe(true)
+    expect(basicsDone(spent)).toBe(false)
   })
 })

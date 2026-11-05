@@ -6,6 +6,7 @@ import {
 } from '@tms/sheet-core'
 import {
   Button,
+  type Help,
   hitTarget,
   Pressable,
   Text,
@@ -13,8 +14,9 @@ import {
   tokens,
   useLayout,
   useTheme,
+  WithHelp,
 } from '@tms/ui'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useContext, useState } from 'react'
 import {
   type StyleProp,
   StyleSheet,
@@ -26,9 +28,12 @@ import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { AnchorHeader } from './AnchorHeader'
+import { useAnchor } from './anchor'
 import { ChipFlow } from './ChipFlow'
-import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
+import { blockHelp, GroupHelpLine } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
+import { StripScope } from './groupTabsState'
 import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
 
@@ -83,9 +88,20 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
   const { breakpoint, stacked } = useLayout()
   const columns =
     breakpoint === 'expanded' && !stacked && !tabs.tabbed && groups.length > 1
+  // O "ir ao grupo" (P05-D): o grupo com título à vista é âncora, medida
+  // dentro do corpo, que é medido dentro do layout, que é medido na seção
+  const inPanel = useContext(StripScope)
+  const layoutAnchor = useAnchor(inPanel ? `${section.id}~layout` : null, {
+    parent: section.id,
+    focusable: false,
+  })
+  const bodyAnchor = useAnchor(inPanel ? `${section.id}~body` : null, {
+    parent: `${section.id}~layout`,
+    focusable: false,
+  })
 
   return (
-    <View testID={`groups-${section.id}`}>
+    <View testID={`groups-${section.id}`} onLayout={layoutAnchor.onLayout}>
       {tabs.bar}
       {showFilter || section.def.searchable ? (
         <FilterBar
@@ -116,6 +132,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
         {...tabs.panelProps}
         style={columns ? styles.columns : undefined}
         testID={`groups-${section.id}-body`}
+        onLayout={bodyAnchor.onLayout}
       >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
@@ -138,19 +155,20 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
               key={g.id}
               headed={headed}
               style={columns ? styles.column : undefined}
-            >
-              {header ? (
-                <View style={styles.title}>
-                  <GroupTitle
-                    title={g.title}
-                    help={blockHelp(g.title, groupText, listText)}
-                    testID={`group-help-${g.id}`}
-                    right={
-                      <CreationCounter fieldIds={g.fieldIds} items={headed} />
+              anchor={
+                inPanel && header && groups.length > 1
+                  ? {
+                      id: `${section.id}/${g.id}`,
+                      parent: `${section.id}~body`,
                     }
-                  />
-                </View>
-              ) : g.title && !echo ? (
+                  : null
+              }
+              title={header ? g.title : null}
+              help={header ? blockHelp(g.title, groupText, listText) : null}
+              helpTestID={`group-help-${g.id}`}
+              right={<CreationCounter fieldIds={g.fieldIds} items={headed} />}
+            >
+              {header ? null : g.title && !echo ? (
                 // Com abas, o "?" vai no topo do conteúdo da aba
                 <GroupHelpLine
                   help={blockHelp(g.title, groupText, null)}
@@ -204,16 +222,46 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
 function GroupBlock({
   headed,
   style,
+  anchor,
+  title,
+  help,
+  helpTestID,
+  right,
   children,
 }: {
   readonly headed: FieldId | undefined
   // A coluna do grupo no desktop (T-28)
   readonly style?: StyleProp<ViewStyle>
+  // O grupo como âncora do "ir ao grupo" (P05-D); o título recebe o foco
+  readonly anchor: { readonly id: string; readonly parent: string } | null
+  readonly title: string | null
+  // O "?" do título: a frase do grupo e a da lista que ele nomeia (R-19)
+  readonly help: Help | null
+  readonly helpTestID?: string
+  // O contador ao lado do título
+  readonly right: ReactNode
   readonly children: ReactNode
 }) {
+  const { onLayout, target } = useAnchor(anchor?.id ?? null, {
+    parent: anchor?.parent,
+  })
   return (
     <HeadedList.Provider value={headed}>
-      <View style={style}>{children}</View>
+      <View style={style} onLayout={onLayout}>
+        {title ? (
+          <View style={styles.title}>
+            <WithHelp help={help} fill testID={helpTestID}>
+              <AnchorHeader
+                title={title}
+                level="group"
+                right={right}
+                target={target}
+              />
+            </WithHelp>
+          </View>
+        ) : null}
+        {children}
+      </View>
     </HeadedList.Provider>
   )
 }

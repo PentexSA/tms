@@ -191,6 +191,13 @@ Regras:
 - A roda é gravada inteira: o primeiro passo parte do padrão calculado.
 - Nunca é expressão: só as duas formas fechadas acima.
 
+**Texto por opção (`text` e `longText`).** O `default` de um campo de texto só aceita a forma `{ from, map }`, com texto no lugar do número: o texto inicial que depende de uma escolha (a Fraqueza pelo Clã, a característica do antecedente de D&D, a ocupação do CoC). Como todo `default`, vale enquanto a ficha não grava o campo: o texto gravado, **inclusive vazio**, vence, e nada é gravado sozinho. Opção sem entrada, ou `choice` vazio, dá vazio. Cada texto é texto puro de uma linha, até 400 caracteres e até o `maxLength` do campo. É escrito pelo time, nunca copiado nem parafraseado do livro (§12).
+
+```json
+"weakness": { "type": "longText", "label": "Fraqueza do clã", "maxLength": 600,
+  "default": { "from": "clan", "map": { "<opção>": "<resumo de uma linha, escrito pelo time>" } } }
+```
+
 ### `track`
 
 - `rule: wod-stacking` (Vitalidade):
@@ -229,6 +236,7 @@ Regras:
 - `text` com `aspect: true` é um aspecto do Fate: texto de primeira classe, exibido como bloco no topo da zona de jogo.
 - `placeholder`: extensão documentada (texto de exemplo no campo vazio), ainda não consumida pelo protótipo.
 - `suggestions` (só `text`): até 100 textos para escolher com um toque, cada um até o `maxLength` do campo e sem repetir. O texto continua livre: a sugestão só preenche o campo. A V20 traz os Arquétipos do livro em Natureza e Comportamento.
+- `default`: texto inicial por opção de um `choice` (§3, "Texto por opção").
 - Notas (`longText`) nunca vão para logs (§11).
 
 ### `choice` e `tags`
@@ -236,6 +244,7 @@ Regras:
 - `choice.options: [{ id, label, meta?, glyphParam? }]`. `glyph: augur-moon` desenha a fase da lua a partir de `glyphParam` (0 a 1), no fato do campo (v2).
 - `tags.options: [{ id, label, roll? }]`. `roll: advantage | disadvantage` muda a rolagem `sum-vs-target` quando `roll.conditions.field` aponta para estas tags.
 - Valor: `choice` guarda o id; `tags` guarda a lista de ids.
+- `choice.recommend`: as opções que a identidade recomenda, por ids de opção do próprio campo (a Esfera de afinidade pela Tradição). A mesma forma da `list` (abaixo).
 
 ### `slots`
 
@@ -267,6 +276,14 @@ Regras:
 
 Valor: `[{ "id": "dynamic", "text": "Ardente", "value": 2 }]`.
 - `catalog`: sugestões ao adicionar. **Só nomes**: descrições protegidas não entram no template (§12).
+- `catalogDefaults: [{ meta, value, items }]`: o meta inicial de nomes do `catalog` (o Posto de cada Dom). `meta` é um meta `number` do item, `value` cabe na faixa dele e cada nome aparece no máximo uma vez por `meta`; até 10 entradas, cada uma com até 200 nomes. O item adicionado pelo nome nasce com esse meta; sem entrada, vale o `min` do meta. O `catalog` continua uma lista de nomes, e o desconto de XP por `itemIn` não muda.
+- `recommend: { outside, by: [{ from, label, map }] }`: o que a identidade recomenda (as Disciplinas do clã, os Dons da Raça, do Augúrio e da Tribo). `from` é um `choice` da ficha; `map` leva cada opção dele a nomes do `catalog` (lista) ou a ids de opção (no `choice`); `label` é o selo ("do clã", até 24) e `outside` diz o que fica fora ("fora do clã", até 60). De 1 a 4 fontes; até 100 opções por fonte e 200 nomes por opção, sem repetir. Opção sem entrada (Caitiff) não recomenda nada, e nada fica "fora". **Só recomenda:** não muda preço, conta nem o que o servidor aceita. Na criação, a tela marca as recomendadas com o selo, põe as outras depois e avisa "fora do clã: confirme com o narrador", sem bloquear.
+
+```json
+"disciplines": { "type": "list", "catalog": ["..."],
+  "recommend": { "outside": "fora do clã",
+    "by": [{ "from": "clan", "label": "do clã", "map": { "<opção>": ["<nome do catálogo>", "..."] } }] } }
+```
 - Itens com `value` numérico ou `meta.bonus` numérico viram opções da parada quando a seção está em `roll.slots[].from`.
 - Extensões documentadas, fora do `REGISTRY` e ainda não consumidas pelo protótipo: `searchable` e `density` (dicas visuais) e `rollAs` (`ability` ou `attack`).
 
@@ -501,6 +518,7 @@ Tudo o que o template referencia por nome vem de uma lista registrada no código
 | `budgetRules` | `budgetRule` | `priority-budget`, `fixed-budget`, `item-count`, `point-buy` |
 | `capRules` | `capRule` | `creation-cap`, `hard-cap` |
 | `costRules` | `costRule` | `flat`, `per-current`, `item-meta`, `credit` |
+| `creationAdvice` | `creationAdviceRule` | `item-meta-max` |
 | `optionEffects` | `optionEffect` | `flag`, `choice`, `bounded-number` |
 
 Derivações, com assinatura:
@@ -658,7 +676,8 @@ O campo `license` é obrigatório e diz o que o template embute.
 | D&D 5e (SRD 5.1) | Nomes e regras do SRD 5.1 | Licença **CC BY 4.0**, da Wizards of the Coast LLC. Exige atribuição visível no app (ex.: "Sobre o sistema"), com o texto do campo `license`. Conteúdo fora do SRD não entra. |
 | Fate Core | Nomes de perícias, escada e estrutura da ficha | Licença **CC BY 3.0 Unported**, da Evil Hat Productions. Exige atribuição visível, com o texto de atribuição publicado pela Evil Hat. |
 
-- `catalog` de `list` traz só nomes, nunca descrições.
+- `catalog` de `list` traz só nomes, nunca descrições. O `recommend` e o `catalogDefaults` também: só nomes do catálogo, ids e números.
+- O texto por opção de um `default` (a Fraqueza do clã) é escrito pelo time, com palavras próprias, e revisado por uma segunda pessoa: nunca copiado nem parafraseado frase a frase do livro.
 - **Frases de ajuda (`help`).** São escritas pelo time, com palavras próprias, e revisadas por uma segunda pessoa que conheça o sistema. Não copiam nem parafraseiam de perto um trecho de livro. Num sistema comercial, a frase explica o termo para quem joga pela primeira vez; ela não é a descrição do livro. As frases de poderes (Disciplinas, Dons, Esferas, Ritos) esperam a conferência de quem cuida da parte jurídica.
 - Antes de publicar um sistema novo, confira a licença do material de origem com quem cuida da parte jurídica.
 
@@ -787,6 +806,11 @@ Os três templates WoD (`vtm-v20` 1.8.0, `mta-m20` 1.6.0, `wta-w20` 1.6.0) têm 
 | `caps` | Tetos: `creation-cap` limita só o que os pontos básicos pagam (acima, só bônus); `hard-cap` limita a criação inteira, com número ou `{ field }` (o valor de um `rating`/`number`). |
 | `baselines` | Valor inicial condicional: substitui o padrão do campo na conta quando `when` vale. `locked: true` proíbe comprar acima dele. |
 | `untracked` | Campos de evolução que a criação não contabiliza (o resto da ficha de D&D). |
+| `advice` | Avisos que **não bloqueiam**, de 1 a 20, com `rule` da lista `creationAdvice`. A tela avisa; a conta (`checkCreation`, `complete`) e o servidor não leem. |
+
+| `advice.rule` | Parâmetros | Aviso |
+|---|---|---|
+| `item-meta-max` | `targets` (listas), `meta` (um meta `number` de todas elas), `max` (na faixa do meta) | Itens com o meta acima de `max` ("na criação, os Dons são de Posto 1: confirme com o narrador"). |
 
 | `rule` | Parâmetros | Conta |
 |---|---|---|

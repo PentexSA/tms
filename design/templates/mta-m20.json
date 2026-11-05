@@ -439,6 +439,26 @@
         { "id": "spirit", "label": "Espírito" },
         { "id": "time", "label": "Tempo" }
       ],
+      "recommend": {
+        "outside": "fora da Tradição",
+        "by": [
+          {
+            "from": "tradition",
+            "label": "da Tradição",
+            "map": {
+              "ordem-de-hermes": ["forces"],
+              "coro-celestial": ["forces", "prime", "spirit"],
+              "culto-do-extase": ["life", "mind", "time"],
+              "eutanatos": ["entropy", "life", "spirit"],
+              "irmandade-akashica": ["life", "mind"],
+              "sonhadores": ["forces", "life", "matter", "spirit"],
+              "verbena": ["forces", "life"],
+              "filhos-do-eter": ["forces", "matter", "prime"],
+              "virtualidade": ["correspondence", "forces"]
+            }
+          }
+        ]
+      },
       "help": "A Esfera mais natural para o personagem, em geral ligada à Tradição."
     },
     "correspondence": {

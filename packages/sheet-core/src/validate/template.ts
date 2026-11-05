@@ -116,14 +116,16 @@ const KEYS = {
     clock: ['segments', 'rule', 'fills'],
     state: ['options', 'cost'],
     mark: ['states', 'bonus'],
-    text: ['maxLength', 'aspect', 'placeholder', 'suggestions'],
-    longText: ['maxLength', 'placeholder'],
-    choice: ['options', 'glyph'],
+    text: ['maxLength', 'aspect', 'placeholder', 'suggestions', 'default'],
+    longText: ['maxLength', 'placeholder', 'default'],
+    choice: ['options', 'glyph', 'recommend'],
     tags: ['options'],
     list: [
       'itemLabel',
       'item',
       'catalog',
+      'catalogDefaults',
+      'recommend',
       'searchable',
       'density',
       'fixed',
@@ -338,6 +340,67 @@ function check(
       num(`${path}.map.${k}`, n, min, max)
     }
   }
+  // Mapa de opção de um choice: chaves que existem, de 1 a 100 entradas
+  const optionMap = (
+    path: string,
+    from: unknown,
+    map: unknown
+  ): [string, unknown][] => {
+    const choice = field(from)
+    if (choice?.type !== 'choice') {
+      err(`${path}.from`, `campo '${from}' não é um choice`)
+      return []
+    }
+    const m = rec(map)
+    if (!m) {
+      err(`${path}.map`, 'precisa ser objeto')
+      return []
+    }
+    const entries = Object.entries(m)
+    if (!entries.length || entries.length > 100)
+      err(`${path}.map`, 'de 1 a 100 opções')
+    const options = asArray(choice.options).map(o => rec(o)?.id)
+    for (const [k] of entries)
+      if (!options.includes(k))
+        err(`${path}.map.${k}`, `opção '${k}' não existe em '${from}'`)
+    return entries.slice(0, 100)
+  }
+  // `recommend` (lista ou choice): nomes do catálogo ou ids de opção do campo
+  const recommend = (p: string, f: Obj) => {
+    if (f.recommend == null) return
+    const path = `${p}.recommend`
+    keys(path, f.recommend, ['outside', 'by'])
+    const r = rec(f.recommend)
+    if (!r) return
+    text(`${path}.outside`, r.outside, 60)
+    const by = objs(`${path}.by`, r.by)
+    if (!by.length || by.length > 4) err(`${path}.by`, 'de 1 a 4 fontes')
+    const allowed =
+      f.type === 'list'
+        ? asArray(f.catalog)
+        : asArray(f.options).map(o => rec(o)?.id)
+    for (const [i, s] of by.slice(0, 4).entries()) {
+      const sp = `${path}.by.${i}`
+      keys(sp, s, ['from', 'label', 'map'])
+      text(`${sp}.label`, s.label, 24)
+      for (const [k, names] of optionMap(sp, s.from, s.map)) {
+        if (!Array.isArray(names) || !names.length || names.length > 200) {
+          err(`${sp}.map.${k}`, 'lista de 1 a 200 entradas')
+          continue
+        }
+        if (new Set(names).size !== names.length)
+          err(`${sp}.map.${k}`, 'entrada repetida')
+        for (const n of names)
+          if (!allowed.includes(n))
+            err(
+              `${sp}.map.${k}`,
+              f.type === 'list'
+                ? `'${n}' não está no catálogo`
+                : `opção '${n}' não existe`
+            )
+      }
+    }
+  }
   const accentOk = (v: unknown) =>
     v === 'accent-neutral' || (typeof v === 'string' && palette.includes(v))
 
@@ -417,7 +480,25 @@ function check(
     }
     if (f.type === 'rating')
       formula(`${p}.default`, f.default, numOr(f.min, 0), numOr(f.max, 10))
-    else if (f.default != null)
+    else if (f.type === 'text' || f.type === 'longText') {
+      // Texto por opção de um choice (a Fraqueza pelo Clã), uma linha cada
+      if (f.default != null) {
+        const d = rec(f.default)
+        if (!d) err(`${p}.default`, 'precisa ser objeto { from, map }')
+        else {
+          keys(`${p}.default`, d, ['from', 'map'])
+          const max = Math.min(
+            numOr(f.maxLength, f.type === 'text' ? 200 : 4000),
+            400
+          )
+          for (const [k, v] of optionMap(`${p}.default`, d.from, d.map)) {
+            text(`${p}.default.map.${k}`, v, max)
+            if (typeof v === 'string' && /[\t\n\r]/.test(v))
+              err(`${p}.default.map.${k}`, 'uma linha só')
+          }
+        }
+      }
+    } else if (f.default != null)
       num(
         `${p}.default`,
         f.default,
@@ -597,6 +678,7 @@ function check(
         if (!has(bonus?.ability)) err(`${p}.bonus.ability`, 'campo não existe')
       }
     }
+    if (f.type === 'choice' || f.type === 'list') recommend(p, f)
     if (f.type === 'choice' || f.type === 'tags') {
       const options = objs(`${p}.options`, f.options)
       for (const o of options) {
@@ -627,6 +709,46 @@ function check(
       if (item?.value) {
         num(`${p}.item.value.min`, value?.min, 0, 10)
         num(`${p}.item.value.max`, value?.max, 1, 10)
+      }
+      // O meta inicial de nomes do catálogo (o Posto de cada Dom)
+      if (f.catalogDefaults != null) {
+        const defaults = objs(`${p}.catalogDefaults`, f.catalogDefaults)
+        if (!defaults.length || defaults.length > 10)
+          err(`${p}.catalogDefaults`, 'de 1 a 10 entradas')
+        const catalog = asArray(f.catalog)
+        const metas = asArray(item?.meta).map(rec)
+        const seen = new Map<unknown, Set<unknown>>()
+        for (const [i, d] of defaults.slice(0, 10).entries()) {
+          const dp = `${p}.catalogDefaults.${i}`
+          keys(dp, d, ['meta', 'value', 'items'])
+          const m = metas.find(x => x?.id === d.meta)
+          if (m?.type !== 'number') {
+            err(`${dp}.meta`, `meta numérico '${d.meta}' não existe no item`)
+            continue
+          }
+          if (d.value == null) err(`${dp}.value`, 'obrigatório')
+          else
+            num(
+              `${dp}.value`,
+              d.value,
+              numOr(m.min, -NUM_LIMIT),
+              numOr(m.max, NUM_LIMIT)
+            )
+          const names = d.items
+          if (!Array.isArray(names) || !names.length || names.length > 200) {
+            err(`${dp}.items`, 'lista de 1 a 200 nomes')
+            continue
+          }
+          const done = seen.get(d.meta) ?? new Set<unknown>()
+          seen.set(d.meta, done)
+          for (const n of names) {
+            if (!catalog.includes(n))
+              err(`${dp}.items`, `'${n}' não está no catálogo`)
+            if (done.has(n))
+              err(`${dp}.items`, `'${n}' já tem valor de '${d.meta}'`)
+            done.add(n)
+          }
+        }
       }
     }
   }

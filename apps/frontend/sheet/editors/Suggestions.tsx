@@ -1,6 +1,7 @@
 import { BottomSheet, Button, Chip, tokens } from '@tms/ui'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { byLabel } from '../evolve/text'
 
 // As sugestões de um campo de texto (`suggestions` do template, como os
 // Arquétipos do livro para Natureza e Comportamento): um toque preenche o
@@ -29,9 +30,11 @@ export function SuggestionChips({
   readonly testID?: string
 }) {
   const query = fold(value)
-  const exact = options.some(o => fold(o) === query)
+  // Na ordem do rótulo, não na do array do template (T-60)
+  const sorted = useMemo(() => byLabel(options), [options])
+  const exact = sorted.some(o => fold(o) === query)
   const shown =
-    query && !exact ? options.filter(o => fold(o).includes(query)) : options
+    query && !exact ? sorted.filter(o => fold(o).includes(query)) : sorted
   if (!shown.length) return null
   return (
     <View style={styles.chips} testID={testID}>

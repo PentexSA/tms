@@ -21,3 +21,22 @@ export function withItemDefaults(def: ListField, item: ListItem): ListItem {
   for (const m of missing) meta[m.id] = m.min as number
   return { ...item, meta }
 }
+
+/**
+ * O meta inicial do nome do catálogo (`catalogDefaults`, T-24): o Dom de
+ * Posto 2 nasce com Posto 2. Só para nome do catálogo e meta ainda sem
+ * valor; o resto fica com o `min` (withItemDefaults). O validador da ficha
+ * confere a faixa no servidor.
+ */
+export function withCatalogDefaults(def: ListField, item: ListItem): ListItem {
+  const name = item.name
+  if (!name || !def.catalog?.includes(name) || !def.catalogDefaults) return item
+  const meta: Record<string, number | string> = { ...item.meta }
+  let changed = false
+  for (const d of def.catalogDefaults)
+    if (d.items.includes(name) && meta[d.meta] === undefined) {
+      meta[d.meta] = d.value
+      changed = true
+    }
+  return changed ? { ...item, meta } : item
+}

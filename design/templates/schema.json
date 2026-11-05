@@ -447,6 +447,58 @@
       },
       "additionalProperties": false
     },
+    "textChoiceMap": {
+      "description": "Texto inicial por opção de um campo choice (a Fraqueza pelo Clã). Vale enquanto a ficha não grava o campo; o texto gravado, inclusive vazio, vence. Uma linha cada, até 400 caracteres e até o maxLength do campo (validateTemplate confere). Escrito pelo time, nunca copiado do livro (README §12).",
+      "type": "object",
+      "required": ["from", "map"],
+      "properties": {
+        "from": { "$ref": "#/$defs/fieldRef" },
+        "map": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/safeText", "maxLength": 400 },
+          "minProperties": 1,
+          "maxProperties": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "recommend": {
+      "description": "O que a identidade recomenda (Disciplinas do clã, Esfera da Tradição): por opção de um choice, nomes do catalog (lista) ou ids de opção (choice) do próprio campo. Só recomenda: não muda preço nem conta. O selo (label) e o outside são texto do template; o resto da frase é do app.",
+      "type": "object",
+      "required": ["outside", "by"],
+      "properties": {
+        "outside": { "$ref": "#/$defs/safeText", "maxLength": 60 },
+        "by": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": ["from", "label", "map"],
+            "properties": {
+              "from": { "$ref": "#/$defs/fieldRef" },
+              "label": { "$ref": "#/$defs/safeText", "maxLength": 24 },
+              "map": {
+                "type": "object",
+                "propertyNames": { "$ref": "#/$defs/id" },
+                "additionalProperties": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/safeText", "maxLength": 80 },
+                  "minItems": 1,
+                  "maxItems": 200,
+                  "uniqueItems": true
+                },
+                "minProperties": 1,
+                "maxProperties": 100
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "deriveRef": {
       "description": "Valor calculado por uma derivação da lista fechada a partir de outros campos. Ex.: { derive: vtmBloodPool, from: generation }.",
       "type": "object",
@@ -1213,7 +1265,8 @@
           "maxItems": 100,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/label" }
-        }
+        },
+        "default": { "$ref": "#/$defs/textChoiceMap" }
       },
       "unevaluatedProperties": false
     },
@@ -1232,7 +1285,8 @@
         "placeholder": {
           "description": "Extensão documentada: texto de exemplo no campo vazio (ainda não consumido pelo protótipo).",
           "$ref": "#/$defs/label"
-        }
+        },
+        "default": { "$ref": "#/$defs/textChoiceMap" }
       },
       "unevaluatedProperties": false
     },
@@ -1270,7 +1324,8 @@
           },
           "minItems": 1,
           "maxItems": 100
-        }
+        },
+        "recommend": { "$ref": "#/$defs/recommend" }
       },
       "required": ["options"],
       "unevaluatedProperties": false
@@ -1321,6 +1376,29 @@
           "maxItems": 200,
           "uniqueItems": true
         },
+        "catalogDefaults": {
+          "description": "O meta inicial de nomes do catalog (o Posto de cada Dom): o item adicionado pelo nome nasce com esse meta. Sem entrada, vale o min do meta.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["meta", "value", "items"],
+            "properties": {
+              "meta": { "$ref": "#/$defs/id" },
+              "value": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
+              "items": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/safeText", "maxLength": 80 },
+                "minItems": 1,
+                "maxItems": 200,
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "recommend": { "$ref": "#/$defs/recommend" },
         "fixed": {
           "description": "Itens fixos (não se adiciona nem remove): cada um guarda { id, text } e o que item declarar (value, meta, notes). Ex.: consequências Suave, Moderada e Grave do Fate; Ressonância Dinâmica, Entrópica e Estática do Mago, com pontos.",
           "type": "array",
@@ -2151,6 +2229,10 @@
       "description": "Tetos da criação (REGISTRY.capRules): creation-cap limita só os pontos básicos; hard-cap vale também para os bônus.",
       "enum": ["creation-cap", "hard-cap"]
     },
+    "creationAdviceRule": {
+      "description": "Avisos da criação que não bloqueiam (REGISTRY.creationAdvice): item-meta-max avisa os itens de lista com o meta acima de max (Dom acima do Posto 1). Fora da conta: checkCreation e o servidor não leem.",
+      "enum": ["item-meta-max"]
+    },
     "costRule": {
       "description": "Regras de preço (REGISTRY.costRules): flat e per-current em XP; flat, item-meta e credit em pontos de bônus.",
       "enum": ["flat", "per-current", "item-meta", "credit"]
@@ -2266,7 +2348,24 @@
             "additionalProperties": false
           }
         },
-        "untracked": { "type": "array", "items": { "$ref": "#/$defs/fieldRef" }, "minItems": 1, "maxItems": 200, "uniqueItems": true }
+        "untracked": { "type": "array", "items": { "$ref": "#/$defs/fieldRef" }, "minItems": 1, "maxItems": 200, "uniqueItems": true },
+        "advice": {
+          "description": "Avisos que não bloqueiam (README §14): a tela avisa, a conta não lê.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["rule", "targets", "meta", "max"],
+            "properties": {
+              "rule": { "$ref": "#/$defs/creationAdviceRule" },
+              "targets": { "$ref": "#/$defs/fieldRefs" },
+              "meta": { "$ref": "#/$defs/id" },
+              "max": { "type": "integer", "minimum": -1000000, "maximum": 1000000 }
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": false
     },

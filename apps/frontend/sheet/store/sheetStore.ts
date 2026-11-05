@@ -6,6 +6,7 @@ import {
   type CreationRefusal,
   checkCreation,
   checkCreationBatch,
+  defaultStored,
   type FieldId,
   fieldOrder,
   type Issue,
@@ -159,6 +160,11 @@ export interface DraftNotice {
   readonly action?: 'budget'
 }
 
+/** Onde foi o toque (`values.<lista>#<item>`), para o aviso cair na linha. */
+export interface DraftWriteOptions {
+  readonly at?: string
+}
+
 /** Para onde vão os lotes confirmados no aparelho (o SyncProvider). */
 export interface SheetSync {
   enqueue(characterId: string, batch: QueuedBatch): void | Promise<void>
@@ -253,10 +259,21 @@ export interface SheetActions {
   resolveConflict(path: string, choice: 'mine' | 'theirs'): void
   setMode(mode: SheetMode): void
   startDraft(): void
-  /** Altera o rascunho de Evoluir (validado como um lote). */
-  editDraft(events: readonly SheetEvent[]): CommitResult | null
+  /**
+   * Altera o rascunho de Evoluir (validado como um lote). `at`: onde o
+   * toque aconteceu, quando é mais fino que o caminho gravado (o item de
+   * uma lista, que grava a lista inteira): o aviso de recusa leva os dois.
+   */
+  editDraft(
+    events: readonly SheetEvent[],
+    options?: DraftWriteOptions
+  ): CommitResult | null
   /** Um caminho do rascunho; o `from` é o valor que a tela mostra agora. */
-  setDraftValue(path: string, to: unknown): CommitResult | null
+  setDraftValue(
+    path: string,
+    to: unknown,
+    options?: DraftWriteOptions
+  ): CommitResult | null
   /** O lote que o rascunho viraria (o resumo de "Concluir"). */
   draftEvents(): SheetEvent[]
   saveDraft(label: string): CommitResult | null
@@ -437,6 +454,15 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         readonly result: CommitResult
         readonly notice: Omit<DraftNotice, 'id' | 'paths'>
       }
+  // O campo inteiro (`values.<id>`) sem valor guardado que voltou ao valor
+  // de partida, o mesmo que o `creationFreeze` gravaria
+  const isStart = (sheet: SheetData, from: unknown, e: SheetEvent) => {
+    if (from != null) return false
+    const id = /^values\.([^.#]+)$/.exec(e.path)?.[1]
+    if (!id) return false
+    const start = defaultStored(model, sheet, id)
+    return start !== undefined && jsonEqual(start, e.to)
+  }
   const attemptDraft = (
     s: SheetState,
     draftNow: Draft,
@@ -457,8 +483,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       // `from: null` (campo sem valor guardado) também é o de antes
       const before = draft.get(e.path)
       const from = before ? before.from : e.from
-      // Voltou ao valor de antes: a alteração some do rascunho
-      if (jsonEqual(from, e.to)) draft.delete(e.path)
+      // Voltou ao valor de antes: a alteração some do rascunho. Sem valor
+      // guardado, "o de antes" é o que o campo vale sem nada gravado (T-85),
+      // e o campo volta a acompanhar a fonte
+      if (jsonEqual(from, e.to) || isStart(r.sheet, from, e))
+        draft.delete(e.path)
       else draft.set(e.path, { from, to: e.to })
     }
     // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
@@ -479,7 +508,8 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         { before: shown(s.values, draftNow), after: r.sheet },
         { before: s.check, after: next.check },
         s.creation,
-        s.creationPhase
+        s.creationPhase,
+        { paths: events.map(e => e.path), resolved: next.resolved }
       )
       if (why)
         return {
@@ -589,18 +619,21 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       return { ok: true, batch, queued }
     }
 
-    const editDraft: SheetActions['editDraft'] = events => {
+    const editDraft: SheetActions['editDraft'] = (events, options) => {
       const s = get()
       if (!s.draft) return null
       const attempt = attemptDraft(s, s.draft, events)
       if (!attempt.ok) {
-        // Um aviso só por ficha: o novo substitui o anterior (T-20)
+        // Um aviso só por ficha: o novo substitui o anterior (T-20). Com o
+        // `at`, ele cai também na linha do item tocado (R-25)
         tried = events
         noticeId += 1
+        const paths = events.map(e => e.path)
+        if (options?.at && !paths.includes(options.at)) paths.push(options.at)
         set({
           notice: {
             id: noticeId,
-            paths: events.map(e => e.path),
+            paths,
             ...attempt.notice,
           },
         })
@@ -673,11 +706,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       received,
       editDraft,
 
-      setDraftValue(path, to) {
+      setDraftValue(path, to, options) {
         const s = get()
         if (!s.draft) return null
         const from = valueAt(shown(s.values, s.draft), path)
-        return editDraft([{ path, from, to }])
+        return editDraft([{ path, from, to }], options)
       },
 
       hydrate(batches) {

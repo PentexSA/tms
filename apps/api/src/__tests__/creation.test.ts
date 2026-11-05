@@ -1,5 +1,11 @@
 /// <reference types="bun-types" />
+
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import {
+  checkCreation,
+  compileTemplate,
+  creationInputOf,
+} from '@tms/sheet-core'
 import { completionRole, lifecycleRole } from '../sheets/events'
 import {
   addMember,
@@ -11,6 +17,7 @@ import {
   publish,
   setStatus,
   type TestUser,
+  template,
 } from '../test/factories'
 import {
   createTestContext,
@@ -417,6 +424,118 @@ describe('/events: avaliação parcial', () => {
       expect(res.status).toBe(200)
       expect((await values(id)).alert).toBe(4)
     })
+  })
+})
+
+// P07-D (D-06, D-07, D-09): a tela passa a avisar Dom acima do Posto 1 e
+// Disciplina fora do clã, sem bloquear, e a mostrar o custo da Qualidade.
+// Nada disso muda a conta do servidor: com os templates do produto, ele aceita
+// e recusa o mesmo que antes. Os testes leem o JSON do repositório, então
+// valem também depois que o template ganha `recommend` e `creation.advice`.
+describe('o servidor aceita o que a tela só avisa (templates do produto)', () => {
+  const V20_PRIORITIES = {
+    priorities: {
+      attributes: ['physical', 'social', 'mental'],
+      abilities: ['talents', 'skills', 'knowledges'],
+    },
+  }
+  let vampire: string
+  let werewolf: string
+
+  beforeEach(async () => {
+    await publish(ctx, 'vtm-v20')
+    await publish(ctx, 'wta-w20')
+    vampire = await createChronicle(ctx, storyteller, 'vtm-v20', 'V20')
+    werewolf = await createChronicle(ctx, storyteller, 'wta-w20', 'W20')
+    for (const c of [vampire, werewolf]) await addMember(ctx, c, owner)
+  })
+
+  const sheetOf = async (id: string) =>
+    ((await row(id)).sheet_data as { values: Record<string, unknown> }).values
+  const pointsOn = async (
+    chronicle: string,
+    values: Record<string, unknown>
+  ) => {
+    const id = await createCharacter(ctx, owner, chronicle, values)
+    const res = await as(ctx, owner, 'PATCH', `/characters/${id}/creation`, {
+      revision: 0,
+      choices: V20_PRIORITIES,
+    })
+    expect(res.status).toBe(200)
+    return id
+  }
+
+  it('Dom de Posto 2 na criação por pontos entra (o Posto não está na conta)', async () => {
+    const id = await pointsOn(werewolf, { name: 'Lupino', tribe: 'fianna' })
+    const gifts = [
+      { id: 'g1', name: 'Faro do Asfalto', meta: { rank: 2, source: 'x' } },
+    ]
+    expect((await send(id, owner, 'gifts', null, gifts)).status).toBe(200)
+    expect((await sheetOf(id)).gifts).toEqual(gifts)
+  })
+
+  it('o template do repositório já recomenda as Disciplinas do clã', () => {
+    const fields = template('vtm-v20').fields as Record<
+      string,
+      Record<string, unknown>
+    >
+    expect(fields.disciplines?.recommend).toBeDefined()
+  })
+
+  it('Disciplina fora do clã entra, com a mesma conta de uma do clã', async () => {
+    const outside = await pointsOn(vampire, { name: 'Fora', clan: 'brujah' })
+    const inside = await pointsOn(vampire, { name: 'Dentro', clan: 'brujah' })
+    const list = (name: string) => [{ id: 'd1', name, value: 3 }]
+    expect(
+      (await send(outside, owner, 'disciplines', null, list('Dominação')))
+        .status
+    ).toBe(200)
+    expect(
+      (await send(inside, owner, 'disciplines', null, list('Potência'))).status
+    ).toBe(200)
+    // O 4º ponto sai dos bônus nas duas: o mesmo preço (7), dentro do saldo
+    for (const [id, name] of [
+      [outside, 'Dominação'],
+      [inside, 'Potência'],
+    ] as const) {
+      const four = [{ id: 'd1', name, value: 4 }]
+      expect(
+        (await send(id, owner, 'disciplines', list(name), four)).status
+      ).toBe(200)
+    }
+    // E o mesmo resultado no motor que o servidor usa
+    const model = compileTemplate(template('vtm-v20'))
+    const input = creationInputOf(model, { choices: V20_PRIORITIES })
+    const check = async (id: string) =>
+      checkCreation(model, (await row(id)).sheet_data, input)
+    const a = await check(outside)
+    const b = await check(inside)
+    expect(a.budgets).toEqual(b.budgets)
+    expect(a.freebies).toEqual(b.freebies)
+    expect(a.problems).toEqual(b.problems)
+  })
+
+  it('Qualidade com Custo 2 entra e tira 2 do saldo de bônus (D-06 no servidor)', async () => {
+    const id = await pointsOn(vampire, { name: 'Qualidade', clan: 'brujah' })
+    const merit = (mid: string, cost: number) => ({
+      id: mid,
+      name: `Qualidade ${mid}`,
+      meta: { kind: 'Físico', cost },
+    })
+    const two = [merit('m1', 2)]
+    expect((await send(id, owner, 'merits', null, two)).status).toBe(200)
+    // Saldo de 15: com os 2 já gastos, 10 + 4 passa do saldo e nada entra
+    const over = [...two, merit('m2', 10), merit('m3', 4)]
+    const res = await send(id, owner, 'merits', two, over)
+    expect(res.status).toBe(422)
+    expect(await json(res)).toMatchObject({
+      code: 'CREATION_BUDGET_EXCEEDED',
+      problems: [{ code: 'CREATION_FREEBIES_EXCEEDED', amount: 1 }],
+    })
+    expect((await sheetOf(id)).merits).toEqual(two)
+    // 10 + 3 fecha os 15
+    const exact = [...two, merit('m2', 10), merit('m3', 3)]
+    expect((await send(id, owner, 'merits', two, exact)).status).toBe(200)
   })
 })
 

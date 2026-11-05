@@ -60,9 +60,89 @@ describe('nextStepCopy', () => {
       for (const mode of ['free', 'points'] as const)
         for (const approval of [false, true])
           for (const marker of ['adjust', 'returned', 'ready', null] as const)
-            expect(
-              (nextStepCopy({ by, mode, approval, marker }) ?? '').length
-            ).toBeLessThanOrEqual(NEXT_STEP_MAX)
+            for (const closed of [false, true])
+              expect(
+                (nextStepCopy({ by, mode, approval, marker, closed }) ?? '')
+                  .length
+              ).toBeLessThanOrEqual(NEXT_STEP_MAX)
+  })
+
+  // P05-D (achado 3 do onda-3 §11): a linha muda quando a conta fecha
+  const closedCases: [NextStepInput, string | null][] = [
+    [
+      {
+        by: 'owner',
+        mode: 'points',
+        approval: false,
+        marker: null,
+        closed: true,
+      },
+      'A conta fechou: você conclui.',
+    ],
+    [
+      {
+        by: 'owner',
+        mode: 'points',
+        approval: true,
+        marker: null,
+        closed: true,
+      },
+      'A conta fechou: envie ao narrador.',
+    ],
+    [
+      {
+        by: 'owner',
+        mode: 'points',
+        approval: false,
+        marker: 'adjust',
+        closed: true,
+      },
+      'Ajuste o pedido do narrador e conclua.',
+    ],
+    [
+      {
+        by: 'owner',
+        mode: 'points',
+        approval: true,
+        marker: 'returned',
+        closed: true,
+      },
+      'Ajuste o pedido do narrador e envie de novo.',
+    ],
+    [
+      {
+        by: 'storyteller',
+        mode: 'points',
+        approval: true,
+        marker: null,
+        closed: true,
+      },
+      'A conta fechou: você conclui.',
+    ],
+    // Na criação livre e na ficha alheia, nada muda
+    [
+      {
+        by: 'owner',
+        mode: 'free',
+        approval: false,
+        marker: null,
+        closed: true,
+      },
+      'Quando terminar, avise: o narrador conclui.',
+    ],
+    [
+      {
+        by: 'other',
+        mode: 'points',
+        approval: false,
+        marker: null,
+        closed: true,
+      },
+      null,
+    ],
+  ]
+  it.each(closedCases)('conta fechada: %j → %s', (input, expected) => {
+    expect(nextStepCopy(input)).toBe(expected)
   })
 
   it('markerOf segue a precedência do selo; readerOf, os papéis', () => {

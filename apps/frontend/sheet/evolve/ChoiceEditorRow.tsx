@@ -7,22 +7,51 @@ import { useCompact } from './compact'
 import { fieldHelp } from './EditorShell'
 import { HelpRow, helpRowInner } from './HelpRow'
 import { useFieldIssue, useSetDraft } from './hooks'
+import { badgeText, outsideText, useIdentityAdvice } from './recommend'
 
 // choice e state em Evoluir: a linha abre um radiogroup no sheet. Trocar o
 // Clã (o campo do accent no template) já muda a cor da ficha, porque o
 // rascunho é o que a tela resolve.
+//
+// Com `recommend` no template (a Esfera de afinidade pela Tradição, R-26), as
+// opções recomendadas vêm primeiro, com o selo no texto secundário, que o
+// Choice lê no nome ("Forças, da Tradição"). Na criação, uma escolha fora
+// avisa sob o valor, sem bloquear.
 
 export function ChoiceEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   const compact = useCompact()
+  // Pelo store: trocar a Tradição não muda a entrada deste campo
+  const identity = useIdentityAdvice(resolved.id)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   if (resolved.type !== 'choice' && resolved.type !== 'state') return null
   const def = resolved.field.def
   const current = resolved.option
   const label = current?.label ?? '—'
+  const { recommended } = identity
+  const options = def.options
+    .map(o => {
+      const own = 'meta' in o ? o.meta : 'hint' in o ? o.hint : undefined
+      const badge = badgeText(recommended.get(o.id))
+      return {
+        id: o.id,
+        label: o.label,
+        meta: [own, badge].filter(Boolean).join(' · ') || undefined,
+        help: o.help,
+      }
+    })
+    // Estável: as recomendadas na frente, cada parte na ordem do template
+    .sort(
+      (a, b) => Number(recommended.has(b.id)) - Number(recommended.has(a.id))
+    )
+  const outside =
+    identity.recommend &&
+    identity.advice.get(`values.${resolved.id}`)?.includes('ADVICE_OUTSIDE')
+      ? outsideText(identity.recommend)
+      : null
   return (
     <>
       <HelpRow
@@ -53,6 +82,15 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
             <View style={styles.text}>
               <Text variant="fieldLabel">{def.label}</Text>
               <Text color={current ? 'ink' : 'inkMuted'}>{label}</Text>
+              {outside ? (
+                <Text
+                  variant="caption"
+                  color="inkMuted"
+                  testID={`identity-${resolved.id}`}
+                >
+                  {outside}
+                </Text>
+              ) : null}
               {issue ? (
                 <Text
                   variant="caption"
@@ -95,12 +133,7 @@ export function ChoiceEditorRow({ resolved }: FieldViewProps) {
           label={def.label}
           showLabel={false}
           value={current?.id ?? null}
-          options={def.options.map(o => ({
-            id: o.id,
-            label: o.label,
-            meta: 'meta' in o ? o.meta : 'hint' in o ? o.hint : undefined,
-            help: o.help,
-          }))}
+          options={options}
           onChange={id => {
             const err = set(`values.${resolved.id}`, id)
             setError(err)

@@ -7,19 +7,20 @@ import {
   within,
 } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
+import { Stepper } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import {
   AccessibilityInfo,
   Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
 } from 'react-native'
-
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { modelOf, templateJson } from '../../../test/fixtures'
-import { summarySave } from '../../../test/queries'
+import { sheetsDismissed, summarySave } from '../../../test/queries'
 import {
   json,
   memoryStore,
@@ -28,6 +29,8 @@ import {
   tokens,
 } from '../../../test/session'
 import { SheetScreen } from '../../SheetScreen'
+import { resetBonusSeenMemory } from '../bonusSeen'
+import * as guideModule from '../guide'
 import { CREATION_HELP } from '../help'
 
 // A prioridade escolhida no próprio grupo (Físicos: 7 · 5 · 3) e a trava a
@@ -60,6 +63,8 @@ const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
 const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
 
 beforeEach(() => {
+  // A marca da folha de bônus é da sessão: cada teste começa sem ela
+  resetBonusSeenMemory()
   jest
     .mocked(randomUUID)
     .mockReturnValue('00000000-0000-4000-8000-00000000b201')
@@ -122,7 +127,7 @@ async function open(
   )
   await session.restore()
   renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-  await screen.findByRole('tab', { name: 'Orçamento' })
+  await screen.findByRole('tab', { name: 'Pontos' })
 }
 
 const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
@@ -244,7 +249,7 @@ describe('o "?" da Prioridade e dos pontos de bônus (R-19)', () => {
 
   it('o saldo dos pontos de bônus tem "Ajuda: pontos de bônus"', async () => {
     await open(PRIORITIES, { ...ALMOST, stamina: 3 })
-    tab('Orçamento')
+    tab('Pontos')
     fireEvent.press(
       screen.getByRole('button', { name: 'Ajuda: pontos de bônus' })
     )
@@ -288,16 +293,18 @@ describe('trava da distribuição', () => {
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
 
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-panel')).toBeTruthy()
-    fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
     tab('Ficha')
     step('Vigor')
     // R-17: na fase de bônus, com o grupo cheio, o preço do próximo
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus · +1 = 5 bônus'
     )
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-freebies').props.children).toBe(
       'Bônus: restam 10 de 15.'
     )
@@ -337,7 +344,7 @@ describe('aviso ao lado do toque', () => {
     expect(within(column).getByTestId('notice-wits')).toHaveTextContent(
       'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
     )
-    // "Ver orçamento" leva à aba da fase
+    // "Ver Pontos" leva à aba da fase
     expect(screen.getByTestId('notice-wits-budget')).toBeTruthy()
     step('Inteligência')
     expect(screen.queryByTestId('notice-wits')).toBeNull()
@@ -413,13 +420,92 @@ describe('"+" com a previsão da conta', () => {
   })
 })
 
+// T-85: o "−" no valor inicial tem a cara de indisponível, continua
+// tocável, e o toque diz de onde vem o inicial sem descer
+describe('"−" no valor inicial', () => {
+  it('FdV na Coragem 3: a dica junta os dois lados, e o "−" não desce', async () => {
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const control = () =>
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+    expect(control().props.accessibilityHint).toBe(
+      'Aumentar: +1 = 1 bônus. Diminuir: Na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(screen.getByTestId('notice-willpower')).toHaveTextContent(
+      'Força de Vontade: na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    // Comprar 1 e voltar deixa o "−" livre no 4 e zera o contador
+    step('Força de Vontade permanente')
+    expect(control()).toHaveAccessibilityValue({ now: 4 })
+    expect(control().props.accessibilityHint).toBe('+1 = 1 bônus')
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    expect(screen.getByText(/0 alterações/)).toBeTruthy()
+  })
+})
+
+// Achados 3 e 6 do /code-review (P10-C): acima do inicial, segurar o "−"
+// para no inicial; no web, o "−" bloqueado aponta a própria descrição, e o
+// aviso do "−" não vira a descrição do "+"
+describe('"−" no valor inicial: segurar e descrição', () => {
+  const realOS = Platform.OS
+  const setOS = (os: string) =>
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+  afterEach(() => setOS(realOS))
+
+  it('no app, o "−" acima do inicial leva o stop do inicial', async () => {
+    await open(PRIORITIES, {
+      courage: 3,
+      willpower: { permanent: 6, current: 6 },
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const steppers = screen.UNSAFE_getAllByType(Stepper)
+    const row = steppers.find(
+      x => x.props.label === 'Força de Vontade permanente'
+    )
+    expect(row?.props.decrease).toMatchObject({ blocked: false, stop: 3 })
+  })
+
+  it('no web, o "−" bloqueado sem aviso aponta a descrição dele', async () => {
+    setOS('web')
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const less = () =>
+      screen.getByRole('button', {
+        name: 'Diminuir Força de Vontade permanente',
+      })
+    const more = () =>
+      screen.getByRole('button', {
+        name: 'Aumentar Força de Vontade permanente',
+      })
+    expect(less().props['aria-describedby']).toBe('advice-down-willpower')
+    expect(
+      screen.getByTestId('advice-down-willpower', {
+        includeHiddenElements: true,
+      })
+    ).toHaveTextContent('Na criação, não fica abaixo de 3 (vem de Coragem).')
+    // O toque recusado abre o aviso do "−": ele passa a descrevê-lo, e o
+    // "+" não aponta o aviso que não é dele
+    fireEvent.press(less())
+    expect(screen.getByTestId('notice-willpower')).toBeTruthy()
+    expect(less().props['aria-describedby']).toBe('notice-willpower')
+    expect(more().props['aria-describedby']).not.toBe('notice-willpower')
+  })
+})
+
 // T-18: o saldo que sobra não se lê como gasto, e a conta fechada com bônus
 // livres diz que eles ainda podem ser gastos
 describe('bônus que sobram', () => {
-  it('com os básicos completos e 15 livres, o Orçamento e a barra dizem o que resta', async () => {
+  it('com os básicos completos e 15 livres, a aba Pontos e a barra dizem o que resta', async () => {
     await open(PRIORITIES, { ...ALMOST, stamina: 3 })
     expect(screen.getByText(/Bônus: restam 15 de 15/)).toBeTruthy()
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-ready')).toHaveTextContent(
       'Pontos básicos completos; restam 15 de bônus. Gaste-os nos grupos ou conclua pela barra de cima.'
     )
@@ -431,7 +517,7 @@ describe('bônus que sobram', () => {
   it('com o bônus zerado, a conta fechou', async () => {
     // 15 de bônus: 3 pontos de atributo acima dos básicos (5 cada)
     await open(PRIORITIES, { ...ALMOST, stamina: 3, strength: 5, dexterity: 5 })
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-ready')).toHaveTextContent(
       'A conta fechou: conclua a criação pela barra de cima.'
     )
@@ -442,14 +528,14 @@ describe('bônus que sobram', () => {
 })
 
 describe('extrato do bônus (R-17)', () => {
-  it('o Orçamento mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
+  it('a aba Pontos mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
     await open(PRIORITIES, {
       ...ALMOST,
       stamina: 3,
       alertness: 4,
       willpower: { permanent: 4, current: 4 },
     })
-    tab('Orçamento')
+    tab('Pontos')
     const ledger = screen.getByTestId('creation-ledger')
     expect(ledger).toHaveTextContent(/Habilidades › Talentos: 1 × 2 = 2/)
     expect(ledger).toHaveTextContent(/Prontidão acima de 3: 1/)
@@ -461,14 +547,14 @@ describe('extrato do bônus (R-17)', () => {
   })
 })
 
-describe('aba Orçamento; Salvar sempre', () => {
+describe('aba Pontos; Salvar sempre', () => {
   it('a conta fica na aba; antes de fechar, a barra só tem "Salvar"', async () => {
     await open(PRIORITIES)
     expect(screen.queryByTestId('creation-panel')).toBeNull()
     expect(screen.queryByText('Concluir criação')).toBeNull()
     expect(screen.queryByTestId('creation-action')).toBeNull()
     expect(screen.getByTestId('mode-save')).toHaveTextContent(/^Salvar$/)
-    tab('Orçamento')
+    tab('Pontos')
     expect(screen.getByTestId('creation-problems')).toBeTruthy()
   })
 
@@ -542,7 +628,7 @@ describe('Salvar e Concluir lado a lado (D-01)', () => {
     )
     await session.restore()
     renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-    await screen.findByRole('tab', { name: 'Orçamento' })
+    await screen.findByRole('tab', { name: 'Pontos' })
   }
 
   it('antes de a conta fechar: "Salvar" (nome "Salvar alterações"), sem ação seguinte', async () => {
@@ -663,11 +749,12 @@ describe('barra de Criação em duas linhas (D-01)', () => {
       'Você conclui quando a conta fechar.'
     )
     const actions = screen.getByTestId('mode-bar-actions')
+    // O "Faltam" (P05-D) ocupa o lugar do "Concluir", antes do "Salvar"
     expect(
       within(actions)
         .getAllByRole('button')
         .map(b => b.props.testID)
-    ).toEqual(['mode-save'])
+    ).toEqual(['creation-guide-0', 'creation-guide-more', 'mode-save'])
     // A tela larga continua numa linha
     at(1280)
     expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
@@ -700,6 +787,321 @@ describe('barra de Criação em duas linhas (D-01)', () => {
     expect(save).toHaveTextContent('Salvar')
     expect(save).not.toHaveTextContent('Salvar alterações')
     expect(save.props.accessibilityLabel).toBe('Salvar alterações')
+  })
+})
+
+// P05-D (D-05, R-18): o "Faltam: …" na barra, ao lado do "Salvar", com os
+// itens que levam ao grupo; com a conta fechada, ele sai e o "Concluir" entra
+describe('"Faltam" na barra (R-18)', () => {
+  const guide = () => within(screen.getByTestId('creation-guide'))
+  // Só faltam as Virtudes
+  const VIRTUES = {
+    ...ALMOST,
+    stamina: 3,
+    conscience: 1,
+    selfControl: 1,
+    courage: 1,
+  }
+
+  it('com a conta aberta: "Faltam:" e os itens como botões, antes do "Salvar"', async () => {
+    await open(PRIORITIES)
+    expect(guide().getByText('Faltam:')).toBeTruthy()
+    // A 390 (264 dp no slot): o primeiro item inteiro e o "e mais N"
+    expect(
+      screen.getByRole('button', {
+        name: 'Físicos 7: Físicos: faltam 7 pontos básicos.',
+      })
+    ).toHaveTextContent('Físicos 7')
+    expect(
+      screen.getByRole('button', {
+        name: 'e mais 8: ver tudo o que falta em Pontos',
+      })
+    ).toBeTruthy()
+    expect(screen.queryByTestId('creation-action')).toBeNull()
+  })
+
+  it('no começo, nem o primeiro cabe: um botão só, que leva à aba', async () => {
+    await open()
+    expect(guide().queryByText('Faltam:')).toBeNull()
+    expect(guide().getByRole('button')).toHaveTextContent('Faltam 5 itens')
+    fireEvent.press(guide().getByRole('button'))
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    expect(screen.getByTestId('creation-problems')).toBeTruthy()
+  })
+
+  it('tocar "Virtudes 7" leva à aba Vantagens e rola até a seção', async () => {
+    await open(PRIORITIES, VIRTUES)
+    expect(guide().getByText('Falta:')).toBeTruthy()
+    const scrollView = screen.UNSAFE_getAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollTo = jest.spyOn(scrollView, 'scrollTo')
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Virtudes 7: Virtudes: faltam 7 pontos básicos.',
+      })
+    )
+    expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeSelected()
+    // A seção nova é medida depois da troca de aba: o pedido espera por ela
+    layout('section-advantages', 300)
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenCalledWith({
+        y: 600 + 300 - 120,
+        animated: true,
+      })
+    )
+  })
+
+  // /code-review 5: o leitor de tela do app só vai a um elemento de
+  // acessibilidade; o alvo do foco é o próprio título, não o contêiner
+  it('o alvo do foco é o título (header) da seção e do grupo', async () => {
+    await open(PRIORITIES, VIRTUES)
+    tab('Vantagens')
+    const group = screen.getByRole('header', { name: 'Virtudes' })
+    expect(group.props.nativeID).toBe('anchor-advantages-virtues')
+    tab('Ficha')
+    const section = screen.getByRole('header', { name: 'Habilidades' })
+    expect(section.props.nativeID).toBe('anchor-abilities')
+  })
+
+  // /code-review 7: a lista só é montada de novo quando a conta muda
+  it('mudar o que não é a conta não remonta a lista do guia', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const spy = jest.spyOn(guideModule, 'guideItems')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('fechar a conta tira o "Faltam" e mostra o "Concluir"', async () => {
+    await open(PRIORITIES, ALMOST)
+    expect(screen.getByTestId('creation-guide')).toBeTruthy()
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir criação'
+    )
+  })
+
+  // Achado 3 do onda-3 §11: a linha do próximo passo muda com o botão
+  it('fechar a conta muda a linha do próximo passo, e o anúncio sai uma vez', async () => {
+    await open(PRIORITIES, { ...ALMOST, stamina: 3, conscience: 3 })
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    const announce = jest.mocked(AccessibilityInfo.announceForAccessibility)
+    tab('Vantagens')
+    announce.mockClear()
+    step('Consciência')
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'A conta fechou: você conclui.'
+    )
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    // Os básicos fecharam na mesma passagem: só a folha anuncia
+    expect(announce.mock.calls).toEqual([
+      ['Pontos básicos distribuídos. Agora os pontos gastam bônus.'],
+    ])
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    // Abrir e fechar a conta de novo, sem a folha: o anúncio da conta
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Consciência' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'Você conclui quando a conta fechar.'
+    )
+    announce.mockClear()
+    step('Consciência')
+    expect(announce.mock.calls).toEqual([
+      ['A conta fechou. Você pode concluir pela barra.'],
+    ])
+  })
+
+  // /code-review 3: com a aprovação, o anúncio diz enviar, como o botão
+  it('com a aprovação, o anúncio da conta fechada diz enviar ao narrador', async () => {
+    const c = character(PRIORITIES, {
+      ...ALMOST,
+      stamina: 3,
+      conscience: 3,
+    }) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...c.data, creation: { ...c.data.creation, approval: true } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Pontos' })
+    tab('Vantagens')
+    step('Consciência')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Consciência' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    const announce = jest.mocked(AccessibilityInfo.announceForAccessibility)
+    announce.mockClear()
+    step('Consciência')
+    expect(announce.mock.calls).toEqual([
+      ['A conta fechou. Você pode enviar ao narrador pela barra.'],
+    ])
+    expect(screen.getByTestId('next-step')).toHaveTextContent(
+      'A conta fechou: envie ao narrador.'
+    )
+  })
+
+  it('na criação livre (Editar), nada de "Faltam"', async () => {
+    const free = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...free.data, creation: { ...free.data.creation, mode: 'free' } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    await screen.findByTestId('creation-ready')
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
+  })
+})
+
+// P05-D (R-18): a aba "Pontos" e o "O que falta" tocável; o "confirme com o
+// narrador" (o ponto de extensão do P07-D) separado do que falta
+describe('aba Pontos (R-18)', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it('a aba se chama "Pontos"; o "O que falta" tem um botão por item, que leva ao grupo', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const list = within(screen.getByTestId('creation-problems'))
+    expect(list.getByRole('header', { name: 'O que falta' })).toBeTruthy()
+    const items = list.getAllByRole('button')
+    // Sem o corte em 12: os 9 grupos do V20
+    expect(items).toHaveLength(9)
+    expect(items[0]).toHaveTextContent('Físicos: faltam 7 pontos básicos.')
+    const virtues = list.getByRole('button', {
+      name: 'Virtudes: faltam 7 pontos básicos.',
+    })
+    fireEvent.press(virtues)
+    expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeSelected()
+  })
+
+  // /code-review 1: uma zona sem aba (a identidade) não tem âncora; o toque
+  // leva à lista inteira, em vez de um pedido que nunca se resolve
+  it('alvo numa zona sem aba vai à lista do "O que falta"', async () => {
+    const notice: guideModule.GuideItem = {
+      key: 'confirm:identity',
+      kind: 'confirm',
+      short: 'Clã',
+      text: 'Confirme com o narrador: o clã.',
+      target: {
+        tab: 'identity',
+        section: 'about-facts',
+        group: null,
+        path: 'values.clan',
+      },
+    }
+    jest.spyOn(guideModule, 'useCreationNotices').mockReturnValue([notice])
+    await open(PRIORITIES)
+    tab('Pontos')
+    const scrollView = screen.UNSAFE_getAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollTo = jest.spyOn(scrollView, 'scrollTo')
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    layout('creation-panel', 0)
+    fireEvent.press(
+      within(screen.getByTestId('creation-notices')).getByRole('button')
+    )
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenCalledWith({ y: 480, animated: true })
+    )
+  })
+
+  it('o "confirme com o narrador" fica na aba e na confirmação, nunca no "Faltam"', async () => {
+    const notice: guideModule.GuideItem = {
+      key: 'confirm:gift',
+      kind: 'confirm',
+      short: 'Dom',
+      text: 'Confirme com o narrador: um Dom acima do Posto 1.',
+      target: null,
+    }
+    jest.spyOn(guideModule, 'useCreationNotices').mockReturnValue([notice])
+    await open(PRIORITIES, { ...ALMOST, stamina: 3 })
+    // A conta fechada: o aviso não esconde o "Concluir" nem entra no "Faltam"
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    tab('Pontos')
+    const block = within(screen.getByTestId('creation-notices'))
+    expect(
+      block.getByRole('header', { name: 'Para confirmar com o narrador' })
+    ).toBeTruthy()
+    expect(block.getByRole('button')).toHaveTextContent(
+      'Confirme com o narrador: um Dom acima do Posto 1.'
+    )
+    fireEvent.press(screen.getByTestId('creation-action'))
+    expect(
+      screen.getByText('1 item para confirmar com o narrador; veja em Pontos.')
+    ).toBeTruthy()
+  })
+})
+
+// P05-D (U-07): a fase em texto, com a troca manual como ação secundária
+describe('fase da conta em texto (U-07)', () => {
+  it('"Fase: pontos básicos", sem rádio; a troca manual vai e volta', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const panel = within(screen.getByTestId('creation-panel'))
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos básicos'
+    )
+    expect(panel.queryAllByRole('radio')).toHaveLength(0)
+    fireEvent.press(
+      panel.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    // Com os básicos faltando, dá para voltar
+    fireEvent.press(
+      panel.getByRole('button', { name: 'Voltar aos pontos básicos' })
+    )
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos básicos'
+    )
+  })
+
+  it('com os básicos fechados, a fase é a dos bônus, sem a volta', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    tab('Pontos')
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    expect(screen.queryByTestId('creation-phase-switch')).toBeNull()
   })
 })
 
@@ -747,8 +1149,14 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
     step('Vigor')
     expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
-    fireEvent.press(screen.getByRole('button', { name: 'Ver orçamento' }))
-    expect(screen.getByRole('radio', { name: 'Pontos de bônus' })).toBeChecked()
+    fireEvent.press(screen.getByRole('button', { name: 'Ver Pontos' }))
+    // A aba troca depois que a folha sai (onClosed), não no toque
+    expect(screen.queryByTestId('creation-phase')).toBeNull()
+    await sheetsDismissed()
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
     // Em Bônus, o grupo cheio passa
     tab('Ficha')
     step('Vigor')
@@ -756,6 +1164,67 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus · +1 = 5 bônus'
     )
+  })
+})
+
+// P05-D (U-07): a folha só na primeira passagem de cada ficha
+describe('folha de bônus uma vez (U-07)', () => {
+  const OTHER = '00000000-0000-4000-8000-00000000c202'
+  const decrement = (name: string) =>
+    fireEvent(screen.getByRole('adjustable', { name }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+
+  it('tirar e repor não reabre, nem numa tela nova da mesma ficha; outra ficha abre', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    decrement('Vigor')
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+    // Outra tela da mesma ficha: outro store, a mesma marca
+    cleanup()
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+    // Outra ficha: a folha abre
+    cleanup()
+    const c = character(PRIORITIES, ALMOST) as {
+      data: Record<string, unknown>
+    }
+    calls.characterGet.mockResolvedValue(ok({ ...c.data, id: OTHER }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={OTHER} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Pontos' })
+    step('Vigor')
+    expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
+  })
+
+  it('com bônus já gasto, a passagem não abre a folha (o caso do PO-A)', async () => {
+    // A Força de Vontade 2 acima da Coragem: 2 pontos de bônus gastos
+    await open(PRIORITIES, {
+      ...ALMOST,
+      willpower: { permanent: 5, current: 5 },
+    })
+    step('Vigor')
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+  })
+
+  it('quem trocou a fase à mão já sabe dos bônus: sem folha', async () => {
+    await open(PRIORITIES, ALMOST)
+    tab('Pontos')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    tab('Ficha')
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
   })
 })
 

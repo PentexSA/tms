@@ -37,6 +37,7 @@ import { CompletionMessage } from '../creation/CompletionMessage'
 import { useCreation } from '../creation/CreationContext'
 import { useFinishCreation, useFreebiesText } from '../creation/CreationPanel'
 import { completionBy, completionCopy } from '../creation/completion'
+import { GuideRow, useGuideItems } from '../creation/GuideRow'
 import { READY_COPY } from '../creation/nextStep'
 import { useNextStep } from '../creation/useNextStep'
 import { useDraftCount } from './hooks'
@@ -121,6 +122,8 @@ export function useModeBar({
   // O próximo passo (D-03): a linha da barra e o "Avisar que terminei"
   const step = useNextStep()
   const freebies = useFreebiesText()
+  // O "Faltam: …" (D-05, R-18): enquanto a conta está aberta
+  const guide = useGuideItems()
   const [summary, setSummary] = useState<{
     readonly next: SheetMode
     // Concluir a criação depois de salvar
@@ -289,6 +292,10 @@ export function useModeBar({
         label="Criação"
         detail={freebies}
         note={nextStepNote}
+        // No lugar do "Concluir", que só aparece com a conta fechada
+        guide={
+          !finishing.ready && guide.length ? <GuideRow items={guide} /> : null
+        }
         save={{
           // "Salvar" visível; o nome é o do Editar (WCAG 2.5.3: começa
           // pelo texto visível) e não colide com o "Salvar" do resumo
@@ -412,9 +419,10 @@ interface BarAction {
  * A barra de ação do rascunho: o texto ("Criação · N alterações") e as
  * ações. `save` está sempre; `next` é a ação seguinte (concluir ou enviar;
  * no Editar da criação livre, o aviso da D-03); `note` é uma linha sob o
- * texto (o próximo passo). No celular com duas ações (ou com a nota), e com
- * fonte grande, o texto fica em cima e as ações embaixo, numa linha que
- * quebra se não couber.
+ * texto (o próximo passo). `guide` é o "Faltam: …" da criação (P05-D), na
+ * linha das ações, antes do `save`, no lugar do `next` enquanto a conta está
+ * aberta. No celular com duas ações (ou com a nota), e com fonte grande, o
+ * texto fica em cima e as ações embaixo, numa linha que quebra se não couber.
  */
 function EvolveBar({
   count,
@@ -423,6 +431,7 @@ function EvolveBar({
   save,
   next = null,
   note = null,
+  guide = null,
 }: {
   readonly count: number
   readonly label?: string
@@ -431,10 +440,12 @@ function EvolveBar({
   readonly save: BarAction
   readonly next?: BarAction | null
   readonly note?: ReactNode
+  readonly guide?: ReactNode
 }) {
   const { colors } = useTheme()
   const { breakpoint, stacked } = useLayout()
-  const twoLines = stacked || (breakpoint === 'compact' && (next || note))
+  const twoLines =
+    stacked || (breakpoint === 'compact' && (next || note || guide))
   const text = (
     <Text
       variant="caption"
@@ -483,10 +494,14 @@ function EvolveBar({
       )}
       {twoLines ? (
         <View testID="mode-bar-actions" style={styles.barActions}>
+          {guide}
           {actions}
         </View>
       ) : (
-        actions
+        <>
+          {guide}
+          {actions}
+        </>
       )}
     </View>
   )

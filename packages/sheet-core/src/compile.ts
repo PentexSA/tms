@@ -280,6 +280,9 @@ export function withValueDeps(
         deps.push(...refs(max.from))
       if (def.perTurn) deps.push(...refs(def.perTurn.from))
     }
+    // O texto por opção (a Fraqueza) lê o `choice` de que depende
+    if ((def.type === 'text' || def.type === 'longText') && def.default)
+      deps.push(def.default.from)
     for (const d of deps) visit(d)
   }
   for (const id of ids) visit(id)

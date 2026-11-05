@@ -272,6 +272,70 @@ describe('publishTemplate', () => {
     })
   })
 
+  // P07-D: as quatro chaves novas passam pelas duas camadas (schema.json e
+  // validateTemplate). Nomes de Dom fictícios: o catálogo é do time.
+  const withNewKeys = () => {
+    const t = template('wta-w20')
+    const fields = t.fields as Record<string, Json>
+    const gifts = fields.gifts as Json
+    gifts.catalog = ['Faro do Asfalto', 'Passo de Neblina']
+    gifts.catalogDefaults = [
+      { meta: 'rank', value: 2, items: ['Passo de Neblina'] },
+    ]
+    gifts.recommend = {
+      outside: 'fora da Tribo',
+      by: [
+        {
+          from: 'tribe',
+          label: 'da Tribo',
+          map: { fianna: ['Faro do Asfalto'] },
+        },
+      ],
+    }
+    ;(t.creation as Json).advice = [
+      { rule: 'item-meta-max', targets: ['gifts'], meta: 'rank', max: 1 },
+    ]
+    return t
+  }
+
+  it('publica com recommend, catalogDefaults e creation.advice', async () => {
+    const t = withNewKeys()
+    expect(schemaIssues(t)).toEqual([])
+    expect((await publishTemplate(db, t)).status).toBe('published')
+  })
+
+  it('recommend inválido: o schema recusa a forma, o contrato recusa o nome', async () => {
+    const shape = withNewKeys()
+    const gifts = (shape.fields as Record<string, Json>).gifts as Json
+    gifts.recommend = { outside: '<b>x</b>', by: [] }
+    const bad = await rejection(publishTemplate(db, shape))
+    expect(bad.issues.length).toBeGreaterThan(0)
+    expect(bad.issues.every(i => i.stage === 'schema')).toBe(true)
+    // A forma certa, com um nome fora do catálogo: só o contrato pega
+    const names = withNewKeys()
+    const recommend = ((names.fields as Record<string, Json>).gifts as Json)
+      .recommend as { by: Json[] }
+    ;(recommend.by[0] as Json).map = { fianna: ['Dom Inventado'] }
+    expect(schemaIssues(names)).toEqual([])
+    const refused = await rejection(publishTemplate(db, names))
+    expect(refused.issues).toContainEqual({
+      stage: 'contract',
+      path: 'fields.gifts.recommend.by.0.map.fianna',
+      message: "'Dom Inventado' não está no catálogo",
+    })
+  })
+
+  it('o texto por opção (Fraqueza) com quebra de linha é recusado', async () => {
+    const t = template('vtm-v20')
+    const fields = t.fields as Record<string, Json>
+    ;(fields.weakness as Json).default = {
+      from: 'clan',
+      map: { brujah: 'uma\nduas' },
+    }
+    const error = await rejection(publishTemplate(db, t))
+    expect(error.issues[0]?.stage).toBe('schema')
+  })
+
   it('ciclo de teto (só o compile pega) também é recusado', async () => {
     const t = template('vtm-v20')
     const fields = t.fields as Record<string, Json>
