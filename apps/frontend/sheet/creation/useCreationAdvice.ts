@@ -2,7 +2,7 @@ import { creationAdvice } from '@tms/sheet-core'
 import { useSheetSelector } from '../context'
 import { type AdviceNotice, adviceNotices } from './creation'
 
-const same = (
+export const sameNotices = (
   a: readonly AdviceNotice[],
   b: readonly AdviceNotice[]
 ): boolean =>
@@ -25,5 +25,5 @@ const same = (
 export const useCreationAdvice = (): readonly AdviceNotice[] =>
   useSheetSelector(
     s => adviceNotices(s.model, creationAdvice(s.model, s.resolved)),
-    same
+    sameNotices
   )

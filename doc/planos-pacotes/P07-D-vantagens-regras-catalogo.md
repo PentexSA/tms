@@ -648,7 +648,67 @@ Perto do pacote, sem pacote (para o orquestrador): o achado 1 da [onda-3.md](ond
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
-*(A preencher na implementação.)*
+Implementação em 04/11/2026, na `pacote/p07-d-vantagens-regras`, em paralelo com o P05-D e o P10-C (cada um no seu worktree). Os pontos para o PO e as perguntas técnicas seguiram a recomendação deste plano; nada foi decidido aqui.
+
+**O que ficou fora, e por quê:**
+
+1. **O commit 8 entrou em parte.** Entraram o `recommend` das Disciplinas por clã (V20) e o da Esfera de afinidade por Tradição (M20). Ficaram fora:
+   - **o catálogo de Dons do W20** (`catalog`, `catalogDefaults`, `recommend` e `creation.advice` no `wta-w20.json`): espera a lista do time, com duas fontes, e a conferência da licença dos nomes. O W20 continua com o texto livre;
+   - **os 13 resumos da Fraqueza** (`weakness.default`): o time escreve. A `weakness.help` não mudou, porque a frase nova só faz sentido com o resumo.
+
+   O mecanismo dos dois entrou (contrato, motor e tela), testado com dados fictícios (`test/fixtures.ts`, `templateWithIdentity`; nenhum nome de Dom nem resumo do livro).
+2. **O mapa Tradição → Esferas do M20 é dado de jogo a conferir.** São só ids do template, mas o plano pedia duas fontes (§3.10). O mapa foi montado numa fonte só e precisa da conferência do time antes do merge na `main`:
+
+   | Tradição | Esferas recomendadas |
+   |---|---|
+   | Ordem de Hermes | Forças |
+   | Coro Celestial | Forças, Primórdio, Espírito |
+   | Culto do Êxtase | Vida, Mente, Tempo |
+   | Eutanatos | Entropia, Vida, Espírito |
+   | Irmandade Akáshica | Vida, Mente |
+   | Sonhadores | Forças, Vida, Matéria, Espírito |
+   | Verbena | Forças, Vida |
+   | Sociedade do Éter | Forças, Matéria, Primórdio |
+   | Adeptos da Virtualidade | Correspondência, Forças |
+   | Órfão | (nenhuma) |
+3. **O passo do catálogo no `journey-werewolf.spec.ts`** não entrou: sem catálogo no produto, o spec continua provando o texto livre como já fazia.
+4. **O alternativo do −/+ do Posto na linha do Dom** não entrou (ponto 7 do PO): a linha mostra "Posto N", e o Posto muda na folha.
+
+**Dependências em paralelo (o rebase é do orquestrador):**
+
+5. **P10-C.** O "−" da linha usa o `Stepper` de hoje, sem a previsão. O lugar está marcado no `ItemEditorRow` (comentário "O "−" ganha a previsão com o Stepper.decrease do P10-C"). Os blocos "Do clã" / "Outras" ficam na ordem do template: o `byLabel` entra dentro de cada bloco, em `optionBlocks` (`ListEditor.tsx`).
+6. **P05-D.**
+   - Os avisos saem do `useCreationAdvice()` (`sheet/creation/useCreationAdvice.ts`), com itens `{ key, kind: 'confirm', text, field, paths }` (`AdviceNotice`, `adviceNotices` e `adviceText` em `creation.ts`). No rebase, eles viram o corpo do `useCreationNotices` do P05-D.
+   - Até lá, a aba de pontos os mostra num bloco "Para confirmar com o narrador" (`creation-advice`), depois do "O que falta", só texto. É o nome do bloco do onda-4.md §4.2.
+   - A linha nas `notes` da confirmação de concluir ("1 item para confirmar com o narrador; veja em Pontos.") não entrou: ela é da confirmação, que o P05-D desenha.
+   - Os specs ainda usam a aba "Orçamento".
+
+**Desvios de desenho:**
+
+7. **"Usar o resumo do clã" tira o texto gravado, em vez de gravar o resumo.** O efeito na tela é o mesmo (o campo mostra o resumo), e a ficha volta a seguir o Clã, como quem nunca escreveu. O rascunho leva o evento "texto → vazio". Os textos dizem o nome da opção, não "do clã", porque o app não cita termo de sistema: "Usar o resumo de Brujah", "Trocar o seu texto pelo resumo de Brujah?" e, na linha, "Resumo de Brujah; edite para trocar.".
+8. **As frases genéricas** (rascunho do time, para revisão), sem artigo de gênero, que o template não diz:
+   - "Escolha Clã na identidade para ver as recomendações.";
+   - "Posto 2: na criação, vai até 1. Confirme com o narrador.";
+   - "Dons: 1 com Posto acima de 1.";
+   - "Disciplinas: 2 fora do clã." e "Esfera de afinidade: fora da Tradição.";
+   - "Busque pelo nome para ver o restante da lista." (catálogo acima de 40 nomes, sem busca).
+
+   O título do bloco é o selo com a primeira letra maiúscula ("Do clã"); com mais de uma fonte, ele leva a opção ("Da Raça · Lupino").
+9. **A prévia do item novo** diz "Entra com os pontos básicos (faltam 2 de 3)." no lugar de "Entra com 1 ponto básico (faltam 2 de 3).": a mesma frase serve aos grupos de pontos e de itens.
+10. **Ficha ativa:** o −/+ da linha usa a política da classe `advance` (`useClassNote`), não a do campo. A lista em si é `edit` (o nome e as notas seguem livres), e o `useBlockedNote(list.id)` do plano não desabilitaria nada. "Peça ao narrador." aparece uma vez, acima dos itens.
+11. **"Fora do clã" e "Posto N" só com a ficha em `creating`** (o `LifecycleContext`), nos dois modos de criação. O selo aparece também no Editar da ficha ativa.
+12. **O "+" sem saldo no app.** No app, o controle ajustável continua sem `aria-disabled`, e a dica diz o motivo. O `aria-disabled` é do web, conferido no E2E. É o comportamento do `Stepper` de hoje (`increase.blocked`).
+
+**O que mudou fora da §8.5:**
+
+- `apps/frontend/sheet/evolve/recommend.ts` (novo): os textos e o `useIdentityAdvice`;
+- `apps/frontend/sheet/creation/useCreationAdvice.ts` (novo);
+- `apps/frontend/test/fixtures.ts`: `templateWithIdentity` e `GIFTS`, fictícios;
+- `packages/sheet-core/src/compile.ts`: o `withValueDeps` leva o `choice` do texto por opção;
+- `e2e/tests/evolve.spec.ts` e `journey.spec.ts`: "Taumaturgia, do clã";
+- o `ResolvedText` ganhou `defaulted`.
+
+**Testes:** ver a seção 4.1. Os do servidor (commit 1) passam antes e depois, e rodam com os templates do repositório, já com o `recommend`. O E2E e o roteiro manual (seção 11) ficam para a integração.
 
 ---
 
