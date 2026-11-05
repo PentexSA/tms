@@ -6,7 +6,12 @@ import { AccessibilityInfo, Dimensions } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
-import { modelOf, templateJson } from '../../../test/fixtures'
+import {
+  GIFTS,
+  modelOf,
+  templateJson,
+  templateWithIdentity,
+} from '../../../test/fixtures'
 import { textInput } from '../../../test/queries'
 import {
   json,
@@ -71,6 +76,8 @@ const PRIORITIES = {
 interface Options {
   readonly system?: 'vtm-v20' | 'wta-w20' | 'mta-m20'
   readonly mode?: 'points' | 'free'
+  // O template com `recommend` e `creation.advice` de teste (P07-D)
+  readonly identity?: boolean
 }
 
 const character = (
@@ -114,8 +121,9 @@ const character = (
 
 async function open(values?: Record<string, unknown>, options: Options = {}) {
   calls.characterGet.mockResolvedValue(character(values, options))
+  const system = options.system ?? 'vtm-v20'
   calls.templateGet.mockResolvedValue(
-    ok(templateJson(options.system ?? 'vtm-v20'))
+    ok(options.identity ? templateWithIdentity(system) : templateJson(system))
   )
   const { session } = testSession(
     () => json(200, tokens()),
@@ -391,6 +399,104 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     )
     // É o erro do próprio campo, não uma frase solta ao lado dele
     expect(screen.queryByTestId('notice-disciplines')).toBeNull()
+  })
+})
+
+describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
+  it('Brujah: "Do clã" com as 3 e "Outras" com as 14; Dominação entra e a linha avisa, sem bloquear', async () => {
+    await open({ clan: 'brujah' }, { identity: true })
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const sheet = within(screen.getByTestId('add-sheet-disciplines'))
+    expect(sheet.getByRole('header', { name: 'Do clã' })).toBeTruthy()
+    expect(sheet.getByRole('header', { name: 'Outras' })).toBeTruthy()
+    const clan = within(screen.getByTestId('add-block-by-clan'))
+    expect(
+      clan
+        .getAllByRole('button', { name: /, do clã$/ })
+        .map(b => b.props.accessibilityLabel)
+    ).toEqual(['Rapidez, do clã', 'Potência, do clã', 'Presença, do clã'])
+    expect(
+      within(screen.getByTestId('add-block-others')).getAllByRole('button')
+    ).toHaveLength(14)
+    fireEvent.press(sheet.getByRole('button', { name: 'Dominação' }))
+    // Entrou (nada bloqueia) e a linha diz o "fora", só na criação
+    expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
+    const line = screen.getByTestId('identity-disciplines-i1')
+    expect(line).toHaveTextContent('fora do clã: confirme com o narrador')
+    // O "O que falta" ganha o aviso, sem virar problema
+    tab('Orçamento')
+    expect(screen.getByTestId('creation-advice')).toHaveTextContent(
+      /Disciplinas: 1 fora do clã\./
+    )
+    expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
+      /fora do clã/
+    )
+  })
+
+  it('a Disciplina do clã leva o selo na linha e no nome acessível', async () => {
+    await open(
+      {
+        clan: 'brujah',
+        disciplines: [{ id: 'd1', name: 'Potência', value: 1 }],
+      },
+      { identity: true }
+    )
+    expect(
+      screen.getByRole('button', { name: 'Potência, 1 de 5, do clã' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('identity-disciplines-d1')).toHaveTextContent(
+      'do clã'
+    )
+    expect(screen.getByTestId('identity-disciplines-d1')).not.toHaveTextContent(
+      /fora/
+    )
+  })
+})
+
+describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
+  const LUPINO = { breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' }
+
+  it('Dom de Posto 2 do catálogo entra com Posto 2; a linha e o "O que falta" avisam; o "Concluir" não muda', async () => {
+    await open(LUPINO, { system: 'wta-w20', identity: true })
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'neblina')
+    fireEvent.press(
+      screen.getByRole('button', { name: `${GIFTS.rank2}, Posto 2` })
+    )
+    const row = screen.getByRole('button', { name: /^Passo de Neblina/ })
+    expect(row.props.accessibilityLabel).toMatch(/Posto 2/)
+    expect(screen.getByTestId('identity-gifts-i1')).toHaveTextContent(
+      /Posto 2: na criação, vai até 1\. Confirme com o narrador\./
+    )
+    expect(screen.getByTestId('identity-gifts-i1')).toHaveTextContent(
+      /fora da Raça, do Augúrio e da Tribo: confirme com o narrador/
+    )
+    tab('Orçamento')
+    const advice = screen.getByTestId('creation-advice')
+    expect(advice).toHaveTextContent(/Dons: 1 com Posto acima de 1\./)
+    expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
+      /Posto/
+    )
+  })
+
+  it('o Dom recomendado de Posto 1 não avisa', async () => {
+    await open(
+      {
+        ...LUPINO,
+        gifts: [{ id: 'g1', name: GIFTS.tribe, meta: { rank: 1 } }],
+      },
+      { system: 'wta-w20', identity: true }
+    )
+    expect(screen.getByTestId('identity-gifts-g1')).toHaveTextContent(
+      'da Tribo'
+    )
+    expect(screen.getByTestId('identity-gifts-g1')).not.toHaveTextContent(
+      /confirme/
+    )
+    tab('Orçamento')
+    expect(screen.queryByTestId('creation-advice')).toBeNull()
   })
 })
 

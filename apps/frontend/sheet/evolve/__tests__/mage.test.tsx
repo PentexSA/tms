@@ -4,7 +4,8 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native'
-import { example, modelOf } from '../../../test/fixtures'
+import { compileTemplate } from '@tms/sheet-core'
+import { example, modelOf, templateWithIdentity } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
@@ -90,6 +91,47 @@ describe('afinidade', () => {
     fireEvent.press(screen.getByRole('radio', { name: 'Matéria' }))
     await waitFor(() => expect(screen.getByTestId('badge-matter')).toBeTruthy())
     expect(screen.queryByTestId('badge-forces')).toBeNull()
+  })
+})
+
+describe('R-26: a Esfera de afinidade pela Tradição', () => {
+  const m20 = compileTemplate(templateWithIdentity('mta-m20'))
+  const open = async (values: Record<string, unknown>) => {
+    const sheet = { values: { name: 'Nova', ...values }, specialties: {} }
+    await renderLive(
+      { model: m20, sheet, mode: 'evolve' },
+      fakeServer(m20, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+  }
+
+  it('Verbena: as da Tradição vêm primeiro, com "da Tradição" no nome do rádio', async () => {
+    await open({ tradition: 'verbena' })
+    fireEvent.press(
+      screen.getByRole('button', { name: /^Esfera de afinidade/ })
+    )
+    // Os rádios da folha (fora os do seletor de modo, Jogo e Editar)
+    const radios = screen
+      .getAllByRole('radio')
+      .map(r => r.props.accessibilityLabel as string)
+      .filter(l => !['Jogo', 'Editar', 'Leitura'].includes(l))
+    expect(radios.slice(0, 2)).toEqual([
+      'Forças, da Tradição',
+      'Vida, da Tradição',
+    ])
+    expect(radios).toContain('Tempo')
+  })
+
+  it('na criação, a escolha fora da Tradição avisa sob o valor, sem bloquear', async () => {
+    await open({ tradition: 'verbena', affinity: 'time' })
+    expect(screen.getByTestId('identity-affinity')).toHaveTextContent(
+      'fora da Tradição: confirme com o narrador'
+    )
+  })
+
+  it('dentro da Tradição, ou sem Tradição, nada avisa', async () => {
+    await open({ tradition: 'verbena', affinity: 'life' })
+    expect(screen.queryByTestId('identity-affinity')).toBeNull()
   })
 })
 

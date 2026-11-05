@@ -1,4 +1,5 @@
 import {
+  type CreationAdvice,
   type CreationCheck,
   type CreationChoices,
   type CreationComponent,
@@ -258,6 +259,60 @@ export function problemText(
       return `${field}: abaixo do valor inicial.`
   }
 }
+
+/**
+ * Um aviso que não bloqueia (D-07, D-09), como frase: rótulos do template e
+ * números, nunca o nome que o jogador digitou. Não entra no "Faltam" da
+ * barra nem esconde o "Concluir": a conta não o lê. Rascunho do time.
+ */
+export function adviceText(model: SheetModel, a: CreationAdvice): string {
+  const def = model.fields.get(a.field)?.def
+  const label = def?.label ?? 'Um campo'
+  if (a.code === 'ADVICE_OUTSIDE') {
+    const outside =
+      def?.type === 'list' || def?.type === 'choice'
+        ? (def.recommend?.outside ?? 'fora do recomendado')
+        : 'fora do recomendado'
+    return def?.type === 'choice'
+      ? `${label}: ${outside}.`
+      : `${label}: ${a.amount} ${outside}.`
+  }
+  const rule = model.template.creation?.advice?.find(r =>
+    r.targets.includes(a.field)
+  )
+  const meta =
+    def?.type === 'list' && rule
+      ? def.item.meta?.find(m => m.id === rule.meta)
+      : undefined
+  return meta && rule
+    ? `${label}: ${a.amount} com ${meta.label} acima de ${rule.max}.`
+    : `${label}: ${a.amount} acima do limite da criação.`
+}
+
+/**
+ * Os avisos como itens do "O que falta" (`kind: 'confirm'`): o texto e o
+ * alvo (o campo e os caminhos). O P05-D os desenha como itens tocáveis no
+ * `useCreationNotices`; até lá, o painel os mostra como texto.
+ */
+export interface AdviceNotice {
+  readonly key: string
+  readonly kind: 'confirm'
+  readonly text: string
+  readonly field: FieldId
+  readonly paths: readonly string[]
+}
+
+export const adviceNotices = (
+  model: SheetModel,
+  advice: readonly CreationAdvice[]
+): readonly AdviceNotice[] =>
+  advice.map(a => ({
+    key: `${a.code}:${a.field}`,
+    kind: 'confirm',
+    text: adviceText(model, a),
+    field: a.field,
+    paths: a.paths,
+  }))
 
 /** O botão de concluir conforme quem conclui e a aprovação (§3.4). */
 export function completeLabel(

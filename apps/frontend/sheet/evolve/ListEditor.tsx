@@ -2,6 +2,7 @@ import {
   editClass,
   type ListItem,
   type ResolvedList,
+  type ResolvedSheet,
   stored,
 } from '@tms/sheet-core'
 import {
@@ -17,7 +18,7 @@ import {
 } from '@tms/ui'
 import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
-import { useSheetStore } from '../context'
+import { useSheet, useSheetStore } from '../context'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -34,7 +35,15 @@ import {
   useFieldIssue,
   useSetDraft,
 } from './hooks'
-import { withItemDefaults } from './listItem'
+import { withCatalogDefaults, withItemDefaults } from './listItem'
+import {
+  badgeText,
+  chooseText,
+  type IdentityAdvice,
+  itemAdviceLines,
+  missingSources,
+  useIdentityAdvice,
+} from './recommend'
 import { fold, nextItemId, noneOf } from './text'
 import { useRowFeedback } from './useRowFeedback'
 
@@ -89,7 +98,10 @@ function cleanItem(item: ListItem): ListItem {
 
 export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const { colors } = useTheme()
+  const { model } = useSheet()
   const store = useSheetStore()
+  // O selo da identidade e os avisos da criação (D-07, D-09)
+  const identity = useIdentityAdvice(resolved.id, sheet)
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   // Ficha ativa: mudar o valor do item é evolução e pede o narrador, como
@@ -126,10 +138,14 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
     const value = def.item.value
       ? Math.min(def.item.value.max, Math.max(def.item.value.min ?? 0, 1))
       : undefined
-    // Com o mínimo dos metas numéricos: o valor que o editor mostra (T-23)
+    // Com o meta do catálogo (o Posto do Dom, T-24) e o mínimo dos metas
+    // numéricos: o valor que o editor mostra (T-23)
     const item = withItemDefaults(
       def,
-      def.item.aspect ? { id, text: name } : { id, name, value }
+      withCatalogDefaults(
+        def,
+        def.item.aspect ? { id, text: name } : { id, name, value }
+      )
     )
     const refused = write([...items, item])
     if (!refused) setAdding(false)
@@ -137,6 +153,18 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   }
   const current = items.find(i => i.id === editing)
   const border = { borderBottomColor: colors.borderSubtle }
+  const badge = (item: ListItem) =>
+    badgeText(identity.recommended.get(itemTitle(list, item)))
+  // O nome acessível leva o selo: "Potência, 2 de 5, do clã"
+  const label = (item: ListItem) =>
+    [describeItem(list, item), badge(item)].filter(Boolean).join(', ')
+  const below = (item: ListItem) => (
+    <IdentityLines
+      field={`${list.id}-${item.id}`}
+      badge={badge(item)}
+      lines={itemAdviceLines(model, list.id, item, identity)}
+    />
+  )
   return (
     <View testID={`editor-${list.id}`} style={styles.wrap}>
       {headed ? null : <ListHeader resolved={list} sheet={sheet} />}
@@ -151,26 +179,30 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
             key={item.id}
             list={list}
             item={item}
+            label={label(item)}
             blocked={blocked !== null}
             onOpen={() => open(item.id)}
             onStep={value => step(item, value)}
+            below={below(item)}
           />
         ) : (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={describeItem(list, item)}
-            accessibilityValue={
-              itemValue(list, item) !== undefined
-                ? { text: String(itemValue(list, item)) }
-                : undefined
-            }
-            accessibilityHint="Abre o item"
-            onPress={() => open(item.id)}
-            style={[styles.row, border]}
-          >
-            <ItemLine list={list} item={item} />
-          </Pressable>
+          <View key={item.id} style={[styles.plain, border]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={label(item)}
+              accessibilityValue={
+                itemValue(list, item) !== undefined
+                  ? { text: String(itemValue(list, item)) }
+                  : undefined
+              }
+              accessibilityHint="Abre o item"
+              onPress={() => open(item.id)}
+              style={styles.row}
+            >
+              <ItemLine list={list} item={item} />
+            </Pressable>
+            {below(item)}
+          </View>
         )
       )}
       {!list.items.length ? (
@@ -200,6 +232,8 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
       <AddItemSheet
         visible={adding}
         list={list}
+        sheet={sheet}
+        identity={identity}
         onClose={() => setAdding(false)}
         onAdd={add}
       />
@@ -225,17 +259,111 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   )
 }
 
+/** O selo e os avisos da identidade sob o nome do item (R-26, T-24). */
+function IdentityLines({
+  field,
+  badge,
+  lines,
+}: {
+  readonly field: string
+  readonly badge: string
+  readonly lines: readonly string[]
+}) {
+  if (!badge && !lines.length) return null
+  return (
+    <View testID={`identity-${field}`} style={styles.identity}>
+      {badge ? (
+        <Text variant="caption" color="inkMuted">
+          {badge}
+        </Text>
+      ) : null}
+      {lines.map(line => (
+        <Text key={line} variant="caption" color="inkMuted">
+          {line}
+        </Text>
+      ))}
+    </View>
+  )
+}
+
+// Com o catálogo maior que isto, a folha sem busca mostra só as
+// recomendadas, e o resto pela busca (um Modal com 100 botões no Android)
+const OTHERS_MAX = 40
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+interface OptionBlock {
+  readonly key: string
+  readonly title: string | null
+  readonly names: readonly string[]
+}
+
+/**
+ * As opções da folha em blocos (R-26): as recomendadas pela identidade
+ * primeiro, com o título da fonte ("Do clã"; com mais de uma fonte, "Da Raça
+ * · Lupino"), e depois as outras. Com busca, as que casam, recomendadas na
+ * frente. Dentro de cada bloco, a ordem do template (o P10-C ordena pelo
+ * rótulo no rebase).
+ */
+function optionBlocks(
+  list: ResolvedList,
+  sheet: ResolvedSheet,
+  identity: IdentityAdvice,
+  query: string,
+  options: readonly string[]
+): readonly OptionBlock[] {
+  const { recommend, recommended } = identity
+  if (!recommend || !recommended.size)
+    return [{ key: 'all', title: null, names: options }]
+  if (query.trim()) {
+    const first = options.filter(n => recommended.has(n))
+    const rest = options.filter(n => !recommended.has(n))
+    return [{ key: 'search', title: null, names: [...first, ...rest] }]
+  }
+  const catalog = list.field.def.catalog ?? []
+  const seen = new Set<string>()
+  const blocks: OptionBlock[] = []
+  for (const source of recommend.by) {
+    const r = sheet.get(source.from)
+    if (r?.type !== 'choice' || !r.option) continue
+    const mapped = Object.hasOwn(source.map, r.option.id)
+      ? (source.map[r.option.id] ?? [])
+      : []
+    const names = catalog.filter(n => mapped.includes(n) && !seen.has(n))
+    for (const n of names) seen.add(n)
+    if (!names.length) continue
+    const title = capitalize(source.label)
+    blocks.push({
+      key: `by-${source.from}`,
+      title: recommend.by.length > 1 ? `${title} · ${r.option.label}` : title,
+      names,
+    })
+  }
+  if (catalog.length <= OTHERS_MAX)
+    blocks.push({
+      key: 'others',
+      title: 'Outras',
+      names: catalog.filter(n => !seen.has(n)),
+    })
+  return blocks
+}
+
 function AddItemSheet({
   visible,
   list,
+  sheet,
+  identity,
   onClose,
   onAdd,
 }: {
   readonly visible: boolean
   readonly list: ResolvedList
+  readonly sheet: ResolvedSheet
+  readonly identity: IdentityAdvice
   readonly onClose: () => void
   readonly onAdd: (name: string) => Write
 }) {
+  const { model } = useSheet()
   const [query, setQuery] = useState('')
   // Onde o aviso da recusa aparece (T-19): `option:<nome>` (a opção tocada),
   // `custom` (o botão do texto livre) ou `field` (o Enter no campo). O texto
@@ -289,6 +417,55 @@ function AddItemSheet({
     )
   }
   const noticeAt = (where: string) => (at === where ? notice.text : null)
+  const blocks = optionBlocks(list, sheet, identity, query, options)
+  const shown = blocks.reduce((n, b) => n + b.names.length, 0)
+  // Sem escolha na identidade, a lista fica neutra e diz o que escolher
+  const missing = identity.recommend
+    ? missingSources(model, sheet, identity.recommend)
+    : []
+  const choose =
+    identity.recommend && missing.length === identity.recommend.by.length
+      ? chooseText(missing)
+      : null
+  // O meta do catálogo de cada nome ("Posto 2"), no texto e no nome acessível
+  const metasOf = (name: string): string[] =>
+    (def.catalogDefaults ?? []).flatMap(d => {
+      if (!d.items.includes(name)) return []
+      const m = def.item.meta?.find(x => x.id === d.meta)
+      return m ? [`${m.label} ${d.value}`] : []
+    })
+  const option = (name: string) => {
+    const taken = have.has(fold(name))
+    const labels = identity.recommended.get(name) ?? []
+    const secondary = [...metasOf(name), ...labels]
+    const spoken = [name, ...secondary, ...(taken ? ['já na ficha'] : [])]
+    return (
+      <View key={name}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={spoken.join(', ')}
+          disabled={taken}
+          onPress={() => pick(name, `option:${name}`)}
+          style={styles.option}
+        >
+          <View style={styles.flex}>
+            <Text>{name}</Text>
+            {secondary.length ? (
+              <Text variant="caption" color="inkMuted">
+                {secondary.join(' · ')}
+              </Text>
+            ) : null}
+          </View>
+          {taken ? (
+            <Text variant="caption" color="inkMuted">
+              já na ficha
+            </Text>
+          ) : null}
+        </Pressable>
+        {noticeAt(`option:${name}`)}
+      </View>
+    )
+  }
   return (
     <BottomSheet
       visible={visible}
@@ -322,28 +499,26 @@ function AddItemSheet({
           {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
           onSubmitEditing={e => submit(e?.nativeEvent?.text ?? query)}
         />
-        {options.map(name => {
-          const taken = have.has(fold(name))
-          return (
-            <View key={name}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={taken ? `${name}, já na ficha` : name}
-                disabled={taken}
-                onPress={() => pick(name, `option:${name}`)}
-                style={styles.option}
-              >
-                <Text>{name}</Text>
-                {taken ? (
-                  <Text variant="caption" color="inkMuted">
-                    já na ficha
-                  </Text>
-                ) : null}
-              </Pressable>
-              {noticeAt(`option:${name}`)}
-            </View>
-          )
-        })}
+        {choose ? (
+          <Text variant="caption" color="inkMuted">
+            {choose}
+          </Text>
+        ) : null}
+        {blocks.map(block => (
+          <View key={block.key} testID={`add-block-${block.key}`}>
+            {block.title && block.names.length ? (
+              <Text variant="fieldLabel" accessibilityRole="header">
+                {block.title}
+              </Text>
+            ) : null}
+            {block.names.map(option)}
+          </View>
+        ))}
+        {!query.trim() && shown < (def.catalog?.length ?? 0) ? (
+          <Text variant="caption" color="inkMuted">
+            Busque pelo nome para ver o restante da lista.
+          </Text>
+        ) : null}
         {custom && !exact ? (
           <View style={styles.sheet}>
             <Button
@@ -370,6 +545,7 @@ function AddItemSheet({
 function ItemEditorRow({
   list,
   item,
+  label,
   blocked,
   onOpen,
   onStep,
@@ -377,6 +553,8 @@ function ItemEditorRow({
 }: {
   readonly list: ResolvedList
   readonly item: ListItem
+  // O nome acessível do botão do nome, com o selo
+  readonly label: string
   readonly blocked: boolean
   readonly onOpen: () => void
   readonly onStep: (value: number) => void
@@ -399,7 +577,7 @@ function ItemEditorRow({
       <View style={styles.line}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={describeItem(list, item)}
+          accessibilityLabel={label}
           accessibilityHint="Abre o item: nome, especialização e notas"
           onPress={onOpen}
           style={styles.name}
@@ -588,6 +766,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   sheet: { gap: tokens.space[3] },
+  plain: {
+    paddingBottom: tokens.space['0.5'],
+    borderBottomWidth: tokens.borderWidth.hair,
+  },
+  identity: {
+    gap: tokens.space['0.5'],
+    paddingHorizontal: tokens.layout.gutter,
+  },
   itemRow: {
     gap: tokens.space['0.5'],
     paddingVertical: tokens.space[1],

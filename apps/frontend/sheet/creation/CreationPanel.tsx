@@ -43,6 +43,7 @@ import {
   restam,
 } from './creation'
 import { RadioChips } from './RadioChips'
+import { useCreationAdvice } from './useCreationAdvice'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
 // a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
@@ -185,6 +186,9 @@ export function CreationPanel() {
   const { model, roles, store, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
   const phase = useSheetSelector(s => s.creationPhase)
+  // O que só avisa (D-07, D-09): depois do "O que falta", nunca em `danger`.
+  // Texto, sem toque: o P05-D faz os itens tocáveis (useCreationNotices)
+  const notices = useCreationAdvice()
   if (
     !creation?.active ||
     creation.status !== 'creating' ||
@@ -250,6 +254,20 @@ export function CreationPanel() {
             : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
+      {notices.length ? (
+        <View
+          style={styles.block}
+          accessibilityLabel="Para confirmar com o narrador"
+          testID="creation-advice"
+        >
+          <SectionHeader title="Para confirmar com o narrador" level="group" />
+          {notices.map(n => (
+            <Text key={n.key} variant="caption" color="inkMuted">
+              {n.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       {/* As "Regras da casa" gravam: só na Criação, nunca na Leitura (T-33) */}
       {storyteller && mode === 'create' ? <BudgetControls /> : null}
     </View>
