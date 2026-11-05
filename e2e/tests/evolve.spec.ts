@@ -42,6 +42,8 @@ test('criar, evoluir, salvar e recarregar', async ({ page }) => {
 
   await page.getByRole('tab', { name: 'Vantagens' }).click()
   await expect(page.getByText('Nenhuma Disciplina')).toBeVisible()
+  // T-66: o gênero pela regra do português
+  await expect(page.getByText('Nenhuma Qualidade')).toBeVisible()
   await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
   await page.getByLabel('Buscar Disciplina').fill('tauma')
   await page.getByRole('button', { name: 'Taumaturgia', exact: true }).click()

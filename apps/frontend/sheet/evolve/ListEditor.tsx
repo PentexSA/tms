@@ -4,14 +4,14 @@ import {
   Button,
   Pressable,
   Stepper,
-  type StepperIncrease,
+  type StepperAdvice,
   Text,
   TextArea,
   TextField,
   tokens,
   useTheme,
 } from '@tms/ui'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheetStore } from '../context'
 import { useStepAdvice } from '../creation/useStepAdvice'
@@ -27,7 +27,7 @@ import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
 import { useDraftNotice, useFieldIssue, useSetDraft } from './hooks'
 import { withItemDefaults } from './listItem'
-import { fold, nextItemId, noneOf } from './text'
+import { byLabel, fold, nextItemId, noneOf } from './text'
 
 // list em Evoluir (DS: Repeater / ListEditor). O esquema do item vem do
 // template (`item.value`, `specialty`, `notes`, `meta`): Disciplinas do
@@ -204,11 +204,14 @@ function AddItemSheet({
   const notice = useListNotice(list)
   const def = list.field.def
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
+  // Na ordem do rótulo, não na do array do template (T-60); a busca
+  // preserva a ordem
+  const catalog = useMemo(() => byLabel(def.catalog ?? []), [def.catalog])
   const match = (text: string) => {
     const q = fold(text)
     return {
-      options: (def.catalog ?? []).filter(name => fold(name).includes(q)),
-      exact: (def.catalog ?? []).find(name => fold(name) === q),
+      options: catalog.filter(name => fold(name).includes(q)),
+      exact: catalog.find(name => fold(name) === q),
       custom: text.trim(),
     }
   }
@@ -329,7 +332,7 @@ function useItemAdvice(
   item: ListItem,
   draft: ListItem,
   refused: boolean
-): { readonly stepper?: StepperIncrease; readonly note: ReactNode } {
+): { readonly stepper?: StepperAdvice; readonly note: ReactNode } {
   const advice = useStepAdvice(`values.${list.id}#${item.id}`)
   const min = list.field.def.item.value?.min ?? 0
   const fresh = (draft.value ?? min) === (item.value ?? min)

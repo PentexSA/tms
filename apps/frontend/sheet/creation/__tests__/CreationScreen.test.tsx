@@ -7,15 +7,16 @@ import {
   within,
 } from '@testing-library/react-native'
 import { effectiveCreationConfig } from '@tms/sheet-core'
+import { Stepper } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRouter } from 'expo-router'
 import {
   AccessibilityInfo,
   Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
 } from 'react-native'
-
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { modelOf, templateJson } from '../../../test/fixtures'
@@ -388,6 +389,85 @@ describe('"+" com a previsão da conta', () => {
       screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
         .props.accessibilityHint
     ).toBe('+1 = 1 bônus')
+  })
+})
+
+// T-85: o "−" no valor inicial tem a cara de indisponível, continua
+// tocável, e o toque diz de onde vem o inicial sem descer
+describe('"−" no valor inicial', () => {
+  it('FdV na Coragem 3: a dica junta os dois lados, e o "−" não desce', async () => {
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const control = () =>
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' })
+    expect(control().props.accessibilityHint).toBe(
+      'Aumentar: +1 = 1 bônus. Diminuir: Na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(screen.getByTestId('notice-willpower')).toHaveTextContent(
+      'Força de Vontade: na criação, não fica abaixo de 3 (vem de Coragem).'
+    )
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    // Comprar 1 e voltar deixa o "−" livre no 4 e zera o contador
+    step('Força de Vontade permanente')
+    expect(control()).toHaveAccessibilityValue({ now: 4 })
+    expect(control().props.accessibilityHint).toBe('+1 = 1 bônus')
+    fireEvent(control(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(control()).toHaveAccessibilityValue({ now: 3 })
+    expect(screen.getByText(/0 alterações/)).toBeTruthy()
+  })
+})
+
+// Achados 3 e 6 do /code-review (P10-C): acima do inicial, segurar o "−"
+// para no inicial; no web, o "−" bloqueado aponta a própria descrição, e o
+// aviso do "−" não vira a descrição do "+"
+describe('"−" no valor inicial: segurar e descrição', () => {
+  const realOS = Platform.OS
+  const setOS = (os: string) =>
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+  afterEach(() => setOS(realOS))
+
+  it('no app, o "−" acima do inicial leva o stop do inicial', async () => {
+    await open(PRIORITIES, {
+      courage: 3,
+      willpower: { permanent: 6, current: 6 },
+    })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const steppers = screen.UNSAFE_getAllByType(Stepper)
+    const row = steppers.find(
+      x => x.props.label === 'Força de Vontade permanente'
+    )
+    expect(row?.props.decrease).toMatchObject({ blocked: false, stop: 3 })
+  })
+
+  it('no web, o "−" bloqueado sem aviso aponta a descrição dele', async () => {
+    setOS('web')
+    await open(PRIORITIES, { courage: 3 })
+    fireEvent.press(screen.getByRole('button', { name: 'Em jogo' }))
+    const less = () =>
+      screen.getByRole('button', {
+        name: 'Diminuir Força de Vontade permanente',
+      })
+    const more = () =>
+      screen.getByRole('button', {
+        name: 'Aumentar Força de Vontade permanente',
+      })
+    expect(less().props['aria-describedby']).toBe('advice-down-willpower')
+    expect(
+      screen.getByTestId('advice-down-willpower', {
+        includeHiddenElements: true,
+      })
+    ).toHaveTextContent('Na criação, não fica abaixo de 3 (vem de Coragem).')
+    // O toque recusado abre o aviso do "−": ele passa a descrevê-lo, e o
+    // "+" não aponta o aviso que não é dele
+    fireEvent.press(less())
+    expect(screen.getByTestId('notice-willpower')).toBeTruthy()
+    expect(less().props['aria-describedby']).toBe('notice-willpower')
+    expect(more().props['aria-describedby']).not.toBe('notice-willpower')
   })
 })
 

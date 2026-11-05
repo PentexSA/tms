@@ -31,7 +31,11 @@ const SAVE_WIDTH = 86
 export function useGuideItems(): readonly GuideItem[] {
   const { model, roles } = useSheet()
   const check = useSheetSelector(s => s.check)
-  return useMemo(() => guideItems(model, check, roles), [model, check, roles])
+  const resolved = useSheetSelector(s => s.resolved)
+  return useMemo(
+    () => guideItems(model, check, roles, resolved),
+    [model, check, roles, resolved]
+  )
 }
 
 export function GuideRow({ items }: { readonly items: readonly GuideItem[] }) {

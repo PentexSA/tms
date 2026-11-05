@@ -4,6 +4,7 @@ import {
   canReadSection,
   type FieldId,
   fieldRank,
+  type ResolvedSheet,
   type RoleName,
   type SheetModel,
 } from '@tms/sheet-core'
@@ -125,7 +126,9 @@ const fieldLabel = (model: SheetModel, field: FieldId): string =>
 export function guideItems(
   model: SheetModel,
   check: CreationCheck | null,
-  roles: ReadonlySet<RoleName>
+  roles: ReadonlySet<RoleName>,
+  // A ficha resolvida, para o texto dizer de onde vem o inicial (P10-C, T-85)
+  resolved?: ResolvedSheet
 ): readonly GuideItem[] {
   if (!check || check.complete) return []
   const ranked: { readonly item: GuideItem; readonly rank: number }[] = []
@@ -164,7 +167,7 @@ export function guideItems(
       continue
     }
     const key = `${p.code}:${p.budget ?? ''}:${p.group ?? ''}:${p.paths.join(',')}`
-    const text = problemText(model, check, p)
+    const text = problemText(model, check, p, resolved)
     if (p.code === 'CREATION_FREEBIES_EXCEEDED') {
       // Não é de um grupo: leva à aba Pontos, ao "Onde foram os bônus"
       ranked.push({

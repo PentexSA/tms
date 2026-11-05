@@ -238,6 +238,7 @@ export function NumberEditorRow(props: FieldViewProps) {
           onValuePress={blocked ? undefined : open}
           valueNativeID={valueId}
           increase={feedback.increase}
+          decrease={feedback.decrease}
         />
       )}
     </EditorShell>

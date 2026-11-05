@@ -50,6 +50,34 @@ test('criar a ficha pela identidade e abri-la', async ({ page }) => {
   ).toBeVisible()
 })
 
+// T-60: as sugestões na ordem do rótulo em português (o normalize('NFD') do
+// WebKit também), não na do livro em inglês
+test('as sugestões da Natureza vêm na ordem do rótulo', async ({ page }) => {
+  const context = page.context()
+  const user = await signUp(context, 'ordem_t60')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica', systemCode: 'vtm-v20' }
+  )
+  await page.goto(`/chronicles/${chronicle.id}/new-character`)
+  await page
+    .getByRole('button', { name: 'Escolher da lista: Natureza' })
+    .click()
+  const chips = page.getByTestId('suggest-nature-list').getByRole('button')
+  const names = (await chips.allTextContents()).map(t => t.trim())
+  expect(names.slice(0, 5)).toEqual([
+    'Arquiteto',
+    'Autocrata',
+    'Bon Vivant',
+    'Caçador de Emoções',
+    'Camaleão',
+  ])
+  expect(names.slice(-3)).toEqual(['Trapaceiro', 'Valentão', 'Visionário'])
+})
+
 test('sem nome não cria', async ({ page }) => {
   const context = page.context()
   const user = await signUp(context, 'sem_nome')
