@@ -315,7 +315,9 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
   it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
     await open(THREE)
     tab('Pontos')
-    fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
     tab('Ficha')
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))

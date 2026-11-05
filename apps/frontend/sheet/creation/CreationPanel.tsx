@@ -46,7 +46,6 @@ import {
 import { useGuideItems } from './GuideRow'
 import { confirmNote, type GuideItem, useCreationNotices } from './guide'
 import { CLOSED_COPY } from './nextStep'
-import { RadioChips } from './RadioChips'
 
 // O modo de criação (doc/plano-v4.md, Etapa 5). A distribuição fica na ficha;
 // a conta (o que os pontos gastam, saldo de bônus, o que falta) fica na aba
@@ -54,14 +53,6 @@ import { RadioChips } from './RadioChips'
 // a conta fechada, a conclusão ao lado (D-01). As prioridades ficam no
 // cabeçalho de cada grupo (CreationCounter). Concluir exige rede, rascunho
 // salvo e a fila confirmada: a conclusão nunca confirma escolhas ainda locais.
-
-const PHASES: readonly {
-  readonly id: CreationPhase
-  readonly label: string
-}[] = [
-  { id: 'basics', label: 'Pontos básicos' },
-  { id: 'freebies', label: 'Pontos de bônus' },
-]
 
 /** A criação por pontos em `creating`: a aba Pontos e o botão concluir. */
 export function useCreating(): boolean {
@@ -191,9 +182,8 @@ export function CreationAlerts() {
 /** A aba Pontos: o que os pontos gastam, o saldo e o que falta. */
 export function CreationPanel() {
   const creation = useCreation()
-  const { roles, store, mode } = useSheet()
+  const { roles, mode } = useSheet()
   const check = useSheetSelector(s => s.check)
-  const phase = useSheetSelector(s => s.creationPhase)
   const missing = useGuideItems()
   const notices = useCreationNotices()
   // O "ir ao grupo" (P05-D): o painel e os blocos dele são âncoras
@@ -214,24 +204,7 @@ export function CreationPanel() {
       testID="creation-panel"
       onLayout={panel.onLayout}
     >
-      {freebies ? (
-        <View style={styles.block}>
-          <RadioChips
-            label="O que os pontos gastam"
-            options={PHASES}
-            value={phase}
-            onChange={id =>
-              store.getState().setCreationPhase(id as CreationPhase)
-            }
-            testID="creation-phase"
-          />
-          <Text variant="caption" color="inkMuted">
-            {phase === 'basics'
-              ? 'Cada grupo trava quando os pontos básicos acabam. Depois, passe para os pontos de bônus.'
-              : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
-          </Text>
-        </View>
-      ) : null}
+      {freebies ? <PhaseBlock /> : null}
       {freebies ? (
         <Text
           testID="creation-freebies"
@@ -320,6 +293,54 @@ function GuideList({
           </Text>
         </Pressable>
       ))}
+    </View>
+  )
+}
+
+/**
+ * A fase da conta em texto (U-07): o que os pontos gastam agora, com a troca
+ * manual como ação secundária. A fase é só do app (o servidor confere o
+ * saldo de bônus a cada lote, em qualquer fase) e passa sozinha para os
+ * bônus quando os básicos fecham. Rascunho do time, para revisão.
+ */
+function PhaseBlock() {
+  const { store } = useSheet()
+  const phase = useSheetSelector(s => s.creationPhase)
+  // Todos os grupos com prioridade e sem básico sobrando
+  const closed = useSheetSelector(s =>
+    Boolean(
+      s.check?.budgets.length &&
+        s.check.budgets
+          .flatMap(b => b.groups)
+          .every(g => g.budget !== null && g.missing === 0)
+    )
+  )
+  const set = (next: CreationPhase) => store.getState().setCreationPhase(next)
+  const basics = phase === 'basics'
+  return (
+    <View style={styles.block}>
+      <Text testID="creation-phase">
+        {basics ? 'Fase: pontos básicos' : 'Fase: pontos de bônus'}
+      </Text>
+      <Text variant="caption" color="inkMuted">
+        {basics
+          ? 'Cada grupo trava quando os pontos básicos acabam. Quando todos fecharem, a fase passa sozinha para os pontos de bônus.'
+          : 'Passar dos pontos básicos de um grupo usa os pontos de bônus, até o saldo acabar.'}
+      </Text>
+      {basics || !closed ? (
+        <View style={styles.phaseAction}>
+          <Button
+            title={
+              basics
+                ? 'Usar pontos de bônus agora'
+                : 'Voltar aos pontos básicos'
+            }
+            variant="ghost"
+            testID="creation-phase-switch"
+            onPress={() => set(basics ? 'freebies' : 'basics')}
+          />
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -659,6 +680,7 @@ const styles = StyleSheet.create({
   block: { gap: tokens.space[2] },
   entry: { gap: tokens.space['0.5'] },
   item: { justifyContent: 'center', alignItems: 'flex-start' },
+  phaseAction: { alignItems: 'flex-start' },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -263,7 +263,9 @@ describe('trava da distribuição', () => {
 
     tab('Pontos')
     expect(screen.getByTestId('creation-panel')).toBeTruthy()
-    fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
     tab('Ficha')
     step('Vigor')
     // R-17: na fase de bônus, com o grupo cheio, o preço do próximo
@@ -855,6 +857,43 @@ describe('aba Pontos (R-18)', () => {
   })
 })
 
+// P05-D (U-07): a fase em texto, com a troca manual como ação secundária
+describe('fase da conta em texto (U-07)', () => {
+  it('"Fase: pontos básicos", sem rádio; a troca manual vai e volta', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const panel = within(screen.getByTestId('creation-panel'))
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos básicos'
+    )
+    expect(panel.queryAllByRole('radio')).toHaveLength(0)
+    fireEvent.press(
+      panel.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    // Com os básicos faltando, dá para voltar
+    fireEvent.press(
+      panel.getByRole('button', { name: 'Voltar aos pontos básicos' })
+    )
+    expect(panel.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos básicos'
+    )
+  })
+
+  it('com os básicos fechados, a fase é a dos bônus, sem a volta', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    tab('Pontos')
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    expect(screen.queryByTestId('creation-phase-switch')).toBeNull()
+  })
+})
+
 // T-32: a barra usa o mesmo texto do menu, escrito para quem lê
 describe('confirmação da barra', () => {
   it('a dona lê "passa pelo narrador"; o narrador, "passa por você"', async () => {
@@ -900,7 +939,9 @@ describe('aviso dos pontos de bônus', () => {
     step('Vigor')
     expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Ver Pontos' }))
-    expect(screen.getByRole('radio', { name: 'Pontos de bônus' })).toBeChecked()
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
     // Em Bônus, o grupo cheio passa
     tab('Ficha')
     step('Vigor')
