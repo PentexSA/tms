@@ -45,7 +45,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 | `templateVersion` | sim | semver | Sobe a cada publicação. |
 | `locale` | sim | `pt-BR` | Idioma dos rótulos. |
 | `skin` | sim | lista fechada | Fonte display, voz e forma do pip (`wod`, `dnd`, `coc`, `fate`). |
-| `license` | sim | texto (1000) | O que o template embute e sob qual licença (§12). |
+| `license` | sim | texto (1000) | O que o template embute e sob qual licença (§12). No WoD: nomes de traços, regras numéricas e frases curtas do time, escritas com palavras próprias, e nenhum texto do livro. |
 | `identity` | sim | objeto | Nome, selo, resumo, voz e subtítulo (§5). |
 | `accent` | sim | objeto | Cor de identidade por `accent-N` (§5). |
 | `ladders` | não | objeto | Escadas nomeadas (Fate: `+3` = "Bom"). |
@@ -276,7 +276,7 @@ Regras:
 ```
 
 Valor: `[{ "id": "dynamic", "text": "Ardente", "value": 2 }]`.
-- `catalog`: sugestões ao adicionar. **Só nomes**: descrições protegidas não entram no template (§12).
+- `catalog`: sugestões ao adicionar. **Só nomes**: nenhuma descrição do livro entra no template; a frase de cada nome, se houver, é do time e vai no `catalogHelp` (§12).
 - `catalogDefaults: [{ meta, value, items }]`: o meta inicial de nomes do `catalog` (o Posto de cada Dom). `meta` é um meta `number` do item, `value` cabe na faixa dele e cada nome aparece no máximo uma vez por `meta`; até 10 entradas, cada uma com até 200 nomes. O item adicionado pelo nome nasce com esse meta; sem entrada, vale o `min` do meta. O `catalog` continua uma lista de nomes, e o desconto de XP por `itemIn` não muda.
 - `recommend: { outside, by: [{ from, label, map }] }`: o que a identidade recomenda (as Disciplinas do clã, os Dons da Raça, do Augúrio e da Tribo). `from` é um `choice` da ficha; `map` leva cada opção dele a nomes do `catalog` (lista) ou a ids de opção (no `choice`); `label` é o selo ("do clã", até 24) e `outside` diz o que fica fora ("fora do clã", até 60). De 1 a 4 fontes; até 100 opções por fonte e 200 nomes por opção, sem repetir. Opção sem entrada (Caitiff) não recomenda nada, e nada fica "fora". **Só recomenda:** não muda preço, conta nem o que o servidor aceita. Na criação, a tela marca as recomendadas com o selo, põe as outras depois e avisa "fora do clã: confirme com o narrador", sem bloquear.
 
@@ -672,17 +672,17 @@ O campo `license` é obrigatório e diz o que o template embute.
 
 | Sistema | O que pode entrar no template | Observação |
 |---|---|---|
-| World of Darkness (V20, M20, W20) | **Só nomes** de traços e regras numéricas (níveis de Vitalidade, tabela de Geração) | Descrições de Disciplinas, Esferas, Dons e Ritos são protegidas: a mesa escreve as próprias notas. Nenhum símbolo oficial de clã, tradição ou tribo. |
+| World of Darkness (V20, M20, W20) | Nomes de traços (inclusive os Dons do catálogo), regras numéricas (níveis de Vitalidade, tabela de Geração) e frases curtas do time, escritas com palavras próprias | Nenhum texto do livro: nem a descrição de Disciplinas, Esferas, Dons e Ritos, nem trecho parafraseado. A frase do time explica o termo para quem joga pela primeira vez, e as notas do poder continuam da mesa. Nenhum símbolo oficial de clã, tradição ou tribo. Decisão do usuário (05/11/2026): o que envolve a ficha é livre para uso, e a conferência de licença dos nomes não bloqueia. |
 | Call of Cthulhu 7e | **Só nomes** de perícias, valores-base e regras numéricas | Textos de regras e descrições são protegidos. |
 | D&D 5e (SRD 5.1) | Nomes e regras do SRD 5.1 | Licença **CC BY 4.0**, da Wizards of the Coast LLC. Exige atribuição visível no app (ex.: "Sobre o sistema"), com o texto do campo `license`. Conteúdo fora do SRD não entra. |
 | Fate Core | Nomes de perícias, escada e estrutura da ficha | Licença **CC BY 3.0 Unported**, da Evil Hat Productions. Exige atribuição visível, com o texto de atribuição publicado pela Evil Hat. |
 
-- `catalog` de `list` traz só nomes, nunca descrições. O `recommend` e o `catalogDefaults` também: só nomes do catálogo, ids e números.
+- `catalog` de `list` traz só nomes, nunca descrições do livro. O `recommend` e o `catalogDefaults` também: só nomes do catálogo, ids e números.
 - O texto por opção de um `default` (a Fraqueza do clã) é escrito pelo time, com palavras próprias, e revisado por uma segunda pessoa: nunca copiado nem parafraseado frase a frase do livro.
-- **Frases de ajuda (`help`).** São escritas pelo time, com palavras próprias, e revisadas por uma segunda pessoa que conheça o sistema. Não copiam nem parafraseiam de perto um trecho de livro. Num sistema comercial, a frase explica o termo para quem joga pela primeira vez; ela não é a descrição do livro. As frases de poderes (Disciplinas, Dons, Esferas, Ritos) esperam a conferência de quem cuida da parte jurídica.
+- **Frases de ajuda (`help`, `catalogHelp`, `suggestionHelp`).** São escritas pelo time, com palavras próprias, e revisadas por uma segunda pessoa que conheça o sistema. Não copiam nem parafraseiam de perto um trecho de livro. Num sistema comercial, a frase explica o termo para quem joga pela primeira vez; ela não é a descrição do livro. Vale também para as frases de poderes (Disciplinas, Dons e Esferas), que entraram na onda 4 (`doc/planos-pacotes/onda-4-conteudo.json`, rascunho do time, para revisão).
 - Antes de publicar um sistema novo, confira a licença do material de origem com quem cuida da parte jurídica.
 
-**Multi-sistema:** o contrato separa estrutura (que o template traz) de conteúdo protegido (que fica com a mesa), o que permite suportar sistemas comerciais sem redistribuir texto.
+**Multi-sistema:** o contrato separa estrutura e frases curtas do time (que o template traz) do texto do livro (que nunca entra), o que permite suportar sistemas comerciais sem redistribuir texto.
 
 ---
 

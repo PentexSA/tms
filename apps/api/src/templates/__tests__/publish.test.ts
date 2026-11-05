@@ -275,12 +275,15 @@ describe('publishTemplate', () => {
   })
 
   // P07-D: as quatro chaves novas passam pelas duas camadas (schema.json e
-  // validateTemplate). Nomes de Dom fictícios: o catálogo é do time.
+  // validateTemplate). Nomes de Dom fictícios, para os desvios não dependerem
+  // do catálogo do produto (onda 4), que tem o próprio caso logo abaixo.
   const withNewKeys = () => {
     const t = template('wta-w20')
     const fields = t.fields as Record<string, Json>
     const gifts = fields.gifts as Json
     gifts.catalog = ['Faro do Asfalto', 'Passo de Neblina']
+    // As frases do catálogo do produto citam nomes que este catálogo não tem
+    delete gifts.catalogHelp
     gifts.catalogDefaults = [
       { meta: 'rank', value: 2, items: ['Passo de Neblina'] },
     ]
@@ -304,6 +307,18 @@ describe('publishTemplate', () => {
     const t = withNewKeys()
     expect(schemaIssues(t)).toEqual([])
     expect((await publishTemplate(db, t)).status).toBe('published')
+  })
+
+  // Onda 4: o catálogo de Dons, a Fraqueza e as frases de poderes do produto
+  it('publica os templates do produto com o conteúdo da onda 4', async () => {
+    for (const system of ['vtm-v20', 'wta-w20', 'mta-m20']) {
+      const t = template(system)
+      expect({ system, issues: schemaIssues(t) }).toEqual({
+        system,
+        issues: [],
+      })
+      expect((await publishTemplate(db, t)).status).toBe('published')
+    }
   })
 
   it('recommend inválido: o schema recusa a forma, o contrato recusa o nome', async () => {

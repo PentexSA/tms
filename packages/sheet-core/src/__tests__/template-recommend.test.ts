@@ -8,7 +8,8 @@ import { fmt, type Json, mta, palette, reference, vtm, wta } from './fixtures'
 // catalogDefaults, default por opção em texto e creation.advice): a forma
 // certa passa, cada desvio é recusado, e a porta em TS dá os mesmos erros
 // que a referência (design/scripts/validate.mjs). Os nomes de Dom são
-// fictícios: o catálogo do W20 espera a lista do time e a licença.
+// fictícios, para os desvios não dependerem do catálogo do produto (que tem
+// o próprio teste em onda-4-content.test.ts).
 
 type Fields = Record<string, Json>
 const fieldsOf = (t: Json) => t.fields as Fields
@@ -19,6 +20,8 @@ const GIFTS = ['Faro do Asfalto', 'Passo de Neblina', 'Voz da Matilha']
 function withGifts(t: Json): Json {
   const gifts = fieldsOf(t).gifts as Json
   gifts.catalog = GIFTS
+  // As frases do catálogo do produto citam nomes que este catálogo não tem
+  delete gifts.catalogHelp
   gifts.catalogDefaults = [
     { meta: 'rank', value: 1, items: ['Faro do Asfalto', 'Voz da Matilha'] },
     { meta: 'rank', value: 2, items: ['Passo de Neblina'] },
@@ -84,6 +87,10 @@ describe('as chaves novas, na forma certa', () => {
     ['wta-w20', () => withGifts(wta())],
     ['vtm-v20', () => withClan(vtm())],
     ['mta-m20', () => withTradition(mta())],
+    // O conteúdo da onda 4 (catálogo de Dons, Fraqueza e frases de poderes)
+    ['wta-w20 do produto', () => wta()],
+    ['vtm-v20 do produto', () => vtm()],
+    ['mta-m20 do produto', () => mta()],
   ] as const)('%s valida e compila', (system, make) => {
     const t = make()
     expect(both(system, t)).toEqual([])

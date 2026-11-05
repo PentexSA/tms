@@ -7,7 +7,7 @@
   "templateVersion": "1.7.0",
   "locale": "pt-BR",
   "skin": "wod",
-  "license": "O template traz só nomes de traços e regras numéricas. Descrições de Esferas, rotinas e efeitos são protegidas e não são embutidas.",
+  "license": "O template traz nomes de traços, regras numéricas e frases curtas do time (ajuda e Esferas), escritas com palavras próprias. Nenhum texto do livro é embutido.",
   "identity": {
     "emblem": "nine-star",
     "name": "name",
@@ -429,15 +429,51 @@
       "type": "choice",
       "label": "Esfera de afinidade",
       "options": [
-        { "id": "correspondence", "label": "Correspondência" },
-        { "id": "entropy", "label": "Entropia" },
-        { "id": "forces", "label": "Forças" },
-        { "id": "life", "label": "Vida" },
-        { "id": "matter", "label": "Matéria" },
-        { "id": "mind", "label": "Mente" },
-        { "id": "prime", "label": "Primórdio" },
-        { "id": "spirit", "label": "Espírito" },
-        { "id": "time", "label": "Tempo" }
+        {
+          "id": "correspondence",
+          "label": "Correspondência",
+          "help": "Espaço e distância: ver e ouvir longe, alcançar outro lugar e abrir caminho de um ponto a outro."
+        },
+        {
+          "id": "entropy",
+          "label": "Entropia",
+          "help": "Acaso, sorte e decadência: perceber probabilidades, empurrar a sorte e acelerar o desgaste das coisas."
+        },
+        {
+          "id": "forces",
+          "label": "Forças",
+          "help": "As energias do mundo: luz, calor, som, eletricidade, gravidade e movimento."
+        },
+        {
+          "id": "life",
+          "label": "Vida",
+          "help": "Os seres vivos: curar, mudar o corpo e sentir a vida ao redor."
+        },
+        {
+          "id": "matter",
+          "label": "Matéria",
+          "help": "A matéria sem vida: entender um objeto, mudar a forma dele e transformar uma substância em outra."
+        },
+        {
+          "id": "mind",
+          "label": "Mente",
+          "help": "O pensamento: ler, falar e mudar mentes, inclusive a própria."
+        },
+        {
+          "id": "prime",
+          "label": "Primórdio",
+          "help": "A energia bruta da magia: perceber e usar a Quintessência e dar força e permanência aos efeitos."
+        },
+        {
+          "id": "spirit",
+          "label": "Espírito",
+          "help": "O mundo dos espíritos: ver através da Película, falar com espíritos e atravessar para a Umbra."
+        },
+        {
+          "id": "time",
+          "label": "Tempo",
+          "help": "O tempo: perceber o passado e o futuro e acelerar, atrasar ou parar o tempo ao redor."
+        }
       ],
       "recommend": {
         "outside": "fora da Tradição",
@@ -465,55 +501,64 @@
       "type": "rating",
       "label": "Correspondência",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "Espaço e distância: ver e ouvir longe, alcançar outro lugar e abrir caminho de um ponto a outro."
     },
     "entropy": {
       "type": "rating",
       "label": "Entropia",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "Acaso, sorte e decadência: perceber probabilidades, empurrar a sorte e acelerar o desgaste das coisas."
     },
     "forces": {
       "type": "rating",
       "label": "Forças",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "As energias do mundo: luz, calor, som, eletricidade, gravidade e movimento."
     },
     "life": {
       "type": "rating",
       "label": "Vida",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "Os seres vivos: curar, mudar o corpo e sentir a vida ao redor."
     },
     "matter": {
       "type": "rating",
       "label": "Matéria",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "A matéria sem vida: entender um objeto, mudar a forma dele e transformar uma substância em outra."
     },
     "mind": {
       "type": "rating",
       "label": "Mente",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "O pensamento: ler, falar e mudar mentes, inclusive a própria."
     },
     "prime": {
       "type": "rating",
       "label": "Primórdio",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "A energia bruta da magia: perceber e usar a Quintessência e dar força e permanência aos efeitos."
     },
     "spirit": {
       "type": "rating",
       "label": "Espírito",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "O mundo dos espíritos: ver através da Película, falar com espíritos e atravessar para a Umbra."
     },
     "time": {
       "type": "rating",
       "label": "Tempo",
       "max": 5,
-      "cap": { "field": "arete", "label": "máx. pelo Arete" }
+      "cap": { "field": "arete", "label": "máx. pelo Arete" },
+      "help": "O tempo: perceber o passado e o futuro e acelerar, atrasar ou parar o tempo ao redor."
     },
 
     "backgrounds": {
