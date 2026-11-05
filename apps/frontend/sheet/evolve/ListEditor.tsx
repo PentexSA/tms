@@ -309,7 +309,8 @@ interface OptionBlock {
  * rótulo no rebase).
  */
 function optionBlocks(
-  list: ResolvedList,
+  // O catálogo na ordem do rótulo (byLabel, P10-C)
+  catalog: readonly string[],
   identity: IdentityAdvice,
   query: string,
   options: readonly string[]
@@ -322,7 +323,6 @@ function optionBlocks(
     const rest = options.filter(n => !recommended.has(n))
     return [{ key: 'search', title: null, names: [...first, ...rest] }]
   }
-  const catalog = list.field.def.catalog ?? []
   const seen = new Set<string>()
   const blocks: OptionBlock[] = []
   // As fontes do core (recommendedBySource): a mesma regra do selo
@@ -429,7 +429,7 @@ function AddItemSheet({
     )
   }
   const noticeAt = (where: string) => (at === where ? notice.text : null)
-  const blocks = optionBlocks(list, identity, query, options)
+  const blocks = optionBlocks(catalog, identity, query, options)
   const shown = blocks.reduce((n, b) => n + b.names.length, 0)
   // Sem escolha na identidade, a lista fica neutra e diz o que escolher
   // Uma fonte sem escolha: diga qual falta (as escolhidas já recomendam)
@@ -606,7 +606,7 @@ function ItemEditorRow({
         >
           <ItemLine list={list} item={item} value={false} />
         </Pressable>
-        {/* O "−" ganha a previsão com o Stepper.decrease do P10-C */}
+        {/* O "−" com a previsão do P10-C (abaixo do inicial, na criação) */}
         <Stepper
           label={title}
           value={typeof item.value === 'number' ? item.value : min}
@@ -616,6 +616,7 @@ function ItemEditorRow({
           valueText={n => `${n} de ${schema.max}`}
           disabled={blocked}
           increase={feedback.increase}
+          decrease={feedback.decrease}
         />
       </View>
       {below}

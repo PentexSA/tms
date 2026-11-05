@@ -191,14 +191,13 @@ describe('a roda do Mago sobre o rascunho (U-05)', () => {
       screen.getByRole('button', { name: 'Adicionar Antecedente' })
     )
     fireEvent.press(screen.getByRole('button', { name: 'Avatar' }))
-    fireEvent.press(screen.getByRole('button', { name: /^Avatar, 1 de 5/ }))
+    // R-25 (P07-D): o valor sobe na linha, sem a folha do item
     for (let i = 0; i < 2; i++)
       fireEvent(
-        screen.getByRole('adjustable', { name: 'Avatar, valor' }),
+        screen.getByRole('adjustable', { name: 'Avatar' }),
         'accessibilityAction',
         { nativeEvent: { actionName: 'increment' } }
       )
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
     // Nada salvo: o rascunho é que move a roda
     expect(store().getState().pending).toEqual([])
     fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
