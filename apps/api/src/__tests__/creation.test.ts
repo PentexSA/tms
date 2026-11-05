@@ -466,6 +466,10 @@ describe('o servidor aceita o que a tela só avisa (templates do produto)', () =
   }
 
   it('Dom de Posto 2 na criação por pontos entra (o Posto não está na conta)', async () => {
+    // O template já avisa o Posto acima de 1 (creation.advice): só a tela lê
+    expect(
+      (template('wta-w20').creation as { advice?: unknown[] }).advice
+    ).toHaveLength(1)
     const id = await pointsOn(werewolf, { name: 'Lupino', tribe: 'fianna' })
     const gifts = [
       { id: 'g1', name: 'Faro do Asfalto', meta: { rank: 2, source: 'x' } },
