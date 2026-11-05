@@ -723,6 +723,22 @@ Implementação em 04/11/2026, na `pacote/p07-d-vantagens-regras`, em paralelo c
 9. **`recommendedBySource` no core**, usado pelo `recommendedFor` e pelos blocos da folha.
 10. **O `schema` do `ItemEditorRow` é prop obrigatória.** O guard morto saiu.
 
+**A onda na branch (merge `61e3fb3`, com o P05-D `b5e7e2e` e o P10-C `1af28fd`).** Foi um merge `--no-ff`, sem rebase, como na onda 3. Os conflitos ficaram resolvidos no próprio merge:
+
+- o `problemText` tem um argumento só, `resolved`: a fonte do inicial (P10-C) e a contagem do Custo (P07-D). O `guideItems` do P05-D já passa a ficha, então a contagem vale no "O que falta" e no "Faltam";
+- a `ListEditor` ficou com a linha −/+ do P07-D (sem o `useItemAdvice`) e o `byLabel` do P10-C;
+- a aba Pontos ficou com a do P05-D. O bloco provisório `creation-advice` saiu: não há dois blocos.
+
+A integração entrou em commits próprios, depois do merge:
+
+- **`5d8ad5d`.** O `useCreationAdvice` virou o corpo do `useCreationNotices` (`guide.ts`, `noticeItems`). Os itens `kind: 'confirm'` levam:
+  - o texto do `adviceText`;
+  - o rótulo do campo como texto curto;
+  - o alvo do campo.
+
+  Eles aparecem no bloco "Para confirmar com o narrador" (`creation-notices`) e na linha das `notes` da confirmação de concluir. O texto não começa por "Confirme com o narrador:": o título do bloco já diz isso, e a frase ficaria repetida. Fica para o PO (onda-4.md §4.2). Os testes e o E2E usam a aba "Pontos" (o E2E só no typecheck);
+- **`fb6834f`.** O "−" da linha usa o `decrease` do `useRowFeedback` (`Stepper.decrease`, P10-C). Os blocos da folha ordenam pelo rótulo (`byLabel`) dentro de cada bloco. O teste U-05 do P10-C sobe o Avatar pela linha.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
