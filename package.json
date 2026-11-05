@@ -20,6 +20,7 @@
     "db:codegen": "pnpm -C packages/db codegen",
     "templates:publish": "pnpm -C apps/api templates:publish",
     "seed:roteiro": "bun --env-file=.env scripts/seed-roteiro.ts",
+    "metrics:funnel": "bun --env-file=.env scripts/metrics-funnel.ts",
     "tunel": "bash scripts/tunel.sh",
     "backend": "bash scripts/backend.sh",
     "release": "bash scripts/release.sh",
