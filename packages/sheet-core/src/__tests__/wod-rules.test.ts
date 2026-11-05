@@ -7,6 +7,7 @@ import {
   checkCreation,
   effectiveCreationConfig,
 } from '../creation'
+import { resolve } from '../resolve'
 import { templates } from './fixtures'
 
 // Oráculos das regras de V20, M20 e W20 nos templates publicados
@@ -280,6 +281,29 @@ describe('M20', () => {
     ).toContain('CREATION_HARD_CAP')
   })
 
+  // U-05: a roda segue o Avatar sem nada gravado nela, com outros recursos
+  // já gravados (o rascunho da criação resolve a ficha inteira).
+  it('a Quintessência acompanha o Avatar enquanto a roda não é gravada', () => {
+    const at = (avatar: number) =>
+      resolve(mta, {
+        values: {
+          ...HERMETIC,
+          willpower: { permanent: 6, current: 6 },
+          backgrounds: [
+            { id: 'b1', name: 'Avatar', value: avatar },
+            { id: 'b2', name: 'Recursos', value: 4 },
+          ],
+        },
+      }).get('wheel')
+    const paradox = { id: 'paradox', n: 0 }
+    expect(at(3)).toMatchObject({
+      fills: [{ id: 'quintessence', n: 3 }, paradox],
+    })
+    expect(at(5)).toMatchObject({
+      fills: [{ id: 'quintessence', n: 5 }, paradox],
+    })
+  })
+
   it('XP: Esfera de afinidade ×7, outra ×8, nova 10, Arete ×8, Antecedente ×3', () => {
     const v = { ...HERMETIC, arete: 3, forces: 2, matter: 2 }
     expect(price(mta, v, { field: 'forces' })).toBe(14)
@@ -341,6 +365,22 @@ describe('W20', () => {
     })
     expect(r.problems).toEqual([])
     expect(r.freebies?.spent).toBe(7 + 4 + 1)
+  })
+
+  // T-85: a regra do servidor que o "−" do app passa a prever. Abaixo do
+  // valor do Augúrio, salvar passa e concluir não; o limite não muda.
+  it('Fúria abaixo do Augúrio: incompleta, salva e não conclui', () => {
+    const r = creation(wta, { ...AHROUN, rage: { permanent: 4, current: 4 } })
+    const below = r.problems.filter(p => p.code === 'CREATION_BELOW_INITIAL')
+    expect(below).toEqual([
+      expect.objectContaining({
+        severity: 'incomplete',
+        paths: ['values.rage'],
+        amount: 1,
+      }),
+    ])
+    expect(r.savable).toBe(true)
+    expect(r.complete).toBe(false)
   })
 
   it('Renome não se compra na criação', () => {

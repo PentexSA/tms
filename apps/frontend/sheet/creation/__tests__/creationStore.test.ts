@@ -3,6 +3,7 @@ import {
   effectiveCreationConfig,
   type SheetData,
 } from '@tms/sheet-core'
+import { modelOf } from '../../../test/fixtures'
 import { createSheetStore } from '../../store/sheetStore'
 
 const template = require('../../../../../design/templates/testes/acct-teste.json')
@@ -315,5 +316,72 @@ describe('aviso da recusa no store', () => {
     const store = creating()
     expect(set(store, 'str', 9)).toMatchObject({ ok: false })
     expect(store.getState().notice?.cause).toBe('invalid')
+  })
+})
+
+// T-85: no W20, a Fúria do Ahroun não desce abaixo de 5 na criação (só no
+// app); o aviso diz o Augúrio, e o rascunho fica vazio
+describe('o "−" no valor inicial (T-85)', () => {
+  const w20 = modelOf('wta-w20')
+  const creating = (phase: 'basics' | 'freebies') => {
+    const store = createSheetStore({
+      characterId: ID,
+      model: w20,
+      sheet: {
+        values: {
+          name: 'L',
+          breed: 'lupino',
+          auspice: 'ahroun',
+          tribe: 'fianna',
+        },
+        specialties: {},
+      },
+      sheetVersion: 0,
+      roles: ['owner'],
+      mode: 'create',
+      sync: { enqueue: jest.fn() },
+      creation: {
+        config: effectiveCreationConfig(w20),
+        choices: {
+          priorities: {
+            attributes: ['physical', 'social', 'mental'],
+            abilities: ['talents', 'skills', 'knowledges'],
+          },
+        },
+      },
+    })
+    store.getState().setCreationPhase(phase)
+    store.getState().startDraft()
+    return store
+  }
+
+  it.each(['basics', 'freebies'] as const)(
+    'em %s: o toque é recusado, com o aviso, e nada entra no rascunho',
+    phase => {
+      const store = creating(phase)
+      const r = store
+        .getState()
+        .setDraftValue('values.rage', { permanent: 4, current: 4 })
+      expect(r).toMatchObject({ ok: false, kind: 'creation' })
+      expect(store.getState().notice).toMatchObject({
+        paths: ['values.rage'],
+        cause: 'initial',
+        text: 'Fúria: na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).',
+      })
+      expect(store.getState().draftEvents()).toEqual([])
+    }
+  )
+
+  it('acima do inicial, o "−" desfaz a compra e zera o contador', () => {
+    const store = creating('freebies')
+    const s = () => store.getState()
+    expect(
+      s().setDraftValue('values.rage', { permanent: 6, current: 6 })
+    ).toMatchObject({ ok: true })
+    expect(
+      s().setDraftValue('values.rage', { permanent: 5, current: 5 })
+    ).toMatchObject({ ok: true })
+    expect(s().draftEvents()).toEqual([])
+    expect(s().notice).toBeNull()
   })
 })

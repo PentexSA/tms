@@ -6,6 +6,7 @@ import {
   type CreationRefusal,
   checkCreation,
   checkCreationBatch,
+  defaultStored,
   type FieldId,
   fieldOrder,
   type Issue,
@@ -453,6 +454,15 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         readonly result: CommitResult
         readonly notice: Omit<DraftNotice, 'id' | 'paths'>
       }
+  // O campo inteiro (`values.<id>`) sem valor guardado que voltou ao valor
+  // de partida, o mesmo que o `creationFreeze` gravaria
+  const isStart = (sheet: SheetData, from: unknown, e: SheetEvent) => {
+    if (from != null) return false
+    const id = /^values\.([^.#]+)$/.exec(e.path)?.[1]
+    if (!id) return false
+    const start = defaultStored(model, sheet, id)
+    return start !== undefined && jsonEqual(start, e.to)
+  }
   const attemptDraft = (
     s: SheetState,
     draftNow: Draft,
@@ -473,8 +483,11 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       // `from: null` (campo sem valor guardado) também é o de antes
       const before = draft.get(e.path)
       const from = before ? before.from : e.from
-      // Voltou ao valor de antes: a alteração some do rascunho
-      if (jsonEqual(from, e.to)) draft.delete(e.path)
+      // Voltou ao valor de antes: a alteração some do rascunho. Sem valor
+      // guardado, "o de antes" é o que o campo vale sem nada gravado (T-85),
+      // e o campo volta a acompanhar a fonte
+      if (jsonEqual(from, e.to) || isStart(r.sheet, from, e))
+        draft.delete(e.path)
       else draft.set(e.path, { from, to: e.to })
     }
     // O rascunho não passa do lote que a API aceita (50 eventos, 64 KiB):
@@ -495,7 +508,8 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
         { before: shown(s.values, draftNow), after: r.sheet },
         { before: s.check, after: next.check },
         s.creation,
-        s.creationPhase
+        s.creationPhase,
+        { paths: events.map(e => e.path), resolved: next.resolved }
       )
       if (why)
         return {

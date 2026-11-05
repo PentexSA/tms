@@ -8,7 +8,7 @@ import {
 import type { SheetData } from '@tms/sheet-core'
 import { AccessibilityInfo, StyleSheet } from 'react-native'
 import { example, modelOf } from '../../../test/fixtures'
-import { fakeServer, renderLive } from '../../../test/live'
+import { fakeServer, LIVE_ID, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 import type { PostOutcome } from '../../sync/sender'
 
@@ -429,6 +429,103 @@ describe('Editar: editores', () => {
     expect(
       screen.getByRole('adjustable', { name: 'Força de Vontade atual' })
     ).toHaveAccessibilityValue({ now: 3 })
+  })
+
+  // T-22: na criação, o atual cheio acompanha o permanente; a ficha nasce
+  // cheia (4/4, não 4/7)
+  describe('na criação, o atual cheio acompanha o permanente', () => {
+    const creating = {
+      characterId: LIVE_ID,
+      chronicleId: 'c1',
+      status: 'creating',
+      info: null,
+      active: false,
+    }
+    const expectNow = (name: string, now: number) =>
+      expect(screen.getByRole('adjustable', { name })).toHaveAccessibilityValue(
+        { now }
+      )
+    it.each([
+      [
+        'vtm-v20',
+        { name: 'Nova', clan: 'brujah', courage: 3 },
+        'Força de Vontade',
+        'willpower',
+        3,
+      ],
+      [
+        'wta-w20',
+        { name: 'Lupa', breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' },
+        'Gnose',
+        'gnosis',
+        5,
+      ],
+      [
+        'wta-w20',
+        { name: 'Lupa', breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' },
+        'Fúria',
+        'rage',
+        5,
+      ],
+      ['mta-m20', { name: 'Maga' }, 'Força de Vontade', 'willpower', 5],
+    ] as const)('%s: %s', async (system, values, label, id, start) => {
+      const m = modelOf(system)
+      const sheet: SheetData = { values: { ...values }, specialties: {} }
+      const { store } = await renderLive(
+        { model: m, sheet, mode: 'evolve', creation: creating },
+        fakeServer(m, sheet).post
+      )
+      increment(`${label} permanente`)
+      expectNow(`${label} atual`, start + 1)
+      expect(store().getState().draftEvents()).toEqual([
+        {
+          path: `values.${id}`,
+          from: null,
+          to: { permanent: start + 1, current: start + 1 },
+        },
+      ])
+    })
+
+    it('em pending também; o atual gasto fica onde está', async () => {
+      const sheet: SheetData = {
+        values: {
+          name: 'Nova',
+          clan: 'brujah',
+          courage: 3,
+          willpower: { permanent: 3, current: 2 },
+        },
+        specialties: {},
+      }
+      await renderLive(
+        {
+          model,
+          sheet,
+          mode: 'evolve',
+          creation: { ...creating, status: 'pending' },
+        },
+        fakeServer(model, sheet).post
+      )
+      increment('Força de Vontade permanente')
+      expectNow('Força de Vontade atual', 2)
+    })
+
+    it('na ficha concluída, o atual não sobe (o de antes)', async () => {
+      const sheet: SheetData = {
+        values: { name: 'Nova', clan: 'brujah', courage: 3 },
+        specialties: {},
+      }
+      await renderLive(
+        {
+          model,
+          sheet,
+          mode: 'evolve',
+          creation: { ...creating, status: 'complete' },
+        },
+        fakeServer(model, sheet).post
+      )
+      increment('Força de Vontade permanente')
+      expectNow('Força de Vontade atual', 3)
+    })
   })
 
   it('a ficha recém-criada abre em Editar', async () => {

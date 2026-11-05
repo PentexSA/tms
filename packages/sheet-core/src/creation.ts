@@ -14,6 +14,7 @@ import type {
   FieldId,
   FreebieCost,
   SheetData,
+  SheetValue,
 } from './contract'
 import { stored } from './fields'
 import { type ResolvedSheet, resolve } from './resolve'
@@ -695,10 +696,10 @@ export function checkCreation(
     if (f.readOnly || accounted.has(id) || untracked.has(id) || ledger.has(id))
       continue
     const now = r.get(id)
-    const blank = resolve(model, withoutValue(data, id))
-    const was = blank.get(id)
-    if (!now || !was) continue
-    const parts = classifyChange(f, stored(was, blank), stored(now, r))
+    if (!now) continue
+    const start = startOf(model, data, id)
+    if (start === undefined) continue
+    const parts = classifyChange(f, start, stored(now, r))
     const advance = parts.filter(p => p.kind === 'advance').map(p => p.path)
     if (advance.length)
       problem({
@@ -845,6 +846,34 @@ export function creationFreeze(
     if (value !== undefined) out[id] = value
   }
   return out
+}
+
+/**
+ * O valor gravado equivalente a não gravar nada no campo: resolve a ficha sem
+ * ele e devolve o `stored` do resultado. É o mesmo cálculo do
+ * `creationFreeze` para os campos com fórmula, e serve ao app para saber que
+ * um campo voltou ao valor de partida (o contador de alterações volta a
+ * zero). `undefined` quando o campo não existe no modelo.
+ */
+export function defaultStored(
+  model: SheetModel,
+  sheet: SheetData | unknown,
+  id: FieldId
+): unknown {
+  if (!model.fields.has(id)) return undefined
+  return startOf(model, sheetData(sheet), id)
+}
+
+// O `stored` do campo resolvido sem o valor dele: o de partida. O mesmo
+// cálculo serve ao fail-secure do `checkCreation` e ao `defaultStored`.
+function startOf(
+  model: SheetModel,
+  data: SheetData,
+  id: FieldId
+): SheetValue | undefined {
+  const blank = resolve(model, withoutValue(data, id))
+  const resolved = blank.get(id)
+  return resolved ? (stored(resolved, blank) as SheetValue) : undefined
 }
 
 // Metadados de criação gravados na ficha (`characters.creation`, doc/plano-v4.md

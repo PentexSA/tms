@@ -16,6 +16,7 @@ import { track } from './track'
 import type { FieldType } from './types'
 
 export { inactiveNote, modifierNote } from './rating'
+export { editResource, type ResourcePart } from './resource'
 export type { FieldType } from './types'
 
 // Um comportamento por tipo da lista fechada: o build quebra se faltar um.

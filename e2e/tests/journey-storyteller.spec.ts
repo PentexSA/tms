@@ -28,20 +28,18 @@ async function createSheet(page: Page, chronicleId: string, name: string) {
   await page
     .getByRole('button', { name: 'Aumentar Força', exact: true })
     .click()
-  for (let i = 0; i < 3; i++) {
+  // Na criação, o atual cheio acompanha o permanente (T-22): ele fica no
+  // máximo, e o "Aumentar" do atual, desabilitado
+  for (let i = 0; i < 3; i++)
     await page
       .getByRole('button', {
         name: 'Aumentar Força de Vontade permanente',
         exact: true,
       })
       .click()
-    await page
-      .getByRole('button', {
-        name: 'Aumentar Força de Vontade atual',
-        exact: true,
-      })
-      .click()
-  }
+  await expect(
+    page.getByLabel('Força de Vontade atual, 4', { exact: true })
+  ).toBeVisible()
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
     .click()

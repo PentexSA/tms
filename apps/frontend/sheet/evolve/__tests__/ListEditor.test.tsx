@@ -46,6 +46,31 @@ describe('ListEditor', () => {
     })
   })
 
+  // T-60: o catálogo na ordem do rótulo; a busca preserva a ordem
+  it('as opções do catálogo vêm na ordem do rótulo', async () => {
+    await helenaInEvolve()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar Disciplina' })
+    )
+    const names = () =>
+      screen
+        .getAllByRole('button')
+        .map(b => String(b.props.accessibilityLabel ?? '').split(',')[0])
+    const all = names()
+    // As da ficha (Auspícios, Dominação, Taumaturgia) também estão nas
+    // linhas da lista: a ordem é conferida pelas outras
+    const at = (n: string) => all.lastIndexOf(n)
+    expect(at('Animalismo')).toBeGreaterThanOrEqual(0)
+    expect(at('Animalismo')).toBeLessThan(at('Demência'))
+    expect(at('Demência')).toBeLessThan(at('Fortitude'))
+    expect(at('Quietus')).toBeLessThan(at('Quimerismo'))
+    expect(at('Quimerismo')).toBeLessThan(at('Rapidez'))
+    expect(at('Tenebrosidade')).toBeLessThan(at('Vicissitude'))
+    fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'qui')
+    const found = names()
+    expect(found.indexOf('Quietus')).toBeLessThan(found.indexOf('Quimerismo'))
+  })
+
   it('adicionar por nome livre (fora do catálogo)', async () => {
     const { disciplines } = await helenaInEvolve()
     fireEvent.press(
@@ -231,9 +256,22 @@ describe('ListEditor', () => {
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     expect(screen.getByText('Nenhuma Disciplina')).toBeTruthy()
     expect(screen.getByText('Nenhum Antecedente')).toBeTruthy()
+    // T-66: o gênero pela regra do português, não pela letra final
+    expect(screen.getByText('Nenhuma Qualidade')).toBeTruthy()
+    expect(screen.queryByText('Nenhum Qualidade')).toBeNull()
     expect(
       screen.getByRole('button', { name: 'Adicionar Antecedente' })
     ).toBeTruthy()
+  })
+
+  it('T-66: na Leitura, a lista vazia também concorda', async () => {
+    const nova = { values: { name: 'Nova' }, specialties: {} }
+    await renderLive(
+      { model: vtm, sheet: nova, mode: 'read' },
+      fakeServer(vtm, nova).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    expect(screen.getByText('Nenhuma Qualidade')).toBeTruthy()
   })
 
   it('renomear o item; o campo de nome respeita o limite do validador', async () => {

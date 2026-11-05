@@ -17,7 +17,7 @@ import {
   tokens,
   useTheme,
 } from '@tms/ui'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
 import { addAdvice, metaAdvice } from '../creation/creation'
@@ -46,7 +46,7 @@ import {
   itemLabels,
   useIdentityAdvice,
 } from './recommend'
-import { fold, nextItemId, noneOf } from './text'
+import { byLabel, fold, nextItemId, noneOf } from './text'
 import { useRowFeedback } from './useRowFeedback'
 
 // list em Evoluir (DS: Repeater / ListEditor). O esquema do item vem do
@@ -377,11 +377,14 @@ function AddItemSheet({
   const notice = useListNotice(list)
   const def = list.field.def
   const have = new Set(list.items.map(i => fold(itemTitle(list, i))))
+  // Na ordem do rótulo, não na do array do template (T-60); a busca
+  // preserva a ordem
+  const catalog = useMemo(() => byLabel(def.catalog ?? []), [def.catalog])
   const match = (text: string) => {
     const q = fold(text)
     return {
-      options: (def.catalog ?? []).filter(name => fold(name).includes(q)),
-      exact: (def.catalog ?? []).find(name => fold(name) === q),
+      options: catalog.filter(name => fold(name).includes(q)),
+      exact: catalog.find(name => fold(name) === q),
       custom: text.trim(),
     }
   }

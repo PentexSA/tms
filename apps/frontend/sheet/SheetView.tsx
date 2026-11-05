@@ -11,7 +11,6 @@ import {
 import {
   KeyboardArea,
   Pressable,
-  SectionHeader,
   TabPanel,
   Text,
   ThemeProvider,
@@ -23,11 +22,13 @@ import {
   type ReactElement,
   type ReactNode,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import {
+  type HostInstance,
   Platform,
   RefreshControl,
   ScrollView,
@@ -47,6 +48,7 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
+import { type GuideTarget, MISSING_TARGET, POINTS_TAB } from './creation/guide'
 import {
   CompletedWhileEditingBanner,
   ReturnedBanner,
@@ -55,8 +57,11 @@ import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
+import { AnchorHeader } from './layouts/AnchorHeader'
+import { type AnchorTarget, anchorDomId, focusView } from './layouts/anchor'
 import {
   GroupTabsContext,
+  SCROLL_ROOT,
   StripScope,
   useGroupTabsState,
 } from './layouts/groupTabsState'
@@ -73,7 +78,7 @@ import { createSheetStore, type SheetStore } from './store/sheetStore'
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
 // template). Aba sem seção legível some.
 //
-// Na criação por pontos, a conta ganha uma aba própria (Orçamento), depois
+// Na criação por pontos, a conta ganha uma aba própria (Pontos), depois
 // das da ficha: a distribuição fica nas abas, a conta não empurra a ficha.
 //
 // Em Jogo, no celular (compact), o "Em jogo" vira o CombatDock fixo embaixo;
@@ -109,7 +114,7 @@ export type SheetViewProps =
     }
 
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
-const BUDGET_TAB = 'creation'
+const BUDGET_TAB = POINTS_TAB
 
 function readableZones(model: SheetModel, roles: readonly RoleName[]) {
   return model.zones.filter(
@@ -205,7 +210,7 @@ function SheetBody({
   const [tab, setTab] = useState<string>(zones[0]?.id ?? 'build')
   const mode = useStore(store, s => s.mode)
   const creating = useCreating()
-  // T-33: a conta (aba Orçamento) também em Leitura, para o narrador na ficha
+  // T-33: a conta (aba Pontos) também em Leitura, para o narrador na ficha
   // alheia em criação por pontos; o que é de edição (o aviso de bônus, as
   // recusas e as "Regras da casa") continua só na Criação
   const narrator = roles.includes('storyteller') && !roles.includes('owner')
@@ -218,7 +223,7 @@ function SheetBody({
     : (zones.find(z => z.id === tab) ?? zones[0])
   const tabs = [
     ...zones.map(z => ({ id: z.id, label: z.label ?? z.id })),
-    ...(budget ? [{ id: BUDGET_TAB, label: 'Orçamento' }] : []),
+    ...(budget ? [{ id: BUDGET_TAB, label: 'Pontos' }] : []),
   ]
   // A aba do painel; sem ela entre as abas (nenhuma zona legível), o
   // conteúdo fica num contêiner comum, sem papel de painel
@@ -268,10 +273,70 @@ function SheetBody({
     },
     [groupTabs.store]
   )
-  // "Ver orçamento" nos avisos da recusa (T-07): só com a aba Orçamento
+  // A troca de aba à mão esquece um "ir ao grupo" ainda pendente
+  const selectTab = useCallback(
+    (id: string) => {
+      groupTabs.store.cancelJump()
+      showTab(id)
+    },
+    [groupTabs.store, showTab]
+  )
+  // "Ver Pontos" nos avisos da recusa (T-07): só com a aba Pontos
   const openBudget = useMemo(
     () => (budget ? () => showTab(BUDGET_TAB) : null),
     [budget, showTab]
+  )
+  // O "ir ao grupo" do "O que falta" (P05-D, R-18): a aba, a sub-aba e a
+  // âncora da seção (ou do grupo); a rolagem e o foco vêm quando a âncora é
+  // medida (a aba nova ainda não foi desenhada). Fica na mesma tela: nada
+  // vai para a URL nem para o histórico
+  const tabIds = tabs.map(t => t.id).join(' ')
+  const tabSet = useMemo(() => new Set(tabIds.split(' ')), [tabIds])
+  const playRef = useRef<HostInstance>(null)
+  const playTarget = useMemo(
+    () => ({
+      ref: playRef,
+      nativeID: anchorDomId(PLAY_ANCHOR),
+      tabIndex: -1 as const,
+    }),
+    []
+  )
+  // O "Em jogo" é alvo só quando está na rolagem (no Jogo do celular, ele
+  // vira o dock)
+  const playAnchored = play.length > 0 && !docked
+  const goTo = useCallback(
+    (target: GuideTarget | null) => {
+      const anchors = groupTabs.store
+      if (target?.tab === 'play' && playAnchored) {
+        setPlayOpen(true)
+        anchors.jumpTo([PLAY_ANCHOR])
+        return
+      }
+      // Uma zona sem aba (a identidade) não tem âncora: a lista inteira, na
+      // aba Pontos, em vez de um pedido que nunca se resolve
+      const t = target && tabSet.has(target.tab) ? target : MISSING_TARGET
+      if (!tabSet.has(t.tab)) return
+      showTab(t.tab)
+      const section = t.section ? model.sections.get(t.section) : undefined
+      if (section?.def.groupTabs && t.group) anchors.select(section.id, t.group)
+      anchors.jumpTo(
+        [
+          t.section && t.group ? `${t.section}/${t.group}` : null,
+          t.section,
+          t.tab === BUDGET_TAB ? 'creation-panel' : null,
+        ].filter((id): id is string => Boolean(id))
+      )
+    },
+    [groupTabs.store, model, showTab, tabSet, playAnchored]
+  )
+  const { reduceMotion } = useTheme()
+  useEffect(
+    () =>
+      groupTabs.store.onJump((y, focus) => {
+        scrollRef.current?.scrollTo({ y, animated: !reduceMotion })
+        focus?.()
+      }),
+    [groupTabs.store, reduceMotion]
   )
   // O header (painel do NPC e barra do narrador) é do app, não da ficha:
   // fica com o tema de fora (a skin do app e o accent neutro), mesmo quando
@@ -313,12 +378,27 @@ function SheetBody({
       ) : null,
       <IdentityBlock key="identity" />,
       play.length && !docked ? (
-        <View key="play">
+        <View
+          key="play"
+          onLayout={e =>
+            groupTabs.store.anchorAt(
+              PLAY_ANCHOR,
+              e.nativeEvent.layout.y,
+              () => focusView(playRef.current),
+              SCROLL_ROOT
+            )
+          }
+        >
+          {/* O alvo do foco é o próprio botão ou o título (P05-D) */}
           {collapsible ? (
-            <PlayToggle open={playOpen} onToggle={() => setPlayOpen(v => !v)} />
+            <PlayToggle
+              open={playOpen}
+              onToggle={() => setPlayOpen(v => !v)}
+              target={playTarget}
+            />
           ) : (
             <View style={styles.title}>
-              <SectionHeader title="Em jogo" level="group" />
+              <AnchorHeader title="Em jogo" level="group" target={playTarget} />
             </View>
           )}
           {!collapsible || playOpen ? (
@@ -338,7 +418,7 @@ function SheetBody({
           key="nav"
           tabs={tabs}
           selected={shownTab ?? ''}
-          onSelect={showTab}
+          onSelect={selectTab}
         />
       ) : null,
       <View
@@ -410,7 +490,7 @@ function SheetBody({
 
   return (
     <ThemeProvider skin={model.skin} accent={accent}>
-      <SheetProvider store={store} openBudget={openBudget}>
+      <SheetProvider store={store} openBudget={openBudget} goTo={goTo}>
         <FieldSheetProvider>
           <GroupTabsContext.Provider value={groupTabs}>
             {/* A barra de modos é da ficha viva (editable não muda numa ficha
@@ -431,17 +511,23 @@ function SheetBody({
 }
 
 const PLAY_ID = 'sheet-play'
+const PLAY_ANCHOR = 'play'
 
 /** O título "Em jogo" que abre e recolhe o bloco (T-59). */
 function PlayToggle({
   open,
   onToggle,
+  target,
 }: {
   readonly open: boolean
   readonly onToggle: () => void
+  // O alvo do "ir ao grupo": o botão já é focável, então só a ref e o id
+  readonly target: AnchorTarget
 }) {
   return (
     <Pressable
+      ref={target.ref as never}
+      nativeID={target.nativeID}
       accessibilityRole="button"
       accessibilityLabel="Em jogo"
       accessibilityState={{ expanded: open }}
