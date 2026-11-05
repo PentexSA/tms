@@ -220,24 +220,41 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
   })
 
-  it('editor de Disciplina: + e Aplicar acima dos básicos avisa acima do Aplicar; o − apaga; com 1, Aplicar fecha', async () => {
+  it('R-25: o "+" da linha acima dos básicos avisa sob a linha tocada, sem folha; o "−" apaga', async () => {
     await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
-    const stepper = { name: 'Dominação, valor' }
-    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
-      nativeEvent: { actionName: 'increment' },
-    })
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
-      /Disciplinas/
-    )
-    fireEvent(screen.getByRole('adjustable', stepper), 'accessibilityAction', {
-      nativeEvent: { actionName: 'decrement' },
-    })
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    const row = (id: string) => `item-disciplines-${id}`
+    step('Dominação')
+    // Nenhuma folha abre: o aviso fica na linha tocada, não nas outras
     expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
+    expect(alertsIn(row('d3'))).toHaveLength(1)
+    expect(alertsIn(row('d3'))[0]).toHaveTextContent(/Disciplinas/)
+    expect(
+      within(screen.getByTestId(row('d3'))).getByTestId('notice-disciplines-d3')
+    ).toBeTruthy()
+    expect(alertsIn(row('d1'))).toHaveLength(0)
+    expect(alertsIn(row('d2'))).toHaveLength(0)
+    // O valor não mudou; o "−" é aceito e apaga o aviso
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5' })
+    ).toBeTruthy()
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Dominação' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'decrement' } }
+    )
+    expect(alertsIn(row('d3'))).toHaveLength(0)
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 0 de 5' })
+    ).toBeTruthy()
+  })
+
+  it('a recusa do −/+ da linha não vai para a folha do item', async () => {
+    await open(THREE)
+    step('Dominação')
+    expect(alertsIn('item-disciplines-d3')).toHaveLength(1)
+    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
+    expect(alertsIn('item-disciplines-d3')).toHaveLength(0)
   })
 
   it('tirar o Defeito cujo crédito foi gasto: a frase aparece sob "Remover Inimigo?"', async () => {
@@ -260,26 +277,18 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     ).toBeTruthy()
   })
 
-  it('o "+" do Valor avisa antes do toque; com o Valor já mudado na folha, a previsão sai (R-20)', async () => {
+  it('o "+" da linha avisa antes do toque e continua tocável (R-20)', async () => {
     await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
-    const stepper = () =>
-      screen.getByRole('adjustable', { name: 'Dominação, valor' })
-    // Grupo cheio em Pontos básicos: o motivo antes do toque, na dica e escrito
+    const stepper = () => screen.getByRole('adjustable', { name: 'Dominação' })
+    // Grupo cheio em Pontos básicos: o motivo antes do toque, na dica
     expect(stepper().props.accessibilityHint).toMatch(/Disciplinas/)
-    expect(screen.getByTestId('advice-disciplines-d3')).toHaveTextContent(
-      /Disciplinas/
-    )
-    // O "+" continua tocável: o toque passa pela conta exata
-    fireEvent(stepper(), 'accessibilityAction', {
-      nativeEvent: { actionName: 'increment' },
-    })
-    expect(stepper().props.accessibilityHint).toBeUndefined()
+    // O cabeçalho do grupo já diz "3/3": a linha não repete o motivo
     expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
-    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    // Recusado: o aviso fala pelo motivo, sem a previsão repetida
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(screen.queryByTestId('advice-disciplines-d3')).toBeNull()
+    // Outra Disciplina, a mesma previsão (a conta é do grupo)
+    expect(
+      screen.getByRole('adjustable', { name: 'Taumaturgia' }).props
+        .accessibilityHint
+    ).toMatch(/Disciplinas/)
   })
 
   it('item sem Valor (Dons do W20): nenhuma previsão de "+" na folha', async () => {
@@ -312,34 +321,39 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(screen.getByTestId('notice-stamina')).toBeTruthy()
   })
 
-  it('com saldo, o "+" do Valor mostra o custo em bônus', async () => {
+  it('com saldo, o "+" da linha mostra o custo em bônus', async () => {
     await open(THREE)
     tab('Orçamento')
     fireEvent.press(screen.getByRole('radio', { name: 'Pontos de bônus' }))
     tab('Ficha')
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
     expect(
-      screen.getByRole('adjustable', { name: 'Dominação, valor' }).props
+      screen.getByRole('adjustable', { name: 'Dominação' }).props
         .accessibilityHint
     ).toMatch(/bônus/)
+    // Pago com bônus, o ponto entra pela linha
+    step('Dominação')
+    expect(
+      screen.getByRole('button', { name: 'Dominação, 2 de 5' })
+    ).toBeTruthy()
   })
 
   it('a recusa do Aplicar não aparece sob "Remover X?"', async () => {
-    await open(THREE)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    await open({ merits: SPENT })
+    fireEvent.press(screen.getByRole('button', { name: /^Sono Leve/ }))
+    // Custo 7 → 8 sem saldo: o Aplicar é recusado
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Dominação, valor' }),
+      screen.getByRole('adjustable', { name: 'Sono Leve, Custo' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
+    expect(alertsIn('item-sheet-merits')).toHaveLength(1)
     fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
-    // Só o "Remover Dominação?"; nada da recusa anterior
-    expect(alertsIn('item-sheet-disciplines')).toHaveLength(1)
-    expect(alertsIn('item-sheet-disciplines')[0]).toHaveTextContent(
-      'Remover Dominação?'
+    // Só o "Remover Sono Leve?"; nada da recusa anterior
+    expect(alertsIn('item-sheet-merits')).toHaveLength(1)
+    expect(alertsIn('item-sheet-merits')[0]).toHaveTextContent(
+      'Remover Sono Leve?'
     )
   })
 

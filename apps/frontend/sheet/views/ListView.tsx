@@ -89,9 +89,12 @@ function metaText(m: ListMeta, v: number | string): string {
 export function ItemLine({
   list,
   item,
+  value: showValue = true,
 }: {
   readonly list: ResolvedList
   readonly item: ListItem
+  // Sem os pips e o número: a linha do Editar tem o −/+ (R-25)
+  readonly value?: boolean
 }) {
   const def = list.field.def
   const meta = (def.item.meta ?? [])
@@ -119,7 +122,7 @@ export function ItemLine({
           </Text>
         ) : null}
       </View>
-      {def.item.value && value !== undefined ? (
+      {showValue && def.item.value && value !== undefined ? (
         <>
           <RatingDots value={value} max={def.item.value.max} size="sm" />
           <Text variant="number">{String(value)}</Text>

@@ -1,10 +1,14 @@
-import { type ListItem, type ResolvedList, stored } from '@tms/sheet-core'
+import {
+  editClass,
+  type ListItem,
+  type ResolvedList,
+  stored,
+} from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
   Pressable,
   Stepper,
-  type StepperIncrease,
   Text,
   TextArea,
   TextField,
@@ -14,7 +18,6 @@ import {
 import { type ReactNode, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheetStore } from '../context'
-import { useStepAdvice } from '../creation/useStepAdvice'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -25,9 +28,15 @@ import {
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
 import { DraftNoticeText } from './DraftNoticeText'
-import { useDraftNotice, useFieldIssue, useSetDraft } from './hooks'
+import {
+  useClassNote,
+  useDraftNotice,
+  useFieldIssue,
+  useSetDraft,
+} from './hooks'
 import { withItemDefaults } from './listItem'
 import { fold, nextItemId, noneOf } from './text'
+import { useRowFeedback } from './useRowFeedback'
 
 // list em Evoluir (DS: Repeater / ListEditor). O esquema do item vem do
 // template (`item.value`, `specialty`, `notes`, `meta`): Disciplinas do
@@ -80,8 +89,14 @@ function cleanItem(item: ListItem): ListItem {
 
 export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const { colors } = useTheme()
+  const store = useSheetStore()
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
+  // Ficha ativa: mudar o valor do item é evolução e pede o narrador, como
+  // nas linhas de traço (a lista em si é edição: nome e notas seguem livres)
+  const blocked = useClassNote(
+    editClass(resolved.field) === 'play' ? 'play' : 'advance'
+  )
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   // O cabeçalho do bloco já diz o nome e a conta da lista (T-58)
@@ -91,9 +106,20 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   const def = list.field.def
   const items = stored(list, sheet) as ListItem[]
   // A recusa volta para a folha que recebeu o toque (T-19): desenhada aqui,
-  // embaixo da lista, ela ficava atrás do modal e sobrava ao fechar.
-  const write = (next: readonly ListItem[]): Write =>
-    set(`values.${list.id}`, next.map(cleanItem))
+  // embaixo da lista, ela ficava atrás do modal e sobrava ao fechar. O −/+
+  // da linha manda o `at` do item, e a recusa volta para a linha (R-25)
+  const write = (next: readonly ListItem[], at?: string): Write =>
+    set(`values.${list.id}`, next.map(cleanItem), at ? { at } : undefined)
+  const step = (item: ListItem, value: number) =>
+    write(
+      items.map(i => (i.id === item.id ? { ...i, value } : i)),
+      `values.${list.id}#${item.id}`
+    )
+  // O aviso de um −/+ recusado é da linha: a folha que abre não o herda
+  const open = (id: string) => {
+    store.getState().clearNotice()
+    setEditing(id)
+  }
   const add = (name: string): Write => {
     const id = nextItemId(items)
     // Aspecto (Fate) é só texto; o resto tem nome e, se o esquema pede, valor
@@ -114,23 +140,39 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
   return (
     <View testID={`editor-${list.id}`} style={styles.wrap}>
       {headed ? null : <ListHeader resolved={list} sheet={sheet} />}
-      {list.items.map(item => (
-        <Pressable
-          key={item.id}
-          accessibilityRole="button"
-          accessibilityLabel={describeItem(list, item)}
-          accessibilityValue={
-            itemValue(list, item) !== undefined
-              ? { text: String(itemValue(list, item)) }
-              : undefined
-          }
-          accessibilityHint="Abre o item"
-          onPress={() => setEditing(item.id)}
-          style={[styles.row, border]}
-        >
-          <ItemLine list={list} item={item} />
-        </Pressable>
-      ))}
+      {blocked && def.item.value ? (
+        <Text variant="caption" color="inkMuted" style={styles.empty}>
+          {blocked}
+        </Text>
+      ) : null}
+      {list.items.map(item =>
+        def.item.value ? (
+          <ItemEditorRow
+            key={item.id}
+            list={list}
+            item={item}
+            blocked={blocked !== null}
+            onOpen={() => open(item.id)}
+            onStep={value => step(item, value)}
+          />
+        ) : (
+          <Pressable
+            key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={describeItem(list, item)}
+            accessibilityValue={
+              itemValue(list, item) !== undefined
+                ? { text: String(itemValue(list, item)) }
+                : undefined
+            }
+            accessibilityHint="Abre o item"
+            onPress={() => open(item.id)}
+            style={[styles.row, border]}
+          >
+            <ItemLine list={list} item={item} />
+          </Pressable>
+        )
+      )}
       {!list.items.length ? (
         <Text color="inkMuted" style={styles.empty}>
           {noneOf(def.itemLabel)}
@@ -318,39 +360,69 @@ function AddItemSheet({
 }
 
 /**
- * A previsão do "+" do Valor (R-20, T-19, antes do toque): a trava ou o
- * custo do próximo ponto do item, pelo `useStepAdvice` do caminho do item.
- * A previsão é do valor que o store tem: com o Valor já mudado na folha, ela
- * não vale mais, e o toque decide (o "Aplicar" passa pela conta exata). O
- * "+" bloqueado continua tocável, como nas linhas (`Stepper.increase`).
+ * A linha do item com valor, no Editar e na Criação (R-25): o nome abre a
+ * folha (nome, metas, especialização e notas) e o −/+ muda o valor ali, sem
+ * folha. O toque grava a lista inteira com o `at` do item: a recusa e a
+ * previsão do "+" são as da linha de traço (useRowFeedback com o caminho do
+ * item), perto do toque. Nada de botão dentro de botão: o nome e o −/+ são
+ * alvos lado a lado, cada um com 44 (48 no Android).
  */
-function useItemAdvice(
-  list: ResolvedList,
-  item: ListItem,
-  draft: ListItem,
-  refused: boolean
-): { readonly stepper?: StepperIncrease; readonly note: ReactNode } {
-  const advice = useStepAdvice(`values.${list.id}#${item.id}`)
-  const min = list.field.def.item.value?.min ?? 0
-  const fresh = (draft.value ?? min) === (item.value ?? min)
-  // Sem Valor no item (Dons do W20: um ponto por item), não há "+" a prever
-  if (!advice || !fresh || !list.field.def.item.value) return { note: null }
-  // Com o aviso aberto, o aviso fala pelo motivo
-  const id = `advice-${list.id}-${item.id}`
-  const written = !refused && advice.text ? advice.text : null
-  return {
-    stepper: {
-      blocked: advice.blocked !== null,
-      hint: advice.text,
-      // Com o aviso aberto, o "+" aponta o aviso, como nas linhas
-      hintID: refused ? `notice-${list.id}` : written ? id : null,
-    },
-    note: written ? (
-      <Text variant="caption" color="inkMuted" nativeID={id} testID={id}>
-        {written}
-      </Text>
-    ) : null,
-  }
+function ItemEditorRow({
+  list,
+  item,
+  blocked,
+  onOpen,
+  onStep,
+  below,
+}: {
+  readonly list: ResolvedList
+  readonly item: ListItem
+  readonly blocked: boolean
+  readonly onOpen: () => void
+  readonly onStep: (value: number) => void
+  // O selo e o aviso da identidade (R-26), embaixo do nome
+  readonly below?: ReactNode
+}) {
+  const { colors } = useTheme()
+  const def = list.field.def
+  const schema = def.item.value
+  const field = `${list.id}-${item.id}`
+  const feedback = useRowFeedback(`values.${list.id}#${item.id}`, field)
+  if (!schema) return null
+  const min = schema.min ?? 0
+  const title = itemTitle(list, item) || def.itemLabel
+  return (
+    <View
+      testID={`item-${field}`}
+      style={[styles.itemRow, { borderBottomColor: colors.borderSubtle }]}
+    >
+      <View style={styles.line}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={describeItem(list, item)}
+          accessibilityHint="Abre o item: nome, especialização e notas"
+          onPress={onOpen}
+          style={styles.name}
+        >
+          <ItemLine list={list} item={item} value={false} />
+        </Pressable>
+        {/* O "−" ganha a previsão com o Stepper.decrease do P10-C */}
+        <Stepper
+          label={title}
+          value={typeof item.value === 'number' ? item.value : min}
+          min={min}
+          max={schema.max}
+          onChange={onStep}
+          valueText={n => `${n} de ${schema.max}`}
+          disabled={blocked}
+          increase={feedback.increase}
+        />
+      </View>
+      {below}
+      {feedback.note}
+      {feedback.notice}
+    </View>
+  )
 }
 
 function ItemSheet({
@@ -382,7 +454,6 @@ function ItemSheet({
     setDraft(d => ({ ...d, ...p }))
   }
   const refusal = notice.text
-  const increase = useItemAdvice(list, item, draft, refusal !== null)
   const footer = confirming ? (
     <>
       <Button
@@ -445,21 +516,7 @@ function ItemSheet({
                 maxLength={ITEM_NAME_MAX}
               />
             )}
-            {schema.value ? (
-              <View style={styles.inline}>
-                <Text style={styles.flex}>Valor</Text>
-                <Stepper
-                  label={`${title}, valor`}
-                  value={draft.value ?? schema.value.min ?? 0}
-                  min={schema.value.min ?? 0}
-                  max={schema.value.max}
-                  onChange={value => patch({ value })}
-                  valueText={n => `${n} de ${schema.value?.max}`}
-                  increase={increase.stepper}
-                />
-              </View>
-            ) : null}
-            {increase.note}
+            {/* O Valor fica na linha, com o −/+ (R-25) */}
             {(schema.meta ?? []).map(m =>
               m.type === 'number' ? (
                 <View key={m.id} style={styles.inline}>
@@ -531,6 +588,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   sheet: { gap: tokens.space[3] },
+  itemRow: {
+    gap: tokens.space['0.5'],
+    paddingVertical: tokens.space[1],
+    paddingHorizontal: tokens.layout.gutter,
+    borderBottomWidth: tokens.borderWidth.hair,
+  },
+  line: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[3] },
+  name: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: tokens.size.rowMin,
+  },
   option: {
     flexDirection: 'row',
     alignItems: 'center',

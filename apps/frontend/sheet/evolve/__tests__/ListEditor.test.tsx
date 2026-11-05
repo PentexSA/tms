@@ -56,18 +56,22 @@ describe('ListEditor', () => {
     expect(disciplines()?.at(-1)?.name).toBe('Obtenebração antiga')
   })
 
-  it('o item: valor, especialização e notas, num lote só ao salvar', async () => {
+  it('o item: valor na linha, especialização e notas na folha, num lote só ao salvar', async () => {
     const { disciplines } = await helenaInEvolve()
-    fireEvent.press(
-      screen.getByRole('button', {
-        name: 'Taumaturgia, 3 de 5, especialização Trilha do Sangue',
-      })
-    )
+    // R-25: o valor sobe na própria linha, sem abrir a folha
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Taumaturgia, valor' }),
+      screen.getByRole('adjustable', { name: 'Taumaturgia' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
+    expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Taumaturgia, 4 de 5, especialização Trilha do Sangue',
+      })
+    )
+    // A folha fica com nome, especialização e notas: o Valor saiu dela
+    expect(screen.queryByRole('adjustable', { name: /valor/ })).toBeNull()
     fireEvent.changeText(
       screen.getByLabelText('Especialização'),
       'Trilha da Chama'
@@ -81,6 +85,80 @@ describe('ListEditor', () => {
       specialty: 'Trilha da Chama',
     })
     expect(screen.getByText('Editando · 1 alteração')).toBeTruthy()
+  })
+
+  it('R-25: o "−" desce na linha; o item fica com 0, e tirar é pela folha', async () => {
+    const { disciplines } = await helenaInEvolve()
+    const auspex = () => screen.getByRole('adjustable', { name: 'Auspícios' })
+    for (const _ of [1, 2])
+      fireEvent(auspex(), 'accessibilityAction', {
+        nativeEvent: { actionName: 'decrement' },
+      })
+    expect(disciplines()?.find(d => d.name === 'Auspícios')?.value).toBe(0)
+    expect(
+      screen.getByRole('button', { name: 'Auspícios, 0 de 5' })
+    ).toBeTruthy()
+    // No mínimo, o "−" não desce mais
+    fireEvent(auspex(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(disciplines()?.find(d => d.name === 'Auspícios')?.value).toBe(0)
+  })
+
+  it('R-25: a linha não aninha botões, e o nome abre a folha com a dica', async () => {
+    await helenaInEvolve()
+    const row = within(screen.getByTestId('item-disciplines-d2'))
+    const name = row.getByRole('button', { name: 'Auspícios, 2 de 5' })
+    expect(name.props.accessibilityHint).toBe(
+      'Abre o item: nome, especialização e notas'
+    )
+    expect(within(name).queryByRole('adjustable')).toBeNull()
+    expect(row.getByRole('adjustable', { name: 'Auspícios' })).toBeTruthy()
+  })
+
+  it('R-25: lista sem valor (Qualidades) continua com a linha que abre a folha, sem −/+', async () => {
+    const helena = example('helena').sheet
+    const sheet = {
+      ...helena,
+      values: {
+        ...helena.values,
+        merits: [{ id: 'm1', name: 'Ambidestro', meta: { cost: 1 } }],
+      },
+    }
+    await renderLive(
+      { model: vtm, sheet, mode: 'evolve' },
+      fakeServer(vtm, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const merits = within(screen.getByTestId('editor-merits'))
+    expect(merits.queryByRole('adjustable')).toBeNull()
+    expect(merits.getByRole('button', { name: /^Ambidestro/ })).toBeTruthy()
+  })
+
+  it('R-25: ficha ativa, dona: o −/+ da linha fica desabilitado com "Peça ao narrador."', async () => {
+    const helena = example('helena').sheet
+    await renderLive(
+      {
+        model: vtm,
+        sheet: helena,
+        mode: 'evolve',
+        lifecycle: { status: 'active', locked: false, member: true },
+      },
+      fakeServer(vtm, helena).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const disciplines = within(screen.getByTestId('editor-disciplines'))
+    expect(
+      disciplines.getByRole('adjustable', { name: 'Auspícios' }).props[
+        'aria-disabled'
+      ]
+    ).toBe(true)
+    expect(disciplines.getByText('Peça ao narrador.')).toBeTruthy()
+    // O nome continua abrindo a folha (nome e notas seguem editáveis)
+    fireEvent.press(
+      disciplines.getByRole('button', { name: 'Auspícios, 2 de 5' })
+    )
+    expect(screen.getByTestId('item-sheet-disciplines')).toBeTruthy()
   })
 
   it('remover pede confirmação', async () => {
@@ -349,13 +427,14 @@ describe('outros sistemas, o mesmo editor', () => {
     expect(
       resonance.getByRole('button', { name: 'Entrópica, 0 de 5' })
     ).toBeTruthy()
-    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
-    fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
+    // Os pontos sobem na linha; o descritor muda na folha
     fireEvent(
-      screen.getByRole('adjustable', { name: 'Entrópica, valor' }),
+      resonance.getByRole('adjustable', { name: 'Entrópica' }),
       'accessibilityAction',
       { nativeEvent: { actionName: 'increment' } }
     )
+    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
+    fireEvent.changeText(screen.getByLabelText('Descritor'), 'Fria')
     fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
     const items = store().getState().draftEvents()[0]?.to as ListItem[]
     expect(items).toEqual([

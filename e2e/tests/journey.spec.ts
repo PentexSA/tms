@@ -121,10 +121,11 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('gera')
   await page.getByRole('button', { name: 'Geração', exact: true }).click()
-  await page.getByRole('button', { name: /^Geração, 1 de 5/ }).click()
-  for (let i = 0; i < 4; i++)
-    await stepper(page, 'Aumentar Geração, valor').click()
-  await page.getByRole('button', { name: 'Aplicar' }).click()
+  // R-25: o valor sobe na própria linha, sem abrir a folha do item
+  for (let i = 0; i < 4; i++) await stepper(page, 'Aumentar Geração').click()
+  await expect(
+    page.getByRole('button', { name: /^Geração, 5 de 5/ })
+  ).toBeVisible()
   await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
   await page

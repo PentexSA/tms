@@ -11,7 +11,11 @@ import {
 import { useCallback } from 'react'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
 import { blockedBy, blockedNote, useLifecycle } from '../policy'
-import type { CommitResult, DraftNotice } from '../store/sheetStore'
+import type {
+  CommitResult,
+  DraftNotice,
+  DraftWriteOptions,
+} from '../store/sheetStore'
 
 // O que os editores de Evoluir leem e escrevem. O modo é UX: quem decide se
 // a escrita vale é o applyBatch (aqui, no rascunho) e o servidor.
@@ -78,10 +82,10 @@ export const useDraftCount = (): number =>
 export function useSetDraft() {
   const store = useSheetStore()
   return useCallback(
-    (path: string, to: unknown): string | null => {
+    (path: string, to: unknown, options?: DraftWriteOptions): string | null => {
       const result: CommitResult | null = store
         .getState()
-        .setDraftValue(path, to)
+        .setDraftValue(path, to, options)
       if (!result || result.ok) return null
       return result.issues[0]?.message ?? 'valor inválido'
     },
