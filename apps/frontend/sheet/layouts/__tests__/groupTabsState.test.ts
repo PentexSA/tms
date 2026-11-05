@@ -41,10 +41,13 @@ describe('jumpTo', () => {
     store.anchorAt('advantages', 300)
     await frame()
     expect(jumps.map(j => j.y)).toEqual([780])
-    // Resolvido, o pedido sai: medir de novo não rola de novo
+    // Resolvido, o pedido sai; uma medida nova do destino, dentro da
+    // janela, só corrige a rolagem, sem mover o foco de novo (B1)
     store.anchorAt('advantages', 310)
-    await frame()
-    expect(jumps).toHaveLength(1)
+    expect(jumps.slice(1)).toEqual([{ y: 790, focus: null }])
+    // A mesma posição não rola de novo
+    store.anchorAt('advantages', 310)
+    expect(jumps).toHaveLength(2)
   })
 
   it('prefere o grupo, medido dentro da seção, à seção', async () => {
@@ -147,5 +150,46 @@ describe('remeasure (A3)', () => {
     panel = 0
     store.remeasure()
     expect(store.panelTop()).toBe(1500 - 120)
+  })
+})
+
+// B1 (roteiro do Android): a aba recém-montada mede a âncora numa posição
+// provisória e depois na final; o salto vai para a final
+describe('salto para outra aba (B1)', () => {
+  it('a medida provisória da âncora não vence: o alvo é a final', async () => {
+    const { store, jumps } = setup()
+    const focus = jest.fn()
+    store.jumpTo(['abilities'])
+    // A primeira medida (o painel ainda sem as seções de cima) e a final, no
+    // mesmo quadro: o salto espera um quadro quieto e vai direto à final
+    store.anchorAt('abilities', 0, focus)
+    store.anchorAt('abilities', 900, focus)
+    await frame()
+    expect(jumps).toEqual([{ y: 600 + 900 - 120, focus }])
+    // A final num quadro depois do salto: a rolagem termina nela, e o foco
+    // não se move de novo
+    store.jumpTo(['rites'])
+    store.anchorAt('rites', 0, focus)
+    await frame()
+    store.anchorAt('rites', 1500, focus)
+    expect(jumps.at(-1)).toEqual({ y: 600 + 1500 - 120, focus: null })
+    expect(jumps.filter(j => j.focus)).toHaveLength(2)
+  })
+
+  it('a medida final depois do salto corrige a rolagem, sem mover o foco', async () => {
+    const { store, jumps } = setup()
+    const focus = jest.fn()
+    store.anchorAt('gifts', 0, focus)
+    store.jumpTo(['gifts'])
+    await frame()
+    expect(jumps).toEqual([{ y: 480, focus }])
+    store.anchorAt('gifts', 1200, focus)
+    expect(jumps.slice(1)).toEqual([{ y: 600 + 1200 - 120, focus: null }])
+    // Fora da janela do pedido, nada mais rola
+    const now = jest.spyOn(Date, 'now')
+    now.mockReturnValue(Date.now() + JUMP_TTL_MS + 10)
+    store.anchorAt('gifts', 1300, focus)
+    now.mockRestore()
+    expect(jumps).toHaveLength(2)
   })
 })
