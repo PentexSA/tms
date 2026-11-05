@@ -758,6 +758,21 @@ describe('"Faltam" na barra (R-18)', () => {
     expect(section.props.nativeID).toBe('anchor-abilities')
   })
 
+  // /code-review 7: a lista só é montada de novo quando a conta muda
+  it('mudar o que não é a conta não remonta a lista do guia', async () => {
+    await open(PRIORITIES)
+    tab('Pontos')
+    const spy = jest.spyOn(guideModule, 'guideItems')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    expect(screen.getByTestId('creation-phase')).toHaveTextContent(
+      'Fase: pontos de bônus'
+    )
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
   it('fechar a conta tira o "Faltam" e mostra o "Concluir"', async () => {
     await open(PRIORITIES, ALMOST)
     expect(screen.getByTestId('creation-guide')).toBeTruthy()

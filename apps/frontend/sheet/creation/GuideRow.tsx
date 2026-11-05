@@ -1,6 +1,5 @@
-import { jsonEqual } from '@tms/sheet-core'
 import { Pressable, Text, tokens, useLayout } from '@tms/ui'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector } from '../context'
 import { useGuideNav } from './CreationContext'
@@ -23,13 +22,16 @@ import {
 // A largura do "Salvar" na barra (P03-D §3.0) e o espaço entre os botões
 const SAVE_WIDTH = 86
 
-/** Os itens do "O que falta" da ficha aberta (sem os `confirm`). */
+/**
+ * Os itens do "O que falta" da ficha aberta: só os da conta (`blocking` e
+ * `missing`). Os `confirm` vêm do useCreationNotices (o contrato do P07-D),
+ * nunca daqui. A conta é assinada por referência: a lista só é montada de
+ * novo quando o `check` muda, não a cada atualização do store.
+ */
 export function useGuideItems(): readonly GuideItem[] {
   const { model, roles } = useSheet()
-  return useSheetSelector(
-    s => guideItems(model, s.check, roles).filter(i => i.kind !== 'confirm'),
-    jsonEqual
-  )
+  const check = useSheetSelector(s => s.check)
+  return useMemo(() => guideItems(model, check, roles), [model, check, roles])
 }
 
 export function GuideRow({ items }: { readonly items: readonly GuideItem[] }) {
