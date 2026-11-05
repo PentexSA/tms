@@ -49,7 +49,7 @@ import {
   CreationStatusPanel,
   useCreating,
 } from './creation/CreationPanel'
-import { type GuideTarget, POINTS_TAB } from './creation/guide'
+import { type GuideTarget, MISSING_TARGET, POINTS_TAB } from './creation/guide'
 import {
   CompletedWhileEditingBanner,
   ReturnedBanner,
@@ -283,22 +283,24 @@ function SheetBody({
   // medida (a aba nova ainda não foi desenhada). Fica na mesma tela: nada
   // vai para a URL nem para o histórico
   const tabIds = tabs.map(t => t.id).join(' ')
+  const tabSet = useMemo(() => new Set(tabIds.split(' ')), [tabIds])
   const playRef = useRef<ViewInstance>(null)
+  // O "Em jogo" é alvo só quando está na rolagem (no Jogo do celular, ele
+  // vira o dock)
+  const playAnchored = play.length > 0 && !docked
   const goTo = useCallback(
     (target: GuideTarget | null) => {
-      const t = target ?? {
-        tab: BUDGET_TAB,
-        section: 'creation-missing',
-        group: null,
-        path: null,
-      }
       const anchors = groupTabs.store
-      if (t.tab === 'play') {
+      if (target?.tab === 'play' && playAnchored) {
         setPlayOpen(true)
         anchors.jumpTo([PLAY_ANCHOR])
         return
       }
-      if (tabIds.split(' ').includes(t.tab)) showTab(t.tab)
+      // Uma zona sem aba (a identidade) não tem âncora: a lista inteira, na
+      // aba Pontos, em vez de um pedido que nunca se resolve
+      const t = target && tabSet.has(target.tab) ? target : MISSING_TARGET
+      if (!tabSet.has(t.tab)) return
+      showTab(t.tab)
       const section = t.section ? model.sections.get(t.section) : undefined
       if (section?.def.groupTabs && t.group) anchors.select(section.id, t.group)
       anchors.jumpTo(
@@ -309,7 +311,7 @@ function SheetBody({
         ].filter((id): id is string => Boolean(id))
       )
     },
-    [groupTabs.store, model, showTab, tabIds]
+    [groupTabs.store, model, showTab, tabSet, playAnchored]
   )
   const { reduceMotion } = useTheme()
   useEffect(

@@ -832,6 +832,40 @@ describe('aba Pontos (R-18)', () => {
     expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeSelected()
   })
 
+  // /code-review 1: uma zona sem aba (a identidade) não tem âncora; o toque
+  // leva à lista inteira, em vez de um pedido que nunca se resolve
+  it('alvo numa zona sem aba vai à lista do "O que falta"', async () => {
+    const notice: guideModule.GuideItem = {
+      key: 'confirm:identity',
+      kind: 'confirm',
+      short: 'Clã',
+      text: 'Confirme com o narrador: o clã.',
+      target: {
+        tab: 'identity',
+        section: 'about-facts',
+        group: null,
+        path: 'values.clan',
+      },
+    }
+    jest.spyOn(guideModule, 'useCreationNotices').mockReturnValue([notice])
+    await open(PRIORITIES)
+    tab('Pontos')
+    const scrollView = screen.UNSAFE_getAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollTo = jest.spyOn(scrollView, 'scrollTo')
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    layout('creation-panel', 0)
+    fireEvent.press(
+      within(screen.getByTestId('creation-notices')).getByRole('button')
+    )
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenCalledWith({ y: 480, animated: true })
+    )
+  })
+
   it('o "confirme com o narrador" fica na aba e na confirmação, nunca no "Faltam"', async () => {
     const notice: guideModule.GuideItem = {
       key: 'confirm:gift',
