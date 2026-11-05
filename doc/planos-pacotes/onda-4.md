@@ -703,21 +703,21 @@ Cada linha só fica "ok" com a ficha concluída de ponta a ponta, sem ajuda de f
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| SAIDA-V20-I | Web 390 (I-W, Tarefa 3, SEQ 2; IW-05, IW-06, IW-09) e iOS SE (obrigatório: I-A, Tarefa 3, SEQ 2; IA-06, IA-07, IA-18, IA-21) | J1 | "Vampiro v4" → Nova ficha "Brujah R" (Clã Brujah, pelo rádio) → abrir o "Ajuda: Clã" → Criar → seguir só o "Faltam" da barra até a conta fechar → Vantagens: 3 Disciplinas pelo "Do clã" → Pontos → bônus → "Concluir criação" | O "?" do Clã com a frase do time; o "Faltam" leva a cada grupo com o foco no título; a folha de bônus aparece uma vez; a aba se chama "Pontos" e a fase está em texto; as Disciplinas "do clã" primeiro; a Fraqueza com o resumo do clã; "A conta fechou: você conclui." e o "Concluir" no lugar do "Faltam"; concluída | `onda4-web390-SAIDA-V20-I-01..10.png`, `onda4-ios-se-SAIDA-V20-I-01..10.png` | |
-| SAIDA-V20-E | Android 393 (E-A, Tarefa 2, SEQ 5) e web 390 (E-W, Tarefa 2, SEQ 5) | J1 | "Vampiro v4" → ficha nova → prioridades → traços → a FdV no "Em jogo" → Vantagens com o −/+ na linha → uma Qualidade com bônus → concluir | A FdV atual acompanha a permanente (T-22); o "−" da FdV abaixo do inicial explica e não desce (T-85); o −/+ da Disciplina na linha, sem folha; a Qualidade com Custo, paga com bônus, e a recusa (se houver) dentro da folha, com o nome mantido (T-08); "Nenhuma Qualidade" antes da primeira (T-66) | `onda4-and393-SAIDA-V20-E-01..08.png`, `onda4-web390-SAIDA-V20-E-01..08.png` | |
-| SAIDA-M20 | Web 1280 com passada em 390 (obrigatório: E-W, Tarefa 3, SEQ 6); iOS SE (Iniciante, cobertura nova; PO-A, POA-14, POA-15) | J1 | "Mago v4" → Nova ficha "Verbena R" (Tradição Verbena) → "Casa ou subgrupo" vazia → Criar → Esfera de afinidade → Arete → Esferas → Quintessência no "Em jogo" → concluir | "Casa ou subgrupo" com "Opcional" e o "?"; a ficha abre sem a Casa (U-06); a Esfera "da Tradição" primeiro; uma fora mostra "fora da Tradição: confirme com o narrador" e não bloqueia; a Quintessência = Avatar durante a criação (U-05); a Natureza e o Comportamento em ordem de rótulo (T-60); concluída | `onda4-web1280-SAIDA-M20-01..09.png`, `onda4-ios-se-SAIDA-M20-01..09.png` | |
-| SAIDA-W20 | Android 393 (obrigatório: E-A, Tarefa 3, SEQ 3; EA-08, EA-14) e web 390 (Iniciante, cobertura nova; PO-W, SEQ 4) | J1 | "Lobisomem v4" → Nova ficha "Lupino R" (Lupino, Ahroun e uma Tribo) → Criar → Fúria → Gnose → "Adicionar Dom" → uma recomendada → uma de Posto 2 → Pontos → concluir | Os rádios de Raça, Augúrio e Tribo com título e "?"; a Fúria começa no mínimo do Augúrio, e o "−" abaixo dele explica (T-85); a Gnose acompanha (T-22); "Adicionar Dom" com os blocos "da Raça", "do Augúrio" e "da Tribo"; o Dom de Posto 2 mostra "confirme com o narrador" na linha e em "Para confirmar com o narrador", em Pontos, sem bloquear; o "Concluir" aparece quando a conta fecha; concluída | `onda4-and393-SAIDA-W20-01..09.png`, `onda4-web390-SAIDA-W20-01..09.png` | |
+| SAIDA-V20-I | Web 390 (I-W, Tarefa 3, SEQ 2; IW-05, IW-06, IW-09) e iOS SE (obrigatório: I-A, Tarefa 3, SEQ 2; IA-06, IA-07, IA-18, IA-21) | J1 | "Vampiro v4" → Nova ficha "Brujah R" (Clã Brujah, pelo rádio) → abrir o "Ajuda: Clã" → Criar → seguir só o "Faltam" da barra até a conta fechar → Vantagens: 3 Disciplinas pelo "Do clã" → Pontos → bônus → "Concluir criação" | O "?" do Clã com a frase do time; o "Faltam" leva a cada grupo com o foco no título; a folha de bônus aparece uma vez; a aba se chama "Pontos" e a fase está em texto; as Disciplinas "do clã" primeiro; a Fraqueza com o resumo do clã; "A conta fechou: você conclui." e o "Concluir" no lugar do "Faltam"; concluída | `onda4-web390-SAIDA-V20-I-01..10.png`, `onda4-ios-se-SAIDA-V20-I-01..10.png` | Web 390: ok. iOS SE: ok. Nos dois, a Fraqueza fica sem resumo (os resumos não entraram) |
+| SAIDA-V20-E | Android 393 (E-A, Tarefa 2, SEQ 5) e web 390 (E-W, Tarefa 2, SEQ 5) | J1 | "Vampiro v4" → ficha nova → prioridades → traços → a FdV no "Em jogo" → Vantagens com o −/+ na linha → uma Qualidade com bônus → concluir | A FdV atual acompanha a permanente (T-22); o "−" da FdV abaixo do inicial explica e não desce (T-85); o −/+ da Disciplina na linha, sem folha; a Qualidade com Custo, paga com bônus, e a recusa (se houver) dentro da folha, com o nome mantido (T-08); "Nenhuma Qualidade" antes da primeira (T-66) | `onda4-and393-SAIDA-V20-E-01..08.png`, `onda4-web390-SAIDA-V20-E-01..08.png` | Web 390: ok, com a "Ficha Pontos R" do seed. Android 393: ok, com a "Brujah R" nova |
+| SAIDA-M20 | Web 1280 com passada em 390 (obrigatório: E-W, Tarefa 3, SEQ 6); iOS SE (Iniciante, cobertura nova; PO-A, POA-14, POA-15) | J1 | "Mago v4" → Nova ficha "Verbena R" (Tradição Verbena) → "Casa ou subgrupo" vazia → Criar → Esfera de afinidade → Arete → Esferas → Quintessência no "Em jogo" → concluir | "Casa ou subgrupo" com "Opcional" e o "?"; a ficha abre sem a Casa (U-06); a Esfera "da Tradição" primeiro; uma fora mostra "fora da Tradição: confirme com o narrador" e não bloqueia; a Quintessência = Avatar durante a criação (U-05); a Natureza e o Comportamento em ordem de rótulo (T-60); concluída | `onda4-web1280-SAIDA-M20-01..09.png`, `onda4-ios-se-SAIDA-M20-01..09.png` | Web 1280 e 390: ok. iOS SE: ok, enviada e aprovada. O T-60 da Natureza não se aplica: no M20, o campo é texto livre |
+| SAIDA-W20 | Android 393 (obrigatório: E-A, Tarefa 3, SEQ 3; EA-08, EA-14) e web 390 (Iniciante, cobertura nova; PO-W, SEQ 4) | J1 | "Lobisomem v4" → Nova ficha "Lupino R" (Lupino, Ahroun e uma Tribo) → Criar → Fúria → Gnose → "Adicionar Dom" → uma recomendada → uma de Posto 2 → Pontos → concluir | Os rádios de Raça, Augúrio e Tribo com título e "?"; a Fúria começa no mínimo do Augúrio, e o "−" abaixo dele explica (T-85); a Gnose acompanha (T-22); "Adicionar Dom" com os blocos "da Raça", "do Augúrio" e "da Tribo"; o Dom de Posto 2 mostra "confirme com o narrador" na linha e em "Para confirmar com o narrador", em Pontos, sem bloquear; o "Concluir" aparece quando a conta fecha; concluída | `onda4-and393-SAIDA-W20-01..09.png`, `onda4-web390-SAIDA-W20-01..09.png` | Web 390 e Android 393: ok. O aviso do Posto (A2) faltava no web e foi corrigido em `1a1bd4c`; no Android já aparece. O catálogo fica não conferido (commit 8 do P07-D em parte) |
 
 ### 10.7 Itens que dependem de mais de um pacote
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| X-faltam-dom | Web 390; Android 393; iOS SE | J1 | "Lupino R" com a conta quase fechada e um Dom de Posto 2 → olhar a barra → Pontos → tocar "Concluir criação" | A barra mostra só o que falta da conta, sem o aviso do Dom (P05-D); em Pontos, "O que falta" e depois "Para confirmar com o narrador: …" (P07-D); a confirmação de concluir traz "1 item para confirmar com o narrador"; concluir funciona (o servidor aceita) | `onda4-<plat>-X-faltam-dom-01..04.png` | |
-| X-opcao | Web 390 e 1280 (Chromium e WebKit); Android 360 e 393; iOS SE | J1 | "Brujah R" → Vantagens → "Adicionar Disciplina" → ler as opções → abrir o "?" de uma → escolher uma "Outra" | Os blocos "Do clã" e "Outras", cada um na ordem do rótulo (P07-D com o `byLabel` do P10-C); o nome acessível "Potência, do clã" e o "?" com o nome "Ajuda: Potência" (P10-D); cada alvo ≥ 44 (48 no Android); a 1280, o diálogo de 560 medido no painel; a linha nova com o −/+ (sem "?") e "fora do clã: confirme com o narrador" | `onda4-<plat>-X-opcao-01..05.png` | |
-| X-versao | Web 390; Android 393 | J1 e N | A ficha nova "Brujah R" e a "Antiga R" (10.1) lado a lado → a identidade, a Fraqueza e as Vantagens das duas | A nova: vtm-v20 1.9.0, com os selos, a Fraqueza preenchida e as frases. A antiga: continua na 1.8.0, sem "Atualize o app", com o −/+ na linha, a ordem, o "Nenhuma", o "Faltam" e a aba "Pontos"; sem os selos e sem a Fraqueza preenchida (seção 4.7). As duas abrem para o N | `onda4-<plat>-X-versao-01..04.png` | |
-| X-derivados | Web 390; Android 393 (dock); iOS SE | J1, depois N | "Lupino R": comprar 1 de Fúria e 1 de Gnose com bônus → "Em jogo" → Salvar → Jogo (dock) → N: crônica → Mesa | "Em jogo" com a Fúria atual = permanente e a Gnose atual = permanente; o dock com "Fúria, 6 de 6"; a Mesa (N) com "6/6" no cartão. O mesmo para a FdV do "Brujah R" (V20) e para a Quintessência do "Verbena R" no "Em jogo" (M20; a Gnose do W20 não está no dock nem na Mesa) | `onda4-<plat>-X-derivados-01..06.png` | |
-| X-barra | Android 360, 393 e 411; iOS SE e 17; web 360 e 390 | J1 | "Brujah R" em Criação com a conta aberta → medir a `mode-bar` → fechar a conta → medir de novo | O "Faltam" na linha dos botões, com itens inteiros e "e mais N"; a altura é a mesma com a conta aberta e fechada (108/104 previstos), com o número de linhas de texto anotado (seção 8, pergunta 1); "A conta fechou: você conclui." e o "Concluir" no lugar do "Faltam" | `onda4-<plat>-X-barra-01..04.png` | |
-| X-folha-bonus | iOS SE e 17 (obrigatório: U-07); web 390; Android 393 | J1 | Fechar os básicos (folha) → "Entendi" → Jogo → Criação → tirar um básico e repor → sair da ficha e voltar → tirar e repor | A folha aparece uma vez; nas voltas, não aparece de novo; "Ver Pontos" abre a aba depois de a folha sair (`onClosed`); o foco volta ao "+"; no web, o Esc fecha | `onda4-<plat>-X-folha-bonus-01..06.png` | |
+| X-faltam-dom | Web 390; Android 393; iOS SE | J1 | "Lupino R" com a conta quase fechada e um Dom de Posto 2 → olhar a barra → Pontos → tocar "Concluir criação" | A barra mostra só o que falta da conta, sem o aviso do Dom (P05-D); em Pontos, "O que falta" e depois "Para confirmar com o narrador: …" (P07-D); a confirmação de concluir traz "1 item para confirmar com o narrador"; concluir funciona (o servidor aceita) | `onda4-<plat>-X-faltam-dom-01..04.png` | Web: falha (A2), corrigida em `1a1bd4c`. Android e iOS SE: ok, depois da correção |
+| X-opcao | Web 390 e 1280 (Chromium e WebKit); Android 360 e 393; iOS SE | J1 | "Brujah R" → Vantagens → "Adicionar Disciplina" → ler as opções → abrir o "?" de uma → escolher uma "Outra" | Os blocos "Do clã" e "Outras", cada um na ordem do rótulo (P07-D com o `byLabel` do P10-C); o nome acessível "Potência, do clã" e o "?" com o nome "Ajuda: Potência" (P10-D); cada alvo ≥ 44 (48 no Android); a 1280, o diálogo de 560 medido no painel; a linha nova com o −/+ (sem "?") e "fora do clã: confirme com o narrador" | `onda4-<plat>-X-opcao-01..05.png` | ok em web (Chromium e WebKit, 390 e 1280), Android (360 e 393) e iOS SE. O "?" da Disciplina não existe (o template não tem frase por Disciplina); o "?" de opção foi conferido nos Antecedentes |
+| X-versao | Web 390; Android 393 | J1 e N | A ficha nova "Brujah R" e a "Antiga R" (10.1) lado a lado → a identidade, a Fraqueza e as Vantagens das duas | A nova: vtm-v20 1.9.0, com os selos, a Fraqueza preenchida e as frases. A antiga: continua na 1.8.0, sem "Atualize o app", com o −/+ na linha, a ordem, o "Nenhuma", o "Faltam" e a aba "Pontos"; sem os selos e sem a Fraqueza preenchida (seção 4.7). As duas abrem para o N | `onda4-<plat>-X-versao-01..04.png` | Web 390 e Android 393: ok. A "Antiga R" foi emulada: criada pela tela e passada para a 1.8.0 no banco local. Sem a Fraqueza da ficha nova |
+| X-derivados | Web 390; Android 393 (dock); iOS SE | J1, depois N | "Lupino R": comprar 1 de Fúria e 1 de Gnose com bônus → "Em jogo" → Salvar → Jogo (dock) → N: crônica → Mesa | "Em jogo" com a Fúria atual = permanente e a Gnose atual = permanente; o dock com "Fúria, 6 de 6"; a Mesa (N) com "6/6" no cartão. O mesmo para a FdV do "Brujah R" (V20) e para a Quintessência do "Verbena R" no "Em jogo" (M20; a Gnose do W20 não está no dock nem na Mesa) | `onda4-<plat>-X-derivados-01..06.png` | Web 390 e Mesa a 1280: ok nos três sistemas. Android: ok no V20 e no W20, com dock e Mesa; o M20 fica não conferido. iOS SE: ok |
+| X-barra | Android 360, 393 e 411; iOS SE e 17; web 360 e 390 | J1 | "Brujah R" em Criação com a conta aberta → medir a `mode-bar` → fechar a conta → medir de novo | O "Faltam" na linha dos botões, com itens inteiros e "e mais N"; a altura é a mesma com a conta aberta e fechada (108/104 previstos), com o número de linhas de texto anotado (seção 8, pergunta 1); "A conta fechou: você conclui." e o "Concluir" no lugar do "Faltam" | `onda4-<plat>-X-barra-01..04.png` | Web 360 e 390: 106 px. Android 360, 393 e 411: 110 dp (139 com a fonte a 130%). iOS SE e 17: ~108 pt. A altura é a mesma com a conta aberta e fechada; o texto ocupa 2 linhas |
+| X-folha-bonus | iOS SE e 17 (obrigatório: U-07); web 390; Android 393 | J1 | Fechar os básicos (folha) → "Entendi" → Jogo → Criação → tirar um básico e repor → sair da ficha e voltar → tirar e repor | A folha aparece uma vez; nas voltas, não aparece de novo; "Ver Pontos" abre a aba depois de a folha sair (`onClosed`); o foco volta ao "+"; no web, o Esc fecha | `onda4-<plat>-X-folha-bonus-01..06.png` | Web 390: ok, depois de `459ea67` (o E2E achou a folha reabrindo ao recarregar). Android 393, iOS SE e 17: ok |
 
 ### 10.8 Pendências do iOS da onda 3 ([onda-3.md](onda-3.md) §11)
 
@@ -725,11 +725,11 @@ Rodam no iPhone SE, no bloco 4 do iOS:
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| O3-P05-C | iOS SE | J1 | T-20 (o aviso na altura do toque); T-55 (some ao subir o Arete, no Mago); R-17 (custo e extrato, como o P05-C entregou); R-28 (toast das prioridades); T-21 (rola e foca o Nome) | Como na tabela do P05-C §7. Os textos do P10-C e do P07-D (o "−" do inicial, a Qualidade sem Custo) aparecem no mesmo lugar do aviso | `onda4-ios-se-O3-P05C-01..06.png` | |
-| O3-T-19 | iOS SE | J1 | Gastar os 15 de bônus → "Adicionar Qualidade" → um nome → Return | A recusa dentro da folha, com o nome mantido (T-19; o T-08 do P07-D) | `onda4-ios-se-O3-T19-01..03.png` | |
-| O3-T-26 | iOS SE | J1 | Nova ficha → teclado de software → "Próximo" de campo em campo | O "Próximo" passa ao campo seguinte. Com o idb, o teclado de software some depois do primeiro texto, e o item pode seguir "não conferido", com esse motivo | `onda4-ios-se-O3-T26-01..03.png` | |
-| O3-T-80 | iOS SE | J1 e N | Concluir uma ficha → Histórico | Só "Criação concluída", sem os passos de cada ponto | `onda4-ios-se-O3-T80-01..02.png` | |
-| O3-T-04-gesto | iOS SE | J1 | "Salvar e sair" pelo gesto de voltar | **Segue "não conferido":** o `idb ui swipe` não dispara o gesto de borda (6 variações na onda 3). O "‹" já foi conferido na onda 3 | — | |
+| O3-P05-C | iOS SE | J1 | T-20 (o aviso na altura do toque); T-55 (some ao subir o Arete, no Mago); R-17 (custo e extrato, como o P05-C entregou); R-28 (toast das prioridades); T-21 (rola e foca o Nome) | Como na tabela do P05-C §7. Os textos do P10-C e do P07-D (o "−" do inicial, a Qualidade sem Custo) aparecem no mesmo lugar do aviso | `onda4-ios-se-O3-P05C-01..06.png` | ok (T-20, T-55, R-17, R-28, T-21) |
+| O3-T-19 | iOS SE | J1 | Gastar os 15 de bônus → "Adicionar Qualidade" → um nome → Return | A recusa dentro da folha, com o nome mantido (T-19; o T-08 do P07-D) | `onda4-ios-se-O3-T19-01..03.png` | ok |
+| O3-T-26 | iOS SE | J1 | Nova ficha → teclado de software → "Próximo" de campo em campo | O "Próximo" passa ao campo seguinte. Com o idb, o teclado de software some depois do primeiro texto, e o item pode seguir "não conferido", com esse motivo | `onda4-ios-se-O3-T26-01..03.png` | não conferido: o `idb ui text` esconde o teclado de software depois do primeiro texto |
+| O3-T-80 | iOS SE | J1 e N | Concluir uma ficha → Histórico | Só "Criação concluída", sem os passos de cada ponto | `onda4-ios-se-O3-T80-01..02.png` | ok (J1 e N) |
+| O3-T-04-gesto | iOS SE | J1 | "Salvar e sair" pelo gesto de voltar | **Segue "não conferido":** o `idb ui swipe` não dispara o gesto de borda (6 variações na onda 3). O "‹" já foi conferido na onda 3 | — | não conferido: o idb não faz o gesto de borda |
 
 ### 10.9 Itens obrigatórios por plataforma
 
@@ -802,3 +802,156 @@ Nunca "ok" sem a evidência.
 - os achados da integração;
 - o resultado das suítes;
 - a conferência manual por plataforma.
+
+## 11. Integração (04 e 05/11/2026)
+
+Cada pacote foi implementado em paralelo, por um agente no próprio worktree, e entrou na `onda/4-conteudo-guia` em série, na ordem da seção 2. Antes do merge, o P10-C, o P07-D e o P10-D receberam a onda na própria branch e resolveram os conflitos lá:
+
+- **P10-C:** o "O que falta" passou a `GuideList`, e o texto da origem do inicial chega ao "Faltam" (o `guideItems` recebe a ficha resolvida);
+- **P07-D:**
+  - o "−" da linha usa o `Stepper.decrease`;
+  - os blocos "Do clã" / "Outras" usam o `byLabel`;
+  - os avisos viraram o corpo do `useCreationNotices`;
+- **P10-D:**
+  - o `recommend` e o `help` convivem no mesmo campo;
+  - a linha do item fica sem "?";
+  - o "?" do saldo fica na aba "Pontos";
+  - depois vêm o commit 7 (frase no catálogo e nas sugestões) e o commit de versão.
+
+As correções da integração foram feitas na branch do pacote e entraram na onda por um merge `--no-ff` novo.
+
+| Ordem | Pacote | Merge na onda | Revisão |
+|---|---|---|---|
+| 1 | P05-D | `b5e7e2e`, `459ea67`, `1458f76`, `ffb1253` | `/code-review` (high): 10 achados; 9 corrigidos no pacote, 1 registrado no §10 (a cadeia de âncoras) |
+| 2 | P10-C | `1af28fd` | `/code-review` (high): 10 achados; 8 corrigidos, 2 recusados com o motivo no §10 (a marca "até ser marcado" e o custo do `resolve`, medido em ~2% do toque) |
+| 3 | P07-D | `1762d0d`, `821805a`, `1a1bd4c`, `35b1a70`, `a41e25f` | `/code-review` (high): 10 achados, todos corrigidos |
+| 4 | P10-D, com o commit de versão | `3599998` | `/code-review` (high) em duas rodadas. A primeira, antes do merge da onda, teve 10 achados: 9 tratados e 1 mantido ("a aba Pontos", que depende do P05-D). A segunda, sobre o merge, o commit 7 e a versão, teve 8 achados: 7 corrigidos e 1 em parte (a validação dentro da migration, abaixo) |
+
+**`/security-review` da onda inteira (`c96f2d4..HEAD`):** nenhuma vulnerabilidade com confiança alta. Foram conferidos:
+
+- **o contrato e os validadores.** O texto novo passa pelo `text()`, que recusa `<`, `>`, controle e bidi. A regra "sem link" e "uma linha" fica na publicação, e a leitura das versões antigas continua tolerante;
+- **o `resolve`.** O default por opção lê só chave própria, então `__proto__` não alcança o prototype;
+- **o que não mudou:** o `recommend` e o `creationAdvice` ficam fora da conta e do servidor. O `checkCreation`, o `creationFreeze`, o `validateSheet`, o `describeEvent`, a AuthZ e as rotas não mudaram;
+- **a `0023`:** só dados, sem SQL concatenado;
+- **o texto do template no app:** só em `Text`, sem `dangerouslySetInnerHTML` nem link;
+- **a marca `seen:bonus`:** UUID, só `"1"` vale, e ela sai no logout.
+
+**Perguntas técnicas (seção 8): o que foi aplicado.** Sem resposta do time, cada pacote seguiu a proposta do próprio plano. Os desvios estão no §10 de cada plano.
+
+1. **A altura da barra com o "Faltam"** é a mesma com a conta aberta e fechada:
+
+   | Onde | Altura | Linhas de texto |
+   |---|---|---|
+   | Web a 360 e a 390 | 106 px | 2 |
+   | AVD a 360, 393 e 411 | 110 dp (139 com a fonte a 130%) | 2 |
+   | iOS SE e iPhone 17 | ~108 pt | 2 |
+
+2. **A frase do catálogo e das sugestões** vai num mapa por nome ao lado da lista (`catalogHelp` e `suggestionHelp`), sem a forma de objeto.
+3. **A `0023` é o caminho da versão nova.** A dúvida sobre como a 1.8.0 chegou à produção sem migration segue aberta.
+   - A `0023` usa o `publishProductTemplates` novo (`packages/db/src/templates.ts`), e a `0020` ficou como estava.
+   - **A validação dentro da migration não entrou.** Ela exigiria que o `@tms/db` dependesse do `@tms/sheet-core` e do Ajv, o que muda o `package.json` e o lockfile.
+   - Um teste da API prova que cada arquivo gravado pelas migrations passa pelo schema, pelo contrato, pelo `publicationIssues` e pelo `compileTemplate`. **Fica para decisão.**
+4. **O commit de versão** é o `9d1dcb2`, no fim da branch do P10-D. As correções da segunda revisão vieram depois dele, sem reescrever o histórico.
+5. **O foco depois de "ir ao grupo"** ficou não conferido nos leitores de tela. O `describe-all` não expõe o foco, e o AVD não tem TalkBack. Os saltos para outra aba (B1, abaixo) foram conferidos no AVD e no iOS.
+6. **O contador que volta a zero** vale para todo campo inteiro de `values`. Nenhum teste nem E2E mostrou caso indesejado.
+7. **O seed não ganhou `--fichas-onda4`.** As fichas foram criadas pela tela, com o `--fichas-criacao` da onda 3.
+8. **Só o nível 1 dos Dons:** o catálogo de Dons não entrou (seção 4.9).
+9. **Paradas de Tab:** cada "?" é uma parada; no `Choice`, as setas continuam só nos rádios.
+10. **A ordem usa o `fold` com ponto de código.**
+11. **O "?" só aparece na criação, no Editar e na Nova ficha.**
+12. **O `pip-audit` no venv do idb** não achou vulnerabilidade conhecida (`fb-idb` 1.7.7, Python 3.15.2).
+
+**O que entrou e o que ficou de fora:**
+
+- **Entraram:**
+  - as Disciplinas por clã (V20), copiadas do `itemIn` do XP;
+  - as Esferas por Tradição (M20);
+  - o aviso do Dom acima do Posto 1 (W20, `creation.advice`);
+  - as frases do `P10-D-frases.json`, como rascunho do time.
+- **Ficaram de fora:**
+  - o catálogo de Dons, que espera a lista do time e a licença;
+  - os resumos da Fraqueza, que o time escreve. O mecanismo dos dois entrou, testado com dados fictícios.
+- **Precisam de revisão antes da `main`:**
+  - as frases, por quem conhece cada sistema;
+  - o mapa Tradição → Esferas, montado a partir de uma fonte só (P07-D §10).
+
+**Achados da integração (commits na onda):**
+
+- **`459ea67` (P05-D, achado pelo E2E): a folha de bônus reabria depois de recarregar.**
+  - A memória da sessão fica vazia, e a marca só chega pela leitura assíncrona do aparelho. O `BonusNotice` decidia antes dessa leitura e antes de a conta existir.
+  - Agora ele espera as duas.
+- **`821805a` (P07-D, achado pelo E2E):** o spec clicava sem `force` num "+" com `aria-disabled`. O erro estava no teste.
+- **`1a1bd4c` (P07-D, roteiro web, A2): o `wta-w20` não tinha o `creation.advice` do Posto.**
+  - O brief da implementação restringiu demais o commit 8 do P07-D.
+  - A regra entrou na 1.7.0, que ainda não saiu da máquina.
+- **`1458f76` (P05-D, roteiro web):**
+  - **A3: a faixa fixa mostrava as sub-abas e a Prioridade da seção errada a 390,** depois de abrir ou fechar o "Em jogo". No RN-web, o `onLayout` só dispara com mudança de tamanho. O código é da onda 3, e a posição agora é lida de novo quando o conteúdo da rolagem muda de tamanho. O E2E ganhou o passo em `layout.spec.ts`;
+  - **A1: o narrador, em Leitura, via e acionava "Usar pontos de bônus agora".** A troca agora só aparece na Criação.
+- **`35b1a70` (P07-D, roteiro Android, T-24d):** a folha do Dom não mostrava o aviso do Posto. Agora o aviso acompanha o rascunho da folha.
+- **`ffb1253` (P05-D, roteiro Android):**
+  - **B1: o "ir ao grupo" para outra aba parava no topo da aba no AVD.** O salto espera um quadro sem medida nova e corrige a rolagem se o destino mudar até 1,5 s depois. Conferido no iOS;
+  - **B2: "falta 1 ponto básicos."** Agora o singular e o plural estão certos, também no contador falado e na recusa.
+- **`a41e25f` (P07-D, roteiro iOS, A4): o "fora da Tradição" ficava dentro do botão, e o VoiceOver não o lia.**
+  - A mesma correção vale para o "Resumo de …" da Fraqueza e para o erro do servidor, que viraram texto à parte.
+  - Conferido no Jest; não foi reconferido no iOS.
+
+**Resultado na onda com os quatro pacotes (`a41e25f`):**
+
+| Verificação | Resultado |
+|---|---|
+| build, typecheck e lint | verdes |
+| sheet-core | 1119 testes. O `random.test.ts` (distribuição dos d10 com a fonte real) falhou uma vez numa rodada e passou nas três seguintes; a onda não o toca |
+| config | 38 testes |
+| db | 39 testes |
+| api | 1924 testes (65 `*.pg.test` pulados no PGLite) |
+| ui | 226 testes |
+| frontend | 1593 testes; `test:coverage` dentro das metas. O Jest pelo `pnpm test` não encerra sozinho também na base `78de35c`; na integração, roda com `--forceExit` |
+| `*.pg.test` | 45 testes, no banco `tms_pg_test` |
+| E2E Chromium e WebKit | 184 testes, com os specs novos `creation-guide` e `help` e os passos novos de `advantages`, `layout` (A3), `creation-feedback`, `create-character`, `evolve` e `a11y-keyboard` |
+| Build nativo local (debug) | Android: `assembleDebug` (arm64). iOS: `xcodebuild` Debug para o simulador, com assinatura local. A onda não muda nada nativo, nem o `package.json` ou o lockfile |
+
+**Conferência manual** (API local com o seed do roteiro; contas `@roteiro.test`, só dados fictícios). O resultado de cada item está nas seções 10.6 a 10.8.
+
+| Onde | Seed | Resumo |
+|---|---|---|
+| Web 390, 360 e 1280 (Chromium; WebKit nos itens de Safari) | 05/11 00:44 | Os quatro SAIDA ok. A2, A3 e A1 achados e corrigidos. O R-19c não tem "?" em Jogo nem na folha da FdV, e isso é o desenho (pergunta 11) |
+| Android, AVD Pixel 3a a 393; layout a 360 e 411, e a 360 com a fonte a 130% | 05/11 01:48 | SAIDA-V20-E e SAIDA-W20 ok. B1, B2 e T-24d achados e corrigidos. O AVD ficou lento (carga de 6 a 29, ANR em tecla) e foi reiniciado com `-cores 4 -memory 3072`, só como opção de execução |
+| iOS, simulador iPhone SE (18.1) e iPhone 17 (26.5), pelo idb | 05/11 06:48 | SAIDA-V20-I e SAIDA-M20 ok, e todas as correções do web e do Android ok. A4 achado e corrigido. Da 10.8, o O3-P05-C, o O3-T-19 e o O3-T-80 ok |
+
+**Achados do roteiro manual que ficaram sem correção:**
+
+1. **Recursos no "Adicionar Antecedente" (iOS SE):** o texto do "?" da última opção visível abre abaixo da dobra da folha, e é preciso rolar para ler.
+2. **"Faltam" a 375 pt (desenho):** com "Disciplinas 3" como primeiro item, a barra mostra "Faltam 3 itens" em vez de "Disciplinas 3 · e mais 2". A estimativa do `fitGuide` passa da capacidade por 0,1 caractere. Segue a regra do plano, que não corta texto.
+3. **"Comportamento" a 360 (web):** o rótulo da identidade quebra no meio da palavra.
+4. **Traço no limite do template (onda-2.md §6, ponto 5):** no mínimo e no máximo, o botão usa `disabled` e `tabindex=-1`, sem explicação.
+5. **Android:** dentro do controle ajustável, o "−" e o "+" aparecem no dump com `content-desc` "−"/"+", sem o nome do item. Fica para ouvir com o TalkBack.
+6. **Histórico (anterior à onda):** o N tem "Desfazer" no lote de criação da J1 mesmo com a ficha já aprovada.
+7. **Higiene no iOS:** no login do bloco 4, a senha do seed caiu no campo E-mail pelo teclado de software. O `describe-all` do driver mostrou o valor na saída do terminal da sessão.
+   - Ela não foi para nenhum arquivo, captura ou relatório.
+   - O driver passou a esconder o valor dos campos E-mail e Senha.
+   - É a constante fictícia do seed, que pode ser trocada.
+
+**O que ficou não conferido, e por quê:**
+
+- **O catálogo de Dons e a Fraqueza com o resumo** (T-24a, T-24f, R-26c, os blocos do T-24e): o conteúdo não entrou.
+- **O "?" da Disciplina:** o template não tem frase por Disciplina. O "?" de opção foi conferido nos Antecedentes.
+- **Os anúncios do VoiceOver e do TalkBack e o foco no título** (R-18g e a 10.10): o AVD não tem TalkBack, e o `describe-all` não expõe o foco.
+- **O3-T-26 e O3-T-04-gesto:** limites do idb.
+- **No Android, por tempo, com o AVD lento:**
+  - a Quintessência do M20 no "Em jogo";
+  - o T-24d a 360;
+  - a Humanidade no T-85;
+  - "Nenhuma Cicatriz";
+  - o "?" pelo teclado.
+- **O A4 no iOS depois da correção:** só no Jest.
+
+**Fica para depois da integração local:**
+
+- os pontos para o PO da seção 6 e das ondas 1 a 3, que continuam sem decisão;
+- **a validação dentro da `0023`** (pergunta 3, acima);
+- **o conteúdo:**
+  - a revisão das frases e do mapa Tradição → Esferas;
+  - a lista de Dons, com a licença;
+  - os resumos da Fraqueza;
+- o anúncio pelo VoiceOver e pelo TalkBack, para ouvir no aparelho;
+- push da onda e PR para a `main`, com uma seção por pacote.
