@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from '@testing-library/react-native'
-import type { ListItem } from '@tms/sheet-core'
-import { example, modelOf } from '../../../test/fixtures'
+import { compileTemplate, type ListItem } from '@tms/sheet-core'
+import { example, modelOf, templateJson } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
@@ -363,6 +363,31 @@ describe('outros sistemas, o mesmo editor', () => {
       { id: 'entropic', text: 'Fria', value: 1 },
       { id: 'static', text: 'Metódica', value: 1 },
     ])
+  })
+
+  // R-19 (revisão, item 3): o help do item fixo é desenhado no topo da folha
+  it('Mago: a folha do item fixo mostra a frase dele, se o template tiver', async () => {
+    const c = example('otto')
+    const t = templateJson(c.system)
+    const resonanceDef = (t.fields as Record<string, Record<string, unknown>>)
+      .resonance as { fixed: { id: string; help?: string }[] }
+    const [dynamic, entropic] = resonanceDef.fixed
+    if (dynamic) dynamic.help = 'Frase da Dinâmica, do teste.'
+    if (entropic) delete entropic.help
+    const model = compileTemplate(t)
+    await renderLive(
+      { model, sheet: c.sheet, mode: 'evolve' },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    const resonance = within(screen.getByTestId('editor-resonance'))
+    fireEvent.press(resonance.getByRole('button', { name: /^Dinâmica/ }))
+    expect(screen.getByTestId('item-help')).toHaveTextContent(
+      'Frase da Dinâmica, do teste.'
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+    fireEvent.press(resonance.getByRole('button', { name: /^Entrópica/ }))
+    expect(screen.queryByTestId('item-help')).toBeNull()
   })
 
   it('Fate: consequências (lista fixa) e aspectos (texto)', async () => {

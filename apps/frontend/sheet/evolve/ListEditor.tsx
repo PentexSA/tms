@@ -402,6 +402,7 @@ function ItemSheet({
   // até o próximo ajuste (T-19)
   const notice = useListNotice(list)
   const title = itemTitle(list, item) || def.itemLabel
+  const fixedHelp = def.fixed?.find(x => x.id === item.id)?.help
   const patch = (p: Partial<Mutable<ListItem>>) => {
     notice.clear()
     setDraft(d => ({ ...d, ...p }))
@@ -455,6 +456,13 @@ function ItemSheet({
           </>
         ) : (
           <>
+            {/* A frase do item fixo (R-19): quem abriu a folha já pediu o item,
+                então ela vai como texto, sem "?" */}
+            {fixedHelp ? (
+              <Text variant="caption" color="inkMuted" testID="item-help">
+                {fixedHelp}
+              </Text>
+            ) : null}
             {def.fixed || schema.aspect ? (
               <TextField
                 label={def.itemLabel}
