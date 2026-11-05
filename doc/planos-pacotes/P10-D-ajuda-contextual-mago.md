@@ -519,7 +519,74 @@ Os pontos para o PO das ondas 1 a 3 ([onda-1.md](onda-1.md) §6, [onda-2.md](ond
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
-(Preenchido na implementação.)
+Implementação em 04/11/2026, na `pacote/p10-d-ajuda-contextual`, a partir da ponta da onda (`78de35c`), em paralelo com os outros três pacotes. Os commits:
+
+| # | Commit | Estado |
+|---|---|---|
+| 1 | `c31217d` feat(core): help nas opções, nos grupos e nos itens fixos do template | feito, sem as sugestões e o catálogo (desvio 1) |
+| 2 | `260c503` test(api): publicação recusa ajuda com link ou grande | feito |
+| 3 | `7660168` feat(ui): HelpButton e HelpText; help no Choice e no TextField | feito |
+| 4 | `7a3026c` feat(app): "?" nas linhas da criação e do Editar | feito |
+| 5 | `34fab93` feat(app): "?" em "Prioridade" e "pontos de bônus" | feito, no saldo (desvio 5) |
+| 6 | `0b0dae1` feat(templates): Casa ou subgrupo, opcional, no Mago | feito |
+| 7 | sugestões e catálogo com nome e ajuda | **adiado para o rebase** sobre o P07-D (desvio 1) |
+| 8 | `13d013a` content(templates): frases do time | feito, sem o catálogo (desvio 7) |
+| 9 | `4d67d86` test(e2e): ajuda contextual e Casa do Mago | escrito; roda na integração |
+
+**Perguntas técnicas: o que foi aplicado** (proposta do plano, sem resposta do time):
+
+- pergunta 1: a frase expande na linha (disclosure), sem folha nem tooltip;
+- pergunta 2: cada "?" é uma parada de Tab. No `Choice`, as setas continuam só nos rádios, e o "?" fica fora do foco itinerante;
+- pergunta 3: o `validateTemplate` do core continua sem conferir as chaves das opções. O Ajv da publicação confere;
+- pergunta 4: `help` em cada nó, sem glossário;
+- pergunta 8: o "?" só aparece na criação, no Editar e na Nova ficha. Em Jogo e Leitura, nada muda.
+
+**Pontos para o PO (§9):** nenhum decidido. O ponto 1 segue a proposta: as duas frases do app ficam em `sheet/creation/help.ts`. O ponto 3 também: "Opcional" vai como `placeholder` e frase, sem chave nova.
+
+**Desvios:**
+
+1. **O commit 7 não entrou.** Ele depende da forma do catálogo do P07-D, em desenvolvimento noutro worktree ao mesmo tempo. Por isso:
+   - o commit 1 não traz as sugestões nem o catálogo nas duas formas;
+   - `entryName` e `entryHelp` não existem ainda.
+
+   No rebase sobre o P07-D, o commit 7 segue a recomendação da consolidação (onda-4.md §4.3): a frase vai num mapa por nome, ao lado da lista. Ele traz as 34 frases do catálogo (Antecedentes: 10, 10 e 14).
+2. **O link é recusado sem diferença de caixa,** inclusive "WWW.". O `not` do schema passou a `(://|[wW]{3}\.)`. O core e o `validate.mjs` também recusam tab e quebra de linha na ajuda ("ajuda em uma linha só"). O `isSafeText` aceita os dois, e o schema já os proibia.
+3. **A regra "sem link" vale para todo `$defs/helpText`,** não só o `help` do campo. Isso inclui o `note` das opções de `state` e o `help` das ações e das recuperações. Nenhum template tem link (conferido pelo `build.mjs`).
+4. **O "?" do cabeçalho de lista fica no `ListEditor`,** num `EditorListHeader`, não no `ListHeader` da `views/`. O `ListHeader` é do modo Jogo e Leitura, que ficam sem "?" (pergunta 8).
+   - **No bloco que o título nomeia** (T-58), o "?" da lista vai no título do grupo.
+   - **Quando o título é o da seção,** a frase vem logo abaixo dele (W20 "Dons", M20 "Antecedentes").
+5. **O "?" dos pontos de bônus fica no saldo da aba da conta,** não no rótulo da aba. O rótulo é o "Orçamento", que o P05-D troca por "Pontos" ao mesmo tempo. Assim, o rebase sobre o P05-D é só textual.
+6. **Os grupos de seção leem a frase do `section.def.groups`.** O `CompiledGroup` do core não mudou, e o `dist` não precisou de rebuild depois do commit 1.
+7. **Commit 8: as frases do `P10-D-frases.json`, menos o catálogo.** Elas entraram por um script de edição textual, que deixa o resto do arquivo como estava. Cada objeto que ganhou `help` passou para várias linhas.
+
+   | Template | Campos | Grupos | Opções |
+   |---|---|---|---|
+   | V20 | 11 | 7 | 14 |
+   | W20 | 10 | 7 | 21 |
+   | M20 | 12, mais a Casa do commit 6 | 7 | 14 |
+
+   - **Ações nos `help` de hoje:**
+     - "junta" usa a frase da lista, que já inclui o que a de hoje explicava;
+     - "substitui" troca a frase (Gnose);
+     - "mantém" não muda nada (roda);
+     - a Fraqueza ficou com o P07-D.
+   - **Os outros 15 `help` de hoje** ficaram como estão: Consciência (Talento e Virtude), Qualidades e Defeitos (nos três), Deformidade, Glória, Ritos, Fetiches, Rotinas, Ressonância e Maravilhas. A revisão 6 da §3.8 só passou pelos 7 que a lista cobre. O corpo do commit 8 cita "Prontidão" por engano: o Talento de que se trata é a Consciência.
+   - **Um teste Bun** (`help-phrases.test.ts`) confere a lista contra os templates.
+8. **Fora da §8.5:** `design/telas/validate.js` e `design/telas/dados.js`, que o `build.mjs` gera, e `sheet/views/__tests__/matrix.test.tsx`.
+   - No `matrix.test.tsx`, o teste de "rótulo começa pelo texto visível" pula o "?". O "?" é botão de ícone, com o nome "Ajuda: <campo>", como o `IconButton`.
+   - Arquivos novos: `evolve/HelpRow.tsx`, `layouts/groupHelp.tsx` e `creation/InlineHelp.tsx`.
+9. **O E2E** ganhou o `exact` em Conceito, Natureza, Comportamento e Senhor, e a Casa ganhou o `exact` no commit 6. Um script conferiu os outros seletores de botão e de rótulo, e nenhum fica ambíguo. O `help.spec.ts` usa a folha do Clã no Editar, em vez da folha da Força de Vontade, para provar o Esc dentro da folha. A Força de Vontade é uma linha com Stepper, sem folha.
+
+**Para a integração:**
+
+- o rebase sobre o P05-D (o "?" da Prioridade e do saldo continua; o texto da aba é do P05-D);
+- o rebase sobre o P07-D e o commit 7;
+- o commit de versão;
+- o E2E inteiro;
+- o roteiro manual da §11;
+- o `/code-review` e o `/security-review`.
+
+As frases são rascunho do time, para revisão. O merge na `main` espera a revisão de quem conhece cada sistema.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
