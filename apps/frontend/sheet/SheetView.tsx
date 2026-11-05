@@ -11,7 +11,6 @@ import {
 import {
   KeyboardArea,
   Pressable,
-  SectionHeader,
   TabPanel,
   Text,
   ThemeProvider,
@@ -29,13 +28,13 @@ import {
   useState,
 } from 'react'
 import {
+  type HostInstance,
   Platform,
   RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
   View,
-  type ViewInstance,
 } from 'react-native'
 import { useStore } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -58,7 +57,8 @@ import { DiceButton } from './dice'
 import { canEditSomething } from './evolve/hooks'
 import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
-import { anchorDomId, focusView } from './layouts/anchor'
+import { AnchorHeader } from './layouts/AnchorHeader'
+import { type AnchorTarget, anchorDomId, focusView } from './layouts/anchor'
 import {
   GroupTabsContext,
   SCROLL_ROOT,
@@ -292,7 +292,15 @@ function SheetBody({
   // vai para a URL nem para o histórico
   const tabIds = tabs.map(t => t.id).join(' ')
   const tabSet = useMemo(() => new Set(tabIds.split(' ')), [tabIds])
-  const playRef = useRef<ViewInstance>(null)
+  const playRef = useRef<HostInstance>(null)
+  const playTarget = useMemo(
+    () => ({
+      ref: playRef,
+      nativeID: anchorDomId(PLAY_ANCHOR),
+      tabIndex: -1 as const,
+    }),
+    []
+  )
   // O "Em jogo" é alvo só quando está na rolagem (no Jogo do celular, ele
   // vira o dock)
   const playAnchored = play.length > 0 && !docked
@@ -381,18 +389,18 @@ function SheetBody({
             )
           }
         >
-          <View ref={playRef} nativeID={anchorDomId(PLAY_ANCHOR)} tabIndex={-1}>
-            {collapsible ? (
-              <PlayToggle
-                open={playOpen}
-                onToggle={() => setPlayOpen(v => !v)}
-              />
-            ) : (
-              <View style={styles.title}>
-                <SectionHeader title="Em jogo" level="group" />
-              </View>
-            )}
-          </View>
+          {/* O alvo do foco é o próprio botão ou o título (P05-D) */}
+          {collapsible ? (
+            <PlayToggle
+              open={playOpen}
+              onToggle={() => setPlayOpen(v => !v)}
+              target={playTarget}
+            />
+          ) : (
+            <View style={styles.title}>
+              <AnchorHeader title="Em jogo" level="group" target={playTarget} />
+            </View>
+          )}
           {!collapsible || playOpen ? (
             <View nativeID={PLAY_ID}>
               {play.map(s => (
@@ -509,12 +517,17 @@ const PLAY_ANCHOR = 'play'
 function PlayToggle({
   open,
   onToggle,
+  target,
 }: {
   readonly open: boolean
   readonly onToggle: () => void
+  // O alvo do "ir ao grupo": o botão já é focável, então só a ref e o id
+  readonly target: AnchorTarget
 }) {
   return (
     <Pressable
+      ref={target.ref as never}
+      nativeID={target.nativeID}
       accessibilityRole="button"
       accessibilityLabel="Em jogo"
       accessibilityState={{ expanded: open }}

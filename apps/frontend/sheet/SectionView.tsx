@@ -1,10 +1,11 @@
 import { type CompiledSection, canReadSection } from '@tms/sheet-core'
-import { SectionHeader, tokens } from '@tms/ui'
+import { tokens } from '@tms/ui'
 import { useContext } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from './context'
 import { CreationCounter } from './creation/CreationCounter'
 import { layoutFor } from './layouts'
+import { AnchorHeader } from './layouts/AnchorHeader'
 import { useAnchor } from './layouts/anchor'
 import { StripScope, useGroupTabsContext } from './layouts/groupTabsState'
 import { sectionList } from './layouts/headedList'
@@ -43,8 +44,9 @@ export function SectionView({
     >
       {/* Sem título (a zona de uma seção só), a rolagem basta */}
       {hideTitle ? null : (
-        <View style={styles.title} {...anchor.target}>
-          <SectionHeader
+        <View style={styles.title}>
+          <AnchorHeader
+            target={anchor.target}
             title={section.def.title}
             right={
               <CreationCounter

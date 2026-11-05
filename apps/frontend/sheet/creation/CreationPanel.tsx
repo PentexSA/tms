@@ -22,6 +22,7 @@ import {
   useSaveCreation,
 } from '../../lib/queries/creation'
 import { useSheet, useSheetSelector } from '../context'
+import { AnchorHeader } from '../layouts/AnchorHeader'
 import { useAnchor } from '../layouts/anchor'
 import { bonusSeenNow, markBonusSeen, readBonusSeen } from './bonusSeen'
 import { CompletionMessage } from './CompletionMessage'
@@ -275,9 +276,7 @@ function GuideList({
       testID={testID}
       onLayout={onLayout}
     >
-      <View {...target}>
-        <SectionHeader title={title} level="group" />
-      </View>
+      <AnchorHeader title={title} level="group" target={target} />
       {items.map(item => (
         <Pressable
           key={item.key}
@@ -363,9 +362,7 @@ function Ledger() {
       testID="creation-ledger"
       onLayout={onLayout}
     >
-      <View {...target}>
-        <SectionHeader title="Onde foram os bônus" level="group" />
-      </View>
+      <AnchorHeader title="Onde foram os bônus" level="group" target={target} />
       {ledger.entries.map(e => (
         <View key={e.key} style={styles.entry}>
           <Text variant="caption">{e.text}</Text>

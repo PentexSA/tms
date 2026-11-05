@@ -746,6 +746,18 @@ describe('"Faltam" na barra (R-18)', () => {
     )
   })
 
+  // /code-review 5: o leitor de tela do app só vai a um elemento de
+  // acessibilidade; o alvo do foco é o próprio título, não o contêiner
+  it('o alvo do foco é o título (header) da seção e do grupo', async () => {
+    await open(PRIORITIES, VIRTUES)
+    tab('Vantagens')
+    const group = screen.getByRole('header', { name: 'Virtudes' })
+    expect(group.props.nativeID).toBe('anchor-advantages-virtues')
+    tab('Ficha')
+    const section = screen.getByRole('header', { name: 'Habilidades' })
+    expect(section.props.nativeID).toBe('anchor-abilities')
+  })
+
   it('fechar a conta tira o "Faltam" e mostra o "Concluir"', async () => {
     await open(PRIORITIES, ALMOST)
     expect(screen.getByTestId('creation-guide')).toBeTruthy()

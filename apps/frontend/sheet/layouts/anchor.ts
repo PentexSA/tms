@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import {
   AccessibilityInfo,
+  type HostInstance,
   type LayoutChangeEvent,
   Platform,
-  type ViewInstance,
 } from 'react-native'
 import { useGroupTabsContext } from './groupTabsState'
 
@@ -18,8 +18,18 @@ import { useGroupTabsContext } from './groupTabsState'
 export const anchorDomId = (id: string): string =>
   `anchor-${id.replace(/[^A-Za-z0-9_-]/g, '-')}`
 
+/**
+ * O alvo do foco: o texto do título (AnchorHeader), um elemento de
+ * acessibilidade, para o leitor de tela do app ir até ele.
+ */
+export interface AnchorTarget {
+  readonly ref?: RefObject<HostInstance | null>
+  readonly nativeID?: string
+  readonly tabIndex?: -1
+}
+
 /** O foco programático: no web, o elemento; no app, o leitor de tela. */
-export function focusView(view: ViewInstance | null) {
+export function focusView(view: HostInstance | null) {
   if (!view) return
   if (Platform.OS === 'web') {
     ;(view as unknown as { focus?: (o?: object) => void }).focus?.({
@@ -32,7 +42,7 @@ export function focusView(view: ViewInstance | null) {
 
 /**
  * `onLayout` vai na vista que dá a posição (relativa a `parent`, outra
- * âncora, ou ao painel); `target`, na vista que recebe o foco (o título).
+ * âncora, ou ao painel); `target`, no texto do título que recebe o foco (AnchorHeader).
  * Com `focusable` falso, a âncora só mede (um contêiner intermediário).
  */
 export function useAnchor(
@@ -40,7 +50,7 @@ export function useAnchor(
   { parent, focusable = true }: { parent?: string; focusable?: boolean } = {}
 ) {
   const store = useGroupTabsContext()?.store
-  const ref = useRef<ViewInstance>(null)
+  const ref = useRef<HostInstance>(null)
   const focus = useCallback(() => focusView(ref.current), [])
   useEffect(() => {
     if (!store || !id) return
@@ -56,9 +66,7 @@ export function useAnchor(
             parent
           )
       : undefined
-  const target =
-    id && focusable
-      ? { ref, nativeID: anchorDomId(id), tabIndex: -1 as const }
-      : {}
+  const target: AnchorTarget =
+    id && focusable ? { ref, nativeID: anchorDomId(id), tabIndex: -1 } : {}
   return { onLayout, target }
 }

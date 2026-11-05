@@ -8,7 +8,6 @@ import {
   Button,
   hitTarget,
   Pressable,
-  SectionHeader,
   Text,
   textStyle,
   tokens,
@@ -27,6 +26,7 @@ import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { AnchorHeader } from './AnchorHeader'
 import { useAnchor } from './anchor'
 import { ChipFlow } from './ChipFlow'
 import { useGroupTabs } from './groupTabs'
@@ -154,17 +154,8 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
                     }
                   : null
               }
-              title={
-                header ? (
-                  <SectionHeader
-                    title={g.title}
-                    level="group"
-                    right={
-                      <CreationCounter fieldIds={g.fieldIds} items={headed} />
-                    }
-                  />
-                ) : null
-              }
+              title={header ? g.title : null}
+              right={<CreationCounter fieldIds={g.fieldIds} items={headed} />}
             >
               {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
               {titled || tabs.inStrip ? null : (
@@ -204,6 +195,7 @@ function GroupBlock({
   style,
   anchor,
   title,
+  right,
   children,
 }: {
   readonly headed: FieldId | undefined
@@ -211,7 +203,9 @@ function GroupBlock({
   readonly style?: StyleProp<ViewStyle>
   // O grupo como âncora do "ir ao grupo" (P05-D); o título recebe o foco
   readonly anchor: { readonly id: string; readonly parent: string } | null
-  readonly title: ReactNode
+  readonly title: string | null
+  // O contador ao lado do título
+  readonly right: ReactNode
   readonly children: ReactNode
 }) {
   const { onLayout, target } = useAnchor(anchor?.id ?? null, {
@@ -221,8 +215,13 @@ function GroupBlock({
     <HeadedList.Provider value={headed}>
       <View style={style} onLayout={onLayout}>
         {title ? (
-          <View style={styles.title} {...target}>
-            {title}
+          <View style={styles.title}>
+            <AnchorHeader
+              title={title}
+              level="group"
+              right={right}
+              target={target}
+            />
           </View>
         ) : null}
         {children}
