@@ -173,6 +173,36 @@ export const itemLabels = (
   name: string
 ): readonly string[] | undefined => labelsFor(identity.recommended, name)
 
+/**
+ * As linhas de aviso de um item ainda na folha (T-24d): o meta acima do
+ * limite pelo rascunho da folha (subir o Posto para 2 já avisa, antes do
+ * "Aplicar") e o "fora" pelo aviso da ficha, no caminho do item. O mesmo
+ * texto da linha; só na criação, e nada bloqueia.
+ */
+export function draftAdviceLines(
+  model: SheetModel,
+  list: FieldId,
+  draft: ListItem,
+  identity: IdentityAdvice
+): readonly string[] {
+  if (!identity.creating) return []
+  const lines: string[] = []
+  const def = model.fields.get(list)?.def
+  if (def?.type === 'list')
+    for (const rule of model.template.creation?.advice ?? []) {
+      if (rule.rule !== 'item-meta-max' || !rule.targets.includes(list))
+        continue
+      const meta = def.item.meta?.find(m => m.id === rule.meta)
+      const v = draft.meta?.[rule.meta]
+      if (meta && typeof v === 'number' && v > rule.max)
+        lines.push(aboveText(meta, v, rule.max))
+    }
+  const codes = identity.advice.get(`values.${list}#${draft.id}`) ?? []
+  if (codes.includes('ADVICE_OUTSIDE') && identity.recommend)
+    lines.push(outsideText(identity.recommend))
+  return lines
+}
+
 /** As linhas de aviso de um item da lista, só na criação. */
 export function itemAdviceLines(
   model: SheetModel,
