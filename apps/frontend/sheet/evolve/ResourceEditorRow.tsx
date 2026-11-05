@@ -1,5 +1,5 @@
 import { editResource, type ResourcePart } from '@tms/sheet-core'
-import { Stepper, type StepperIncrease, Text, tokens } from '@tms/ui'
+import { Stepper, type StepperAdvice, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useCreation } from '../creation/CreationContext'
 import type { FieldViewProps } from '../views/types'
@@ -40,8 +40,8 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
     max: number
     onChange: (n: number) => void
     blocked: string | null
-    increase?: StepperIncrease
-    decrease?: StepperIncrease
+    increase?: StepperAdvice
+    decrease?: StepperAdvice
   }[] = []
   if (def.permanent && r.permanent !== null)
     rows.push({

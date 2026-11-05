@@ -4,7 +4,7 @@ import {
   Button,
   Pressable,
   Stepper,
-  type StepperIncrease,
+  type StepperAdvice,
   Text,
   TextArea,
   TextField,
@@ -332,7 +332,7 @@ function useItemAdvice(
   item: ListItem,
   draft: ListItem,
   refused: boolean
-): { readonly stepper?: StepperIncrease; readonly note: ReactNode } {
+): { readonly stepper?: StepperAdvice; readonly note: ReactNode } {
   const advice = useStepAdvice(`values.${list.id}#${item.id}`)
   const min = list.field.def.item.value?.min ?? 0
   const fresh = (draft.value ?? min) === (item.value ?? min)

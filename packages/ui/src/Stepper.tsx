@@ -39,26 +39,29 @@ export interface StepperProps {
   // lado. Fica fora da árvore de acessibilidade: o controle já tem o nome.
   readonly showLabel?: boolean
   // O que o próximo ponto faria (T-20, R-17), dito antes do toque
-  readonly increase?: StepperIncrease
+  readonly increase?: StepperAdvice
   // O mesmo para o "−" (T-85: na criação, não desce abaixo do inicial).
   // Sem ele, o "−" é o de sempre.
-  readonly decrease?: StepperIncrease
+  readonly decrease?: StepperAdvice
 }
 
 /**
  * O "+" (`increase`) ou o "−" (`decrease`) com a trava ou o custo, antes do
- * toque; o nome do tipo ficou o do "+", que veio primeiro. `blocked`: o botão fica com a
+ * toque. `blocked`: o botão fica com a
  * cara de indisponível (opacidade e `aria-disabled`), mas **continua
  * tocável**: o toque chega a quem decide (a conta exata e o servidor), que
  * explica o motivo; a previsão pode errar para o lado bloqueado. Segurar não
  * repete. `hint`: o motivo ou o custo ("+1 = 2 bônus"); no app, a dica do
  * controle ajustável; no web, o "+" aponta `hintID` com `aria-describedby`.
  */
-export interface StepperIncrease {
+export interface StepperAdvice {
   readonly blocked?: boolean
   readonly hint?: string | null
   readonly hintID?: string | null
 }
+
+/** O nome de antes do `decrease` (P05-C); o mesmo tipo, para não quebrar. */
+export type StepperIncrease = StepperAdvice
 
 const HOLD_DELAY_MS = 400
 const REPEAT_MS = 100

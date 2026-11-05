@@ -366,10 +366,11 @@ Edita qualquer número com − e +, um passo por toque.
     valueText?: (v: number) => string; onChange: (v: number) => void
     size?: 'lg' | 'inline'; allowInput?: boolean; disabled?: boolean
     showLabel?: boolean // rótulo visível acima; padrão false
-    increase?: StepperIncrease // previsão do "+" (P05-C)
-    decrease?: StepperIncrease // previsão do "−" (P10-C); sem ela, o "−" de sempre
+    increase?: StepperAdvice // previsão do "+" (P05-C)
+    decrease?: StepperAdvice // previsão do "−" (P10-C); sem ela, o "−" de sempre
   }
-  type StepperIncrease = { blocked?: boolean; hint?: string | null; hintID?: string | null }
+  type StepperAdvice = { blocked?: boolean; hint?: string | null; hintID?: string | null }
+  type StepperIncrease = StepperAdvice // o nome antigo, mantido como alias
   ```
   `increase` e `decrease` dizem, antes do toque, o que o próximo passo faria. Com `blocked`, o botão fica com a cara de indisponível (opacidade e, no web, `aria-disabled="true"` direto no elemento, nunca `disabled`) e **continua tocável**: o toque chega a quem decide, que explica o motivo; segurar não repete. No web, `hintID` vira o `aria-describedby` do botão; no app, a dica vai ao controle ajustável e, com as duas, junta "Aumentar: … Diminuir: …".
   `showLabel` liga o rótulo visível acima do controle quando a tela não o mostra ao lado (Dados e Dificuldade da Mesa, Quantidade, XP a conceder). Ele fica `aria-hidden`: o controle já tem o nome, e não há leitura dupla.

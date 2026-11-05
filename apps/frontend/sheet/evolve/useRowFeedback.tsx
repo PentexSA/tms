@@ -1,4 +1,4 @@
-import { type StepperIncrease, Text } from '@tms/ui'
+import { type StepperAdvice, Text } from '@tms/ui'
 import type { ReactNode } from 'react'
 import { useStepAdvice } from '../creation/useStepAdvice'
 import { DraftNoticeText } from './DraftNoticeText'
@@ -18,8 +18,8 @@ export function useRowFeedback(
 ): {
   readonly notice: ReactNode
   readonly note: ReactNode
-  readonly increase: StepperIncrease | undefined
-  readonly decrease: StepperIncrease | undefined
+  readonly increase: StepperAdvice | undefined
+  readonly decrease: StepperAdvice | undefined
 } {
   const notice = useDraftNotice(path)
   const advice = useStepAdvice(path)
