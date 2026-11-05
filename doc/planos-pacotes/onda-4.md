@@ -955,3 +955,121 @@ As correções da integração foram feitas na branch do pacote e entraram na on
   - os resumos da Fraqueza;
 - o anúncio pelo VoiceOver e pelo TalkBack, para ouvir no aparelho;
 - push da onda e PR para a `main`, com uma seção por pacote.
+
+## 12. Funcionalidades que entraram
+
+O que a onda entrega, do ponto de vista de quem usa. A ponta é a `onda/4-conteudo-guia` em `282fbf8`.
+
+### 12.1 Guia da criação (P05-D)
+
+- **"Faltam" na barra de criação.** Enquanto a conta está aberta, a barra mostra o que falta (por exemplo, "Faltam: Virtudes 7 · e mais 2"), no lugar do "Concluir criação".
+  - A linha mostra só itens inteiros, mais "e mais N".
+  - Se nenhum item cabe, ela vira "Faltam N itens".
+  - A altura da barra não muda.
+- **Ir ao grupo.** Cada item do "Faltam" e do "O que falta" é um botão. Ele leva à aba, à sub-aba e ao grupo, e põe o foco no título.
+  - "e mais N" leva à aba Pontos.
+  - No Android, o salto para outra aba espera a medida final.
+- **Aba "Pontos".** A aba "Orçamento" da ficha passa a "Pontos". Ela traz:
+  - o "O que falta", tocável;
+  - o bloco "Para confirmar com o narrador";
+  - "Ver Pontos" na folha de bônus.
+
+  As regras da crônica continuam com o nome "Orçamento".
+- **Conta fechada.** A linha do próximo passo diz "A conta fechou: você conclui." (ou "envie ao narrador", com aprovação), e o "Concluir criação" aparece no lugar do "Faltam".
+- **Fase em texto.** A aba mostra "Fase: pontos básicos" ou "Fase: pontos de bônus".
+  - A troca manual é um botão secundário.
+  - Ela só aparece para quem edita a criação, nunca em Leitura.
+- **Folha de bônus uma vez por ficha.** A folha "Começaram os pontos de bônus" aparece só na primeira passagem.
+  - Ela não volta ao tirar e repor um ponto, ao trocar de modo, ao sair e voltar nem ao recarregar.
+  - A marca fica no aparelho e sai no logout.
+
+### 12.2 Vantagens (P07-D)
+
+- **−/+ na própria linha** dos itens com valor (Disciplinas, Antecedentes, Esferas): sem abrir folha, com o aviso de recusa perto do toque.
+  - A folha do item fica com o nome, as metas, a especialização e as notas.
+  - Os Dons mostram "Posto N", e o Posto muda na folha.
+- **O que é do clã ou da Tradição.** No V20, as Disciplinas do clã têm o selo "do clã". No M20, a Esfera da Tradição tem o selo "da Tradição".
+  - Na folha "Adicionar", elas vêm primeiro, no bloco "Do clã".
+  - A escolha de fora mostra "fora do clã: confirme com o narrador" e não bloqueia.
+  - Trocar o Clã ou a Tradição atualiza os selos na hora.
+- **Aviso do Posto no W20.** Um Dom acima do Posto 1 mostra "confirme com o narrador" em três lugares, sem bloquear:
+  - na linha e na folha do Dom;
+  - em "Para confirmar com o narrador", na aba Pontos;
+  - na confirmação de concluir.
+- **Fraqueza com o resumo do clã.** É o mecanismo de padrão mostrado, com "Usar o resumo do clã". Os resumos do time ainda não entraram.
+- **Folha "Adicionar":**
+  - a prévia do custo do item novo;
+  - o aviso de nome repetido ("Já há “Ambidestro” na ficha"), com "Adicionar outro";
+  - a Qualidade sem Custo, com o texto certo.
+- **Leitor de tela.** Os avisos "fora do clã", "fora da Tradição" e "Resumo de …" são texto à parte, lido pelo VoiceOver e pelo TalkBack.
+
+### 12.3 Derivados, ordem e textos (P10-C)
+
+- **O atual acompanha o permanente** na criação: Força de Vontade, Fúria, Gnose e Quintessência.
+- **Voltar ao valor de partida tira a alteração** da contagem ("1 alteração" some).
+- **O "−" no valor inicial** (a Fúria pelo Augúrio, a Força de Vontade pela Coragem) fica com cara de indisponível e continua tocável.
+  - O toque explica: "Na criação, não fica abaixo de N (vem de …)".
+  - Segurar o "−" para no valor inicial.
+- **Listas de escolha na ordem do rótulo,** a mesma no web, no Android e no iOS.
+- **A lista vazia concorda em gênero:** "Nenhuma Qualidade", "Nenhum Defeito", "Nenhuma Cicatriz".
+- **Singular e plural certos:** "falta 1 ponto básico", "faltam 3 pontos básicos".
+
+### 12.4 Ajuda contextual e Mago (P10-D)
+
+- **"?" com uma frase curta** em quatro lugares: campos, opções de identidade (Clãs, Raças, Augúrios, Tribos, Tradições e Essências), grupos de seção, e Antecedentes no catálogo e nas sugestões.
+  - Ele abre na própria linha, sem janela, e é lido pelo leitor de tela.
+  - O nome acessível é "Ajuda: <campo>".
+  - Só aparece na Criação, no Editar e na Nova ficha.
+- **"?" em "Prioridade" e no saldo dos pontos de bônus,** com frases do app.
+- **Item fixo com frase:** a Ressonância do M20 mostra a frase no topo da folha.
+- **"Casa ou subgrupo" no Mago,** com o `placeholder` "Opcional", em todas as Tradições. A ficha abre sem a Casa.
+- **Frases:** são 141 (2 do app, 43 do V20, 48 do W20 e 48 do M20), vindas do [`P10-D-frases.json`](P10-D-frases.json). São rascunho do time e esperam revisão antes da `main`.
+
+### 12.5 Para quem mantém templates e componentes
+
+- **Contrato do template.** As chaves novas são opcionais e aditivas:
+  - `recommend`;
+  - `catalogDefaults`;
+  - `default` por opção em texto;
+  - `creation.advice` (`item-meta-max`);
+  - `help` nas opções, nos grupos e nos itens fixos;
+  - `catalogHelp`;
+  - `suggestionHelp`.
+
+  A regra é a mesma no `schema.json`, no `validateTemplate`, no `validate.mjs` e no `publicationIssues`: até 200 caracteres, uma linha, sem link, e nome do mapa só da lista. O `compileTemplate` continua aceitando as versões antigas.
+- **Core (`@tms/sheet-core`):**
+  - `recommendedFor`, `recommendedBySource` e `creationAdvice`, fora de `problems`, que o servidor não chama;
+  - `editResource` e `defaultStored`;
+  - o `default` por opção no `resolve`;
+  - o `help` no `CompiledGroup`.
+- **`@tms/ui`:**
+  - `Stepper.decrease`, com o tipo `StepperAdvice` (o `StepperIncrease` continua como alias);
+  - `HelpButton`, `HelpText` e `WithHelp`;
+  - `help` no `Choice` e no `TextField`.
+
+  Tudo isso está documentado no `design/design-system/components.md`.
+- **Banco:** `publishProductTemplates(db)` em `packages/db/src/templates.ts`, e a migration `0023_templates_onda4.ts`, só de dados.
+
+### 12.6 Templates publicados
+
+| Template | Versão | O que muda no conteúdo |
+|---|---|---|
+| `vtm-v20` | 1.8.0 → **1.9.0** | Disciplinas por clã (`recommend`), frases de campos, grupos, Clãs e Antecedentes, e a revisão dos `help` de hoje |
+| `wta-w20` | 1.6.0 → **1.7.0** | aviso do Posto acima de 1 (`creation.advice`), frases de campos, grupos, Raças, Augúrios, Tribos e Antecedentes |
+| `mta-m20` | 1.6.0 → **1.7.0** | Esferas por Tradição (`recommend`), "Casa ou subgrupo" opcional, frases de campos, grupos, Tradições, Essências e Antecedentes |
+
+- **Fichas criadas antes** continuam na versão em que nasceram e abrem no app novo. Elas ganham tudo o que é código:
+  - o −/+ na linha;
+  - o "Faltam";
+  - a aba "Pontos";
+  - a ordem;
+  - o "?" nos campos que já tinham `help`.
+- **Fichas novas** nascem na versão nova.
+
+### 12.7 O que não entrou
+
+- **O catálogo de Dons do W20,** que espera a lista do time e a licença. O W20 continua com o texto livre.
+- **Os resumos da Fraqueza,** que o time escreve.
+- **As frases de poderes** (Disciplinas, Dons, Esferas e Ritos), que esperam o PO e a licença.
+- **A validação dentro da migration `0023`,** que fica para decisão (seção 11, pergunta 3).
+- **O P14-D e o P15-D,** que a matriz acrescentou à onda em 03/11 (seção 6, ponto 1).
