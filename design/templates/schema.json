@@ -206,9 +206,16 @@
       "maxLength": 16
     },
     "helpText": {
-      "description": "Texto de ajuda exibido no detalhe do campo (texto puro, até 400 caracteres).",
+      "description": "Texto de ajuda exibido no detalhe do campo e no \"?\" da criação e do Editar (texto puro, até 400 caracteres, sem link).",
       "$ref": "#/$defs/safeText",
-      "maxLength": 400
+      "maxLength": 400,
+      "not": { "pattern": "(://|[wW]{3}\\.)" }
+    },
+    "helpShort": {
+      "description": "Frase curta de ajuda de uma opção, de um grupo ou de um item fixo (texto puro de uma linha, até 200 caracteres, sem link). Escrita pelo time, nunca trecho de livro (README §12). Sempre desenhada como texto.",
+      "$ref": "#/$defs/safeText",
+      "maxLength": 200,
+      "not": { "pattern": "(://|[wW]{3}\\.)" }
     },
     "glyph": {
       "description": "Glifo curto (até 3 caracteres), sempre acompanhado de texto: forma e cor nunca carregam significado sozinhas.",
@@ -1114,6 +1121,7 @@
               "label": { "$ref": "#/$defs/label" },
               "hint": { "$ref": "#/$defs/label" },
               "note": { "$ref": "#/$defs/helpText" },
+              "help": { "$ref": "#/$defs/helpShort" },
               "modifiers": {
                 "description": "Modificadores aplicados enquanto o estado está ativo. add soma (resultado nunca abaixo de 0); set fixa o valor. A UI mostra a origem.",
                 "type": "array",
@@ -1255,7 +1263,8 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
-              }
+              },
+              "help": { "$ref": "#/$defs/helpShort" }
             },
             "additionalProperties": false
           },
@@ -1283,7 +1292,8 @@
               "roll": {
                 "description": "Efeito automático na rolagem sum-vs-target via roll.conditions.",
                 "$ref": "#/$defs/conditionRoll"
-              }
+              },
+              "help": { "$ref": "#/$defs/helpShort" }
             },
             "additionalProperties": false
           },
@@ -1324,7 +1334,8 @@
               "meta": {
                 "description": "Texto secundário (ex.: absorve 2).",
                 "$ref": "#/$defs/label"
-              }
+              },
+              "help": { "$ref": "#/$defs/helpShort" }
             },
             "additionalProperties": false
           },
@@ -1479,6 +1490,7 @@
             "properties": {
               "id": { "$ref": "#/$defs/id" },
               "title": { "$ref": "#/$defs/label" },
+              "help": { "$ref": "#/$defs/helpShort" },
               "fields": { "$ref": "#/$defs/fieldRefs" }
             },
             "additionalProperties": false

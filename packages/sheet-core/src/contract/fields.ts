@@ -202,6 +202,8 @@ export interface StateOption {
   readonly label: string
   readonly hint?: string
   readonly note?: string
+  // Frase curta de ajuda (até 200, sem link), escrita pelo time.
+  readonly help?: string
   readonly modifiers?: readonly StateModifier[]
 }
 
@@ -241,6 +243,8 @@ export interface ChoiceOption {
   readonly label: string
   readonly meta?: string
   readonly glyphParam?: number
+  // Frase curta de ajuda (até 200, sem link), escrita pelo time.
+  readonly help?: string
 }
 
 export interface ChoiceField extends FieldBase<'choice'> {
@@ -252,6 +256,7 @@ export interface TagOption {
   readonly id: string
   readonly label: string
   readonly roll?: ConditionRoll
+  readonly help?: string
 }
 
 export interface TagsField extends FieldBase<'tags'> {
@@ -283,6 +288,7 @@ export interface ListFixedItem {
   readonly id: string
   readonly label: string
   readonly meta?: string
+  readonly help?: string
 }
 
 export interface ListField extends FieldBase<'list'> {

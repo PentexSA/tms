@@ -546,6 +546,13 @@ export function validateTemplate(t, palette) {
     if (v.length > max) err(path, `texto acima de ${max} caracteres`)
     if (!isSafeText(v)) err(path, 'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML')
   }
+  // Ajuda (campo, opção, grupo, item fixo): texto puro e sem link (o mesmo validateTemplate do core).
+  const help = (path, v, max) => {
+    text(path, v, max)
+    if (typeof v !== 'string') return
+    if (/[\t\n\r]/.test(v)) err(path, 'ajuda em uma linha só')
+    if (/:\/\/|www\./i.test(v)) err(path, 'ajuda com link (://, www.): a frase é texto puro')
+  }
   const oneOf = (path, v, list, what) => {
     if (!list.includes(v)) err(path, `${what} '${v}' fora da lista fechada`)
   }
@@ -608,7 +615,7 @@ export function validateTemplate(t, palette) {
     keys(p, f, [...KEYS.fieldCommon, ...(KEYS.field[f.type] ?? [])])
     text(`${p}.label`, f.label)
     if (f.shortLabel) text(`${p}.shortLabel`, f.shortLabel, 16)
-    if (f.help) text(`${p}.help`, f.help, 400)
+    if (f.help) help(`${p}.help`, f.help, 400)
     for (const m of f.editableIn ?? []) oneOf(`${p}.editableIn`, m, REGISTRY.modes, 'modo')
     if (f.colorRole) oneOf(`${p}.colorRole`, f.colorRole, REGISTRY.colorRoles, 'colorRole')
     if (f.defaultAction) oneOf(`${p}.defaultAction`, f.defaultAction, REGISTRY.defaultActions, 'defaultAction')
@@ -701,6 +708,7 @@ export function validateTemplate(t, palette) {
     if (f.type === 'state') {
       for (const o of f.options ?? []) {
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
         for (const m of o.modifiers ?? []) {
           if (!has(m.field)) err(`${p}.options.${o.id}.modifiers`, `campo '${m.field}' não existe`)
           oneOf(`${p}.options.${o.id}.modifiers.op`, m.op, REGISTRY.modifierOps, 'op')
@@ -715,12 +723,13 @@ export function validateTemplate(t, palette) {
       if (f.bonus) { oneOf(`${p}.bonus.derive`, f.bonus.derive, REGISTRY.derive, 'derive'); if (!has(f.bonus.ability)) err(`${p}.bonus.ability`, 'campo não existe') }
     }
     if (['choice', 'tags'].includes(f.type)) {
-      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label) }
+      for (const o of f.options ?? []) { if (!ID.test(o.id ?? '')) err(`${p}.options`, `id '${o.id}' inválido`); text(`${p}.options.${o.id}.label`, o.label); if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200) }
       for (const o of f.options ?? []) if (o.roll) oneOf(`${p}.options.${o.id}.roll`, o.roll, REGISTRY.conditionRoll, 'roll')
       if (f.glyph) oneOf(`${p}.glyph`, f.glyph, REGISTRY.glyphs, 'glyph')
     }
     if (f.type === 'list') {
       for (const c of f.catalog ?? []) text(`${p}.catalog`, c, 80)
+      for (const x of f.fixed ?? []) if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
       for (const m of f.item?.meta ?? []) text(`${p}.item.meta.${m.id}.label`, m.label)
       if (f.item?.value) { num(`${p}.item.value.min`, f.item.value.min, 0, 10); num(`${p}.item.value.max`, f.item.value.max, 1, 10) }
     }
@@ -740,7 +749,7 @@ export function validateTemplate(t, palette) {
     num(`${p}.columns`, s.columns, 1, 6)
     num(`${p}.minColWidth`, s.minColWidth, 120, 600)
     const ids = [...(s.fields ?? []), ...(s.groups ?? []).flatMap(g => g.fields)]
-    for (const g of s.groups ?? []) text(`${p}.groups.${g.id}.title`, g.title)
+    for (const g of s.groups ?? []) { text(`${p}.groups.${g.id}.title`, g.title); if (g.help != null) help(`${p}.groups.${g.id}.help`, g.help, 200) }
     for (const id of ids) if (!has(id)) err(`${p}`, `campo '${id}' não existe`)
     if (s.filter) { oneOf(`${p}.filter.rule`, s.filter.rule, REGISTRY.filterRules, 'filtro'); text(`${p}.filter.label`, s.filter.label) }
     if (s.badge && !has(s.badge.field)) err(`${p}.badge`, `campo '${s.badge.field}' não existe`)

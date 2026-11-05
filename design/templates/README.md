@@ -65,7 +65,7 @@ Isso segue o modelo de dados do repositório: a estrutura da ficha vem de `trait
 
 Ids (de campo, seção, opção, estado, linha, tipo de dano) seguem `^[a-zA-Z][a-zA-Z0-9-]*$`, com até 64 caracteres. Nomes herdados de `Object.prototype` (`constructor`, `toString`, `valueOf`...) são proibidos.
 
-Todo texto exibido é **texto seguro**: sem `<`, `>`, controles C0 e C1 (U+0000 a U+001F, U+007F a U+009F), separadores U+2028 e U+2029 nem controles bidirecionais (U+202A a U+202E, U+2066 a U+2069). O schema também proíbe tab e quebra de linha (todo texto de template é de uma linha); `isSafeText` de `validate.mjs` aceita os dois. Limites: rótulo 200, `shortLabel` 16, `help` 400, `roll.label` e `target.label` 24, `suffix` 24, `chipFormat` 60, item de catálogo 80, `license` 1000. `validateTemplate` também limita qualquer string do template a 1000 caracteres, o aninhamento a 12 níveis e proíbe as chaves `__proto__`, `constructor` e `prototype` em qualquer profundidade.
+Todo texto exibido é **texto seguro**: sem `<`, `>`, controles C0 e C1 (U+0000 a U+001F, U+007F a U+009F), separadores U+2028 e U+2029 nem controles bidirecionais (U+202A a U+202E, U+2066 a U+2069). O schema também proíbe tab e quebra de linha (todo texto de template é de uma linha); `isSafeText` de `validate.mjs` aceita os dois. Limites: rótulo 200, `shortLabel` 16, `help` do campo 400, `help` de opção, grupo e item fixo 200, `roll.label` e `target.label` 24, `suffix` 24, `chipFormat` 60, item de catálogo 80, `license` 1000. `validateTemplate` também limita qualquer string do template a 1000 caracteres, o aninhamento a 12 níveis e proíbe as chaves `__proto__`, `constructor` e `prototype` em qualquer profundidade.
 
 Não coloque `$schema` dentro do template: o topo é fechado (`additionalProperties: false`). Para ter autocompletar no editor, associe `schema.json` aos arquivos pela configuração do editor.
 
@@ -80,6 +80,14 @@ Não coloque `$schema` dentro do template: o topo é fechado (`additionalPropert
 ## 3. Tipos de campo
 
 Propriedades comuns a todos os tipos: `type`, `label` (obrigatórios), `shortLabel`, `sublabel` (linha secundária, ex.: "Des"), `help` e `editableIn`.
+
+**Ajuda (`help`).** O `help` do campo (até 400) aparece nas folhas de detalhe e num "?" na criação, no Editar e na Nova ficha. A frase curta (`$defs/helpShort`, até 200) também cabe:
+
+- nas opções de `choice`, `tags` e `state`;
+- nos itens `fixed` de `list`;
+- nos grupos de seção (`sections[].groups[].help`).
+
+As duas são texto puro de uma linha e **sem link**: `://` e `www.` são recusados no schema, no `validateTemplate` e no `validate.mjs`. O app sempre desenha a frase como texto. Nó sem `help` não mostra "?", então a ajuda pode entrar aos poucos, sem código. Quem escreve a frase: §12.
 
 `editableIn` diz em quais modos o campo muda: `play` (modo Jogo) e `edit` (modo Evoluir). Padrão: `text` e `longText` em ambos; os demais só em Evoluir. Recursos de jogo declaram `["play"]`. O modo é UX: o servidor valida cada escrita (§11).
 
@@ -651,6 +659,7 @@ O campo `license` é obrigatório e diz o que o template embute.
 | Fate Core | Nomes de perícias, escada e estrutura da ficha | Licença **CC BY 3.0 Unported**, da Evil Hat Productions. Exige atribuição visível, com o texto de atribuição publicado pela Evil Hat. |
 
 - `catalog` de `list` traz só nomes, nunca descrições.
+- **Frases de ajuda (`help`).** São escritas pelo time, com palavras próprias, e revisadas por uma segunda pessoa que conheça o sistema. Não copiam nem parafraseiam de perto um trecho de livro. Num sistema comercial, a frase explica o termo para quem joga pela primeira vez; ela não é a descrição do livro. As frases de poderes (Disciplinas, Dons, Esferas, Ritos) esperam a conferência de quem cuida da parte jurídica.
 - Antes de publicar um sistema novo, confira a licença do material de origem com quem cuida da parte jurídica.
 
 **Multi-sistema:** o contrato separa estrutura (que o template traz) de conteúdo protegido (que fica com a mesa), o que permite suportar sistemas comerciais sem redistribuir texto.

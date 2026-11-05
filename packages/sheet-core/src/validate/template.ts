@@ -207,6 +207,8 @@ const FORBIDDEN_KEYS: readonly string[] = [
   'constructor',
   'prototype',
 ]
+// Link na ajuda (o mesmo `not` do $defs/helpText e do helpShort no schema.json).
+const LINK = /:\/\/|www\./i
 const PLAYABLE: readonly unknown[] = [
   'resource',
   'track',
@@ -259,6 +261,16 @@ function check(
         path,
         'texto com caracteres proibidos (< >, controle ou bidi): rótulo é texto, nunca HTML'
       )
+  }
+  // Ajuda (do campo, da opção, do grupo, do item fixo): texto puro e sem link.
+  // A frase sai sempre num <Text>; o link é recusado para que nenhum template
+  // leve o jogador para fora do app.
+  const help = (path: string, v: unknown, max: number) => {
+    text(path, v, max)
+    if (typeof v !== 'string') return
+    if (/[\t\n\r]/.test(v)) err(path, 'ajuda em uma linha só')
+    if (LINK.test(v))
+      err(path, 'ajuda com link (://, www.): a frase é texto puro')
   }
   const oneOf = (
     path: string,
@@ -383,7 +395,7 @@ function check(
     keys(p, f, [...KEYS.fieldCommon, ...typeKeys])
     text(`${p}.label`, f.label)
     if (f.shortLabel) text(`${p}.shortLabel`, f.shortLabel, 16)
-    if (f.help) text(`${p}.help`, f.help, 400)
+    if (f.help) help(`${p}.help`, f.help, 400)
     for (const m of list(`${p}.editableIn`, f.editableIn))
       oneOf(`${p}.editableIn`, m, REGISTRY.modes, 'modo')
     if (f.colorRole)
@@ -562,6 +574,7 @@ function check(
     if (f.type === 'state') {
       for (const o of objs(`${p}.options`, f.options)) {
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
         for (const m of objs(`${p}.options.${o.id}.modifiers`, o.modifiers)) {
           if (!has(m.field))
             err(
@@ -597,6 +610,7 @@ function check(
       for (const o of options) {
         if (!isId(o.id)) err(`${p}.options`, `id '${o.id}' inválido`)
         text(`${p}.options.${o.id}.label`, o.label)
+        if (o.help != null) help(`${p}.options.${o.id}.help`, o.help, 200)
       }
       for (const o of options)
         if (o.roll)
@@ -611,6 +625,8 @@ function check(
     if (f.type === 'list') {
       for (const c of list(`${p}.catalog`, f.catalog))
         text(`${p}.catalog`, c, 80)
+      for (const x of objs(`${p}.fixed`, f.fixed))
+        if (x.help != null) help(`${p}.fixed.${x.id}.help`, x.help, 200)
       const item = rec(f.item)
       for (const m of objs(`${p}.item.meta`, item?.meta))
         text(`${p}.item.meta.${m.id}.label`, m.label)
@@ -645,7 +661,10 @@ function check(
         return list(`${p}.groups.${g.id}.fields`, g.fields)
       }),
     ]
-    for (const g of groups) text(`${p}.groups.${g.id}.title`, g.title)
+    for (const g of groups) {
+      text(`${p}.groups.${g.id}.title`, g.title)
+      if (g.help != null) help(`${p}.groups.${g.id}.help`, g.help, 200)
+    }
     for (const id of ids) if (!has(id)) err(`${p}`, `campo '${id}' não existe`)
     if (s.filter) {
       const filter = rec(s.filter)
