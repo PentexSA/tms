@@ -550,13 +550,13 @@ Implementação em 04/11/2026, na `pacote/p10-d-ajuda-contextual`, a partir da p
    - `entryName` e `entryHelp` não existem ainda.
 
    No rebase sobre o P07-D, o commit 7 segue a recomendação da consolidação (onda-4.md §4.3): a frase vai num mapa por nome, ao lado da lista. Ele traz as 34 frases do catálogo (Antecedentes: 10, 10 e 14).
-2. **O link é recusado sem diferença de caixa,** inclusive "WWW.". O `not` do schema passou a `(://|[wW]{3}\.)`. O core e o `validate.mjs` também recusam tab e quebra de linha na ajuda ("ajuda em uma linha só"). O `isSafeText` aceita os dois, e o schema já os proibia.
+2. **O link é recusado sem diferença de caixa,** inclusive "WWW." (depois da revisão, só na publicação: ver abaixo). O `not` do schema passou a `(://|[wW]{3}\.)`. O core e o `validate.mjs` também recusam tab e quebra de linha na ajuda ("ajuda em uma linha só"). O `isSafeText` aceita os dois, e o schema já os proibia.
 3. **A regra "sem link" vale para todo `$defs/helpText`,** não só o `help` do campo. Isso inclui o `note` das opções de `state` e o `help` das ações e das recuperações. Nenhum template tem link (conferido pelo `build.mjs`).
 4. **O "?" do cabeçalho de lista fica no `ListEditor`,** num `EditorListHeader`, não no `ListHeader` da `views/`. O `ListHeader` é do modo Jogo e Leitura, que ficam sem "?" (pergunta 8).
    - **No bloco que o título nomeia** (T-58), o "?" da lista vai no título do grupo.
    - **Quando o título é o da seção,** a frase vem logo abaixo dele (W20 "Dons", M20 "Antecedentes").
 5. **O "?" dos pontos de bônus fica no saldo da aba da conta,** não no rótulo da aba. O rótulo é o "Orçamento", que o P05-D troca por "Pontos" ao mesmo tempo. Assim, o rebase sobre o P05-D é só textual.
-6. **Os grupos de seção leem a frase do `section.def.groups`.** O `CompiledGroup` do core não mudou, e o `dist` não precisou de rebuild depois do commit 1.
+6. **Os grupos de seção liam a frase do `section.def.groups`,** sem mudar o `CompiledGroup`. A revisão (item 10) desfez isso: a frase vai no `CompiledGroup`.
 7. **Commit 8: as frases do `P10-D-frases.json`, menos o catálogo.** Elas entraram por um script de edição textual, que deixa o resto do arquivo como estava. Cada objeto que ganhou `help` passou para várias linhas.
 
    | Template | Campos | Grupos | Opções |
@@ -576,6 +576,22 @@ Implementação em 04/11/2026, na `pacote/p10-d-ajuda-contextual`, a partir da p
    - No `matrix.test.tsx`, o teste de "rótulo começa pelo texto visível" pula o "?". O "?" é botão de ícone, com o nome "Ajuda: <campo>", como o `IconButton`.
    - Arquivos novos: `evolve/HelpRow.tsx`, `layouts/groupHelp.tsx` e `creation/InlineHelp.tsx`.
 9. **O E2E** ganhou o `exact` em Conceito, Natureza, Comportamento e Senhor, e a Casa ganhou o `exact` no commit 6. Um script conferiu os outros seletores de botão e de rótulo, e nenhum fica ambíguo. O `help.spec.ts` usa a folha do Clã no Editar, em vez da folha da Força de Vontade, para provar o Esc dentro da folha. A Força de Vontade é uma linha com Stepper, sem folha.
+
+**Correções do `/code-review` (high) da integração:**
+
+| Item | Commit | O que mudou |
+|---|---|---|
+| 2 e 8 | `7357ec4` | O "sem link" e a linha única saem do `validateTemplate` e vão para o `publicationIssues` (core e `validate.mjs`), que o `publishTemplate` e o `build.mjs` rodam. A regra vale nos 11 nós de `$defs/helpText` e `helpShort` do schema, com as mesmas mensagens nas duas camadas que não são o Ajv. Um teste confere a lista de nós contra o `schema.json`. O `compileTemplate` do app fica tolerante com versões antigas, e a escrita (publicação) fica estrita. O `git log -p` dos templates não mostra `://` nem `www.` em nenhum `help` ou `note` publicado |
+| 3 | `7357ec4`, `e7dc167` | A opção de `tags` deixa de aceitar `help`, porque o app não a desenha (schema, tipo e validadores). O `help` do item `fixed` é desenhado como texto no topo da `ItemSheet` (a Ressonância do M20) |
+| 10 | `3e4b91d` | O `help` do grupo vai no `CompiledGroup` (o `dist` foi refeito). Os layouts leem `g.help`, e o `groupHelpOf` sai |
+| 1 | `d72b00e` | O `HelpText` é uma região viva sempre montada. Fechada, ela fica vazia e fora do fluxo, e só o conteúdo muda. O web e o Android anunciam a frase, e o `aria-controls` sempre aponta um elemento que existe |
+| 7 | `d72b00e` | No `Choice` com frase em 2 colunas, a célula tem `flexBasis` 240 e cresce. Não há mais medida com `onLayout` nem o salto de 1 para 2 colunas |
+| 9 | `d72b00e` | O `WithHelp` do `@tms/ui` é a composição única de [conteúdo][?] com a frase embaixo. Usam: `Choice`, `TextField`, `HelpRow`, o cabeçalho da lista, o título e a linha do grupo, a Prioridade e o saldo. O `InlineHelp` sai, e o `TextEditor` usa o `fieldHelp(def)`. O `EditorShell` continua com `useHelp`, porque a frase vai na largura da linha |
+| 6 | `d72b00e` | No bloco que o título nomeia, um "?" mostra a frase do grupo e a da lista juntas: a do grupo primeiro, e a repetida sai (`blockHelp`). No ramo echo, a frase do grupo não se perde. Os itens 1, 7, 9 e 6 ficaram num commit só porque mudam a mesma API (`HelpText`) e os mesmos arquivos |
+| 5 | `908c9b6` | A frase da Prioridade não cita mais "Atributos e Habilidades" e termina com "Cada conjunto de grupos tem a sua própria ordem.". O `P10-D-frases.json` e o `.md` têm a mesma frase. Um teste confere que as frases do app não citam nome de nenhum dos seis templates |
+| 4 | — | Fica como está. A frase dos pontos de bônus diz "a aba Pontos", e esse texto depende do P05-D, que entra antes no merge e renomeia a aba. Sem o P05-D, a aba ainda se chama "Orçamento" |
+
+O "Jest did not exit" não vem dos testes novos. Com `--detectOpenHandles`, eles não deixam nada aberto: `help.test.tsx` do app e do `@tms/ui`, `creation/__tests__/help.test.ts` e `new-character.test.tsx`. A origem não foi conferida na base.
 
 **Para a integração:**
 
