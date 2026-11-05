@@ -7,6 +7,7 @@ import {
   withValueDeps,
 } from '../compile'
 import type { Template } from '../contract'
+import { creationFreeze, defaultStored } from '../creation'
 import { formulaDeps, formulaValue } from '../defaults'
 import { DERIVE, isDeriveName } from '../derive'
 import { planClock } from '../effects'
@@ -540,5 +541,44 @@ describe('os templates do produto: valores iniciais do livro', () => {
     expect(r.get('willpower')).toMatchObject({ permanent: 3 })
     expect(r.get('glory')).toMatchObject({ permanent: 2 })
     expect(r.get('honor')).toMatchObject({ permanent: 1 })
+  })
+})
+
+// T-85: o valor de partida que o app usa para zerar o contador é o mesmo que
+// o `creationFreeze` grava ao concluir, em todo campo com fórmula.
+describe('defaultStored: igual ao que o creationFreeze grava', () => {
+  const cases: [string, Json, Record<string, unknown>][] = [
+    [
+      'vtm-v20',
+      vtm(),
+      { name: 'A', clan: 'brujah', conscience: 3, selfControl: 2, courage: 4 },
+    ],
+    [
+      'wta-w20',
+      wta(),
+      { name: 'B', breed: 'lupino', auspice: 'ahroun', tribe: 'wendigo' },
+    ],
+    [
+      'mta-m20',
+      mta(),
+      { name: 'C', backgrounds: [{ id: 'b1', name: 'Avatar', value: 4 }] },
+    ],
+  ]
+  it.each(cases)('%s', (_name, template, values) => {
+    const model = compileTemplate(template)
+    const frozen = creationFreeze(model, { values })
+    expect(Object.keys(frozen).length).toBeGreaterThan(0)
+    for (const [id, value] of Object.entries(frozen))
+      expect(defaultStored(model, { values }, id)).toEqual(value)
+  })
+
+  it('ignora o valor gravado do próprio campo e some fora do modelo', () => {
+    const model = compileTemplate(wta())
+    const values = { auspice: 'ahroun', rage: { permanent: 7, current: 2 } }
+    expect(defaultStored(model, { values }, 'rage')).toEqual({
+      permanent: 5,
+      current: 5,
+    })
+    expect(defaultStored(model, { values }, 'naoExiste')).toBeUndefined()
   })
 })

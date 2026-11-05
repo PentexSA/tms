@@ -14,7 +14,9 @@ export function ChoiceEditor({ id, def, value, onChange, error }: EditorProps) {
           id: o.id,
           label: o.label,
           meta: 'meta' in o ? o.meta : 'hint' in o ? o.hint : undefined,
+          help: o.help,
         }))}
+        help={def.help}
       />
       {error ? (
         <Text variant="caption" color="danger" accessibilityRole="alert">

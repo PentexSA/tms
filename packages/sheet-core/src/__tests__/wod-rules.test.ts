@@ -7,6 +7,8 @@ import {
   checkCreation,
   effectiveCreationConfig,
 } from '../creation'
+import { creationAdvice } from '../recommend'
+import { resolve } from '../resolve'
 import { templates } from './fixtures'
 
 // Oráculos das regras de V20, M20 e W20 nos templates publicados
@@ -109,6 +111,49 @@ describe('V20', () => {
     expect(r.freebies?.spent).toBe(2 + 2 + 7 + 4)
   })
 
+  // P07-D: a tela avisa "fora do clã" e mostra o custo da Qualidade, mas a
+  // conta da criação continua a mesma (o servidor repete esta função).
+  it('Disciplina fora do clã fecha a criação como uma do clã', () => {
+    const outside = creation(vtm, {
+      ...BRUJAH,
+      disciplines: [
+        { id: 'd1', name: 'Dominação', value: 2 },
+        { id: 'd2', name: 'Auspícios', value: 1 },
+      ],
+    })
+    expect(outside).toEqual(creation(vtm, BRUJAH))
+  })
+
+  it('Qualidade: o Custo sai dos bônus, item a item', () => {
+    const r = creation(vtm, {
+      ...BRUJAH,
+      merits: [
+        { id: 'm1', name: 'Um', meta: { kind: 'Físico', cost: 2 } },
+        { id: 'm2', name: 'Dois', meta: { kind: 'Social', cost: 3 } },
+      ],
+    })
+    expect(r.problems).toEqual([])
+    expect(r.freebies?.spent).toBe(5)
+  })
+
+  // P07-D (R-26): o "do clã" da tela é o mesmo mapa do desconto de XP
+  it('o recommend das Disciplinas é igual, clã a clã, ao itemIn do XP', () => {
+    const def = vtm.fields.get('disciplines')?.def
+    const by = def?.type === 'list' ? def.recommend?.by : undefined
+    const xp = vtm.template.costs?.xp?.rules?.find(r => r.id === 'discipline')
+    const fromXp = Object.fromEntries(
+      (xp?.when ?? []).flatMap(w =>
+        w.if.itemIn && w.if.in?.[0] ? [[w.if.in[0], [...w.if.itemIn]]] : []
+      )
+    )
+    expect(by).toHaveLength(1)
+    expect(by?.[0]?.from).toBe('clan')
+    expect(by?.[0]?.map).toEqual(fromXp)
+    // 13 clãs; o Caitiff fica sem recomendação
+    expect(Object.keys(fromXp)).toHaveLength(13)
+    expect(Object.hasOwn(by?.[0]?.map ?? {}, 'caitiff')).toBe(false)
+  })
+
   it('Habilidade acima de 3 só com bônus', () => {
     const r = creation(vtm, { ...BRUJAH, alertness: 4 })
     expect(r.problems).toEqual([])
@@ -169,6 +214,18 @@ describe('V20', () => {
 
 describe('M20', () => {
   const mta = compileTemplate(templates['mta-m20'])
+
+  it('a Esfera de afinidade recomenda por Tradição; o Órfão fica sem', () => {
+    const def = mta.fields.get('affinity')?.def
+    const source = def?.type === 'choice' ? def.recommend?.by[0] : undefined
+    expect(source?.from).toBe('tradition')
+    const tradition = mta.fields.get('tradition')?.def
+    const ids =
+      tradition?.type === 'choice' ? tradition.options.map(o => o.id) : []
+    expect(Object.keys(source?.map ?? {}).sort()).toEqual(
+      ids.filter(id => id !== 'orfao').sort()
+    )
+  })
   // 7 em Antecedentes e 6 em Esferas, nenhuma acima do Arete 1
   const HERMETIC: Values = {
     ...ATTRIBUTES,
@@ -225,6 +282,29 @@ describe('M20', () => {
     ).toContain('CREATION_HARD_CAP')
   })
 
+  // U-05: a roda segue o Avatar sem nada gravado nela, com outros recursos
+  // já gravados (o rascunho da criação resolve a ficha inteira).
+  it('a Quintessência acompanha o Avatar enquanto a roda não é gravada', () => {
+    const at = (avatar: number) =>
+      resolve(mta, {
+        values: {
+          ...HERMETIC,
+          willpower: { permanent: 6, current: 6 },
+          backgrounds: [
+            { id: 'b1', name: 'Avatar', value: avatar },
+            { id: 'b2', name: 'Recursos', value: 4 },
+          ],
+        },
+      }).get('wheel')
+    const paradox = { id: 'paradox', n: 0 }
+    expect(at(3)).toMatchObject({
+      fills: [{ id: 'quintessence', n: 3 }, paradox],
+    })
+    expect(at(5)).toMatchObject({
+      fills: [{ id: 'quintessence', n: 5 }, paradox],
+    })
+  })
+
   it('XP: Esfera de afinidade ×7, outra ×8, nova 10, Arete ×8, Antecedente ×3', () => {
     const v = { ...HERMETIC, arete: 3, forces: 2, matter: 2 }
     expect(price(mta, v, { field: 'forces' })).toBe(14)
@@ -273,6 +353,31 @@ describe('W20', () => {
     expect(r.freebies?.remaining).toBe(15)
   })
 
+  // P07-D (D-07, A2 do roteiro): o template avisa o Dom acima do Posto 1.
+  // O Dom é da Raça (Hominídeo), para o "fora" não entrar no aviso.
+  it('Dom de Posto 2 dá ADVICE_ABOVE_LEVEL; o de Posto 1, não; a conta não muda', () => {
+    const at = (rank: number) => ({
+      ...AHROUN,
+      gifts: [
+        { id: 'g1', name: 'Mestre do Fogo', meta: { rank } },
+        ...(AHROUN.gifts as Values[]).slice(1),
+      ],
+    })
+    const sheet = (rank: number) => resolve(wta, { values: at(rank) })
+    expect(creationAdvice(wta, sheet(2))).toEqual([
+      {
+        code: 'ADVICE_ABOVE_LEVEL',
+        field: 'gifts',
+        paths: ['values.gifts#g1'],
+        amount: 1,
+        rule: 0,
+      },
+    ])
+    expect(creationAdvice(wta, sheet(1))).toEqual([])
+    // Só avisa: a conta fecha igual com o Posto 2
+    expect(creation(wta, at(2))).toEqual(creation(wta, at(1)))
+  })
+
   it('bônus: Dom 7, Gnose 2, Fúria 1; o Posto não entra na conta', () => {
     const r = creation(wta, {
       ...AHROUN,
@@ -286,6 +391,22 @@ describe('W20', () => {
     })
     expect(r.problems).toEqual([])
     expect(r.freebies?.spent).toBe(7 + 4 + 1)
+  })
+
+  // T-85: a regra do servidor que o "−" do app passa a prever. Abaixo do
+  // valor do Augúrio, salvar passa e concluir não; o limite não muda.
+  it('Fúria abaixo do Augúrio: incompleta, salva e não conclui', () => {
+    const r = creation(wta, { ...AHROUN, rage: { permanent: 4, current: 4 } })
+    const below = r.problems.filter(p => p.code === 'CREATION_BELOW_INITIAL')
+    expect(below).toEqual([
+      expect.objectContaining({
+        severity: 'incomplete',
+        paths: ['values.rage'],
+        amount: 1,
+      }),
+    ])
+    expect(r.savable).toBe(true)
+    expect(r.complete).toBe(false)
   })
 
   it('Renome não se compra na criação', () => {

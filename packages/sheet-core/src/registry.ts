@@ -80,6 +80,8 @@ export const REGISTRY = {
   budgetRules: ['priority-budget', 'fixed-budget', 'item-count', 'point-buy'],
   capRules: ['creation-cap', 'hard-cap'],
   costRules: ['flat', 'per-current', 'item-meta', 'credit'],
+  // Avisos da criação que não bloqueiam (README §14, creation.advice)
+  creationAdvice: ['item-meta-max'],
   optionEffects: ['flag', 'choice', 'bounded-number'],
 } as const
 
@@ -115,6 +117,7 @@ export type SlotReset = Registry['slotResets'][number]
 export type BudgetRule = Registry['budgetRules'][number]
 export type CapRule = Registry['capRules'][number]
 export type CostRule = Registry['costRules'][number]
+export type CreationAdviceName = Registry['creationAdvice'][number]
 export type OptionEffect = Registry['optionEffects'][number]
 
 // Confere se um valor desconhecido (vindo do banco ou do cliente) está na lista.

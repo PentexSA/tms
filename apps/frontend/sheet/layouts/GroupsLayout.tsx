@@ -6,16 +6,16 @@ import {
 } from '@tms/sheet-core'
 import {
   Button,
+  type Help,
   hitTarget,
   Pressable,
-  SectionHeader,
   Text,
   textStyle,
   tokens,
   useLayout,
   useTheme,
 } from '@tms/ui'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useContext, useState } from 'react'
 import {
   type StyleProp,
   StyleSheet,
@@ -27,8 +27,11 @@ import { useSheet, useSheetSelector } from '../context'
 import { CreationCounter } from '../creation/CreationCounter'
 import { filterActive, visibleFields } from '../evolve/filters'
 import { FieldSlot } from '../FieldSlot'
+import { useAnchor } from './anchor'
 import { ChipFlow } from './ChipFlow'
+import { blockHelp, GroupHelpLine, GroupTitle } from './groupHelp'
 import { useGroupTabs } from './groupTabs'
+import { StripScope } from './groupTabsState'
 import { echoesSection, HeadedList, titledList } from './headedList'
 import type { LayoutProps } from './types'
 
@@ -83,9 +86,24 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
   const { breakpoint, stacked } = useLayout()
   const columns =
     breakpoint === 'expanded' && !stacked && !tabs.tabbed && groups.length > 1
+  // O "ir ao grupo" (P05-D): o grupo com título à vista é âncora, medida
+  // dentro do corpo, que é medido dentro do layout, que é medido na seção
+  const inPanel = useContext(StripScope)
+  const layoutAnchor = useAnchor(inPanel ? `${section.id}~layout` : null, {
+    parent: section.id,
+    focusable: false,
+  })
+  const bodyAnchor = useAnchor(inPanel ? `${section.id}~body` : null, {
+    parent: `${section.id}~layout`,
+    focusable: false,
+  })
 
   return (
-    <View testID={`groups-${section.id}`}>
+    <View
+      ref={layoutAnchor.layoutRef as never}
+      testID={`groups-${section.id}`}
+      onLayout={layoutAnchor.onLayout}
+    >
       {tabs.bar}
       {showFilter || section.def.searchable ? (
         <FilterBar
@@ -116,6 +134,8 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
         {...tabs.panelProps}
         style={columns ? styles.columns : undefined}
         testID={`groups-${section.id}-body`}
+        onLayout={bodyAnchor.onLayout}
+        ref={bodyAnchor.layoutRef as never}
       >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
@@ -127,22 +147,47 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
             g.fieldIds,
             header ? g.title : echo ? section.def.title : null
           )
+          // A frase do grupo e, no bloco que o título nomeia (T-58), a da
+          // lista: com as duas, o "?" mostra as duas (blockHelp)
+          const listDef = headed ? model.fields.get(headed)?.def : undefined
+          const draft = isDraftMode(mode)
+          const groupText = draft ? g.help : null
+          const listText = draft ? listDef?.help : null
           return (
             <GroupBlock
               key={g.id}
               headed={headed}
               style={columns ? styles.column : undefined}
-            >
-              {header ? (
-                <View style={styles.title}>
-                  <SectionHeader
-                    title={g.title}
-                    level="group"
-                    right={
-                      <CreationCounter fieldIds={g.fieldIds} items={headed} />
+              anchor={
+                inPanel && header && groups.length > 1
+                  ? {
+                      id: `${section.id}/${g.id}`,
+                      parent: `${section.id}~body`,
                     }
-                  />
-                </View>
+                  : null
+              }
+              title={header ? g.title : null}
+              help={header ? blockHelp(g.title, groupText, listText) : null}
+              helpTestID={`group-help-${g.id}`}
+              right={<CreationCounter fieldIds={g.fieldIds} items={headed} />}
+            >
+              {header ? null : g.title && !echo ? (
+                // Com abas, o "?" vai no topo do conteúdo da aba
+                <GroupHelpLine
+                  help={blockHelp(g.title, groupText, null)}
+                  testID={`group-help-${g.id}`}
+                />
+              ) : echo ? (
+                // O título da seção nomeia o bloco: o "?" vem logo abaixo, com
+                // a frase do grupo e a da lista
+                <GroupHelpLine
+                  help={blockHelp(
+                    listDef?.label ?? section.def.title,
+                    groupText,
+                    listText
+                  )}
+                  testID={`group-help-${g.id}`}
+                />
               ) : null}
               {/* Na faixa fixa, o contador vai junto com as abas (T-27) */}
               {titled || tabs.inStrip ? null : (
@@ -180,16 +225,45 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
 function GroupBlock({
   headed,
   style,
+  anchor,
+  title,
+  help,
+  helpTestID,
+  right,
   children,
 }: {
   readonly headed: FieldId | undefined
   // A coluna do grupo no desktop (T-28)
   readonly style?: StyleProp<ViewStyle>
+  // O grupo como âncora do "ir ao grupo" (P05-D); o título recebe o foco
+  readonly anchor: { readonly id: string; readonly parent: string } | null
+  readonly title: string | null
+  // O "?" do título: a frase do grupo e a da lista que ele nomeia (R-19)
+  readonly help: Help | null
+  readonly helpTestID?: string
+  // O contador ao lado do título
+  readonly right: ReactNode
   readonly children: ReactNode
 }) {
+  const { onLayout, layoutRef, target } = useAnchor(anchor?.id ?? null, {
+    parent: anchor?.parent,
+  })
   return (
     <HeadedList.Provider value={headed}>
-      <View style={style}>{children}</View>
+      <View ref={layoutRef as never} style={style} onLayout={onLayout}>
+        {title ? (
+          <View style={styles.title}>
+            <GroupTitle
+              title={title}
+              help={help}
+              right={right}
+              target={target}
+              testID={helpTestID}
+            />
+          </View>
+        ) : null}
+        {children}
+      </View>
     </HeadedList.Provider>
   )
 }

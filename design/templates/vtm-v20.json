@@ -4,10 +4,10 @@
   "name": "Vampiro: A Máscara — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "V20",
-  "templateVersion": "1.8.0",
+  "templateVersion": "1.9.0",
   "locale": "pt-BR",
   "skin": "wod",
-  "license": "O template traz só nomes de traços e regras numéricas. Descrições de Disciplinas e poderes são protegidas e não são embutidas: a mesa escreve as próprias notas.",
+  "license": "O template traz nomes de traços, regras numéricas e frases curtas do time (ajuda, Disciplinas e o resumo da Fraqueza do clã), escritas com palavras próprias. Nenhum texto do livro é embutido.",
   "identity": {
     "emblem": "ankh",
     "name": "name",
@@ -41,26 +41,88 @@
   },
   "fields": {
     "name": { "type": "text", "label": "Nome", "maxLength": 80 },
-    "concept": { "type": "text", "label": "Conceito", "maxLength": 80 },
+    "concept": {
+      "type": "text",
+      "label": "Conceito",
+      "maxLength": 80,
+      "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+    },
     "clan": {
       "type": "choice",
       "label": "Clã",
       "options": [
-        { "id": "assamitas", "label": "Assamitas" },
-        { "id": "brujah", "label": "Brujah" },
-        { "id": "gangrel", "label": "Gangrel" },
-        { "id": "giovanni", "label": "Giovanni" },
-        { "id": "lasombra", "label": "Lasombra" },
-        { "id": "malkavianos", "label": "Malkavianos" },
-        { "id": "nosferatu", "label": "Nosferatu" },
-        { "id": "ravnos", "label": "Ravnos" },
-        { "id": "seguidores-de-set", "label": "Seguidores de Set" },
-        { "id": "toreador", "label": "Toreador" },
-        { "id": "tremere", "label": "Tremere" },
-        { "id": "tzimisce", "label": "Tzimisce" },
-        { "id": "ventrue", "label": "Ventrue" },
-        { "id": "caitiff", "label": "Caitiff" }
-      ]
+        {
+          "id": "assamitas",
+          "label": "Assamitas",
+          "help": "Clã de assassinos e estudiosos, com uma tradição de disciplina e de honra própria."
+        },
+        {
+          "id": "brujah",
+          "label": "Brujah",
+          "help": "Clã de rebeldes e idealistas, de temperamento quente e rápido para a briga."
+        },
+        {
+          "id": "gangrel",
+          "label": "Gangrel",
+          "help": "Clã de andarilhos próximos dos animais, que vivem longe das cidades com facilidade."
+        },
+        {
+          "id": "giovanni",
+          "label": "Giovanni",
+          "help": "Clã de família e de negócios, ligado aos mortos e fechado aos de fora."
+        },
+        {
+          "id": "lasombra",
+          "label": "Lasombra",
+          "help": "Clã de líderes ambiciosos, ligados às sombras. A maioria está no Sabá."
+        },
+        {
+          "id": "malkavianos",
+          "label": "Malkavianos",
+          "help": "Clã marcado por algum tipo de loucura, que às vezes vê o que os outros não veem."
+        },
+        {
+          "id": "nosferatu",
+          "label": "Nosferatu",
+          "help": "Clã de aparência monstruosa, que vive escondido e negocia segredos."
+        },
+        {
+          "id": "ravnos",
+          "label": "Ravnos",
+          "help": "Clã de viajantes e trapaceiros, mestres da ilusão."
+        },
+        {
+          "id": "seguidores-de-set",
+          "label": "Seguidores de Set",
+          "help": "Clã de cultistas de um deus antigo, que corrompem pela tentação."
+        },
+        {
+          "id": "toreador",
+          "label": "Toreador",
+          "help": "Clã de artistas e amantes da beleza, influentes na alta sociedade."
+        },
+        {
+          "id": "tremere",
+          "label": "Tremere",
+          "help": "Clã de feiticeiros do sangue, organizado numa hierarquia rígida."
+        },
+        {
+          "id": "tzimisce",
+          "label": "Tzimisce",
+          "help": "Clã de senhores antigos que moldam carne e osso. A maioria está no Sabá."
+        },
+        {
+          "id": "ventrue",
+          "label": "Ventrue",
+          "help": "Clã de aristocratas e líderes, exigentes até com a presa."
+        },
+        {
+          "id": "caitiff",
+          "label": "Caitiff",
+          "help": "Vampiro sem clã conhecido. Não tem Disciplinas de clã nem fraqueza de clã."
+        }
+      ],
+      "help": "A linhagem do vampiro. Define três Disciplinas mais fáceis de aprender e uma fraqueza própria."
     },
     "generation": {
       "type": "number",
@@ -68,9 +130,15 @@
       "readOnly": true,
       "derive": "vtmGeneration",
       "from": { "list": "backgrounds", "item": "Geração" },
-      "suffix": "ª geração"
+      "suffix": "ª geração",
+      "help": "Distância até os primeiros vampiros. Número menor: mais sangue no corpo e mais gasto por turno. Muda com o Antecedente Geração."
     },
-    "sire": { "type": "text", "label": "Senhor", "maxLength": 80 },
+    "sire": {
+      "type": "text",
+      "label": "Senhor",
+      "maxLength": 80,
+      "help": "O vampiro que criou o personagem. Pode ficar em branco se ninguém sabe quem foi."
+    },
     "nature": {
       "type": "text",
       "label": "Natureza",
@@ -118,7 +186,8 @@
         "Tradicionalista",
         "Trapaceiro",
         "Visionário"
-      ]
+      ],
+      "help": "Quem o personagem é por dentro. Agir de acordo com ela, na mesa, pode devolver Força de Vontade."
     },
     "demeanor": {
       "type": "text",
@@ -167,7 +236,8 @@
         "Tradicionalista",
         "Trapaceiro",
         "Visionário"
-      ]
+      ],
+      "help": "A máscara que o personagem mostra aos outros. Pode ser diferente da Natureza."
     },
     "quote": { "type": "text", "label": "Citação", "maxLength": 160 },
 
@@ -457,7 +527,51 @@
         "Vicissitude",
         "Tenebrosidade"
       ],
-      "rollAs": "ability"
+      "catalogHelp": {
+        "Animalismo": "Afinidade com os animais e com a Besta: falar com animais, chamá-los e acalmar ou atiçar a fúria dos outros.",
+        "Auspícios": "Percepção sobrenatural: sentidos aguçados, ler auras, saber o passado de um objeto pelo toque e, nos níveis altos, projetar a mente.",
+        "Rapidez": "Velocidade sobrenatural: reflexos acima do humano e, a cada nível, mais ações no mesmo turno.",
+        "Demência": "A loucura como arma: semear confusão, medo e delírio na mente dos outros.",
+        "Dominação": "Controle da mente pelo olhar e pela voz: dar ordens, apagar ou mudar lembranças e, no topo, tomar o corpo de alguém.",
+        "Fortitude": "Resistência sobrenatural: aguentar golpes, fogo e sol que derrubariam outro vampiro.",
+        "Ofuscação": "Passar despercebido: sumir da atenção dos outros, mudar o rosto que eles veem e esconder pessoas ou objetos.",
+        "Potência": "Força sobrenatural: cada nível soma sucessos às jogadas de força e ao dano corpo a corpo.",
+        "Presença": "Carisma sobrenatural: atrair, encantar ou intimidar, inclusive multidões inteiras.",
+        "Metamorfose": "Mudar o corpo: olhos que veem no escuro, garras, fundir-se com a terra e virar lobo, morcego ou névoa.",
+        "Quietus": "A arte do assassino: silêncio absoluto, um toque que fere e o próprio sangue usado como veneno.",
+        "Serpentis": "Os dons da serpente: olhar que paralisa, língua venenosa, pele de cobra e o coração guardado fora do corpo.",
+        "Taumaturgia": "Magia do sangue: trilhas e rituais aprendidos com estudo, cada um com efeitos próprios.",
+        "Necromancia": "Poder sobre os mortos: ver e falar com fantasmas, invocá-los e mexer com cadáveres.",
+        "Quimerismo": "Ilusões que enganam os sentidos, de um som ou uma imagem pequena a cenas inteiras que parecem reais.",
+        "Vicissitude": "Moldar carne e osso como barro, no próprio corpo e no dos outros.",
+        "Tenebrosidade": "Domínio das sombras: apagar a luz, criar braços de trevas e virar sombra."
+      },
+      "recommend": {
+        "outside": "fora do clã",
+        "by": [
+          {
+            "from": "clan",
+            "label": "do clã",
+            "map": {
+              "assamitas": ["Rapidez", "Ofuscação", "Quietus"],
+              "brujah": ["Rapidez", "Potência", "Presença"],
+              "gangrel": ["Animalismo", "Fortitude", "Metamorfose"],
+              "giovanni": ["Dominação", "Necromancia", "Potência"],
+              "lasombra": ["Dominação", "Tenebrosidade", "Potência"],
+              "malkavianos": ["Auspícios", "Demência", "Ofuscação"],
+              "nosferatu": ["Animalismo", "Ofuscação", "Potência"],
+              "ravnos": ["Animalismo", "Quimerismo", "Fortitude"],
+              "seguidores-de-set": ["Ofuscação", "Presença", "Serpentis"],
+              "toreador": ["Auspícios", "Rapidez", "Presença"],
+              "tremere": ["Auspícios", "Dominação", "Taumaturgia"],
+              "tzimisce": ["Animalismo", "Auspícios", "Vicissitude"],
+              "ventrue": ["Dominação", "Fortitude", "Presença"]
+            }
+          }
+        ]
+      },
+      "rollAs": "ability",
+      "help": "Poderes do sangue. As três do clã aparecem primeiro; na criação, as outras pedem a confirmação do narrador."
     },
     "backgrounds": {
       "type": "list",
@@ -478,7 +592,20 @@
         "Recursos",
         "Lacaios",
         "Status"
-      ]
+      ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Fama": "O quanto o personagem é conhecido no mundo comum. Abre portas e também atrai olhares.",
+        "Geração": "Cada ponto deixa o vampiro uma geração mais perto dos primeiros. Muda a Geração da identidade e o máximo de sangue.",
+        "Rebanho": "Pessoas de quem o vampiro se alimenta com segurança. Mais pontos: mais gente e menos tempo caçando.",
+        "Influência": "Peso nas instituições humanas: política, polícia, imprensa, negócios.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Lacaios": "Servos leais ao vampiro. Mais pontos: mais servos ou servos mais capazes.",
+        "Status": "A posição do vampiro na sociedade dos vampiros da cidade."
+      },
+      "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
     "conscience": {
       "type": "rating",
@@ -500,13 +627,32 @@
       "min": 0,
       "max": 10,
       "default": { "derive": "sum", "from": ["conscience", "selfControl"] },
-      "help": "Começa em Consciência + Autocontrole e acompanha as Virtudes até você marcar outro valor."
+      "help": "O quanto o vampiro ainda age como gente. Começa em Consciência + Autocontrole e acompanha as Virtudes até você marcar outro valor."
     },
     "weakness": {
       "type": "longText",
       "label": "Fraqueza do clã",
       "maxLength": 600,
-      "help": "Escreva a fraqueza com as suas palavras."
+      "default": {
+        "from": "clan",
+        "map": {
+          "assamitas": "Sangue de vampiro vicia: cada vez que bebe vitae de outro membro, o personagem precisa resistir para não querer mais, e a vontade de cometer diablerie cresce. Combine com o narrador como o vício aparece na crônica.",
+          "brujah": "A raiva vem fácil: resistir ao frenesi é mais difícil que para os outros clãs, e a Força de Vontade não basta para evitá-lo por completo, só para segurá-lo por um momento.",
+          "gangrel": "Cada frenesi deixa uma marca animal no corpo (orelhas, pelos, olhos, garras). Algumas marcas ficam para sempre e, acumuladas, deixam o personagem menos à vontade entre os mortais.",
+          "giovanni": "O Beijo machuca: quem serve de alimento sofre mais dano que com outros vampiros e sente dor, não prazer. Alimentar-se sem ferir alguém de verdade exige mais cuidado.",
+          "lasombra": "Não aparece em espelhos, fotos, vídeos nem em nenhuma superfície que reflita. Isso denuncia o personagem para quem presta atenção e complica a vida entre os mortais.",
+          "malkavianos": "Carrega pelo menos uma perturbação mental que nunca se cura de vez. Com Força de Vontade ela pode ser contida por algum tempo, mas sempre volta.",
+          "nosferatu": "A aparência é monstruosa: a Aparência fica em 0 e não sobe. As jogadas que dependem de boa impressão falham, e o personagem precisa se esconder dos mortais.",
+          "ravnos": "Cada Ravnos tem um vício ligado a um crime ou trapaça (mentir, roubar, enganar). Diante da chance de praticá-lo, precisa resistir para não ceder.",
+          "seguidores-de-set": "Luz forte incomoda e enfraquece: sob luz intensa as jogadas ficam mais difíceis, e o sol fere ainda mais que aos outros vampiros.",
+          "toreador": "A beleza prende: diante de algo realmente belo, o personagem fica fascinado e esquece o resto até a cena mudar ou até conseguir se controlar.",
+          "tremere": "O laço de sangue com o clã prende mais rápido: beber o sangue de um Tremere mais velho leva ao laço com menos goles que o normal.",
+          "tzimisce": "Precisa descansar junto de um punhado de terra de um lugar importante da vida mortal. Cada dia sem ela enfraquece o personagem, até a terra voltar.",
+          "ventrue": "Paladar exigente: só se alimenta de um tipo de mortal, escolhido na criação (por exemplo, médicos ou pessoas apaixonadas). Outro sangue não alimenta e é posto para fora.",
+          "caitiff": "Sem clã, não tem fraqueza de clã nem Disciplinas de clã. Em troca, costuma ser desprezado pelos outros vampiros, que o veem como alguém sem lugar."
+        }
+      },
+      "help": "Começa com um resumo do time sobre a fraqueza do clã. Escreva por cima se a mesa usar outra versão."
     },
 
     "willpower": {
@@ -520,7 +666,7 @@
       },
       "editableIn": ["play"],
       "defaultAction": "spend1",
-      "help": "Permanente limita o temporário e só muda em Evoluir. Começa igual à Coragem até ser marcado."
+      "help": "Determinação: gastar um ponto garante um sucesso ou ajuda a resistir a um impulso. Começa igual à Coragem; o permanente limita o temporário."
     },
     "blood": {
       "type": "resource",
@@ -538,7 +684,8 @@
           "effect": "health.heal",
           "params": { "field": "health", "types": ["bashing", "lethal"] }
         }
-      ]
+      ],
+      "help": "A reserva de sangue no corpo. Paga Disciplinas, cura e esforço físico. A Geração define o máximo."
     },
     "health": {
       "type": "track",
@@ -643,17 +790,20 @@
         {
           "id": "physical",
           "title": "Físicos",
-          "fields": ["strength", "dexterity", "stamina"]
+          "fields": ["strength", "dexterity", "stamina"],
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
         },
         {
           "id": "social",
           "title": "Sociais",
-          "fields": ["charisma", "manipulation", "appearance"]
+          "fields": ["charisma", "manipulation", "appearance"],
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
         },
         {
           "id": "mental",
           "title": "Mentais",
-          "fields": ["perception", "intelligence", "wits"]
+          "fields": ["perception", "intelligence", "wits"],
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
         }
       ]
     },
@@ -684,7 +834,8 @@
             "leadership",
             "streetwise",
             "subterfuge"
-          ]
+          ],
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
         },
         {
           "id": "skills",
@@ -700,7 +851,8 @@
             "performance",
             "stealth",
             "survival"
-          ]
+          ],
+          "help": "Habilidades aprendidas com treino ou com um ofício."
         },
         {
           "id": "knowledges",
@@ -716,7 +868,8 @@
             "politics",
             "science",
             "technology"
-          ]
+          ],
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
         }
       ]
     },
@@ -739,7 +892,8 @@
         {
           "id": "virtues",
           "title": "Virtudes",
-          "fields": ["conscience", "selfControl", "courage"]
+          "fields": ["conscience", "selfControl", "courage"],
+          "help": "Consciência, Autocontrole e Coragem. Elas definem a Humanidade e a Força de Vontade com que o vampiro começa."
         },
         { "id": "morality", "title": "Trilha", "fields": ["humanity"] },
         { "id": "weakness", "title": "Fraqueza", "fields": ["weakness"] }

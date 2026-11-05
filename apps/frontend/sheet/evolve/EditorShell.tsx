@@ -1,4 +1,12 @@
-import { Text, tokens, useTheme } from '@tms/ui'
+import {
+  type Help,
+  HelpButton,
+  HelpText,
+  Text,
+  tokens,
+  useHelp,
+  useTheme,
+} from '@tms/ui'
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -6,8 +14,11 @@ import { StyleSheet, View } from 'react-native'
 // esquerda, controle à direita. O erro (do core, da conta ou do servidor) fica
 // na coluna do rótulo, logo abaixo dele, na altura do toque (T-20): embaixo
 // de tudo, ele caía fora da tela a 390 px. A linha cresce para baixo.
+// Com `help` (a frase do template, R-19), o "?" fica logo depois do rótulo, e
+// a frase aberta vai no topo do `below`, na largura da linha.
 export function EditorShell({
   label,
+  help,
   sub,
   note,
   error,
@@ -16,6 +27,7 @@ export function EditorShell({
   testID,
 }: {
   readonly label: string
+  readonly help?: Help | null
   readonly sub?: string | null
   // Nota da linha sob o rótulo (o custo do próximo ponto na criação)
   readonly note?: ReactNode
@@ -26,6 +38,7 @@ export function EditorShell({
   readonly testID?: string
 }) {
   const { colors } = useTheme()
+  const helpState = useHelp()
   return (
     <View
       testID={testID}
@@ -36,7 +49,22 @@ export function EditorShell({
           style={styles.text}
           testID={testID ? `${testID}-label` : undefined}
         >
-          <Text variant="fieldLabel">{label}</Text>
+          {help ? (
+            <View style={styles.labelRow}>
+              <Text variant="fieldLabel" style={styles.labelText}>
+                {label}
+              </Text>
+              <HelpButton
+                subject={help.subject}
+                expanded={helpState.expanded}
+                onToggle={helpState.toggle}
+                controls={helpState.textId}
+                testID={testID ? `${testID}-help` : undefined}
+              />
+            </View>
+          ) : (
+            <Text variant="fieldLabel">{label}</Text>
+          )}
           {sub ? (
             <Text variant="caption" color="inkMuted" numberOfLines={2}>
               {sub}
@@ -53,6 +81,13 @@ export function EditorShell({
         </View>
         {children}
       </View>
+      {help ? (
+        <HelpText
+          id={helpState.textId}
+          text={help.text}
+          expanded={helpState.expanded}
+        />
+      ) : null}
       {below}
     </View>
   )
@@ -69,4 +104,10 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[3] },
   text: { flex: 1, gap: tokens.space['0.5'] },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[1],
+  },
+  labelText: { flexShrink: 1 },
 })

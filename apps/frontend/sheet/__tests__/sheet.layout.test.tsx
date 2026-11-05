@@ -14,7 +14,12 @@ import { Dimensions, ScrollView, StyleSheet, TextInput } from 'react-native'
 import * as apiModule from '../../lib/api'
 import { type createFakeApi, ok } from '../../test/fake-api'
 import { example, modelOf, sheetFor, templateJson } from '../../test/fixtures'
-import { fakeServer, type LiveProps, renderLive } from '../../test/live'
+import {
+  fakeServer,
+  LIVE_ID,
+  type LiveProps,
+  renderLive,
+} from '../../test/live'
 import { sheetsDismissed, textInput } from '../../test/queries'
 import {
   json,
@@ -522,6 +527,50 @@ describe('T-59: "Em jogo" recolhido na Criação', () => {
   )
 })
 
+// T-22: comprar FdV na criação e salvar deixa o dock do Jogo cheio (4 de 4)
+describe('T-22: o dock mostra o atual que acompanhou o permanente', () => {
+  it('V20 no celular: FdV 3 → 4 na criação, salva, Jogo com 4 de 4', async () => {
+    resize(PHONE)
+    const sheet = {
+      values: { name: 'Nova', clan: 'brujah', courage: 3 },
+      specialties: {},
+    }
+    const server = fakeServer(vtm, sheet)
+    await renderLive(
+      {
+        model: vtm,
+        sheet,
+        mode: 'evolve',
+        creation: {
+          characterId: LIVE_ID,
+          chronicleId: 'c1',
+          status: 'creating',
+          info: null,
+          active: false,
+        },
+      },
+      server.post
+    )
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Força de Vontade permanente' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'increment' } }
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar alterações' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(server.post).toHaveBeenCalledTimes(1))
+    expect(server.current().values.willpower).toEqual({
+      permanent: 4,
+      current: 4,
+    })
+    if (!screen.queryByRole('radio', { name: 'Jogo', checked: true }))
+      fireEvent.press(screen.getByRole('radio', { name: 'Jogo' }))
+    expect(
+      screen.getAllByLabelText(/^Força de Vontade, 4 de 4/).length
+    ).toBeGreaterThan(0)
+  })
+})
+
 describe('T-27 (parte 1): no celular, os controles de modo rolam com a ficha', () => {
   const scroll = () =>
     screen.UNSAFE_getByType(KeyboardArea).findAllByType(ScrollView)[0]!
@@ -600,7 +649,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     )
     await session.restore()
     renderWithSession(<SheetScreen id={ID} initialMode="create" />, session)
-    await screen.findByRole('tab', { name: 'Orçamento' })
+    await screen.findByRole('tab', { name: 'Pontos' })
   }
   const nav = () => within(screen.getByTestId('sheet-nav'))
   const layout = (testID: string, y: number, height = 400) =>
@@ -623,7 +672,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     const sticky = scroll.props.stickyHeaderIndices as number[]
     expect(children[sticky[0]!]!.key).toBe('nav')
     // No topo da zona: os Atributos
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeTruthy()
     expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
     expect(nav().getByTestId('counter-physical')).toBeTruthy()
     // O corpo não repete a barra
@@ -648,7 +697,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     // De volta ao topo: os Atributos, com a escolha das Habilidades guardada
     scrollTo(0)
     expect(nav().getByLabelText('Grupos de Atributos')).toBeTruthy()
-    // "Orçamento" a um toque, sem voltar ao topo; o painel novo começa logo
+    // "Pontos" a um toque, sem voltar ao topo; o painel novo começa logo
     // abaixo da faixa (600 − 120), não no fim de um conteúdo mais curto
     scrollTo(1450)
     const scrollView = screen
@@ -657,8 +706,8 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
       scrollTo: (o: object) => void
     }
     const scrollToSpy = jest.spyOn(scrollView, 'scrollTo')
-    fireEvent.press(nav().getByRole('tab', { name: 'Orçamento' }))
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+    fireEvent.press(nav().getByRole('tab', { name: 'Pontos' }))
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeSelected()
     expect(scrollToSpy).toHaveBeenCalledWith({ y: 480, animated: false })
     // No topo, trocar de aba não rola
     scrollToSpy.mockClear()
@@ -670,7 +719,7 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
   it('a 750: as abas da zona continuam fixas; sub-abas não há', async () => {
     resize(TABLET)
     await openCreation()
-    expect(nav().getByRole('tab', { name: 'Orçamento' })).toBeTruthy()
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeTruthy()
     expect(nav().queryByLabelText(/^Grupos de/)).toBeNull()
     expect(screen.queryByTestId('group-tabs-attributes')).toBeNull()
   })

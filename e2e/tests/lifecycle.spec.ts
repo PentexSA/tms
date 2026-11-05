@@ -120,14 +120,16 @@ test('T-05: a ficha em criação abre na montagem pela lista e depois de recarre
     await page.getByRole('button', { name: 'Criar ficha' }).click()
     await expect(radio(page, 'Criação')).toBeChecked()
 
-    // Voltar à crônica e tocar a ficha na lista: Criação, com o Orçamento
+    // Voltar à crônica e tocar a ficha na lista: Criação, com a aba Pontos
     // (QAW-37, IW-04)
     await page
       .getByRole('button', { name: 'Voltar para Crônica por pontos' })
       .click()
     await page.getByRole('button', { name: /^Isadora Vex,/ }).click()
     await expect(radio(page, 'Criação')).toBeChecked()
-    await expect(page.getByRole('tab', { name: 'Orçamento' })).toBeVisible()
+    await expect(
+      page.getByRole('tab', { name: 'Pontos', exact: true })
+    ).toBeVisible()
     // Recarregar: Criação de novo (EW-08)
     await page.reload()
     await expect(radio(page, 'Criação')).toBeChecked()

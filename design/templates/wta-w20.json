@@ -4,10 +4,10 @@
   "name": "Lobisomem: O Apocalipse — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "W20",
-  "templateVersion": "1.6.0",
+  "templateVersion": "1.7.0",
   "locale": "pt-BR",
   "skin": "wod",
-  "license": "O template traz só nomes de traços e regras numéricas. Descrições de Dons e Ritos são protegidas e não são embutidas.",
+  "license": "O template traz nomes de traços (inclusive os Dons do catálogo), regras numéricas e frases curtas do time, escritas com palavras próprias. Nenhum texto do livro é embutido.",
   "identity": {
     "emblem": "claws",
     "name": "name",
@@ -43,15 +43,33 @@
   "fields": {
     "name": { "type": "text", "label": "Nome", "maxLength": 80 },
     "deedName": { "type": "text", "label": "Nome de feito", "maxLength": 80 },
-    "concept": { "type": "text", "label": "Conceito", "maxLength": 80 },
+    "concept": {
+      "type": "text",
+      "label": "Conceito",
+      "maxLength": 80,
+      "help": "Uma frase sobre quem o personagem era antes da história: profissão, papel ou jeito de viver."
+    },
     "breed": {
       "type": "choice",
       "label": "Raça",
       "options": [
-        { "id": "hominideo", "label": "Hominídeo" },
-        { "id": "impuro", "label": "Impuro" },
-        { "id": "lupino", "label": "Lupino" }
-      ]
+        {
+          "id": "hominideo",
+          "label": "Hominídeo",
+          "help": "Nasceu humano e cresceu entre pessoas. Entende a cidade melhor que o mato."
+        },
+        {
+          "id": "impuro",
+          "label": "Impuro",
+          "help": "Filho de dois pais da mesma espécie. Carrega uma deformidade desde o nascimento."
+        },
+        {
+          "id": "lupino",
+          "label": "Lupino",
+          "help": "Nasceu lobo e aprendeu a forma humana depois. Entende o mato melhor que a cidade."
+        }
+      ],
+      "help": "A forma em que o personagem nasceu: humana, lobo ou mestiça. Muda a Gnose inicial e os Dons à mão."
     },
     "auspice": {
       "type": "choice",
@@ -62,55 +80,111 @@
           "id": "ragabash",
           "label": "Ragabash",
           "meta": "lua nova",
-          "glyphParam": 0
+          "glyphParam": 0,
+          "help": "Nasceu na lua nova: o questionador e trapaceiro, que testa as regras do grupo."
         },
         {
           "id": "theurge",
           "label": "Theurge",
           "meta": "lua crescente",
-          "glyphParam": 0.25
+          "glyphParam": 0.25,
+          "help": "Nasceu na lua crescente: o místico, que lida com os espíritos."
         },
         {
           "id": "philodox",
           "label": "Philodox",
           "meta": "meia-lua",
-          "glyphParam": 0.5
+          "glyphParam": 0.5,
+          "help": "Nasceu na meia-lua: o juiz, que busca o equilíbrio e guarda a tradição."
         },
         {
           "id": "galliard",
           "label": "Galliard",
           "meta": "lua gibosa",
-          "glyphParam": 0.75
+          "glyphParam": 0.75,
+          "help": "Nasceu na lua gibosa: o contador de histórias, que guarda a memória do grupo."
         },
         {
           "id": "ahroun",
           "label": "Ahroun",
           "meta": "lua cheia",
-          "glyphParam": 1
+          "glyphParam": 1,
+          "help": "Nasceu na lua cheia: o guerreiro, que vai à frente na luta."
         }
-      ]
+      ],
+      "help": "A fase da lua no nascimento, que define o papel no grupo. Muda a Fúria inicial e os Dons à mão."
     },
     "tribe": {
       "type": "choice",
       "label": "Tribo",
       "options": [
-        { "id": "furias-negras", "label": "Fúrias Negras" },
-        { "id": "roedores-de-ossos", "label": "Roedores de Ossos" },
-        { "id": "filhos-de-gaia", "label": "Filhos de Gaia" },
-        { "id": "fianna", "label": "Fianna" },
-        { "id": "crias-de-fenris", "label": "Crias de Fenris" },
-        { "id": "andarilhos-do-asfalto", "label": "Andarilhos do Asfalto" },
-        { "id": "garras-vermelhas", "label": "Garras Vermelhas" },
-        { "id": "senhores-das-sombras", "label": "Senhores das Sombras" },
-        { "id": "peregrinos-silenciosos", "label": "Peregrinos Silenciosos" },
-        { "id": "presas-de-prata", "label": "Presas de Prata" },
+        {
+          "id": "furias-negras",
+          "label": "Fúrias Negras",
+          "help": "Tribo quase só de mulheres, protetoras dos lugares selvagens."
+        },
+        {
+          "id": "roedores-de-ossos",
+          "label": "Roedores de Ossos",
+          "help": "Tribo dos que vivem à margem, entre os pobres e esquecidos das cidades."
+        },
+        {
+          "id": "filhos-de-gaia",
+          "label": "Filhos de Gaia",
+          "help": "Tribo de curandeiros e pacificadores, que busca a união entre as tribos."
+        },
+        {
+          "id": "fianna",
+          "label": "Fianna",
+          "help": "Tribo de bardos e guerreiros de origem celta, amantes de festas e histórias."
+        },
+        {
+          "id": "crias-de-fenris",
+          "label": "Crias de Fenris",
+          "help": "Tribo de guerreiros de origem nórdica, que valoriza a força e a batalha."
+        },
+        {
+          "id": "andarilhos-do-asfalto",
+          "label": "Andarilhos do Asfalto",
+          "help": "Tribo adaptada à cidade e à tecnologia."
+        },
+        {
+          "id": "garras-vermelhas",
+          "label": "Garras Vermelhas",
+          "help": "Tribo de lupinos que rejeita a humanidade e defende a natureza."
+        },
+        {
+          "id": "senhores-das-sombras",
+          "label": "Senhores das Sombras",
+          "help": "Tribo ambiciosa e disciplinada, que busca o poder e a liderança."
+        },
+        {
+          "id": "peregrinos-silenciosos",
+          "label": "Peregrinos Silenciosos",
+          "help": "Tribo de viajantes e mensageiros, sem um lar fixo."
+        },
+        {
+          "id": "presas-de-prata",
+          "label": "Presas de Prata",
+          "help": "Tribo nobre, de linhagens antigas, que por tradição lidera as outras."
+        },
         {
           "id": "observadores-das-estrelas",
-          "label": "Observadores das Estrelas"
+          "label": "Observadores das Estrelas",
+          "help": "Tribo de místicos e filósofos, voltada à meditação e ao equilíbrio."
         },
-        { "id": "uktena", "label": "Uktena" },
-        { "id": "wendigo", "label": "Wendigo" }
-      ]
+        {
+          "id": "uktena",
+          "label": "Uktena",
+          "help": "Tribo de místicos, ligada a segredos e a espíritos antigos."
+        },
+        {
+          "id": "wendigo",
+          "label": "Wendigo",
+          "help": "Tribo de guerreiros ligada aos povos originários da América do Norte."
+        }
+      ],
+      "help": "A sociedade a que o personagem pertence. Muda a Força de Vontade inicial e os Dons à mão."
     },
     "rank": {
       "type": "rating",
@@ -124,7 +198,8 @@
         "3": "Adren",
         "4": "Athro",
         "5": "Ancião"
-      }
+      },
+      "help": "A posição na sociedade. Começa em 1 e sobe com o Renome. Dom acima do Posto pede a confirmação do narrador."
     },
     "sept": { "type": "text", "label": "Seita", "maxLength": 80 },
     "totem": { "type": "text", "label": "Totem da matilha", "maxLength": 60 },
@@ -472,7 +547,8 @@
       },
       "editableIn": ["play"],
       "defaultAction": "spend1",
-      "colorRole": "accent"
+      "colorRole": "accent",
+      "help": "A raiva do lobo. Dá ações extras e ajuda a mudar de forma. Começa no valor do Augúrio e, na criação, não fica abaixo dele."
     },
     "gnosis": {
       "type": "resource",
@@ -488,7 +564,7 @@
       "editableIn": ["play"],
       "defaultAction": "spend1",
       "colorRole": "alt-warm",
-      "help": "Recurso par da Fúria: cor quase neutra e preenchimento hachurado, para nunca depender só da cor."
+      "help": "A ligação com o mundo espiritual. Usada em Dons, em fetiches e para atravessar ao outro lado. Começa pela Raça."
     },
     "willpower": {
       "type": "resource",
@@ -517,7 +593,8 @@
         }
       },
       "editableIn": ["play"],
-      "defaultAction": "spend1"
+      "defaultAction": "spend1",
+      "help": "Determinação. Gastar um ponto garante um sucesso numa rolagem ou ajuda a resistir a um impulso. Começa pela Tribo."
     },
     "glory": {
       "type": "resource",
@@ -590,7 +667,208 @@
           { "id": "source", "type": "text", "label": "Origem" }
         ],
         "notes": true
-      }
+      },
+      "catalog": [
+        "Abrir Lacre",
+        "Aproveitar a Brecha",
+        "Aura de Confiança",
+        "Camuflagem",
+        "Chama Prateada",
+        "Chamado da Wyld",
+        "Chamar a Brisa",
+        "Cheiro da Forma Verdadeira",
+        "Cheiro de Homem",
+        "Cheiro de Mel Doce",
+        "Cheiro de Água Corrente",
+        "Controlar Máquina Simples",
+        "Criar Elemento",
+        "Culinária",
+        "Diagnóstico",
+        "Equilíbrio",
+        "Fala das Feras",
+        "Fala Espiritual",
+        "Fala Mental",
+        "Falha Fatal",
+        "Fúria Primordial",
+        "Garra do Falcão",
+        "Garras Afiadas",
+        "Inspiração",
+        "Lobo à Porta",
+        "Luz Feérica",
+        "Mestre do Fogo",
+        "Misericórdia",
+        "Mortalha",
+        "Persuasão",
+        "Rei das Feras",
+        "Resistir a Toxinas",
+        "Resistir à Dor",
+        "Rosto de Fenris",
+        "Salto da Lebre",
+        "Sentidos Aguçados",
+        "Sentir a Magia",
+        "Sentir a Presa",
+        "Sentir a Wyrm",
+        "Silêncio",
+        "Sopro da Wyld",
+        "Tiro Certeiro",
+        "Toque da Mãe",
+        "Toque que Derruba",
+        "Trocar a Pele",
+        "Turvar o Olhar",
+        "Velocidade do Pensamento",
+        "Verdade de Gaia"
+      ],
+      "catalogHelp": {
+        "Abrir Lacre": "Abre trancas, fechaduras e lacres sem a chave.",
+        "Aproveitar a Brecha": "Acha uma vantagem numa disputa, mesmo quando parece não haver nenhuma.",
+        "Aura de Confiança": "Transmite segurança e esconde as fraquezas de quem tenta ler a sua alma.",
+        "Camuflagem": "Some no mato, na neve e na natureza: fica difícil de ver.",
+        "Chama Prateada": "Envolve o corpo numa luz prateada que ilumina e intimida.",
+        "Chamado da Wyld": "Um uivo que leva emoção e mensagem para longe, até outros Garou.",
+        "Chamar a Brisa": "Chama um vento frio que espalha cheiros e atrapalha os inimigos.",
+        "Cheiro da Forma Verdadeira": "Pelo cheiro, sabe o que alguém é de verdade: humano, Parente, vampiro ou outra criatura.",
+        "Cheiro de Homem": "Carrega o cheiro humano que deixa os animais nervosos, desconfiados ou hostis.",
+        "Cheiro de Mel Doce": "Um cheiro doce gruda em alguém e atrai insetos e atenção indesejada.",
+        "Cheiro de Água Corrente": "Apaga o próprio cheiro e o rastro, como quem atravessa um rio.",
+        "Controlar Máquina Simples": "Faz mecanismos simples obedecerem: portas, catracas, alavancas.",
+        "Criar Elemento": "Faz surgir uma pequena porção de terra, ar, fogo ou água do nada.",
+        "Culinária": "Transforma quase qualquer coisa em comida que alimenta.",
+        "Diagnóstico": "Entende o que há de errado com uma máquina só de examiná-la.",
+        "Equilíbrio": "Equilíbrio perfeito em corda, beiral, galho ou qualquer apoio estreito.",
+        "Fala das Feras": "Conversa com os animais e entende o que eles contam.",
+        "Fala Espiritual": "Conversa com os espíritos e entende o que eles dizem.",
+        "Fala Mental": "Liga a mente de algumas pessoas para conversarem sem palavras.",
+        "Falha Fatal": "Percebe o ponto fraco de alguém, no corpo ou no caráter.",
+        "Fúria Primordial": "Transforma a dor e a raiva em Fúria a mais, na hora em que precisa.",
+        "Garra do Falcão": "A mão ou a mandíbula não solta o que agarrou.",
+        "Garras Afiadas": "Afia as garras numa superfície dura para causarem mais dano.",
+        "Inspiração": "Dá coragem aos aliados para seguir na luta mesmo quando tudo parece perdido.",
+        "Lobo à Porta": "Desperta num humano o medo antigo do lobo, que o faz recuar ou fugir.",
+        "Luz Feérica": "Cria pequenas luzes que iluminam, distraem e enganam.",
+        "Mestre do Fogo": "Perde o medo do fogo e aguenta melhor as queimaduras, que deixam de ser tão graves por um tempo.",
+        "Misericórdia": "Golpes que machucam sem matar: o dano fica mais leve.",
+        "Mortalha": "Cobre o lugar com uma escuridão densa que esconde quem está nela.",
+        "Persuasão": "As palavras ganham peso: convencer, negociar e acalmar alguém fica mais fácil.",
+        "Rei das Feras": "Pede ajuda a um animal, que atende por respeito.",
+        "Resistir a Toxinas": "Aguenta venenos, drogas e doenças que derrubariam outro.",
+        "Resistir à Dor": "Ignora a dor dos ferimentos e age sem a penalidade por um tempo.",
+        "Rosto de Fenris": "Assume um ar terrível que impõe respeito ou medo a quem olha.",
+        "Salto da Lebre": "Saltos enormes, muito além do que o corpo permitiria.",
+        "Sentidos Aguçados": "Visão, audição e olfato de lobo, mesmo na forma humana.",
+        "Sentir a Magia": "Percebe por perto magia, encantamentos e poderes em uso.",
+        "Sentir a Presa": "Sabe para onde foi a caça ou a pessoa que procura, seguindo o rastro.",
+        "Sentir a Wyrm": "Percebe por perto a presença e o rastro da corrupção da Wyrm.",
+        "Silêncio": "Move-se sem fazer nenhum som.",
+        "Sopro da Wyld": "Desperta energia e clareza em alguém: mais disposição, atenção e vontade.",
+        "Tiro Certeiro": "Um disparo ou arremesso que acerta de um jeito improvável.",
+        "Toque da Mãe": "Cura os ferimentos de outra pessoa pelo toque.",
+        "Toque que Derruba": "Um toque leve derruba o oponente no chão.",
+        "Trocar a Pele": "Solta o pelo e a camada de fora da pele para escapar de agarrões e amarras.",
+        "Turvar o Olhar": "Fica difícil de notar: os olhares escorregam e não se fixam no personagem.",
+        "Velocidade do Pensamento": "Corre muito mais rápido que o normal por um tempo.",
+        "Verdade de Gaia": "Percebe quando alguém mente para o personagem."
+      },
+      "catalogDefaults": [
+        {
+          "meta": "rank",
+          "value": 1,
+          "items": [
+            "Abrir Lacre",
+            "Aproveitar a Brecha",
+            "Aura de Confiança",
+            "Camuflagem",
+            "Chama Prateada",
+            "Chamado da Wyld",
+            "Chamar a Brisa",
+            "Cheiro da Forma Verdadeira",
+            "Cheiro de Homem",
+            "Cheiro de Mel Doce",
+            "Cheiro de Água Corrente",
+            "Controlar Máquina Simples",
+            "Criar Elemento",
+            "Culinária",
+            "Diagnóstico",
+            "Equilíbrio",
+            "Fala das Feras",
+            "Fala Espiritual",
+            "Fala Mental",
+            "Falha Fatal",
+            "Fúria Primordial",
+            "Garra do Falcão",
+            "Garras Afiadas",
+            "Inspiração",
+            "Lobo à Porta",
+            "Luz Feérica",
+            "Mestre do Fogo",
+            "Misericórdia",
+            "Mortalha",
+            "Persuasão",
+            "Rei das Feras",
+            "Resistir a Toxinas",
+            "Resistir à Dor",
+            "Rosto de Fenris",
+            "Salto da Lebre",
+            "Sentidos Aguçados",
+            "Sentir a Magia",
+            "Sentir a Presa",
+            "Sentir a Wyrm",
+            "Silêncio",
+            "Sopro da Wyld",
+            "Tiro Certeiro",
+            "Toque da Mãe",
+            "Toque que Derruba",
+            "Trocar a Pele",
+            "Turvar o Olhar",
+            "Velocidade do Pensamento",
+            "Verdade de Gaia"
+          ]
+        }
+      ],
+      "recommend": {
+        "outside": "fora da Raça, do Augúrio e da Tribo",
+        "by": [
+          {
+            "from": "breed",
+            "label": "da Raça",
+            "map": {
+              "hominideo": ["Mestre do Fogo", "Persuasão", "Cheiro de Homem"],
+              "impuro": ["Criar Elemento", "Fúria Primordial", "Sentir a Wyrm", "Trocar a Pele"],
+              "lupino": ["Salto da Lebre", "Sentidos Aguçados", "Sentir a Presa"]
+            }
+          },
+          {
+            "from": "auspice",
+            "label": "do Augúrio",
+            "map": {
+              "ragabash": ["Turvar o Olhar", "Abrir Lacre", "Cheiro de Água Corrente"],
+              "theurge": ["Toque da Mãe", "Sentir a Wyrm", "Fala Espiritual"],
+              "philodox": ["Resistir à Dor", "Cheiro da Forma Verdadeira", "Verdade de Gaia", "Rei das Feras"],
+              "galliard": ["Fala das Feras", "Chamado da Wyld", "Fala Mental"],
+              "ahroun": ["Toque que Derruba", "Inspiração", "Garras Afiadas"]
+            }
+          },
+          {
+            "from": "tribe",
+            "label": "da Tribo",
+            "map": {
+              "furias-negras": ["Sopro da Wyld", "Sentidos Aguçados", "Sentir a Wyrm"],
+              "roedores-de-ossos": ["Culinária", "Resistir a Toxinas", "Cheiro de Mel Doce"],
+              "filhos-de-gaia": ["Misericórdia", "Toque da Mãe", "Resistir à Dor"],
+              "fianna": ["Luz Feérica", "Persuasão", "Resistir a Toxinas"],
+              "crias-de-fenris": ["Garras Afiadas", "Resistir à Dor", "Rosto de Fenris"],
+              "andarilhos-do-asfalto": ["Controlar Máquina Simples", "Diagnóstico", "Tiro Certeiro"],
+              "garras-vermelhas": ["Fala das Feras", "Lobo à Porta", "Cheiro de Água Corrente"],
+              "senhores-das-sombras": ["Aura de Confiança", "Falha Fatal", "Aproveitar a Brecha"],
+              "peregrinos-silenciosos": ["Silêncio", "Velocidade do Pensamento"],
+              "presas-de-prata": ["Garra do Falcão", "Chama Prateada", "Sentir a Wyrm"],
+              "observadores-das-estrelas": ["Equilíbrio", "Sentir a Wyrm"],
+              "uktena": ["Sentir a Magia", "Mortalha", "Fala Espiritual"],
+              "wendigo": ["Chamar a Brisa", "Camuflagem", "Resistir à Dor"]
+            }
+          }
+        ]
+      },
+      "help": "Poderes ensinados pelos espíritos. Os da Raça, do Augúrio e da Tribo aparecem primeiro; o Posto mostra o nível."
     },
     "rites": {
       "type": "list",
@@ -655,7 +933,20 @@
         "Ritos",
         "Totem",
         "Raça Pura"
-      ]
+      ],
+      "catalogHelp": {
+        "Aliados": "Pessoas que ajudam o personagem quando ele pede. Mais pontos: mais gente ou gente mais capaz.",
+        "Ancestrais": "A memória dos antepassados, que o personagem pode chamar para pedir conselho ou habilidade.",
+        "Contatos": "Pessoas que passam informação. Não lutam pelo personagem, mas sabem das coisas.",
+        "Fetiche": "Um objeto com um espírito dentro, que o personagem já tem no começo. O nível é o do fetiche.",
+        "Parentes": "Humanos e lobos da família que sabem do segredo e ajudam o personagem.",
+        "Mentor": "Alguém mais experiente que orienta o personagem, quando quer.",
+        "Recursos": "Dinheiro e bens. Mais pontos: uma vida mais confortável e mais coisas à mão.",
+        "Ritos": "Ritos que o personagem já conhece no começo. Cada ponto vale um nível de rito.",
+        "Totem": "O espírito protetor da matilha. Os pontos dos membros se somam para o totem.",
+        "Raça Pura": "Sangue de linhagem antiga e reconhecida. Os outros da espécie reagem com mais respeito."
+      },
+      "help": "Recursos fora da ficha: contatos, dinheiro, aliados, influência. O nível diz quanto o personagem tem."
     },
     "battleScars": {
       "type": "list",
@@ -745,17 +1036,20 @@
         {
           "id": "physical",
           "title": "Físicos",
-          "fields": ["strength", "dexterity", "stamina"]
+          "fields": ["strength", "dexterity", "stamina"],
+          "help": "Força, Destreza e Vigor: o que o corpo do personagem consegue fazer."
         },
         {
           "id": "social",
           "title": "Sociais",
-          "fields": ["charisma", "manipulation", "appearance"]
+          "fields": ["charisma", "manipulation", "appearance"],
+          "help": "Carisma, Manipulação e Aparência: como o personagem lida com outras pessoas."
         },
         {
           "id": "mental",
           "title": "Mentais",
-          "fields": ["perception", "intelligence", "wits"]
+          "fields": ["perception", "intelligence", "wits"],
+          "help": "Percepção, Inteligência e Raciocínio: atenção, conhecimento e rapidez de pensamento."
         }
       ]
     },
@@ -786,7 +1080,8 @@
             "primalUrge",
             "streetwise",
             "subterfuge"
-          ]
+          ],
+          "help": "Habilidades que vêm do jeito e da prática, sem estudo formal."
         },
         {
           "id": "skills",
@@ -802,7 +1097,8 @@
             "performance",
             "stealth",
             "survival"
-          ]
+          ],
+          "help": "Habilidades aprendidas com treino ou com um ofício."
         },
         {
           "id": "knowledges",
@@ -818,7 +1114,8 @@
             "rituals",
             "science",
             "technology"
-          ]
+          ],
+          "help": "Habilidades que pedem estudo: campos de saber, ciência e técnica."
         }
       ]
     },
@@ -832,7 +1129,8 @@
         {
           "id": "renown",
           "title": "Renome",
-          "fields": ["glory", "honor", "wisdom"]
+          "fields": ["glory", "honor", "wisdom"],
+          "help": "Glória, Honra e Sabedoria: a fama que o personagem ganha. O permanente começa pelo Augúrio."
         }
       ]
     },
@@ -1082,7 +1380,10 @@
         "max": 3
       }
     ],
-    "untracked": ["rank", "rites", "fetishes", "battleScars"]
+    "untracked": ["rank", "rites", "fetishes", "battleScars"],
+    "advice": [
+      { "rule": "item-meta-max", "targets": ["gifts"], "meta": "rank", "max": 1 }
+    ]
   },
   "costs": {
     "freebie": [

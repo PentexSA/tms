@@ -7,6 +7,7 @@ import {
   type TextInputProps,
   View,
 } from 'react-native'
+import { type Help, WithHelp } from './HelpButton'
 import { hitTarget } from './metrics'
 import { Text } from './Text'
 import { textStyle, useTheme } from './theme'
@@ -19,6 +20,8 @@ export interface TextFieldProps
   readonly onChangeText: (text: string) => void
   readonly error?: string | null
   readonly hint?: string
+  /** O "?" ao lado do rótulo, com a frase de ajuda abaixo dele (R-19). */
+  readonly help?: Help | null
   // Mostra o contador "12/80" quando há maxLength.
   readonly counter?: boolean
   // Com o React 19 o ref é prop: quem chama foca o campo (T-21). O `...rest`
@@ -32,6 +35,7 @@ export function TextField({
   onChangeText,
   error,
   hint,
+  help,
   counter = true,
   maxLength,
   multiline,
@@ -43,9 +47,11 @@ export function TextField({
   const { colors } = theme
   return (
     <View style={styles.root}>
-      <Text variant="fieldLabel" nativeID={`${id}-label`}>
-        {label}
-      </Text>
+      <WithHelp help={help}>
+        <Text variant="fieldLabel" nativeID={`${id}-label`}>
+          {label}
+        </Text>
+      </WithHelp>
       <TextInput
         testID={testID}
         accessibilityLabel={label}

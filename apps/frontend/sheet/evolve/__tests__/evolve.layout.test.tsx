@@ -1,12 +1,13 @@
 import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import type { SheetData } from '@tms/sheet-core'
+import { compileTemplate } from '@tms/sheet-core'
 import {
   AccessibilityInfo,
   Dimensions,
   Platform,
   StyleSheet,
 } from 'react-native'
-import { modelOf } from '../../../test/fixtures'
+import { modelOf, templateWithIdentity } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
 import { textInput } from '../../../test/queries'
 
@@ -111,6 +112,132 @@ describe('T-10: Enter aplica na folha de uma linha', () => {
     expect(input.props.multiline).toBe(true)
     expect(input.props.onSubmitEditing).toBeUndefined()
     expect(input.props.returnKeyType).toBeUndefined()
+  })
+
+  describe('R-26: a Fraqueza já vem com o resumo do clã', () => {
+    const v20 = compileTemplate(templateWithIdentity('vtm-v20'))
+    const brujah: SheetData = {
+      values: { name: 'Nova', clan: 'brujah' },
+      specialties: {},
+    }
+    const open = async (sheet = brujah) => {
+      const live = await renderLive(
+        { model: v20, sheet },
+        fakeServer(v20, sheet).post
+      )
+      enterEvolve()
+      fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+      return live
+    }
+    const row = () => screen.getByTestId('editor-weakness')
+    const pickClan = (label: string) => {
+      fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+      fireEvent.press(screen.getByRole('button', { name: /^Clã/ }))
+      fireEvent.press(screen.getByRole('radio', { name: label }))
+      fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    }
+
+    it('A4: "Resumo de …" é texto à parte, fora do botão da Fraqueza', async () => {
+      await open()
+      const button = row()
+      expect(button.props.accessibilityRole).toBe('button')
+      expect(within(button).queryByTestId('default-weakness')).toBeNull()
+      expect(screen.getByTestId('default-weakness')).toHaveTextContent(
+        /Resumo de Brujah/
+      )
+    })
+
+    it('Brujah mostra o resumo; trocar para Toreador mostra o outro; nada é gravado', async () => {
+      const { store } = await open()
+      expect(row()).toHaveTextContent(/Resumo fictício de teste A\./)
+      expect(screen.getByTestId('default-weakness')).toHaveTextContent(
+        /Resumo de Brujah/
+      )
+      // Aplicar sem mudar o texto não grava nada
+      fireEvent.press(row())
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      expect(
+        store()
+          .getState()
+          .draftEvents()
+          .filter(e => e.path === 'values.weakness')
+      ).toEqual([])
+      pickClan('Toreador')
+      expect(row()).toHaveTextContent(/Resumo fictício de teste B\./)
+      expect(
+        store()
+          .getState()
+          .draftEvents()
+          .map(e => e.path)
+      ).toEqual(['values.clan'])
+    })
+
+    it('o texto editado fica ao trocar o Clã; apagar tudo volta ao resumo', async () => {
+      const { store } = await open()
+      fireEvent.press(row())
+      fireEvent.changeText(textInput('Fraqueza do clã'), 'Meu texto')
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      pickClan('Toreador')
+      expect(row()).toHaveTextContent(/Meu texto/)
+      expect(screen.queryByTestId('default-weakness')).toBeNull()
+      fireEvent.press(row())
+      fireEvent.changeText(textInput('Fraqueza do clã'), '   ')
+      fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+      expect(row()).toHaveTextContent(/Resumo fictício de teste B\./)
+      expect(
+        store()
+          .getState()
+          .draftEvents()
+          .find(e => e.path === 'values.weakness')
+      ).toBeUndefined()
+    })
+
+    it('"Usar o resumo" troca o texto do jogador, com confirmação', async () => {
+      await open({
+        values: { name: 'Nova', clan: 'brujah', weakness: 'Meu texto' },
+        specialties: {},
+      })
+      fireEvent.press(row())
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Usar o resumo de Brujah' })
+      )
+      expect(
+        screen.getByText('Trocar o seu texto pelo resumo de Brujah?')
+      ).toBeTruthy()
+      // Cancelar volta ao editor, sem trocar
+      fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(textInput('Fraqueza do clã').props.value).toBe('Meu texto')
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Usar o resumo de Brujah' })
+      )
+      fireEvent.press(screen.getByRole('button', { name: 'Trocar' }))
+      expect(row()).toHaveTextContent(/Resumo fictício de teste A\./)
+    })
+
+    it('com texto próprio, trocar o Clã troca o "Usar o resumo de …" (code review)', async () => {
+      await open({
+        values: { name: 'Nova', clan: 'brujah', weakness: 'Meu texto' },
+        specialties: {},
+      })
+      pickClan('Toreador')
+      fireEvent.press(row())
+      expect(
+        screen.getByRole('button', { name: 'Usar o resumo de Toreador' })
+      ).toBeTruthy()
+    })
+
+    it('Caitiff (sem resumo) e sem Clã: o campo fica vazio, sem "Usar o resumo"', async () => {
+      await open({
+        values: { name: 'Nova', clan: 'caitiff' },
+        specialties: {},
+      })
+      expect(row()).toHaveTextContent(/—/)
+      expect(screen.queryByTestId('default-weakness')).toBeNull()
+      fireEvent.press(row())
+      expect(
+        screen.queryByRole('button', { name: /^Usar o resumo/ })
+      ).toBeNull()
+    })
   })
 
   it('Cancelar e Fechar não aplicam', async () => {

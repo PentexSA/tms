@@ -1,10 +1,12 @@
 import { type CompiledSection, canReadSection } from '@tms/sheet-core'
-import { SectionHeader, tokens } from '@tms/ui'
+import { tokens } from '@tms/ui'
 import { useContext } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet } from './context'
 import { CreationCounter } from './creation/CreationCounter'
 import { layoutFor } from './layouts'
+import { AnchorHeader } from './layouts/AnchorHeader'
+import { useAnchor } from './layouts/anchor'
 import { StripScope, useGroupTabsContext } from './layouts/groupTabsState'
 import { sectionList } from './layouts/headedList'
 
@@ -22,24 +24,32 @@ export function SectionView({
   const { model, roles } = useSheet()
   const shared = useGroupTabsContext()
   const inPanel = useContext(StripScope)
+  // O "ir ao grupo" (P05-D): toda seção do painel diz onde começa, e o
+  // título recebe o foco
+  // Com sub-abas, a seção diz onde começa: a faixa fixa mostra as abas da
+  // seção que está no topo da tela (T-27). A mesma medida vale para a
+  // âncora, e no web é refeita quando algo acima cresce (A3)
+  const reportsPlace = Boolean(
+    shared?.strip && inPanel && section.def.groupTabs
+  )
+  const store = shared?.store
+  const anchor = useAnchor(inPanel ? section.id : null, {
+    onY: reportsPlace && store ? y => store.sectionAt(section.id, y) : null,
+  })
   if (!canReadSection(model, section.id, roles)) return null
   const Layout = layoutFor(section.def.layout)
-  // Com sub-abas, a seção diz onde começa: a faixa fixa mostra as abas da
-  // seção que está no topo da tela (T-27)
-  const reportsPlace = shared?.strip && inPanel && section.def.groupTabs
   return (
     <View
+      ref={anchor.layoutRef as never}
       style={styles.section}
       testID={`section-${section.id}`}
-      onLayout={
-        reportsPlace
-          ? e => shared.store.sectionAt(section.id, e.nativeEvent.layout.y)
-          : undefined
-      }
+      onLayout={anchor.onLayout}
     >
+      {/* Sem título (a zona de uma seção só), a rolagem basta */}
       {hideTitle ? null : (
         <View style={styles.title}>
-          <SectionHeader
+          <AnchorHeader
+            target={anchor.target}
             title={section.def.title}
             right={
               <CreationCounter

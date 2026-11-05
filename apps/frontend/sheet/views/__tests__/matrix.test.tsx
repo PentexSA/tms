@@ -138,6 +138,9 @@ describe.each(entries)('%s · %s · %s', (skin, type, variant) => {
     expect(targets.length).toBeGreaterThan(0)
     for (const t of targets) {
       const label = String(t.props.accessibilityLabel ?? t.props['aria-label'])
+      // O "?" da ajuda (R-19) é botão de ícone, como o IconButton: o nome
+      // "Ajuda: <campo>" começa pelo que ele faz e termina no rótulo visível
+      if (label === `Ajuda: ${entry.resolved.field.def.label}`) continue
       expect({
         label,
         ok: visible.some(v => label.startsWith(v)),

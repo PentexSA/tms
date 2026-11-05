@@ -84,6 +84,41 @@ test('T-35 e T-71: abas com setas e Espaço; Esc devolve o foco; um Fechar', asy
   await expect(add).toBeFocused()
 })
 
+test('P07-D a 1280: "Adicionar Disciplina" no diálogo de 560; Tab na linha', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await sheetInEvolve(page, 'linha')
+  await page.getByRole('tab', { name: 'Vantagens' }).click()
+  await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
+  // A medida é no painel, depois da entrada (lição d9fa56f da onda 3)
+  const panel = page
+    .getByTestId('bottom-sheet-root')
+    .locator('[aria-modal="true"]')
+  await expect(panel).toBeVisible()
+  await expect
+    .poll(async () => (await panel.boundingBox())?.width ?? 0)
+    .toBeLessThanOrEqual(560)
+  const box = await panel.boundingBox()
+  expect(
+    Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - 640)
+  ).toBeLessThanOrEqual(2)
+  await page.getByLabel('Buscar Disciplina').fill('fortit')
+  await page.getByRole('button', { name: 'Fortitude', exact: true }).click()
+  await expect(panel).toHaveCount(0)
+  // R-25: o nome, depois "Diminuir", depois "Aumentar"
+  const name = page.getByRole('button', { name: /^Fortitude, 1 de 5/ })
+  await name.focus()
+  await page.keyboard.press('Tab')
+  await expect(
+    page.getByRole('button', { name: 'Diminuir Fortitude', exact: true })
+  ).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(
+    page.getByRole('button', { name: 'Aumentar Fortitude', exact: true })
+  ).toBeFocused()
+})
+
 test('T-25: Digitar aplica ao sair, um campo por vez, recusa decimal', async ({
   page,
 }) => {

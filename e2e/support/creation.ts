@@ -114,7 +114,7 @@ export async function prepared(
 // A 390, as sub-abas ficam na faixa fixa e são as da seção que está no
 // topo da tela (T-27): a ficha rola até a seção começar logo abaixo da
 // faixa (não embaixo dela, que cobriria a primeira linha) antes de tocar a
-// sub-aba. Um nome fora do mapa é uma aba da zona ("Orçamento")
+// sub-aba. Um nome fora do mapa é uma aba da zona ("Pontos")
 const GROUP_SECTION: Record<string, string> = {
   Físicos: 'attributes',
   Sociais: 'attributes',

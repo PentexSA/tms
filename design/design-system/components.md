@@ -32,7 +32,7 @@ Regras que valem para todos: alvo tocável ≥ 44 com `.ds-pressable`; texto só
 | Grupo | Componentes |
 |---|---|
 | Fundamentos | [Pressable](#pressable-camada-de-estado) · [Icon](#icon) · [Card](#card) · [Utilitários](#utilitários-de-uijs) |
-| Ações | [Button](#button) · [IconButton](#iconbutton) · [SegmentedControl](#segmentedcontrol) · [Chip](#chip) |
+| Ações | [Button](#button) · [IconButton](#iconbutton) · [HelpButton / HelpText](#helpbutton--helptext) · [SegmentedControl](#segmentedcontrol) · [Chip](#chip) |
 | Valores | [RatingDots](#ratingdots) · [NumberField](#numberfield) · [PercentField](#percentfield) · [MarkToggle](#marktoggle) · [Choice / StateChoice](#choice--statechoice) · [Tags / Tag](#tags--tag) · [TextField / TextArea / AspectField](#textfield--textarea--aspectfield) |
 | Recursos | [Resource](#resource) · [Track / LeveledTrack](#track--leveledtrack) · [Slots](#slots) · [Clock](#clock) · [Stepper / ValueEditor](#stepper--valueeditor) |
 | Ficha | [FieldRow](#fieldrow) · [Grid / Cell / Pyramid](#grid--cell--pyramid) · [SectionHeader](#sectionheader) · [SectionTabs](#sectiontabs) · [FilterBar / Search](#filterbar--search) · [CharacterHeader](#characterheader) · [IdentityBlock](#identityblock) · [IdentityChip](#identitychip) · [Avatar](#avatar) · [SyncIndicator](#syncindicator) · [ModeBar](#modebar) · [CombatDock / DockChip](#combatdock--dockchip) · [Repeater / ListEditor](#repeater--listeditor) |
@@ -123,6 +123,29 @@ Botão só com ícone e rótulo acessível obrigatório.
 - **A11y:** web `aria-label` ("Voltar para Noites de São Paulo", "Mais opções" com `aria-haspopup="dialog"`, "Fechar", "Editar Notas"). RN `accessibilityRole="button"` + `accessibilityLabel`.
 - **Multi-sistema:** o mesmo voltar, ⋯ e editar em qualquer ficha; o rótulo usa nomes vindos dos dados (crônica, campo).
 - **Resolve:** §7, C-20.
+
+### HelpButton / HelpText
+
+O "?" da ajuda contextual (R-19, D-11): uma frase curta do template, expandida na própria linha, ao lado do que explica.
+
+- **Padrão:** *disclosure*. Sem tooltip (não existe no toque e o leitor de tela lê mal) e sem folha (a escolha já está numa folha, e uma folha sobre outra fecharia a escolha). Nada da `BottomSheet` muda: com uma ajuda aberta dentro de uma folha, o Esc continua fechando a folha, e o foco volta ao gatilho dela.
+- **API RN:**
+
+  ```ts
+  type HelpButtonProps = { subject: string; expanded: boolean; onToggle(): void; controls?: string }
+  type HelpTextProps = { id: string; text: string; expanded: boolean }
+  type Help = { subject: string; text: string }
+  type WithHelpProps = { help: Help | null; children?: ReactNode; fill?: boolean; style?; textStyle? }
+  function useHelp(): { expanded: boolean; toggle(): void; textId: string }
+  ```
+  O `WithHelp` é a composição de todo "?": [conteúdo][?] numa linha e, abaixo, a frase (`fill` estica o conteúdo e põe o "?" na ponta). O `Choice` (`help` no grupo e em cada opção) e o `TextField` (`help: Help`) já o usam. O `useHelp` com o `HelpButton` e o `HelpText` fica para quem põe a frase longe do "?" (a linha do Editar, com a frase na largura da linha).
+- **Alvo:** o do `Pressable` (44, 48 no Android), com o glifo "?" num círculo de 22. Borda `border-control`; aberto, borda e glifo `action`.
+- **A11y:** nome "Ajuda: <nome do campo ou da opção>", papel `button`, `aria-expanded` (web) e `accessibilityState.expanded` (app), `aria-controls` no web. A frase é `caption`/`ink-muted`, numa região viva **sempre montada**, vazia quando fechada (fora do fluxo, sem somar o `gap`), em que só o conteúdo muda: assim ela é anunciada ao abrir (`aria-live="polite"` no web, `accessibilityLiveRegion="polite"` no Android), e o `aria-controls` sempre aponta um elemento que existe. No iOS, `announceForAccessibility` ao abrir.
+  - **Fora do controle:** o "?" é irmão do rádio ou do botão da linha, nunca filho. Botão dentro de rádio não é aceito pelo ARIA, e no app seria um alvo dentro de outro. O nome do rádio não muda.
+  - **Teclado:** cada "?" é uma parada de Tab. No `Choice`, as setas continuam só nos rádios (o foco itinerante não passa pelos "?").
+- **Colunas do `Choice`:** com frase em alguma opção, a célula tem base de 240 e cresce (`flexBasis`, sem medir a tela): 2 colunas a partir de 480 de largura, 1 abaixo, sem salto.
+- **Onde aparece:** na criação, no Editar e na Nova ficha. Em Leitura e Jogo, as folhas de detalhe já mostram o `help`.
+- **Multi-sistema:** o mesmo "?" em qualquer template. Nó sem frase não mostra "?", então um template sem frase fica igual. O texto é sempre texto puro, nunca HTML nem link.
 
 ### SegmentedControl
 
@@ -366,8 +389,13 @@ Edita qualquer número com − e +, um passo por toque.
     valueText?: (v: number) => string; onChange: (v: number) => void
     size?: 'lg' | 'inline'; allowInput?: boolean; disabled?: boolean
     showLabel?: boolean // rótulo visível acima; padrão false
+    increase?: StepperAdvice // previsão do "+" (P05-C)
+    decrease?: StepperAdvice // previsão do "−" (P10-C); sem ela, o "−" de sempre
   }
+  type StepperAdvice = { blocked?: boolean; hint?: string | null; hintID?: string | null }
+  type StepperIncrease = StepperAdvice // o nome antigo, mantido como alias
   ```
+  `increase` e `decrease` dizem, antes do toque, o que o próximo passo faria. Com `blocked`, o botão fica com a cara de indisponível (opacidade e, no web, `aria-disabled="true"` direto no elemento, nunca `disabled`) e **continua tocável**: o toque chega a quem decide, que explica o motivo; segurar não repete. No web, `hintID` vira o `aria-describedby` do botão; no app, a dica vai ao controle ajustável e, com as duas, junta "Aumentar: … Diminuir: …".
   `showLabel` liga o rótulo visível acima do controle quando a tela não o mostra ao lado (Dados e Dificuldade da Mesa, Quantidade, XP a conceder). Ele fica `aria-hidden`: o controle já tem o nome, e não há leitura dupla.
 - **Estados:** normal, no limite, desabilitado, digitando.
 - **A11y:** web `role="group"` com botões reais "Diminuir/Aumentar {rótulo}" (fora do Tab, alcançáveis por toque) e `role="spinbutton"` + `aria-valuemin/max/now/valuetext` no valor; setas, PageUp/PageDown, Home/End, Enter para digitar. Segurar repete só no visual e grava uma alteração ao soltar. RN `accessibilityRole="adjustable"` + `accessibilityValue` + `increment`/`decrement`; háptico de seleção (proposta). O `aria-valuetext` vai sempre (`valueText` ou o número): sem texto, o iOS lê `now/(max−min)` como porcentagem (7 de 0 a 1000 vira "1%").
@@ -433,6 +461,7 @@ Navegação da ficha: **3 abas fixas, uma por zona do template** (Ficha · Poder
   - Caixa normal, 15 px, peso 700.
   - Em `.ds-header.is-collapsed`, a faixa some ao rolar para baixo e volta ao rolar para cima ou com foco.
 - **Faixa fixa no app (RN, T-27):** as abas ficam numa faixa (`SheetNav`) presa no topo da rolagem (`stickyHeaderIndices`; no web, `position: sticky`), em todos os tamanhos. No celular, a faixa leva também as sub-abas e o contador da seção com grupos que está no topo da tela (Físicos | Sociais | Mentais perto dos Atributos; Talentos | Perícias | Conhecimentos nas Habilidades), e o corpo continua filtrando pelo grupo escolhido. A escolha fica num contexto por ficha (`GroupTabsContext`); sem ele (prévias), cada seção guarda a própria aba. A versão que recolhe ao rolar, com animação, fica para depois.
+- **Aba "Pontos" e "ir ao grupo" (RN, P05-D):** na criação por pontos, a conta é a aba "Pontos" (o id continua `creation`), depois das da ficha; o atalho dos avisos e da folha de bônus é "Ver Pontos". O mesmo contexto guarda as âncoras do "ir ao grupo": toda seção do painel, cada grupo com título e o "Em jogo" dizem onde começam (`onLayout`), e o título recebe o foco (no web, `id="anchor-<seção>"` ou `anchor-<seção>-<grupo>` com `tabIndex={-1}`; no app, o foco do leitor de tela). O pedido feito antes de a aba nova ser desenhada espera a medida, sem timer. O "Orçamento" das regras da crônica não muda.
 - **Comportamento:**
   - Os painéis existem todos; os inativos ficam `hidden`. Na impressão aparecem todos.
   - Cada personagem lembra a aba ativa e a rolagem de cada aba.
@@ -560,15 +589,16 @@ Faixa que diz em que modo a ficha está.
 - **Classes:** `ds-modebar` (faixa `surface-raised` abaixo do header, caption), `strong` (rótulo em caixa alta), `__actions`.
 - **Variantes:** Editando ("Editando · N alterações" + "Salvar alterações", desabilitado sem alterações; a saída do modo é o seletor); Criação ("Criação · N alterações · Bônus: …" + "Salvar" e, com a conta fechada, "Concluir criação", "Enviar para aprovação" ou, para o narrador, "Concluir e aprovar" ao lado); Leitura ("Ficha de {dono}" + "Editar como narrador" para o narrador); Narrador ("As alterações ficam assinadas no histórico" + "Voltar à leitura"); Arquivada ("Somente leitura" + Restaurar para o dono). Em Jogo não aparece.
 - **Salvar × Concluir (D-01, P03-D):** salvar o progresso nunca conclui. "Salvar" fica sempre na barra de Criação e grava o lote sem sair do modo; a ação seguinte (concluir ou enviar) aparece ao lado só quando a conta fecha, e salva antes de concluir. O "Salvar" visível da Criação tem o nome acessível "Salvar alterações", o mesmo do Editar (o texto visível começa o nome, WCAG 2.5.3). "Concluir" só aparece em "Concluir criação" e "Concluir e aprovar". Revê o "um botão só" e a barra "Editando · Concluir" da DS-04 (`doc/avaliacao-ui-ux.md`), e volta ao plano-v4 ("Separar 'Salvar alterações' de 'Concluir criação'").
-- **Ações (RN):** o `EvolveBar` recebe `save` (sempre), `next` (a ação seguinte, a principal, à direita) e `note` (uma linha sob o texto, para o próximo passo). No `compact` com duas ações ou com a nota, e com fonte de 130% (`stacked`), fica em duas linhas: o texto em cima e as ações embaixo, alinhadas à direita, numa linha que quebra se não couber. Nos outros casos, uma linha só.
+- **Ações (RN):** o `EvolveBar` recebe `save` (sempre), `next` (a ação seguinte, a principal, à direita), `note` (uma linha sob o texto, para o próximo passo) e `guide` (o "Faltam: …" da criação, P05-D, na linha das ações, antes do `save`). No `compact` com duas ações ou com a nota, e com fonte de 130% (`stacked`), fica em duas linhas: o texto em cima e as ações embaixo, alinhadas à direita, numa linha que quebra se não couber. Nos outros casos, uma linha só.
 - **Sair com rascunho:** o "Sair sem salvar?" da ficha tem "Descartar e sair" (`danger`), "Continuar editando" (`ghost`) e "Salvar e sair" (principal). No `compact` ou `stacked`, em coluna, com a principal embaixo; a partir de 600, numa linha, com "Descartar e sair" à esquerda. A saída acontece depois que a folha sai da tela; recusada a gravação, a frase aparece na folha e nada sai.
 - **API RN:** `{ mode: 'read' | 'evolve' | 'storyteller' | 'archived'; title: string; message: string; actions?: ButtonProps[] }`.
 - **Estados:** as quatro variantes.
 - **A11y:** `role="region"` com `aria-label` ("Modo Evoluir"); entrar em Evoluir é anunciado. O seletor de modo é um `radiogroup` com tabindex itinerante e ativação manual no web: a seta só move o foco, e Espaço ou Enter trocam o modo (trocar de modo é uma ação). Os chips de prioridade da criação (`RadioChips`) seguem o mesmo padrão, porque a escolha grava na hora.
 - **Multi-sistema:** a mesma barra para qualquer template; o que cada modo libera vem de `editableIn` por campo.
-- **Narrador na ficha alheia (RN, T-33, P09-C):** abre em Leitura, sem seletor de modo, com a conta (aba Orçamento) quando a ficha está em criação por pontos; as "Regras da casa", o aviso de bônus e as recusas ficam só na Criação. A edição abre só pelo "Editar como narrador", que usa o `go` da barra (contexto `ModeBarActions`): Criação na criação por pontos ativa, Editar na criação livre, Jogo na ficha em uso. Depois dele, o seletor é o do dono ("Jogo · Criação" ou "Jogo · Editar"). "Voltar à leitura" com alterações passa pelo resumo de salvar ou descartar, e quem entrou pela Leitura volta a ela. Sem escrita (pela política), sem o botão. É interface: o servidor continua aceitando e assinando a edição do narrador.
+- **Narrador na ficha alheia (RN, T-33, P09-C):** abre em Leitura, sem seletor de modo, com a conta (aba Pontos) quando a ficha está em criação por pontos; as "Regras da casa", o aviso de bônus e as recusas ficam só na Criação. A edição abre só pelo "Editar como narrador", que usa o `go` da barra (contexto `ModeBarActions`): Criação na criação por pontos ativa, Editar na criação livre, Jogo na ficha em uso. Depois dele, o seletor é o do dono ("Jogo · Criação" ou "Jogo · Editar"). "Voltar à leitura" com alterações passa pelo resumo de salvar ou descartar, e quem entrou pela Leitura volta a ela. Sem escrita (pela política), sem o botão. É interface: o servidor continua aceitando e assinando a edição do narrador.
 - **No celular (RN, T-27):** o `useModeBar()` separa a barra em três partes com um estado só (`switcher`, `actionBar`, `summary`). No `compact`, o seletor de modo, o painel do NPC e a barra do narrador (o `header` do `SheetView`) rolam com a ficha; a barra de ação ("Criação · N alterações" e as ações) fica fixa, porque é onde se salva e conclui. Fora do `compact`, o `SheetView` monta as três juntas, fixas acima, como antes.
 - **Próximo passo (RN, P04-D):** sob a contagem, uma linha em caption e `inkMuted` (`testID="next-step"`) diz o próximo passo e quem conclui, pelo modo da crônica e pelo papel ("Quando terminar, avise: o narrador conclui.", "Você conclui quando a conta fechar.", "Quando a conta fechar, envie ao narrador."). Ela não é região viva: muda pouco, e o banner da ficha anuncia o pedido do narrador. Ela entra pelo `note` do `EvolveBar`. Na criação livre, a dona tem "Avisar que terminei" no `next` do Editar, com a confirmação do resumo; com ele ao lado, o salvar do Editar mostra "Salvar" e mantém o nome acessível "Salvar alterações", como na Criação (onda-3 §4.1; a D-01 escreve "Salvar alterações" no Editar, e a regra ali é ponto para o PO). "Salvar" e "Avisar que terminei" somam ~292 dp e cabem numa linha a partir de 360 dp.
+- **"Faltam" na Criação (RN, P05-D, D-05):** enquanto a conta está aberta, o slot `guide` ocupa, na linha dos botões, o lugar onde o "Concluir criação" aparece quando ela fecha: "Faltam: Virtudes 7 · e mais 2", à esquerda do "Salvar". A altura da barra não muda (a linha dos botões já existia). Só itens inteiros, na ordem do "O que falta" (o que impede salvar primeiro, depois a ordem da ficha); depois, "e mais N"; se nem um item cabe, um botão só, "Faltam N itens". A conta é por caractere (`caption` × `fontScale` × 0,6 em), com a largura medida do slot; nenhum texto é cortado. Cada item é um botão (alvo de 44, 48 no Android), com o nome que começa pelo texto visível ("Virtudes 7: faltam 7 pontos básicos") e a dica "Vai ao grupo na ficha": o toque troca a aba, a sub-aba e rola até o grupo, logo abaixo da faixa fixa, com o foco no título. "e mais N" e "Faltam N itens" levam à aba Pontos, com o foco em "O que falta". O separador "·" fica fora dos alvos e não é lido. O item que impede salvar usa `danger`, e o texto diz "acima": a cor nunca é a única pista. Os avisos que não bloqueiam ("confirme com o narrador") não entram no "Faltam". Com a conta fechada, a linha do próximo passo muda ("A conta fechou: você conclui.") e sai um anúncio, uma vez, se a folha de bônus não abriu na mesma passagem.
 - **Resolve:** C-01, C-19, DS-04.
 
 ### CombatDock / DockChip

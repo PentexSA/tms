@@ -49,7 +49,69 @@ export interface GroupTabsStore {
   readonly panelTop: () => number
   /** A posição da rolagem. */
   readonly scrollY: () => number
+  /**
+   * Uma âncora do "ir ao grupo" (P05-D, R-18): o `y` dela dentro de `parent`
+   * (outra âncora; sem ela, o painel da zona; `SCROLL_ROOT`, a própria
+   * rolagem) e, se ela recebe o foco, a função que o põe nela.
+   */
+  readonly anchorAt: (
+    id: string,
+    y: number,
+    focus?: (() => void) | null,
+    parent?: string
+  ) => void
+  /** A âncora saiu da tela (a seção desmontou). */
+  readonly dropAnchor: (id: string) => void
+  /** Esquece o pedido pendente (a pessoa trocou de aba à mão). */
+  readonly cancelJump: () => void
+  /**
+   * Ir à primeira âncora conhecida da lista (a do grupo, depois a da seção).
+   * Se nenhuma foi medida ainda (a aba acabou de trocar), o pedido espera o
+   * próximo `anchorAt`, sem timer; um pedido novo troca o velho.
+   */
+  readonly jumpTo: (ids: readonly string[]) => void
+  /** Quem rola: recebe a rolagem de destino e o foco da âncora. */
+  readonly onJump: (
+    listener: (y: number, focus: (() => void) | null) => void
+  ) => () => void
+  /**
+   * Quem mede a própria posição de novo quando o conteúdo da rolagem muda de
+   * tamanho (A3: no web, o onLayout só dispara quando o tamanho da vista
+   * muda, não quando ela desce porque algo acima cresceu).
+   */
+  readonly onRemeasure: (measure: () => void) => () => void
+  /** Remede todas as posições (o conteúdo da rolagem mudou de tamanho). */
+  readonly remeasure: () => void
 }
+
+/** O `parent` das âncoras medidas direto na rolagem (o "Em jogo"). */
+export const SCROLL_ROOT = '@scroll'
+
+interface AnchorNode {
+  readonly y: number
+  readonly focus: (() => void) | null
+  readonly parent: string | undefined
+}
+
+// Um quadro depois da primeira âncora medida: as âncoras irmãs (o grupo
+// dentro da seção) chegam no mesmo layout
+// O pedido que não se resolve logo (a âncora não montou) expira: uma âncora
+// que monta muito depois, sem ação da pessoa, não rola a ficha nem move o
+// foco. A medida da aba nova chega em poucos quadros
+export const JUMP_TTL_MS = 1500
+// B1: a aba recém-montada mede as vistas mais de uma vez (no Android, a
+// primeira medida da âncora é provisória). O salto espera um quadro sem
+// medida nova, até MAX_WAIT_FRAMES; depois dele, dentro da janela do pedido,
+// uma posição nova do destino (ou uma faixa mais alta, com as sub-abas da
+// seção nova) corrige a rolagem, sem mover o foco de novo
+const MAX_WAIT_FRAMES = 6
+const SETTLE_MS = JUMP_TTL_MS
+const SETTLE_FIXES = 6
+
+const nextFrame = (run: () => void) =>
+  typeof requestAnimationFrame === 'function'
+    ? requestAnimationFrame(() => run())
+    : setTimeout(run, 0)
 
 export interface GroupTabsShared {
   /** A faixa fixa desenha as sub-abas: o corpo não desenha a barra. */
@@ -91,6 +153,91 @@ export function createGroupTabsStore(): GroupTabsStore {
   let nav = 0
   let scroll = 0
   let currentId: string | null = null
+  const anchors = new Map<string, AnchorNode>()
+  const measurers = new Set<() => void>()
+  const jumpListeners = new Set<
+    (y: number, focus: (() => void) | null) => void
+  >()
+  let pending: readonly string[] | null = null
+  let requestedAt = 0
+  let scheduled = false
+  // Houve medida desde o último quadro do salto que espera
+  let moved = false
+  // O último salto, para corrigir quando a faixa muda de altura logo depois
+  let landed: {
+    readonly id: string
+    readonly at: number
+    y: number
+    fixes: number
+  } | null = null
+  // O `y` da âncora: relativo ao painel (`panel`) ou à rolagem (`scroll`)
+  const place = (
+    id: string,
+    depth = 0
+  ): { readonly y: number; readonly root: 'panel' | 'scroll' } | null => {
+    const node = anchors.get(id)
+    if (!node || depth > 8) return null
+    if (node.parent === SCROLL_ROOT) return { y: node.y, root: 'scroll' }
+    if (node.parent === undefined) return { y: node.y, root: 'panel' }
+    const up = place(node.parent, depth + 1)
+    return up ? { y: up.y + node.y, root: up.root } : null
+  }
+  const target = (id: string): number | null => {
+    const at = place(id)
+    if (!at) return null
+    return Math.max(0, at.root === 'panel' ? panel + at.y - nav : at.y)
+  }
+  const expired = () => Date.now() - requestedAt > JUMP_TTL_MS
+  const resolve = () => {
+    if (!pending || scheduled) return
+    if (expired()) {
+      pending = null
+      return
+    }
+    if (!pending.some(id => place(id) !== null)) return
+    scheduled = true
+    moved = false
+    let waits = 0
+    const step = () => {
+      // Uma medida nova no último quadro: espera mais um, até o limite
+      if (moved && waits < MAX_WAIT_FRAMES) {
+        moved = false
+        waits += 1
+        nextFrame(step)
+        return
+      }
+      scheduled = false
+      const ids = pending
+      const id = ids?.find(x => place(x) !== null)
+      const y = id ? target(id) : null
+      if (!id || y === null) return
+      pending = null
+      landed = { id, at: Date.now(), y, fixes: 0 }
+      const focus = anchors.get(id)?.focus ?? null
+      for (const listener of jumpListeners) listener(y, focus)
+    }
+    nextFrame(step)
+  }
+  // Uma medida chegou: o salto que espera aguarda mais um quadro, e o que
+  // já rolou confere o destino
+  const measured = () => {
+    if (scheduled) moved = true
+    settle()
+  }
+  // O destino mudou logo depois do salto (a medida final da aba nova, a
+  // faixa mais alta): o começo dele volta a ficar logo abaixo da faixa
+  const settle = () => {
+    if (!landed || landed.fixes >= SETTLE_FIXES) return
+    if (Date.now() - landed.at > SETTLE_MS) {
+      landed = null
+      return
+    }
+    const y = target(landed.id)
+    if (y === null || y === landed.y) return
+    landed.y = y
+    landed.fixes += 1
+    for (const listener of jumpListeners) listener(y, null)
+  }
   const notify = () => {
     for (const listener of listeners) listener()
   }
@@ -128,10 +275,13 @@ export function createGroupTabsStore(): GroupTabsStore {
     panelAt(y) {
       panel = y
       if (recompute()) notify()
+      measured()
     },
     navHeight(height) {
+      if (height === nav) return
       nav = height
       if (recompute()) notify()
+      measured()
     },
     scrolled(y) {
       scroll = y
@@ -145,6 +295,35 @@ export function createGroupTabsStore(): GroupTabsStore {
     current: () => (currentId ? (sections.get(currentId) ?? null) : null),
     panelTop: () => Math.max(0, panel - nav),
     scrollY: () => scroll,
+    anchorAt(id, y, focus = null, parent) {
+      anchors.set(id, { y, focus, parent })
+      measured()
+      resolve()
+    },
+    dropAnchor(id) {
+      anchors.delete(id)
+    },
+    cancelJump() {
+      pending = null
+      landed = null
+    },
+    jumpTo(ids) {
+      pending = ids.length ? ids : null
+      requestedAt = Date.now()
+      landed = null
+      resolve()
+    },
+    onJump(listener) {
+      jumpListeners.add(listener)
+      return () => jumpListeners.delete(listener)
+    },
+    onRemeasure(measure) {
+      measurers.add(measure)
+      return () => measurers.delete(measure)
+    },
+    remeasure() {
+      for (const measure of [...measurers]) measure()
+    },
   }
 }
 

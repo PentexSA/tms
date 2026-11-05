@@ -38,7 +38,8 @@ export function targetKind(f: Obj | undefined): TargetKind | null {
 }
 
 const KEYS = {
-  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked'],
+  creation: ['freebies', 'budgets', 'caps', 'baselines', 'untracked', 'advice'],
+  advice: ['rule', 'targets', 'meta', 'max'],
   budget: {
     'priority-budget': ['id', 'label', 'rule', 'budgets', 'groups'],
     'fixed-budget': ['id', 'label', 'rule', 'budget', 'targets'],
@@ -429,4 +430,29 @@ export function checkAccounting(t: Obj, c: AccountingChecker): void {
       else if (tracked(id as string))
         err('creation.untracked', `campo '${id}' já está na conta da criação`)
     }
+  // Avisos que não bloqueiam (D-07): o meta numérico de itens de lista
+  const advice =
+    creation.advice === undefined
+      ? []
+      : objs('creation.advice', creation.advice, 20)
+  for (const [i, a] of advice.entries()) {
+    const p = `creation.advice.${i}`
+    keys(p, a, KEYS.advice)
+    if (!(REGISTRY.creationAdvice as readonly unknown[]).includes(a.rule))
+      err(`${p}.rule`, `regra '${a.rule}' fora da lista fechada`)
+    let min = -NUM_LIMIT
+    let max = NUM_LIMIT
+    for (const id of targets(`${p}.targets`, a.targets, ['items'])) {
+      const m = asArray(rec(field(id)?.item)?.meta)
+        .map(rec)
+        .find(x => x?.id === a.meta)
+      if (m?.type !== 'number') {
+        err(`${p}.meta`, `'${id}' não tem meta numérico '${a.meta}'`)
+        continue
+      }
+      if (typeof m.min === 'number') min = Math.max(min, m.min)
+      if (typeof m.max === 'number') max = Math.min(max, m.max)
+    }
+    required(`${p}.max`, a.max, min, max)
+  }
 }
