@@ -715,6 +715,19 @@ O que a implementação fez diferente deste plano, e por quê. Nenhum desvio mud
 9. **No E2E da folha uma vez,** a ficha é salva antes de recarregar. O rascunho local pode voltar depois do `reload`, e então a ficha abriria com os básicos fechados e a passagem não aconteceria de novo.
 10. **`useFreebiesNotes`** soma a linha do "confirme com o narrador", então ela aparece também na confirmação de "Aprovar ficha" do narrador.
 
+**Depois do `/code-review` (high), na própria branch:**
+
+11. **Zona sem aba** (a identidade, ou o "Em jogo" quando vira o dock): o alvo cai no `MISSING_TARGET`, em vez de um pedido que nunca se resolve. As abas ficam num `Set` memoizado.
+12. **O pedido expira em 1,5 s** (`JUMP_TTL_MS`), conferido na hora da medida, sem timer, e é esquecido na troca de aba à mão (`cancelJump`). Isso revê o "sem timer" do desvio 2: a espera continua sem timer, e um pedido velho não rola mais a ficha.
+13. **A faixa que cresce depois do salto:** quando a altura da faixa muda até 1 s depois (as sub-abas da seção nova), o destino é recalculado e a rolagem corrigida, até duas vezes, sem mover o foco de novo.
+14. **O alvo do foco é o texto do título** (papel `header`), num `AnchorHeader` do app, com o mesmo desenho do `SectionHeader`, porque o `@tms/ui` não expõe a ref do título e este pacote não o muda. Isso substitui o desvio 8 (o contêiner não era elemento de acessibilidade). No "Em jogo", o alvo é o próprio botão que recolhe. A troca por uma prop `titleRef` no `SectionHeader` do `@tms/ui` fica como sugestão: é aditiva, mas pede a conferência no nativo (S-01).
+15. **Com aprovação, o anúncio da conta fechada** diz "Você pode enviar ao narrador pela barra.", como o botão e a linha.
+16. **"Onde foram os bônus" sem extrato** não deixa âncora velha: o id da âncora é nulo sem extrato.
+17. **O `useGuideItems`** assina o `check` por referência e monta a lista num `useMemo`. O filtro dos `confirm` saiu, porque o `guideItems` só produz `blocking` e `missing`, e os `confirm` vêm do `useCreationNotices` (o contrato do P07-D).
+18. **`basicsClosed`** é a regra dos grupos, e o `basicsDone` é ela mais o saldo de bônus. A fase em texto usa o `basicsClosed`.
+19. **A cadeia de âncoras relativas** (seção → layout → corpo → grupo, `GroupsLayout`) continua. Trocar por `measureLayout` no momento do salto mediria o destino de verdade e tiraria as três âncoras intermediárias, mas o `measureLayout` é assíncrono, precisa da ref do painel e não roda no Jest (o mock não chama o callback): os testes da navegação passariam a depender de mocks de medida. Fica para depois, se o roteiro mostrar um salto fora do lugar. Até lá, um conteúdo novo entre o corpo e o grupo, fora dessa cadeia, desloca o destino.
+20. **"Jest did not exit" no `pnpm test`:** os arquivos novos passam com `--detectOpenHandles` sem nenhum handle aberto, e o `jest` direto do frontend (com e sem `--coverage`) termina. O travamento aparece só pelo turbo (`turbo run test --filter=frontend`) e **vem de antes do pacote**: com o código do app e do E2E da base (`78de35c`) no mesmo worktree, os 1388 testes passam e o Jest também não termina. Não é do P05-D.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
