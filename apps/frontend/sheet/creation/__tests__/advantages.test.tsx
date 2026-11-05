@@ -501,9 +501,12 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
         .getAllByRole('button', { name: /, do clã$/ })
         .map(b => b.props.accessibilityLabel)
     ).toEqual(['Potência, do clã', 'Presença, do clã', 'Rapidez, do clã'])
-    expect(
-      within(screen.getByTestId('add-block-others')).getAllByRole('button')
-    ).toHaveLength(14)
+    // 14 opções, cada uma com o "?" da frase da Disciplina (onda 4)
+    const others = within(screen.getByTestId('add-block-others'))
+      .getAllByRole('button')
+      .map(b => b.props.accessibilityLabel as string)
+    expect(others.filter(l => !l.startsWith('Ajuda: '))).toHaveLength(14)
+    expect(others.filter(l => l.startsWith('Ajuda: '))).toHaveLength(14)
     fireEvent.press(sheet.getByRole('button', { name: 'Dominação' }))
     // Entrou (nada bloqueia) e a linha diz o "fora", só na criação
     expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
@@ -542,9 +545,10 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
 describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
   const LUPINO = { breed: 'lupino', auspice: 'ahroun', tribe: 'fianna' }
 
-  // A2 do roteiro web: com o wta-w20 do produto (sem catálogo), o Dom de
-  // texto livre com Posto 2 avisa na linha, na aba Pontos e na confirmação
-  it('wta-w20 do produto: Dom livre de Posto 2 avisa na linha, em Pontos e ao concluir', async () => {
+  // A2 do roteiro web: com o wta-w20 do produto, o Dom com Posto 2 avisa na
+  // linha, na aba Pontos e na confirmação. Os três são recomendados (onda 4:
+  // Mestre do Fogo é da Raça), para o aviso ser só o do Posto
+  it('wta-w20 do produto: Dom de Posto 2 avisa na linha, em Pontos e ao concluir', async () => {
     await open(
       {
         strength: 4,
@@ -575,7 +579,7 @@ describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
           { id: 'b2', name: 'Fetiche', value: 2 },
         ],
         gifts: [
-          { id: 'g1', name: 'Faro do Asfalto', meta: { rank: 2 } },
+          { id: 'g1', name: 'Mestre do Fogo', meta: { rank: 2 } },
           { id: 'g2', name: 'Inspiração', meta: { rank: 1 } },
           { id: 'g3', name: 'Persuasão', meta: { rank: 1 } },
         ],
@@ -585,7 +589,13 @@ describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
     expect(screen.getByTestId('identity-gifts-g1')).toHaveTextContent(
       /Posto 2: na criação, vai até 1\. Confirme com o narrador\./
     )
-    expect(screen.queryByTestId('identity-gifts-g2')).toBeNull()
+    // Os de Posto 1 têm só o selo, sem aviso
+    expect(screen.getByTestId('identity-gifts-g2')).toHaveTextContent(
+      'do Augúrio'
+    )
+    expect(screen.getByTestId('identity-gifts-g2')).not.toHaveTextContent(
+      /confirme/
+    )
     tab('Pontos')
     expect(screen.getByTestId('creation-notices')).toHaveTextContent(
       /Dons: 1 com Posto acima de 1\./

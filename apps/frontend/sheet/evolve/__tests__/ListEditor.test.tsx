@@ -600,9 +600,17 @@ describe('R-26 e T-24: o que a identidade recomenda', () => {
       screen.getByRole('button', { name: 'Adicionar Disciplina' })
     )
     const clan = within(screen.getByTestId('add-block-by-clan'))
+    // Cada Disciplina tem a sua frase (onda 4): [opção][Ajuda: <nome>]
     expect(
       clan.getAllByRole('button').map(b => b.props.accessibilityLabel)
-    ).toEqual(['Auspícios, do clã', 'Dominação, do clã', 'Taumaturgia, do clã'])
+    ).toEqual([
+      'Auspícios, do clã',
+      'Ajuda: Auspícios',
+      'Dominação, do clã',
+      'Ajuda: Dominação',
+      'Taumaturgia, do clã',
+      'Ajuda: Taumaturgia',
+    ])
   })
 
   it('o nome gravado sem acento ou com outra caixa leva o selo do catálogo', async () => {
@@ -668,6 +676,95 @@ describe('R-26 e T-24: o que a identidade recomenda', () => {
     )
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     expect(screen.queryByTestId('identity-gifts-g1')).toBeNull()
+  })
+})
+
+// Onda 4: o catálogo de Dons do produto (wta-w20), com os Dons de nível 1 da
+// Raça, do Augúrio e da Tribo e o Posto 1 de cada nome. Rascunho do time.
+describe('onda 4: o catálogo de Dons do wta-w20', () => {
+  const w20 = modelOf('wta-w20')
+  const render = async (values: Record<string, unknown>) => {
+    const sheet = { values: { name: 'Nova', ...values }, specialties: {} }
+    const live = await renderLive(
+      { model: w20, sheet, mode: 'evolve' },
+      fakeServer(w20, sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    return live
+  }
+  const gifts = (store: () => { getState(): { draftEvents(): unknown[] } }) =>
+    (store().getState().draftEvents()[0] as { to?: ListItem[] } | undefined)?.to
+  const HOMINIDEO = { breed: 'hominideo', auspice: 'ahroun', tribe: 'fianna' }
+
+  it('"Adicionar Dom" tem os blocos da Raça, do Augúrio e da Tribo; o resto pela busca', async () => {
+    await render(HOMINIDEO)
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    const sheet = within(screen.getByTestId('add-sheet-gifts'))
+    const titles = sheet
+      .getAllByRole('header')
+      .map(h => h.props.children)
+      .filter(t => t !== 'Adicionar Dom')
+    expect(titles).toEqual([
+      'Da Raça · Hominídeo',
+      'Do Augúrio · Ahroun',
+      'Da Tribo · Fianna',
+    ])
+    // Persuasão é da Raça e da Tribo: aparece uma vez, com os dois selos
+    expect(
+      within(screen.getByTestId('add-block-by-breed')).getByRole('button', {
+        name: 'Persuasão, Posto 1, da Raça, da Tribo',
+      })
+    ).toBeTruthy()
+    expect(
+      within(screen.getByTestId('add-block-by-auspice')).getByRole('button', {
+        name: 'Inspiração, Posto 1, do Augúrio',
+      })
+    ).toBeTruthy()
+    expect(
+      within(screen.getByTestId('add-block-by-tribe')).getByRole('button', {
+        name: 'Luz Feérica, Posto 1, da Tribo',
+      })
+    ).toBeTruthy()
+    // Cada Dom do catálogo tem a sua frase
+    expect(
+      sheet.getByRole('button', { name: 'Ajuda: Inspiração' })
+    ).toBeTruthy()
+    // 48 nomes: sem busca, "Outras" não aparece
+    expect(screen.queryByTestId('add-block-others')).toBeNull()
+    expect(
+      sheet.getByText('Busque pelo nome para ver o restante da lista.')
+    ).toBeTruthy()
+  })
+
+  it('o Dom do catálogo nasce com Posto 1', async () => {
+    const { store } = await render(HOMINIDEO)
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Inspiração, Posto 1, do Augúrio' })
+    )
+    expect(gifts(store)?.at(-1)).toEqual({
+      id: 'i1',
+      name: 'Inspiração',
+      meta: { rank: 1 },
+    })
+  })
+
+  it('a busca acha o Dom de outro grupo, e o nome livre continua', async () => {
+    const { store } = await render(HOMINIDEO)
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Dom' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'lebre')
+    expect(
+      screen.getByRole('button', { name: 'Salto da Lebre, Posto 1' })
+    ).toBeTruthy()
+    fireEvent.changeText(screen.getByLabelText('Buscar Dom'), 'Uivo Inventado')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Uivo Inventado”' })
+    )
+    expect(gifts(store)?.at(-1)).toEqual({
+      id: 'i1',
+      name: 'Uivo Inventado',
+      meta: { rank: 1 },
+    })
   })
 })
 

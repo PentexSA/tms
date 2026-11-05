@@ -478,6 +478,73 @@ describe('o servidor aceita o que a tela só avisa (templates do produto)', () =
     expect((await sheetOf(id)).gifts).toEqual(gifts)
   })
 
+  // Onda 4: o W20 ganhou catálogo de Dons (Posto 1) e recomendação por Raça,
+  // Augúrio e Tribo. O servidor não lê nada disso: o Dom do catálogo e o nome
+  // livre entram com a mesma conta, e o Posto continua de 1 a 5.
+  it('com o catálogo de Dons, o nome livre e o do catálogo têm a mesma conta', async () => {
+    const w20 = template('wta-w20').fields as Record<
+      string,
+      Record<string, unknown>
+    >
+    expect(w20.gifts?.catalog).toContain('Persuasão')
+    const choices = {
+      name: 'Hominídea',
+      breed: 'hominideo',
+      auspice: 'ahroun',
+      tribe: 'fianna',
+    }
+    const inCatalog = await pointsOn(werewolf, choices)
+    const free = await pointsOn(werewolf, choices)
+    const list = (name: string, rank = 1) => [
+      { id: 'g1', name, meta: { rank } },
+    ]
+    for (const [id, name] of [
+      [inCatalog, 'Persuasão'],
+      [free, 'Faro do Asfalto'],
+    ] as const) {
+      expect((await send(id, owner, 'gifts', null, list(name))).status).toBe(
+        200
+      )
+      expect((await sheetOf(id)).gifts).toEqual(list(name))
+    }
+    const model = compileTemplate(template('wta-w20'))
+    const input = creationInputOf(model, { choices: V20_PRIORITIES })
+    const check = async (id: string) =>
+      checkCreation(model, (await row(id)).sheet_data, input)
+    const a = await check(inCatalog)
+    const b = await check(free)
+    expect(a.budgets).toEqual(b.budgets)
+    expect(a.freebies).toEqual(b.freebies)
+    expect(a.problems).toEqual(b.problems)
+    // O Posto fora de 1 a 5 continua recusado, do catálogo ou não
+    for (const [id, name] of [
+      [inCatalog, 'Persuasão'],
+      [free, 'Faro do Asfalto'],
+    ] as const) {
+      const res = await send(id, owner, 'gifts', list(name), list(name, 6))
+      expect(res.status).toBeGreaterThanOrEqual(400)
+      expect((await sheetOf(id)).gifts).toEqual(list(name))
+    }
+  })
+
+  // Onda 4: a Fraqueza tem o resumo do clã como default (só leitura). O
+  // servidor não grava o resumo sozinho e aceita e recusa o mesmo texto.
+  it('a Fraqueza com o resumo do clã: nada é gravado sozinho; o limite é o mesmo', async () => {
+    const fields = template('vtm-v20').fields as Record<
+      string,
+      Record<string, unknown>
+    >
+    expect(fields.weakness?.default).toBeDefined()
+    const id = await pointsOn(vampire, { name: 'Fraca', clan: 'brujah' })
+    expect((await sheetOf(id)).weakness).toBeUndefined()
+    const mine = 'Texto da mesa.'
+    expect((await send(id, owner, 'weakness', null, mine)).status).toBe(200)
+    expect((await sheetOf(id)).weakness).toBe(mine)
+    const res = await send(id, owner, 'weakness', mine, 'x'.repeat(601))
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect((await sheetOf(id)).weakness).toBe(mine)
+  })
+
   it('o template do repositório já recomenda as Disciplinas do clã', () => {
     const fields = template('vtm-v20').fields as Record<
       string,

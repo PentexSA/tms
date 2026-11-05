@@ -29,8 +29,9 @@ export const templateJson = (system: string): Json =>
 export const modelOf = (system: string): SheetModel =>
   compileTemplate(templates[system])
 
-// Dons fictícios (P07-D): o catálogo do W20 é do time e espera a licença,
-// então o teste usa nomes inventados, com Posto e recomendação
+// Dons fictícios (P07-D): os testes do mecanismo usam nomes inventados, com
+// Posto e recomendação, para não depender do catálogo do produto (onda 4),
+// que tem os próprios casos com `templateJson('wta-w20')`
 export const GIFTS = {
   breed: 'Faro do Asfalto',
   auspice: 'Grito de Alerta',
@@ -62,7 +63,7 @@ export function templateWithIdentity(system: string): Json {
         },
       ],
     }
-  // Resumos fictícios: os da Fraqueza do produto são escritos pelo time
+  // Resumos fictícios, para os testes do mecanismo não fixarem o texto do time
   if (system === 'vtm-v20' && fields.weakness)
     fields.weakness.default = {
       from: 'clan',
@@ -73,6 +74,8 @@ export function templateWithIdentity(system: string): Json {
     }
   if (system === 'wta-w20' && fields.gifts) {
     fields.gifts.catalog = Object.values(GIFTS)
+    // As frases do catálogo do produto citam nomes que este catálogo não tem
+    delete fields.gifts.catalogHelp
     fields.gifts.catalogDefaults = [
       {
         meta: 'rank',

@@ -353,12 +353,13 @@ describe('W20', () => {
     expect(r.freebies?.remaining).toBe(15)
   })
 
-  // P07-D (D-07, A2 do roteiro): o template avisa o Dom acima do Posto 1
+  // P07-D (D-07, A2 do roteiro): o template avisa o Dom acima do Posto 1.
+  // O Dom é da Raça (Hominídeo), para o "fora" não entrar no aviso.
   it('Dom de Posto 2 dá ADVICE_ABOVE_LEVEL; o de Posto 1, não; a conta não muda', () => {
     const at = (rank: number) => ({
       ...AHROUN,
       gifts: [
-        { id: 'g1', name: 'Faro do Asfalto', meta: { rank } },
+        { id: 'g1', name: 'Mestre do Fogo', meta: { rank } },
         ...(AHROUN.gifts as Values[]).slice(1),
       ],
     })

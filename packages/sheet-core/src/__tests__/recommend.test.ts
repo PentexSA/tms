@@ -14,8 +14,8 @@ import { type ResolvedText, resolve } from '../resolve'
 import { type Json, mta, vtm, wta } from './fixtures'
 
 // recommendedFor e creationAdvice (D-07, D-09): o que a identidade recomenda
-// e o que a criação só avisa. Nomes de Dom e resumos fictícios: o catálogo e
-// os textos do produto são do time.
+// e o que a criação só avisa. Nomes de Dom e resumos fictícios no mecanismo;
+// o conteúdo do produto (onda 4) tem os seus casos no fim do arquivo.
 
 type Fields = Record<string, Json>
 const fieldsOf = (t: Json) => t.fields as Fields
@@ -24,6 +24,8 @@ const w20 = () => {
   const t = wta()
   const gifts = fieldsOf(t).gifts as Json
   gifts.catalog = ['Faro do Asfalto', 'Passo de Neblina', 'Voz da Matilha']
+  // As frases do catálogo do produto citam nomes que este catálogo não tem
+  delete gifts.catalogHelp
   gifts.catalogDefaults = [
     { meta: 'rank', value: 2, items: ['Passo de Neblina'] },
   ]
