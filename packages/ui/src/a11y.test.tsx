@@ -32,7 +32,7 @@ import {
   tokens,
   useRovingFocus,
 } from './index'
-import { markSoftDisabled } from './Stepper'
+import { joinHints, markSoftDisabled } from './Stepper'
 
 const realOS = Platform.OS
 const setOS = (os: string) =>
@@ -548,6 +548,125 @@ describe('Stepper: "+" indisponível e dica (T-20)', () => {
     expect(more).toBeEnabled()
     expect(more.props.accessibilityDisabled).toBeUndefined()
     expect(more.props['aria-describedby']).toBeUndefined()
+  })
+})
+
+// T-85 (P10-C): o "−" ganha a mesma previsão do "+". Sem `decrease`, nada
+// muda; com ele, tocável, apagado, sem repetir, e a dica junta os dois lados.
+describe('Stepper: "−" indisponível e dica (T-85)', () => {
+  const DOWN = 'na criação, não fica abaixo de 5 (vem de Augúrio: Ahroun).'
+  const renderDown = (props: Partial<Parameters<typeof Stepper>[0]> = {}) => {
+    const onChange = jest.fn()
+    render(
+      <Stepper
+        label="Fúria permanente"
+        value={5}
+        min={1}
+        max={10}
+        onChange={onChange}
+        testID="rage"
+        decrease={{ blocked: true, hint: DOWN, hintID: 'notice-rage' }}
+        {...props}
+      />
+    )
+    return onChange
+  }
+  const opacity = (el: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(
+      typeof el.props.style === 'function'
+        ? (el.props.style as (s: { pressed: boolean }) => ViewStyle)({
+            pressed: false,
+          })
+        : (el.props.style as ViewStyle)
+    )?.opacity
+
+  it('no web: o "−" bloqueado fica tocável, apagado e aponta a dica; o "+" não muda', () => {
+    setOS('web')
+    const onChange = renderDown()
+    const less = screen.getByRole('button', {
+      name: 'Diminuir Fúria permanente',
+    })
+    expect(less.props.accessibilityDisabled).toBeUndefined()
+    expect(less.props.accessibilityState).toMatchObject({ disabled: false })
+    expect(less.props['aria-describedby']).toBe('notice-rage')
+    expect(opacity(less)).toBe(0.5)
+    fireEvent.press(less)
+    expect(onChange).toHaveBeenCalledWith(4)
+    const more = screen.getByRole('button', {
+      name: 'Aumentar Fúria permanente',
+    })
+    expect(more.props['aria-describedby']).toBeUndefined()
+    expect(opacity(more)).toBeUndefined()
+  })
+
+  it('segurar o "−" bloqueado não repete nem grava', () => {
+    setOS('web')
+    const onChange = renderDown()
+    const less = screen.getByRole('button', {
+      name: 'Diminuir Fúria permanente',
+    })
+    fireEvent(less, 'longPress')
+    fireEvent(less, 'pressOut')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('no app: as duas previsões numa dica só, com o lado de cada uma', () => {
+    setOS('ios')
+    const onChange = renderDown({
+      increase: { blocked: false, hint: '+1 = 1 bônus' },
+    })
+    const control = screen.getByRole('adjustable', { name: 'Fúria permanente' })
+    expect(control.props.accessibilityHint).toBe(
+      `Aumentar: +1 = 1 bônus. Diminuir: ${DOWN}`
+    )
+    fireEvent(control, 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(onChange).toHaveBeenCalledWith(4)
+    const less = screen.getByTestId('rage-dec', { includeHiddenElements: true })
+    expect(opacity(less)).toBe(0.5)
+  })
+
+  it('só o "−" com dica: ela sozinha, sem prefixo', () => {
+    setOS('android')
+    renderDown()
+    expect(
+      screen.getByRole('adjustable', { name: 'Fúria permanente' }).props
+        .accessibilityHint
+    ).toBe(DOWN)
+  })
+
+  it('no mínimo, o "−" fica desabilitado de verdade, com ou sem previsão', () => {
+    setOS('web')
+    renderDown({ value: 1 })
+    expect(
+      screen.getByRole('button', { name: 'Diminuir Fúria permanente' })
+    ).toBeDisabled()
+  })
+
+  it('sem `decrease`, nada muda no "−"', () => {
+    setOS('web')
+    render(
+      <Stepper label="Fúria" value={5} min={1} max={10} onChange={jest.fn()} />
+    )
+    const less = screen.getByRole('button', { name: 'Diminuir Fúria' })
+    expect(less).toBeEnabled()
+    expect(less.props['aria-describedby']).toBeUndefined()
+    expect(opacity(less)).toBeUndefined()
+  })
+})
+
+describe('joinHints', () => {
+  it('junta com ponto, não duplica o ponto e deixa só o que houver', () => {
+    expect(joinHints('+1 = 1 bônus', 'não desce')).toBe(
+      'Aumentar: +1 = 1 bônus. Diminuir: não desce'
+    )
+    expect(joinHints('cheio.', 'não desce')).toBe(
+      'Aumentar: cheio. Diminuir: não desce'
+    )
+    expect(joinHints('só o +', null)).toBe('só o +')
+    expect(joinHints(undefined, 'só o −')).toBe('só o −')
+    expect(joinHints(null, '')).toBeNull()
   })
 })
 

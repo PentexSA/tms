@@ -40,10 +40,14 @@ export interface StepperProps {
   readonly showLabel?: boolean
   // O que o próximo ponto faria (T-20, R-17), dito antes do toque
   readonly increase?: StepperIncrease
+  // O mesmo para o "−" (T-85: na criação, não desce abaixo do inicial).
+  // Sem ele, o "−" é o de sempre.
+  readonly decrease?: StepperIncrease
 }
 
 /**
- * O "+" com a trava ou o custo, antes do toque. `blocked`: o "+" fica com a
+ * O "+" (`increase`) ou o "−" (`decrease`) com a trava ou o custo, antes do
+ * toque; o nome do tipo ficou o do "+", que veio primeiro. `blocked`: o botão fica com a
  * cara de indisponível (opacidade e `aria-disabled`), mas **continua
  * tocável**: o toque chega a quem decide (a conta exata e o servidor), que
  * explica o motivo; a previsão pode errar para o lado bloqueado. Segurar não
@@ -83,6 +87,21 @@ export function markSoftDisabled(node: unknown, soft: boolean): void {
   else dom.removeAttribute('aria-disabled')
 }
 
+/**
+ * A dica do controle ajustável no app: com as duas previsões, uma frase só,
+ * com o lado de cada uma; com uma, só ela, sem prefixo.
+ */
+export function joinHints(
+  up: string | null | undefined,
+  down: string | null | undefined
+): string | null {
+  if (up && down) {
+    const stop = /[.!?]$/.test(up) ? '' : '.'
+    return `Aumentar: ${up}${stop} Diminuir: ${down}`
+  }
+  return up || down || null
+}
+
 export function Stepper({
   label,
   value,
@@ -97,6 +116,7 @@ export function Stepper({
   valueNativeID,
   showLabel = false,
   increase,
+  decrease,
 }: StepperProps) {
   const { colors } = useTheme()
   const [display, setDisplay] = useState(value)
@@ -159,21 +179,27 @@ export function Stepper({
   useEffect(() => {
     if (web && !plusOff) markSoftDisabled(plusRef.current, softPlus)
   }, [web, plusOff, softPlus])
+  // O "−" bloqueado pela previsão, do mesmo jeito
+  const minusOff = disabled || display <= min
+  const softMinus = !minusOff && decrease?.blocked === true
+  const minusRef = useRef<ComponentRef<typeof View>>(null)
+  useEffect(() => {
+    if (web && !minusOff) markSoftDisabled(minusRef.current, softMinus)
+  }, [web, minusOff, softMinus])
   const button = (delta: 1 | -1) => {
-    const off = disabled || (delta < 0 ? display <= min : display >= max)
+    const off = delta < 0 ? minusOff : plusOff
+    const advice = delta > 0 ? increase : decrease
     // Bloqueado pela previsão, não pelo controle: tocável, com cara de
     // indisponível (o toque explica o motivo)
-    const soft = delta > 0 && !off && increase?.blocked === true
+    const soft = !off && advice?.blocked === true
     const describedBy =
-      web && delta > 0 && increase?.hintID
-        ? { 'aria-describedby': increase.hintID }
-        : {}
+      web && advice?.hintID ? { 'aria-describedby': advice.hintID } : {}
     // No web, o aria-disabled do "+" bloqueado vai direto no elemento
     // (markSoftDisabled), sem o `disabled`. No app, os botões ficam fora do
     // leitor de tela: quem diz a trava é a dica do controle ajustável.
     return (
       <Pressable
-        ref={delta > 0 ? plusRef : undefined}
+        ref={delta > 0 ? plusRef : minusRef}
         testID={testID ? `${testID}-${delta > 0 ? 'inc' : 'dec'}` : undefined}
         {...(web
           ? {
@@ -202,6 +228,7 @@ export function Stepper({
     )
   }
 
+  const hint = joinHints(increase?.hint, decrease?.hint)
   const container = web
     ? { role: 'group' as const, 'aria-label': label }
     : {
@@ -215,7 +242,7 @@ export function Stepper({
         // ("7" de 0 a 1000 vira "1%").
         'aria-valuetext': spoken,
         'aria-disabled': disabled,
-        ...(increase?.hint ? { accessibilityHint: increase.hint } : {}),
+        ...(hint ? { accessibilityHint: hint } : {}),
         accessibilityActions: [
           { name: 'increment' },
           { name: 'decrement' },
