@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import { View } from 'react-native'
-import { useAnchor } from '../anchor'
+import { Platform, View } from 'react-native'
+import { offsetTopOf, useAnchor } from '../anchor'
 import {
   createGroupTabsStore,
   GroupTabsContext,
@@ -45,4 +45,19 @@ it('o id nulo tira a âncora do mapa', async () => {
   store.jumpTo(['creation-ledger'])
   await frame()
   expect(jumps).toEqual([])
+})
+
+// A3: a posição lida na hora, só no web (no app, o onLayout já avisa)
+it('offsetTopOf lê o offsetTop só no web', () => {
+  const view = { offsetTop: 240 } as never
+  expect(offsetTopOf(view)).toBeNull()
+  const os = Platform.OS
+  Platform.OS = 'web'
+  try {
+    expect(offsetTopOf(view)).toBe(240)
+    expect(offsetTopOf(null)).toBeNull()
+    expect(offsetTopOf({} as never)).toBeNull()
+  } finally {
+    Platform.OS = os
+  }
 })

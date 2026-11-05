@@ -118,3 +118,34 @@ describe('jumpTo', () => {
     expect(jumps).toHaveLength(2)
   })
 })
+
+// A3: no web, o onLayout não avisa quando uma vista só desce. Quando o
+// conteúdo da rolagem muda de tamanho, as posições são lidas de novo
+describe('remeasure (A3)', () => {
+  const groups = [{ id: 'g', title: 'G', fieldIds: [] }]
+  it('o painel que desceu ("Em jogo" aberto) troca a seção da faixa', () => {
+    const store = createGroupTabsStore()
+    store.register({ id: 'attributes', title: 'A', tabsId: 'a', groups })
+    store.register({ id: 'abilities', title: 'H', tabsId: 'h', groups })
+    store.panelAt(600)
+    store.navHeight(120)
+    store.sectionAt('attributes', 0)
+    store.sectionAt('abilities', 900)
+    // A rolagem deixa os Atributos no topo, com o painel em 600
+    store.scrolled(500)
+    expect(store.current()?.id).toBe('attributes')
+    // O "Em jogo" abriu: o painel desceu 900, sem onLayout no web
+    let panel = 600
+    const off = store.onRemeasure(() => store.panelAt(panel))
+    panel = 1500
+    store.scrolled(1400)
+    // Sem remedir, a faixa erra: acha que as Habilidades estão no topo
+    expect(store.current()?.id).toBe('abilities')
+    store.remeasure()
+    expect(store.current()?.id).toBe('attributes')
+    off()
+    panel = 0
+    store.remeasure()
+    expect(store.panelTop()).toBe(1500 - 120)
+  })
+})

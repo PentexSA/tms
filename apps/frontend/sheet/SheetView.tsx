@@ -58,7 +58,12 @@ import { canEditSomething } from './evolve/hooks'
 import { ModeBarActions, type ModeBarParts, useModeBar } from './evolve/ModeBar'
 import { IdentityBlock } from './IdentityBlock'
 import { AnchorHeader } from './layouts/AnchorHeader'
-import { type AnchorTarget, anchorDomId, focusView } from './layouts/anchor'
+import {
+  type AnchorTarget,
+  anchorDomId,
+  focusView,
+  offsetTopOf,
+} from './layouts/anchor'
 import {
   GroupTabsContext,
   SCROLL_ROOT,
@@ -329,6 +334,29 @@ function SheetBody({
     },
     [groupTabs.store, model, showTab, tabSet, playAnchored]
   )
+  // O painel e o "Em jogo" são remedidos no web quando o conteúdo da
+  // rolagem muda de tamanho (A3); no app, o onLayout já avisa
+  const panelRef = useRef<HostInstance>(null)
+  const playBlockRef = useRef<HostInstance>(null)
+  const placePlay = useCallback(
+    (y: number) =>
+      groupTabs.store.anchorAt(
+        PLAY_ANCHOR,
+        y,
+        () => focusView(playRef.current),
+        SCROLL_ROOT
+      ),
+    [groupTabs.store]
+  )
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    return groupTabs.store.onRemeasure(() => {
+      const panel = offsetTopOf(panelRef.current)
+      if (panel !== null) groupTabs.store.panelAt(panel)
+      const play = offsetTopOf(playBlockRef.current)
+      if (play !== null) placePlay(play)
+    })
+  }, [groupTabs.store, placePlay])
   const { reduceMotion } = useTheme()
   useEffect(
     () =>
@@ -380,14 +408,8 @@ function SheetBody({
       play.length && !docked ? (
         <View
           key="play"
-          onLayout={e =>
-            groupTabs.store.anchorAt(
-              PLAY_ANCHOR,
-              e.nativeEvent.layout.y,
-              () => focusView(playRef.current),
-              SCROLL_ROOT
-            )
-          }
+          ref={playBlockRef as never}
+          onLayout={e => placePlay(e.nativeEvent.layout.y)}
         >
           {/* O alvo do foco é o próprio botão ou o título (P05-D) */}
           {collapsible ? (
@@ -424,6 +446,7 @@ function SheetBody({
       <View
         key="panel"
         testID="sheet-panel"
+        ref={panelRef as never}
         onLayout={e => groupTabs.store.panelAt(e.nativeEvent.layout.y)}
       >
         <StripScope.Provider value>
@@ -473,6 +496,12 @@ function SheetBody({
               ) : undefined
             }
             scrollEventThrottle={16}
+            // A3: no web, o onLayout não avisa quando uma vista só desce
+            // (o "Em jogo" abriu, um banner entrou): o conteúdo mudou de
+            // tamanho, e as posições são lidas de novo
+            onContentSizeChange={
+              Platform.OS === 'web' ? groupTabs.store.remeasure : undefined
+            }
             onScroll={e =>
               groupTabs.store.scrolled(e.nativeEvent.contentOffset.y)
             }

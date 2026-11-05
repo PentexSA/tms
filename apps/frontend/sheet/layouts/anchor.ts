@@ -41,32 +41,77 @@ export function focusView(view: HostInstance | null) {
 }
 
 /**
- * `onLayout` vai na vista que dá a posição (relativa a `parent`, outra
- * âncora, ou ao painel); `target`, no texto do título que recebe o foco (AnchorHeader).
- * Com `focusable` falso, a âncora só mede (um contêiner intermediário).
+ * O `y` de uma vista dentro da vista-mãe, lido na hora. Só no web: lá, o
+ * onLayout só dispara quando o tamanho muda, e a posição fica velha quando
+ * algo acima cresce (A3). As vistas do react-native-web têm `position:
+ * relative`, então o `offsetTop` é relativo à vista-mãe, como o onLayout.
+ * No app, o onLayout já dispara quando a posição muda: null.
+ */
+export function offsetTopOf(view: HostInstance | null): number | null {
+  if (Platform.OS !== 'web' || !view) return null
+  const top = (view as unknown as { offsetTop?: unknown }).offsetTop
+  return typeof top === 'number' ? top : null
+}
+
+/**
+ * No web, registra a vista para ser remedida quando o conteúdo da rolagem
+ * muda de tamanho (A3). `report` recebe o `y` relativo à vista-mãe.
+ */
+export function useRemeasure(
+  ref: RefObject<HostInstance | null>,
+  report: ((y: number) => void) | null
+) {
+  const store = useGroupTabsContext()?.store
+  const latest = useRef(report)
+  latest.current = report
+  const on = Boolean(report)
+  useEffect(() => {
+    if (!store || !on || Platform.OS !== 'web') return
+    return store.onRemeasure(() => {
+      const y = offsetTopOf(ref.current)
+      if (y !== null) latest.current?.(y)
+    })
+  }, [store, on, ref])
+}
+
+/**
+ * `onLayout` e `layoutRef` vão na vista que dá a posição (relativa a
+ * `parent`, outra âncora, ou ao painel); `target`, no texto do título que
+ * recebe o foco (AnchorHeader). Com `focusable` falso, a âncora só mede (um
+ * contêiner intermediário). `onY` recebe a mesma posição (a seção da faixa).
  */
 export function useAnchor(
   id: string | null,
-  { parent, focusable = true }: { parent?: string; focusable?: boolean } = {}
+  {
+    parent,
+    focusable = true,
+    onY,
+  }: {
+    parent?: string
+    focusable?: boolean
+    onY?: ((y: number) => void) | null
+  } = {}
 ) {
   const store = useGroupTabsContext()?.store
   const ref = useRef<HostInstance>(null)
+  const layoutRef = useRef<HostInstance>(null)
   const focus = useCallback(() => focusView(ref.current), [])
   useEffect(() => {
     if (!store || !id) return
     return () => store.dropAnchor(id)
   }, [store, id])
-  const onLayout =
-    store && id
-      ? (e: LayoutChangeEvent) =>
-          store.anchorAt(
-            id,
-            e.nativeEvent.layout.y,
-            focusable ? focus : null,
-            parent
-          )
-      : undefined
+  const report =
+    store && (id || onY)
+      ? (y: number) => {
+          if (id) store.anchorAt(id, y, focusable ? focus : null, parent)
+          onY?.(y)
+        }
+      : null
+  useRemeasure(layoutRef, report)
+  const onLayout = report
+    ? (e: LayoutChangeEvent) => report(e.nativeEvent.layout.y)
+    : undefined
   const target: AnchorTarget =
     id && focusable ? { ref, nativeID: anchorDomId(id), tabIndex: -1 } : {}
-  return { onLayout, target }
+  return { onLayout, layoutRef, target }
 }
