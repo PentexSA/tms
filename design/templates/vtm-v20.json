@@ -457,6 +457,30 @@
         "Vicissitude",
         "Tenebrosidade"
       ],
+      "recommend": {
+        "outside": "fora do clã",
+        "by": [
+          {
+            "from": "clan",
+            "label": "do clã",
+            "map": {
+              "assamitas": ["Rapidez", "Ofuscação", "Quietus"],
+              "brujah": ["Rapidez", "Potência", "Presença"],
+              "gangrel": ["Animalismo", "Fortitude", "Metamorfose"],
+              "giovanni": ["Dominação", "Necromancia", "Potência"],
+              "lasombra": ["Dominação", "Tenebrosidade", "Potência"],
+              "malkavianos": ["Auspícios", "Demência", "Ofuscação"],
+              "nosferatu": ["Animalismo", "Ofuscação", "Potência"],
+              "ravnos": ["Animalismo", "Quimerismo", "Fortitude"],
+              "seguidores-de-set": ["Ofuscação", "Presença", "Serpentis"],
+              "toreador": ["Auspícios", "Rapidez", "Presença"],
+              "tremere": ["Auspícios", "Dominação", "Taumaturgia"],
+              "tzimisce": ["Animalismo", "Auspícios", "Vicissitude"],
+              "ventrue": ["Dominação", "Fortitude", "Presença"]
+            }
+          }
+        ]
+      },
       "rollAs": "ability"
     },
     "backgrounds": {

@@ -134,6 +134,24 @@ describe('V20', () => {
     expect(r.freebies?.spent).toBe(5)
   })
 
+  // P07-D (R-26): o "do clã" da tela é o mesmo mapa do desconto de XP
+  it('o recommend das Disciplinas é igual, clã a clã, ao itemIn do XP', () => {
+    const def = vtm.fields.get('disciplines')?.def
+    const by = def?.type === 'list' ? def.recommend?.by : undefined
+    const xp = vtm.template.costs?.xp?.rules?.find(r => r.id === 'discipline')
+    const fromXp = Object.fromEntries(
+      (xp?.when ?? []).flatMap(w =>
+        w.if.itemIn && w.if.in?.[0] ? [[w.if.in[0], [...w.if.itemIn]]] : []
+      )
+    )
+    expect(by).toHaveLength(1)
+    expect(by?.[0]?.from).toBe('clan')
+    expect(by?.[0]?.map).toEqual(fromXp)
+    // 13 clãs; o Caitiff fica sem recomendação
+    expect(Object.keys(fromXp)).toHaveLength(13)
+    expect(Object.hasOwn(by?.[0]?.map ?? {}, 'caitiff')).toBe(false)
+  })
+
   it('Habilidade acima de 3 só com bônus', () => {
     const r = creation(vtm, { ...BRUJAH, alertness: 4 })
     expect(r.problems).toEqual([])
@@ -194,6 +212,18 @@ describe('V20', () => {
 
 describe('M20', () => {
   const mta = compileTemplate(templates['mta-m20'])
+
+  it('a Esfera de afinidade recomenda por Tradição; o Órfão fica sem', () => {
+    const def = mta.fields.get('affinity')?.def
+    const source = def?.type === 'choice' ? def.recommend?.by[0] : undefined
+    expect(source?.from).toBe('tradition')
+    const tradition = mta.fields.get('tradition')?.def
+    const ids =
+      tradition?.type === 'choice' ? tradition.options.map(o => o.id) : []
+    expect(Object.keys(source?.map ?? {}).sort()).toEqual(
+      ids.filter(id => id !== 'orfao').sort()
+    )
+  })
   // 7 em Antecedentes e 6 em Esferas, nenhuma acima do Arete 1
   const HERMETIC: Values = {
     ...ATTRIBUTES,

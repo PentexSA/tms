@@ -224,7 +224,9 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(screen.queryByTestId('add-sheet-disciplines')).toBeNull()
     expect(alertsIn('editor-disciplines')).toHaveLength(0)
     // Fechar apaga o aviso do store: a folha do item não o herda
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
     expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
   })
 
@@ -243,7 +245,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     expect(alertsIn(row('d2'))).toHaveLength(0)
     // O valor não mudou; o "−" é aceito e apaga o aviso
     expect(
-      screen.getByRole('button', { name: 'Dominação, 1 de 5' })
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
     ).toBeTruthy()
     fireEvent(
       screen.getByRole('adjustable', { name: 'Dominação' }),
@@ -252,7 +254,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     )
     expect(alertsIn(row('d3'))).toHaveLength(0)
     expect(
-      screen.getByRole('button', { name: 'Dominação, 0 de 5' })
+      screen.getByRole('button', { name: 'Dominação, 0 de 5, do clã' })
     ).toBeTruthy()
   })
 
@@ -260,7 +262,9 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     await open(THREE)
     step('Dominação')
     expect(alertsIn('item-disciplines-d3')).toHaveLength(1)
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
     expect(alertsIn('item-sheet-disciplines')).toHaveLength(0)
     expect(alertsIn('item-disciplines-d3')).toHaveLength(0)
   })
@@ -342,7 +346,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     // Pago com bônus, o ponto entra pela linha
     step('Dominação')
     expect(
-      screen.getByRole('button', { name: 'Dominação, 2 de 5' })
+      screen.getByRole('button', { name: 'Dominação, 2 de 5, do clã' })
     ).toBeTruthy()
   })
 

@@ -474,6 +474,14 @@ describe('o servidor aceita o que a tela só avisa (templates do produto)', () =
     expect((await sheetOf(id)).gifts).toEqual(gifts)
   })
 
+  it('o template do repositório já recomenda as Disciplinas do clã', () => {
+    const fields = template('vtm-v20').fields as Record<
+      string,
+      Record<string, unknown>
+    >
+    expect(fields.disciplines?.recommend).toBeDefined()
+  })
+
   it('Disciplina fora do clã entra, com a mesma conta de uma do clã', async () => {
     const outside = await pointsOn(vampire, { name: 'Fora', clan: 'brujah' })
     const inside = await pointsOn(vampire, { name: 'Dentro', clan: 'brujah' })

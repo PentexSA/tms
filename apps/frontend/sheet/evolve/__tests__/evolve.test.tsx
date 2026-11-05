@@ -54,7 +54,7 @@ function evolveThree() {
   fireEvent.press(screen.getByRole('button', { name: 'Taumaturgia' }))
   expect(screen.getByText('Editando · 3 alterações')).toBeTruthy()
   expect(
-    screen.getByRole('button', { name: 'Taumaturgia, 1 de 5' })
+    screen.getByRole('button', { name: 'Taumaturgia, 1 de 5, do clã' })
   ).toBeTruthy()
 }
 

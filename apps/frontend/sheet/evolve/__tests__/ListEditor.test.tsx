@@ -35,7 +35,7 @@ describe('ListEditor', () => {
     )
     fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'auspi')
     expect(
-      screen.getByRole('button', { name: 'Auspícios, já na ficha' })
+      screen.getByRole('button', { name: 'Auspícios, do clã, já na ficha' })
     ).toBeDisabled()
     fireEvent.changeText(screen.getByLabelText('Buscar Disciplina'), 'fortit')
     fireEvent.press(screen.getByRole('button', { name: 'Fortitude' }))
@@ -72,7 +72,7 @@ describe('ListEditor', () => {
     expect(screen.queryByTestId('item-sheet-disciplines')).toBeNull()
     fireEvent.press(
       screen.getByRole('button', {
-        name: 'Taumaturgia, 4 de 5, especialização Trilha do Sangue',
+        name: 'Taumaturgia, 4 de 5, especialização Trilha do Sangue, do clã',
       })
     )
     // A folha fica com nome, especialização e notas: o Valor saiu dela
@@ -101,7 +101,7 @@ describe('ListEditor', () => {
       })
     expect(disciplines()?.find(d => d.name === 'Auspícios')?.value).toBe(0)
     expect(
-      screen.getByRole('button', { name: 'Auspícios, 0 de 5' })
+      screen.getByRole('button', { name: 'Auspícios, 0 de 5, do clã' })
     ).toBeTruthy()
     // No mínimo, o "−" não desce mais
     fireEvent(auspex(), 'accessibilityAction', {
@@ -113,7 +113,7 @@ describe('ListEditor', () => {
   it('R-25: a linha não aninha botões, e o nome abre a folha com a dica', async () => {
     await helenaInEvolve()
     const row = within(screen.getByTestId('item-disciplines-d2'))
-    const name = row.getByRole('button', { name: 'Auspícios, 2 de 5' })
+    const name = row.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
     expect(name.props.accessibilityHint).toBe(
       'Abre o item: nome, especialização e notas'
     )
@@ -161,7 +161,7 @@ describe('ListEditor', () => {
     expect(disciplines.getByText('Peça ao narrador.')).toBeTruthy()
     // O nome continua abrindo a folha (nome e notas seguem editáveis)
     fireEvent.press(
-      disciplines.getByRole('button', { name: 'Auspícios, 2 de 5' })
+      disciplines.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
     )
     expect(screen.getByTestId('item-sheet-disciplines')).toBeTruthy()
   })
@@ -201,7 +201,9 @@ describe('ListEditor', () => {
   it('remover pede confirmação', async () => {
     const { disciplines } = await helenaInEvolve()
     const open = () =>
-      fireEvent.press(screen.getByRole('button', { name: 'Auspícios, 2 de 5' }))
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
+      )
     open()
     fireEvent.press(screen.getByRole('button', { name: 'Remover' }))
     expect(screen.getByText('Remover Auspícios?')).toBeTruthy()
@@ -216,7 +218,7 @@ describe('ListEditor', () => {
       'Dominação',
     ])
     expect(
-      screen.queryByRole('button', { name: 'Auspícios, 2 de 5' })
+      screen.queryByRole('button', { name: 'Auspícios, 2 de 5, do clã' })
     ).toBeNull()
   })
 
@@ -236,7 +238,9 @@ describe('ListEditor', () => {
 
   it('renomear o item; o campo de nome respeita o limite do validador', async () => {
     const { disciplines } = await helenaInEvolve()
-    fireEvent.press(screen.getByRole('button', { name: 'Dominação, 1 de 5' }))
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Dominação, 1 de 5, do clã' })
+    )
     const name = textInput('Nome')
     expect(name.props.maxLength).toBe(80)
     fireEvent.changeText(name, ' Dominação Plena ')
