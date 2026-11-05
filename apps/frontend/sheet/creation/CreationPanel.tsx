@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 
 import { messageOf } from '../../lib/errors'
+import { useUserStorage } from '../../lib/persist'
 import {
   useApproveCreation,
   useCompleteCreation,
@@ -22,6 +23,7 @@ import {
 } from '../../lib/queries/creation'
 import { useSheet, useSheetSelector } from '../context'
 import { useAnchor } from '../layouts/anchor'
+import { bonusSeenNow, markBonusSeen, readBonusSeen } from './bonusSeen'
 import { CompletionMessage } from './CompletionMessage'
 import { useCreation, useGuideNav } from './CreationContext'
 import {
@@ -384,18 +386,39 @@ function Ledger() {
 /**
  * O aviso de que os pontos básicos acabaram: a distribuição passa a gastar
  * os pontos de bônus. Só na passagem (a ficha que já abre assim muda de fase
- * sem aviso) e uma vez por tela.
+ * sem aviso) e só na primeira passagem de cada ficha (U-07): com a fase
+ * ainda nos básicos, nenhum bônus gasto e a ficha sem a marca deste
+ * aparelho (bonusSeen.ts).
  */
 export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
   const { store } = useSheet()
+  const creation = useCreation()
+  const storage = useUserStorage()
+  const characterId = creation?.characterId ?? ''
   const creating = useCreating()
   const done = useSheetSelector(s => basicsDone(s.check))
   const closed = useSheetSelector(s => s.check?.complete === true)
   const remaining = useSheetSelector(s => s.check?.freebies?.remaining ?? 0)
+  const spent = useSheetSelector(s => s.check?.freebies?.spent ?? 0)
   const [open, setOpen] = useState(false)
   const was = useRef<boolean | null>(null)
   const wasClosed = useRef<boolean | null>(null)
-  const shown = useRef(false)
+  // A marca do aparelho, lida uma vez por ficha (a memória da sessão evita
+  // ler de novo a cada troca de modo)
+  const seen = useRef(false)
+  // "Ver Pontos" troca de aba depois que a folha sai (onClosed)
+  const toPoints = useRef(false)
+
+  useEffect(() => {
+    seen.current = bonusSeenNow(storage, characterId)
+    let alive = true
+    void readBonusSeen(storage, characterId).then(value => {
+      if (alive && value) seen.current = true
+    })
+    return () => {
+      alive = false
+    }
+  }, [storage, characterId])
 
   useEffect(() => {
     if (!creating) return
@@ -406,10 +429,13 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
     let opened = false
     if (done && before !== true) {
       const s = store.getState()
-      if (s.creationPhase === 'basics') s.setCreationPhase('freebies')
-      // Já abriu com tudo distribuído: sem aviso
-      if (before !== null && !shown.current) {
-        shown.current = true
+      const basics = s.creationPhase === 'basics'
+      if (basics) s.setCreationPhase('freebies')
+      // Já abriu com tudo distribuído: sem aviso. Quem trocou a fase à mão
+      // ou já gastou bônus já passou por ela; a marca vale entre telas
+      if (before !== null && basics && spent === 0 && !seen.current) {
+        seen.current = true
+        markBonusSeen(storage, characterId)
         opened = true
         setOpen(true)
         AccessibilityInfo.announceForAccessibility(
@@ -421,13 +447,18 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
     // abriu na mesma passagem, porque ela já anuncia
     if (closedBefore === false && closed && !opened)
       AccessibilityInfo.announceForAccessibility(CLOSED_COPY.announce)
-  }, [creating, done, closed, store])
+  }, [creating, done, closed, spent, store, storage, characterId])
 
   return (
     <BottomSheet
       visible={open}
       title="Começaram os pontos de bônus"
       onClose={() => setOpen(false)}
+      onClosed={() => {
+        if (!toPoints.current) return
+        toPoints.current = false
+        onBudget()
+      }}
       testID="bonus-notice"
       footer={
         <>
@@ -435,8 +466,8 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
             title="Ver Pontos"
             variant="ghost"
             onPress={() => {
+              toPoints.current = true
               setOpen(false)
-              onBudget()
             }}
           />
           <Button title="Entendi" onPress={() => setOpen(false)} />

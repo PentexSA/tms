@@ -19,7 +19,7 @@ import {
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
 import { modelOf, templateJson } from '../../../test/fixtures'
-import { summarySave } from '../../../test/queries'
+import { sheetsDismissed, summarySave } from '../../../test/queries'
 import {
   json,
   memoryStore,
@@ -28,6 +28,7 @@ import {
   tokens,
 } from '../../../test/session'
 import { SheetScreen } from '../../SheetScreen'
+import { resetBonusSeenMemory } from '../bonusSeen'
 import * as guideModule from '../guide'
 
 // A prioridade escolhida no próprio grupo (Físicos: 7 · 5 · 3) e a trava a
@@ -60,6 +61,8 @@ const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
 const TABLET = { width: 750, height: 1334, scale: 2, fontScale: 1 }
 
 beforeEach(() => {
+  // A marca da folha de bônus é da sessão: cada teste começa sem ela
+  resetBonusSeenMemory()
   jest
     .mocked(randomUUID)
     .mockReturnValue('00000000-0000-4000-8000-00000000b201')
@@ -939,6 +942,10 @@ describe('aviso dos pontos de bônus', () => {
     step('Vigor')
     expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Ver Pontos' }))
+    // A aba troca depois que a folha sai (onClosed), não no toque
+    expect(screen.queryByTestId('creation-phase')).toBeNull()
+    await sheetsDismissed()
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
     expect(screen.getByTestId('creation-phase')).toHaveTextContent(
       'Fase: pontos de bônus'
     )
@@ -949,6 +956,67 @@ describe('aviso dos pontos de bônus', () => {
     expect(screen.getByTestId('counter-physical').props.children).toBe(
       '7/7 · +1 bônus · +1 = 5 bônus'
     )
+  })
+})
+
+// P05-D (U-07): a folha só na primeira passagem de cada ficha
+describe('folha de bônus uma vez (U-07)', () => {
+  const OTHER = '00000000-0000-4000-8000-00000000c202'
+  const decrement = (name: string) =>
+    fireEvent(screen.getByRole('adjustable', { name }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+
+  it('tirar e repor não reabre, nem numa tela nova da mesma ficha; outra ficha abre', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    decrement('Vigor')
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+    // Outra tela da mesma ficha: outro store, a mesma marca
+    cleanup()
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+    // Outra ficha: a folha abre
+    cleanup()
+    const c = character(PRIORITIES, ALMOST) as {
+      data: Record<string, unknown>
+    }
+    calls.characterGet.mockResolvedValue(ok({ ...c.data, id: OTHER }))
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={OTHER} initialMode="create" />, session)
+    await screen.findByRole('tab', { name: 'Pontos' })
+    step('Vigor')
+    expect(screen.getByText('Começaram os pontos de bônus')).toBeTruthy()
+  })
+
+  it('com bônus já gasto, a passagem não abre a folha (o caso do PO-A)', async () => {
+    // A Força de Vontade 2 acima da Coragem: 2 pontos de bônus gastos
+    await open(PRIORITIES, {
+      ...ALMOST,
+      willpower: { permanent: 5, current: 5 },
+    })
+    step('Vigor')
+    expect(screen.getByTestId('creation-action')).toBeTruthy()
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
+  })
+
+  it('quem trocou a fase à mão já sabe dos bônus: sem folha', async () => {
+    await open(PRIORITIES, ALMOST)
+    tab('Pontos')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Usar pontos de bônus agora' })
+    )
+    tab('Ficha')
+    step('Vigor')
+    expect(screen.queryByText('Começaram os pontos de bônus')).toBeNull()
   })
 })
 
