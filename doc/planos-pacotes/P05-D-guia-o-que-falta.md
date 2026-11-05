@@ -728,6 +728,16 @@ O que a implementação fez diferente deste plano, e por quê. Nenhum desvio mud
 19. **A cadeia de âncoras relativas** (seção → layout → corpo → grupo, `GroupsLayout`) continua. Trocar por `measureLayout` no momento do salto mediria o destino de verdade e tiraria as três âncoras intermediárias, mas o `measureLayout` é assíncrono, precisa da ref do painel e não roda no Jest (o mock não chama o callback): os testes da navegação passariam a depender de mocks de medida. Fica para depois, se o roteiro mostrar um salto fora do lugar. Até lá, um conteúdo novo entre o corpo e o grupo, fora dessa cadeia, desloca o destino.
 20. **"Jest did not exit" no `pnpm test`:** os arquivos novos passam com `--detectOpenHandles` sem nenhum handle aberto, e o `jest` direto do frontend (com e sem `--coverage`) termina. O travamento aparece só pelo turbo (`turbo run test --filter=frontend`) e **vem de antes do pacote**: com o código do app e do E2E da base (`78de35c`) no mesmo worktree, os 1388 testes passam e o Jest também não termina. Não é do P05-D.
 
+**Depois do roteiro manual do web (a branch recebeu a onda em `3599998`, merge `0c1b570`):**
+
+21. **A3: a faixa errava a seção depois de abrir ou fechar o "Em jogo"** (a 390, com os Atributos no topo, ela mostrava os Talentos, e daria para escolher a prioridade do grupo errado). O código da faixa é da onda 3, mas o "ir ao grupo" usa as mesmas posições. A causa é que, no react-native-web, o `onLayout` só dispara quando o tamanho da vista muda: o painel e as seções desciam sem avisar. A correção:
+    - no web, o `onContentSizeChange` da rolagem chama o `remeasure` do store das sub-abas;
+    - o painel, o "Em jogo", as seções e as âncoras leem a posição de novo (`offsetTop`, relativo à vista-mãe, que no RN-web tem `position: relative`, como o `onLayout`);
+    - no app, nada muda, porque o `onLayout` já avisa quando a posição muda.
+
+    O Jest não reproduz o RN-web, porque o `onLayout` é disparado à mão. O teste do store prova a troca de seção com a remedida. O passo "A3 a 390" do `layout.spec.ts` abre e fecha o "Em jogo" e confere a faixa nos Atributos e nas Habilidades; ele é rodado na integração.
+22. **A1: o narrador em Leitura via e acionava "Usar pontos de bônus agora".** A mudança era só local, mas contrariava o R-18e. A troca manual da fase agora só aparece na Criação (`mode === 'create'`), e em Leitura a fase fica só como texto.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
