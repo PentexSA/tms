@@ -126,7 +126,7 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
     /\b15 de 16\b/
   )
   // O "fora do clã" fica para o narrador, fora do "O que falta"
-  await expect(page.getByTestId('creation-advice')).toContainText(
+  await expect(page.getByTestId('creation-notices')).toContainText(
     'Disciplinas: 1 fora do clã.'
   )
 })

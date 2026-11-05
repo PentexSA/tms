@@ -500,7 +500,7 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
       clan
         .getAllByRole('button', { name: /, do clã$/ })
         .map(b => b.props.accessibilityLabel)
-    ).toEqual(['Rapidez, do clã', 'Potência, do clã', 'Presença, do clã'])
+    ).toEqual(['Potência, do clã', 'Presença, do clã', 'Rapidez, do clã'])
     expect(
       within(screen.getByTestId('add-block-others')).getAllByRole('button')
     ).toHaveLength(14)
@@ -510,8 +510,8 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
     const line = screen.getByTestId('identity-disciplines-i1')
     expect(line).toHaveTextContent('fora do clã: confirme com o narrador')
     // O "O que falta" ganha o aviso, sem virar problema
-    tab('Orçamento')
-    expect(screen.getByTestId('creation-advice')).toHaveTextContent(
+    tab('Pontos')
+    expect(screen.getByTestId('creation-notices')).toHaveTextContent(
       /Disciplinas: 1 fora do clã\./
     )
     expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
@@ -557,8 +557,8 @@ describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
     expect(screen.getByTestId('identity-gifts-i1')).toHaveTextContent(
       /fora da Raça, do Augúrio e da Tribo: confirme com o narrador/
     )
-    tab('Orçamento')
-    const advice = screen.getByTestId('creation-advice')
+    tab('Pontos')
+    const advice = screen.getByTestId('creation-notices')
     expect(advice).toHaveTextContent(/Dons: 1 com Posto acima de 1\./)
     expect(screen.getByTestId('creation-problems')).not.toHaveTextContent(
       /Posto/
@@ -579,8 +579,8 @@ describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
     expect(screen.getByTestId('identity-gifts-g1')).not.toHaveTextContent(
       /confirme/
     )
-    tab('Orçamento')
-    expect(screen.queryByTestId('creation-advice')).toBeNull()
+    tab('Pontos')
+    expect(screen.queryByTestId('creation-notices')).toBeNull()
   })
 })
 
