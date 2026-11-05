@@ -626,9 +626,30 @@ O "Jest did not exit" não vem dos testes novos. Com `--detectOpenHandles`, eles
 | ui | 226 |
 | frontend | 1577, com `--forceExit` |
 
+**Correções do `/code-review` (high) sobre o merge, o commit 7 e o commit de versão.** Os commits ficam depois do commit de versão, sem reescrever o histórico:
+
+| Item | Commit | O que mudou |
+|---|---|---|
+| 8 | `9f247b5` | O `helpMap` (core e `validate.mjs`), depois do erro de tamanho, confere só os primeiros `max` nomes, contra um `Set` |
+| 1, 5, 6, 7 | `a176955` | **6:** o `fieldHelp` e o `nameHelp` vão para um módulo puro, `evolve/help.ts`, e o `Suggestions` usa o `fold` de `evolve/text`. **1:** a frase da `ItemSheet` vem do nome do rascunho, comparado sem acento nem caixa, e o aspecto (sem `name`) não quebra. **5:** os chips continuam quebrando linha, e só a sugestão com frase leva o "?" junto do chip (teste com 1 em 30). **7:** o `GroupTitle` aceita a âncora (`AnchorHeader`) e é o único título com "?". Os quatro itens ficam num commit só porque o módulo novo do 6 é usado pelo 1 e pelo 5 |
+| 3, 4 | `e3a1583` | **3:** `publishProductTemplates(db)` em `packages/db/src/templates.ts`, usado pela `0023`. A `0020` já foi aplicada e fica com o próprio laço, igual: o código de uma migration aplicada não muda. **4:** o teste da `0023` deriva as versões dos arquivos. A "anterior" é a minor de antes, com o **conteúdo de hoje**: o teste prova que as versões convivem no banco, não o conteúdo da `main`, e assim não guarda uma cópia dos JSON antigos como fixture |
+| 2 | `e3a1583`, em parte | Um teste da API prova que cada arquivo que as migrations gravam passa no `schemaIssues`, no `validateTemplate`, no `publicationIssues` e no `compileTemplate`. **A validação dentro da migration não entrou:** o `@tms/db` não depende do `@tms/sheet-core` nem do Ajv, e incluí-los muda o `package.json` e o lockfile, o que o brief da onda proíbe sem aprovação. Fica para decisão: (a) o `@tms/db` passa a depender do core e do Ajv, e a `0023` valida antes de gravar; (b) a validação fica no CI, como hoje. A regra não foi duplicada |
+
+**Verificação depois das correções:** `npx pnpm build`, typecheck, lint e `build.mjs` (6 templates) passaram.
+
+| Pacote | Testes |
+|---|---|
+| core | 1118 |
+| db | 39 |
+| config | 38 |
+| api | 1924 (65 pulados) |
+| ui | 226 |
+| frontend | 1582, com `--forceExit` |
+
 **Para a integração:**
 
 - ~~o merge da onda, o commit 7 e o commit de versão~~: feitos (acima);
+- a decisão do item 2 da segunda revisão (validar dentro da migration, com a dependência nova no `@tms/db`);
 - o E2E inteiro (com o `help.spec.ts`);
 - o roteiro manual da §11;
 - o `/code-review` e o `/security-review`.
