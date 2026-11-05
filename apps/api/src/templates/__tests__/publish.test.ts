@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type DB, migrations } from '@tms/db'
+import { type DB, migrations, PRODUCT_TEMPLATES } from '@tms/db'
 import { createPGliteTestDb } from '@tms/db/testing'
 import { compileTemplate } from '@tms/sheet-core'
 import type { Kysely } from 'kysely'
@@ -535,6 +535,23 @@ describe('os templates do produto (plano-v1, Etapa 7; plano-v2, Etapa 6)', () =>
       readFileSync(join(DESIGN, 'templates/exemplos/personagens.json'), 'utf8')
     ) as { characters: { system: string }[] }
   ).characters
+
+  // O que as migrations dos templates do produto (0020, 0023) gravam passa
+  // pelas mesmas camadas do publishTemplate. A migration não as roda: o
+  // @tms/db não depende do core nem do Ajv (onda-4.md, revisão do P10-D)
+  it.each([...PRODUCT_TEMPLATES] as string[])(
+    '%s: o arquivo que a migration grava passa no schema, no contrato e na publicação',
+    async (system: string) => {
+      const { publicationIssues, validateTemplate, PALETTE } = await import(
+        '@tms/sheet-core'
+      )
+      const t = template(system)
+      expect(schemaIssues(t)).toEqual([])
+      expect(validateTemplate(t, PALETTE)).toEqual([])
+      expect(publicationIssues(t)).toEqual([])
+      expect(() => compileTemplate(t)).not.toThrow()
+    }
+  )
 
   it('a lista é Vampiro, Mago e Lobisomem, e cada arquivo existe', () => {
     expect([...PUBLISHED_SYSTEMS]).toEqual(['vtm-v20', 'mta-m20', 'wta-w20'])

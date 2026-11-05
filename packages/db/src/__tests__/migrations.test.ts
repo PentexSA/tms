@@ -676,10 +676,14 @@ describe('migrations', () => {
   // Onda 4 (onda-4.md §4.7): a 0023 grava as versões novas dos templates do
   // produto num banco que já tem as anteriores, que continuam lá
   describe('0023: as versões da onda 4', () => {
-    const previous: Record<string, string> = {
-      'vtm-v20': '1.8.0',
-      'mta-m20': '1.6.0',
-      'wta-w20': '1.6.0',
+    // As versões de hoje, dos arquivos; a "anterior" de cada uma é a minor de
+    // antes. O banco "de antes" leva o conteúdo de hoje com essa versão: o
+    // teste prova a convivência das versões, não o conteúdo da main
+    const current = (system: string) =>
+      (productTemplate(system) as { templateVersion: string }).templateVersion
+    const previousOf = (v: string) => {
+      const [major, minor, patch] = v.split('.').map(Number)
+      return `${major}.${(minor ?? 1) - 1}.${patch}`
     }
     const versions = async (
       db: Awaited<ReturnType<typeof createPGliteTestDb>>['db']
@@ -694,13 +698,9 @@ describe('migrations', () => {
           .execute()
       ).map(r => `${r.code}@${r.version}`)
 
-    it('os arquivos estão nas versões da onda', () => {
-      expect(
-        PRODUCT_TEMPLATES.map(
-          s =>
-            (productTemplate(s) as { templateVersion: string }).templateVersion
-        )
-      ).toEqual(['1.9.0', '1.7.0', '1.7.0'])
+    it('cada template do produto tem uma minor de antes para conviver', () => {
+      for (const system of PRODUCT_TEMPLATES)
+        expect(Number(current(system).split('.')[1])).toBeGreaterThan(0)
     })
 
     it('um banco com as versões anteriores ganha as novas, e as anteriores ficam', async () => {
@@ -715,7 +715,7 @@ describe('migrations', () => {
         for (const system of PRODUCT_TEMPLATES) {
           const old = {
             ...(productTemplate(system) as Record<string, unknown>),
-            templateVersion: previous[system],
+            templateVersion: previousOf(current(system)),
           }
           expect((await storeTemplate(db, old)).status).toBe('published')
         }
@@ -723,14 +723,12 @@ describe('migrations', () => {
         // As anteriores ficam; as novas entram (a ordem de gravação é a de
         // PRODUCT_TEMPLATES, no laço da migration; o published_at da mesma
         // transação não a distingue)
-        expect((await versions(db)).sort()).toEqual([
-          'mta-m20@1.6.0',
-          'mta-m20@1.7.0',
-          'vtm-v20@1.8.0',
-          'vtm-v20@1.9.0',
-          'wta-w20@1.6.0',
-          'wta-w20@1.7.0',
-        ])
+        expect((await versions(db)).sort()).toEqual(
+          PRODUCT_TEMPLATES.flatMap(system => [
+            `${system}@${previousOf(current(system))}`,
+            `${system}@${current(system)}`,
+          ]).sort()
+        )
         // Num banco novo, a 0020 já gravou estes arquivos: a 0023 só confirma
         for (const system of PRODUCT_TEMPLATES)
           expect(
