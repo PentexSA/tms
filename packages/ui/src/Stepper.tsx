@@ -52,12 +52,15 @@ export interface StepperProps {
  * tocável**: o toque chega a quem decide (a conta exata e o servidor), que
  * explica o motivo; a previsão pode errar para o lado bloqueado. Segurar não
  * repete. `hint`: o motivo ou o custo ("+1 = 2 bônus"); no app, a dica do
- * controle ajustável; no web, o "+" aponta `hintID` com `aria-describedby`.
+ * controle ajustável; no web, o botão aponta `hintID` com `aria-describedby`.
+ * `stop`: até onde segurar repete nesse sentido (o "−" acima do valor
+ * inicial para nele, e o único valor gravado ao soltar é um que entra).
  */
 export interface StepperAdvice {
   readonly blocked?: boolean
   readonly hint?: string | null
   readonly hintID?: string | null
+  readonly stop?: number
 }
 
 /** O nome de antes do `decrease` (P05-C); o mesmo tipo, para não quebrar. */
@@ -151,13 +154,20 @@ export function Stepper({
     clearInterval(hold.current.repeat)
     hold.current.repeat = undefined
   }
+  // Segurar para no `stop` da previsão daquele lado, sem voltar se já
+  // passou dele
+  const holdStep = (delta: number) => {
+    const next = clamp(shown.current + delta)
+    const limit = (delta < 0 ? decrease : increase)?.stop
+    if (limit === undefined) return next
+    return delta < 0
+      ? Math.max(next, Math.min(limit, shown.current))
+      : Math.min(next, Math.max(limit, shown.current))
+  }
   const longPress = (delta: number) => {
     hold.current.repeating = true
-    show(clamp(shown.current + delta))
-    hold.current.repeat = setInterval(
-      () => show(clamp(shown.current + delta)),
-      REPEAT_MS
-    )
+    show(holdStep(delta))
+    hold.current.repeat = setInterval(() => show(holdStep(delta)), REPEAT_MS)
   }
   const pressOut = () => {
     if (!hold.current.repeating) return
