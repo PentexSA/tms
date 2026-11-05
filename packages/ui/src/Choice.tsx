@@ -1,5 +1,11 @@
-import { useId } from 'react'
-import { Platform, StyleSheet, View } from 'react-native'
+import { type ReactNode, useId, useState } from 'react'
+import {
+  type LayoutChangeEvent,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native'
+import { HelpButton, HelpText, useHelp } from './HelpButton'
 import { Pressable } from './Pressable'
 import { useRovingFocus } from './roving'
 import { Text } from './Text'
@@ -12,6 +18,8 @@ export interface ChoiceOption {
   readonly meta?: string
   // Nome acessível por extenso, quando o meta usa abreviações ("For 7").
   readonly spoken?: string
+  /** Frase curta de ajuda da opção: um "?" ao lado do rádio (R-19). */
+  readonly help?: string
 }
 
 export interface ChoiceProps {
@@ -29,10 +37,14 @@ export interface ChoiceProps {
   readonly showLabel?: boolean
   /** Todas as opções sem toque (por exemplo, com um pedido em andamento). */
   readonly disabled?: boolean
+  /** Frase de ajuda do grupo: um "?" na linha do título (R-19). */
+  readonly help?: string
 }
 
 // A partir daqui a lista vira grade, para não rolar uma coluna longa
 const GRID_FROM = 8
+// Com "?" nas opções, a grade só cabe com células de 240 (o "?" ocupa 44/48)
+const GRID_WITH_HELP_MIN = 480
 
 /**
  * Escolha única: radiogroup com um radio marcado (Clã, Natureza...).
@@ -55,10 +67,19 @@ export function Choice({
   columns = options.length >= GRID_FROM ? 2 : 1,
   showLabel = true,
   disabled = false,
+  help,
 }: ChoiceProps) {
   const { colors } = useTheme()
   const titleId = `${useId()}-choice-label`
-  const grid = columns === 2
+  const withHelp = options.some(o => o.help)
+  // Com "?" nas opções, a grade de 2 colunas só a partir de 480 de largura
+  // medida (onLayout); abaixo, 1 coluna. Sem frase, a grade de hoje.
+  const [width, setWidth] = useState(0)
+  const grid = columns === 2 && (!withHelp || width >= GRID_WITH_HELP_MIN)
+  const onLayout = withHelp
+    ? (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)
+    : undefined
+  const groupHelp = useHelp()
   const os = Platform.OS
   const roving = useRovingFocus({
     count: options.length,
@@ -71,11 +92,12 @@ export function Choice({
       accessibilityRole="radiogroup"
       accessibilityLabel={label}
       {...(showLabel && os === 'web' ? { 'aria-labelledby': titleId } : {})}
+      onLayout={onLayout}
       style={[styles.group, grid && styles.grid]}
     >
       {options.map((o, i) => {
         const checked = o.id === value
-        return (
+        const radio = (
           <Pressable
             key={o.id}
             {...roving(i)}
@@ -86,7 +108,7 @@ export function Choice({
             aria-checked={checked}
             disabled={disabled}
             onPress={() => onChange(o.id)}
-            style={[styles.row, grid && styles.cell]}
+            style={[styles.row, o.help ? styles.fill : grid && styles.cell]}
           >
             <View
               style={[
@@ -110,20 +132,80 @@ export function Choice({
             </View>
           </Pressable>
         )
+        if (!o.help) return radio
+        return (
+          <OptionWithHelp
+            key={o.id}
+            subject={o.label}
+            text={o.help}
+            style={grid ? styles.cell : undefined}
+          >
+            {radio}
+          </OptionWithHelp>
+        )
       })}
     </View>
   )
   if (!showLabel) return group
+  const title = (
+    <Text
+      variant="fieldLabel"
+      nativeID={titleId}
+      {...(os === 'android' ? { 'aria-hidden': true } : {})}
+      style={help ? styles.titleText : undefined}
+    >
+      {label}
+    </Text>
+  )
   return (
     <View style={styles.root}>
-      <Text
-        variant="fieldLabel"
-        nativeID={titleId}
-        {...(os === 'android' ? { 'aria-hidden': true } : {})}
-      >
-        {label}
-      </Text>
+      {help ? (
+        <View style={styles.titleRow}>
+          {title}
+          <HelpButton
+            subject={label}
+            expanded={groupHelp.expanded}
+            onToggle={groupHelp.toggle}
+            controls={groupHelp.textId}
+          />
+        </View>
+      ) : (
+        title
+      )}
+      {help && groupHelp.expanded ? (
+        <HelpText id={groupHelp.textId} text={help} />
+      ) : null}
       {group}
+    </View>
+  )
+}
+
+// A opção com frase: [rádio (flex 1)][?] e, abaixo, a frase. O "?" é irmão
+// do rádio, nunca filho: o nome do rádio não muda.
+function OptionWithHelp({
+  subject,
+  text,
+  style,
+  children,
+}: {
+  readonly subject: string
+  readonly text: string
+  readonly style?: object
+  readonly children: ReactNode
+}) {
+  const { expanded, toggle, textId } = useHelp()
+  return (
+    <View style={[styles.option, style]}>
+      <View style={styles.optionRow}>
+        {children}
+        <HelpButton
+          subject={subject}
+          expanded={expanded}
+          onToggle={toggle}
+          controls={textId}
+        />
+      </View>
+      {expanded ? <HelpText id={textId} text={text} /> : null}
     </View>
   )
 }
@@ -150,4 +232,17 @@ const styles = StyleSheet.create({
   },
   dot: { width: 12, height: 12, borderRadius: tokens.radius.pill },
   text: { flex: 1 },
+  fill: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[1],
+  },
+  titleText: { flexShrink: 1 },
+  option: { gap: tokens.space[1] },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[1],
+  },
 })
