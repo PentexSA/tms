@@ -748,6 +748,12 @@ A integração entrou em commits próprios, depois do merge:
   - **API:** o teste do commit 1 (o Posto 2 entra) roda com o template novo.
 - **O E2E não ganhou passo.** Nenhum spec tem um Dom com Posto, e estender o `journey-werewolf` mudaria o lote que ele confere depois.
 
+**T-24d do roteiro Android: o aviso também na folha do Dom.** A folha do item (`ItemSheet`) não mostrava o aviso do Posto acima de 1. Agora mostra, depois do merge da ponta `1458f76`:
+
+- **De onde vem:** o `draftAdviceLines`, com a mesma frase da linha (`aboveText`). Ele lê o Posto do rascunho da folha, então subir para 2 já avisa antes do "Aplicar". O "fora" vem do aviso da ficha (`useIdentityAdvice`), no caminho do item.
+- **Quando aparece:** só com a ficha em criação, e nada bloqueia.
+- **Teste:** o Jest sobe o Posto na folha e vê o aviso; ao voltar para 1, o aviso some.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)

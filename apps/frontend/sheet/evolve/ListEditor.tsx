@@ -43,6 +43,7 @@ import { withCatalogDefaults, withItemDefaults } from './listItem'
 import {
   badgeText,
   chooseText,
+  draftAdviceLines,
   type IdentityAdvice,
   itemAdviceLines,
   itemLabels,
@@ -247,6 +248,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
           key={current.id}
           list={list}
           item={current}
+          identity={identity}
           onClose={() => setEditing(null)}
           onSave={next => {
             const refused = write(items.map(i => (i.id === next.id ? next : i)))
@@ -721,18 +723,22 @@ function MetaStepper({
 function ItemSheet({
   list,
   item,
+  identity,
   onClose,
   onSave,
   onRemove,
 }: {
   readonly list: ResolvedList
   readonly item: ListItem
+  // O aviso da identidade e do limite (T-24d), o mesmo da linha
+  readonly identity: IdentityAdvice
   readonly onClose: () => void
   readonly onSave: (item: ListItem) => void
   readonly onRemove: () => void
 }) {
   const def = list.field.def
   const schema = def.item
+  const { model } = useSheet()
   // Item antigo sem meta: começa do que a folha mostra, e "Aplicar" o grava
   const [draft, setDraft] = useState<ListItem>(() =>
     withItemDefaults(def, item)
@@ -753,6 +759,8 @@ function ItemSheet({
     setDraft(d => ({ ...d, ...p }))
   }
   const refusal = notice.text
+  // Pelo rascunho da folha: o Posto 2 avisa antes do "Aplicar" (T-24d)
+  const advice = draftAdviceLines(model, list.id, draft, identity)
   const footer = confirming ? (
     <>
       <Button
@@ -862,6 +870,15 @@ function ItemSheet({
                 onChangeText={notes => patch({ notes })}
                 maxLength={NOTES_MAX}
               />
+            ) : null}
+            {advice.length ? (
+              <View testID={`item-advice-${list.id}`}>
+                {advice.map(line => (
+                  <Text key={line} variant="caption" color="inkMuted">
+                    {line}
+                  </Text>
+                ))}
+              </View>
             ) : null}
             {refusal}
           </>

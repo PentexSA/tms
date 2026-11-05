@@ -620,6 +620,30 @@ describe('T-24: Dons do catálogo, o Posto e o aviso acima do Posto 1', () => {
     )
   })
 
+  it('T-24d: o "+" do Posto na folha do Dom já avisa; de volta ao 1, some', async () => {
+    await open(
+      { gifts: [{ id: 'g1', name: 'Faro do Asfalto', meta: { rank: 1 } }] },
+      { system: 'wta-w20' }
+    )
+    fireEvent.press(screen.getByRole('button', { name: /^Faro do Asfalto/ }))
+    const sheet = within(screen.getByTestId('item-sheet-gifts'))
+    const rank = () =>
+      screen.getByRole('adjustable', { name: 'Faro do Asfalto, Posto' })
+    expect(sheet.queryByTestId('item-advice-gifts')).toBeNull()
+    fireEvent(rank(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    })
+    expect(sheet.getByTestId('item-advice-gifts')).toHaveTextContent(
+      'Posto 2: na criação, vai até 1. Confirme com o narrador.'
+    )
+    // Nada bloqueia: o "Aplicar" continua disponível
+    expect(sheet.getByRole('button', { name: 'Aplicar' })).toBeEnabled()
+    fireEvent(rank(), 'accessibilityAction', {
+      nativeEvent: { actionName: 'decrement' },
+    })
+    expect(sheet.queryByTestId('item-advice-gifts')).toBeNull()
+  })
+
   it('o Dom recomendado de Posto 1 não avisa', async () => {
     await open(
       {
