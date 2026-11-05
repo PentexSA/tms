@@ -710,6 +710,19 @@ Implementação em 04/11/2026, na `pacote/p07-d-vantagens-regras`, em paralelo c
 
 **Testes:** ver a seção 4.1. Os do servidor (commit 1) passam antes e depois, e rodam com os templates do repositório, já com o `recommend`. O E2E e o roteiro manual (seção 11) ficam para a integração.
 
+**`/code-review` (high), corrigido em três commits `fix`** (`faea82c` no core, `bcf4d58` e `28a9d4b` no app), com teste de regressão em cada achado. O servidor não muda.
+
+1. **A identidade vinha da prop `sheet` do campo.** O `FieldSlot` reaproveita a entrada de um campo que não mudou. Trocar o Clã ou a Tradição deixava velhos o selo, os blocos, o "fora", a ordem da Esfera e o "Usar o resumo de <Clã>". Agora o `useIdentityAdvice(field)` e o `useTextDefault(field)` leem a ficha mostrada do store.
+2. **Várias fontes, uma sem escolha.** Os Dons saíam "fora". Agora nada fica "fora" enquanto alguma fonte está sem escolha, e a folha diz qual falta ("Escolha Augúrio ou Tribo na identidade…").
+3. **O nome do item é comparado com `foldName`** (core), como a busca da folha.
+4. **Duas regras `item-meta-max` na mesma lista.** O aviso leva `rule`, o índice da regra, e a chave e o texto usam esse índice.
+5. **`useCreationAdvice(enabled)`:** não calcula fora da criação e guarda as frases.
+6. **O `creationAdvice` era refeito em cada linha.** Agora é uma vez por ficha resolvida (`adviceOf`, um `WeakMap`), compartilhado pelas linhas e pela aba.
+7. **A prévia com o meta no `catalogDefaults`.** Ela dizia "começa em <mínimo>"; agora diz "o de cada opção".
+8. **A Qualidade sem Custo.** A frase conta os itens e separa "sem Custo" de "com Custo inválido" (o Custo 0). Sem a ficha, diz "sem Custo válido".
+9. **`recommendedBySource` no core**, usado pelo `recommendedFor` e pelos blocos da folha.
+10. **O `schema` do `ItemEditorRow` é prop obrigatória.** O guard morto saiu.
+
 ---
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
