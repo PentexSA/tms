@@ -196,6 +196,42 @@ test('T-27 e T-59 a 390: "Em jogo" recolhido; abas e sub-abas fixas na Criação
   }
 })
 
+// A3 (roteiro web da onda 4): no web, o onLayout não avisa quando o painel
+// só desce. Abrir ou fechar o "Em jogo" sem recarregar deixava a faixa com
+// as sub-abas e a prioridade de outra seção
+test('A3 a 390: abrir e fechar o "Em jogo" mantém a faixa na seção do topo', async ({
+  browser,
+}) => {
+  const desk = await browser.newContext({ viewport: DESKTOP })
+  const phone = await browser.newContext({ viewport: PHONE })
+  try {
+    const { character } = await table(desk, phone, 'faixa_a3')
+    const page = await phone.newPage()
+    await page.goto(`/characters/${character.id}?mode=create`)
+    const playToggle = page.getByRole('button', { name: 'Em jogo' })
+    for (const expanded of ['true', 'false', 'true']) {
+      await playToggle.click()
+      await expect(playToggle).toHaveAttribute('aria-expanded', expanded)
+      // Os Atributos no topo, logo abaixo da faixa
+      await scrollToSection(page, 'attributes')
+      await expect(
+        page.getByRole('tablist', { name: 'Grupos de Atributos' })
+      ).toBeVisible()
+      await expect(
+        page.getByRole('tablist', { name: 'Grupos de Habilidades' })
+      ).toHaveCount(0)
+      // E as Habilidades, quando são elas no topo
+      await scrollToSection(page, 'abilities')
+      await expect(
+        page.getByRole('tablist', { name: 'Grupos de Habilidades' })
+      ).toBeVisible()
+    }
+  } finally {
+    await desk.close()
+    await phone.close()
+  }
+})
+
 test('T-26: Enter no e-mail do login leva à senha', async ({ page }) => {
   await page.goto('/login')
   await page.getByTestId('login-email').fill('ninguem@example.test')

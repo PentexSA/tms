@@ -208,6 +208,7 @@ export function CreationPanel() {
     <View
       style={styles.panel}
       testID="creation-panel"
+      ref={panel.layoutRef as never}
       onLayout={panel.onLayout}
     >
       {freebies ? <PhaseBlock /> : null}
@@ -274,9 +275,12 @@ function GuideList({
   readonly testID: string
 }) {
   const goTo = useGuideNav()
-  const { onLayout, target } = useAnchor(anchor, { parent: 'creation-panel' })
+  const { onLayout, layoutRef, target } = useAnchor(anchor, {
+    parent: 'creation-panel',
+  })
   return (
     <View
+      ref={layoutRef as never}
       style={styles.block}
       accessibilityLabel={label}
       testID={testID}
@@ -353,15 +357,17 @@ function Ledger() {
   const check = useSheetSelector(s => s.check)
   const ledger = freebieLedger(model, check)
   // Sem extrato, sem âncora: o id nulo tira a posição velha do mapa
-  const { onLayout, target } = useAnchor(ledger ? 'creation-ledger' : null, {
-    parent: 'creation-panel',
-  })
+  const { onLayout, layoutRef, target } = useAnchor(
+    ledger ? 'creation-ledger' : null,
+    { parent: 'creation-panel' }
+  )
   if (!ledger) return null
   return (
     <View
       style={styles.block}
       accessibilityLabel="Onde foram os bônus"
       testID="creation-ledger"
+      ref={layoutRef as never}
       onLayout={onLayout}
     >
       <AnchorHeader title="Onde foram os bônus" level="group" target={target} />

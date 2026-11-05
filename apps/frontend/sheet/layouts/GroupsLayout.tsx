@@ -99,7 +99,11 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
   })
 
   return (
-    <View testID={`groups-${section.id}`} onLayout={layoutAnchor.onLayout}>
+    <View
+      ref={layoutAnchor.layoutRef as never}
+      testID={`groups-${section.id}`}
+      onLayout={layoutAnchor.onLayout}
+    >
       {tabs.bar}
       {showFilter || section.def.searchable ? (
         <FilterBar
@@ -131,6 +135,7 @@ export function GroupsLayout({ section, titled: sectionTitled }: LayoutProps) {
         style={columns ? styles.columns : undefined}
         testID={`groups-${section.id}-body`}
         onLayout={bodyAnchor.onLayout}
+        ref={bodyAnchor.layoutRef as never}
       >
         {tabs.groups.map(g => {
           const ids = g.fieldIds.filter(id => shown.has(id))
@@ -240,12 +245,12 @@ function GroupBlock({
   readonly right: ReactNode
   readonly children: ReactNode
 }) {
-  const { onLayout, target } = useAnchor(anchor?.id ?? null, {
+  const { onLayout, layoutRef, target } = useAnchor(anchor?.id ?? null, {
     parent: anchor?.parent,
   })
   return (
     <HeadedList.Provider value={headed}>
-      <View style={style} onLayout={onLayout}>
+      <View ref={layoutRef as never} style={style} onLayout={onLayout}>
         {title ? (
           <View style={styles.title}>
             <GroupTitle
