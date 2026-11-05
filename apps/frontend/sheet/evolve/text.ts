@@ -48,11 +48,14 @@ const MASCULINE_A = new Set([
   'tema',
 ])
 
-// Terminações de substantivos femininos em português, já sem acento
-// ("-ção" → "cao"): Qualidade, Consequência (pelo "a"), Cicatriz, Imagem,
-// Espécie, Análise. Os masculinos que fogem da regra ficam na lista abaixo.
-const FEMININE_ENDINGS = ['ade', 'cao', 'sao', 'gem', 'ie', 'ise', 'triz']
-const MASCULINE_OTHER = new Set(['coracao', 'personagem'])
+// Terminações de substantivos femininos em português, já sem acento:
+// Qualidade, Cicatriz, Imagem, Espécie, Análise (Consequência vai pelo
+// "a"). O "-ção" e o "-são" são conferidos com o acento e a cedilha: sem
+// eles, "Cão", "Falcão" e "Botão" (masculinos em "-ão") cairiam na regra.
+const FEMININE_ENDINGS = ['ade', 'gem', 'ie', 'ise', 'triz']
+const FEMININE_EXACT = ['ção', 'são']
+// Os masculinos que fogem da regra, sem acento
+const MASCULINE_OTHER = new Set(['coracao', 'personagem', 'pisao', 'tesao'])
 
 /**
  * "Nenhuma Disciplina", "Nenhum Antecedente", "Nenhuma Qualidade", "Nenhum
@@ -63,10 +66,14 @@ const MASCULINE_OTHER = new Set(['coracao', 'personagem'])
  * dos templates de hoje (`pt-BR`).
  */
 export function noneOf(itemLabel: string): string {
-  const head = fold(itemLabel).split(/\s+/)[0] ?? ''
+  const raw =
+    itemLabel.normalize('NFC').toLowerCase().trim().split(/\s+/)[0] ?? ''
+  const head = fold(raw)
   const feminine = head.endsWith('a')
     ? !MASCULINE_A.has(head)
-    : FEMININE_ENDINGS.some(e => head.endsWith(e)) && !MASCULINE_OTHER.has(head)
+    : (FEMININE_ENDINGS.some(e => head.endsWith(e)) ||
+        FEMININE_EXACT.some(e => raw.endsWith(e))) &&
+      !MASCULINE_OTHER.has(head)
   return `${feminine ? 'Nenhuma' : 'Nenhum'} ${itemLabel}`
 }
 

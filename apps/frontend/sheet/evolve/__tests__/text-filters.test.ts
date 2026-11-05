@@ -68,6 +68,16 @@ describe('texto de apoio', () => {
     ['Coração', 'Nenhum Coração'],
     ['Personagem', 'Nenhum Personagem'],
     ['Aliado', 'Nenhum Aliado'],
+    // masculinos em "-ão" (achado 9 do /code-review): sem a cedilha ou o
+    // "s", não são "-ção" nem "-são"
+    ['Cão', 'Nenhum Cão'],
+    ['Falcão', 'Nenhum Falcão'],
+    ['Botão', 'Nenhum Botão'],
+    ['Pisão', 'Nenhum Pisão'],
+    ['Visão', 'Nenhuma Visão'],
+    ['Missão', 'Nenhuma Missão'],
+    ['Canção', 'Nenhuma Canção'],
+    ['Cão de guarda', 'Nenhum Cão de guarda'],
   ])('noneOf(%s)', (label, out) => {
     expect(noneOf(label)).toBe(out)
   })
