@@ -635,11 +635,12 @@ describe('barra de Criação em duas linhas (D-01)', () => {
       'Você conclui quando a conta fechar.'
     )
     const actions = screen.getByTestId('mode-bar-actions')
+    // O "Faltam" (P05-D) ocupa o lugar do "Concluir", antes do "Salvar"
     expect(
       within(actions)
         .getAllByRole('button')
         .map(b => b.props.testID)
-    ).toEqual(['mode-save'])
+    ).toEqual(['creation-guide-0', 'creation-guide-more', 'mode-save'])
     // A tela larga continua numa linha
     at(1280)
     expect(screen.queryByTestId('mode-bar-actions')).toBeNull()
@@ -672,6 +673,100 @@ describe('barra de Criação em duas linhas (D-01)', () => {
     expect(save).toHaveTextContent('Salvar')
     expect(save).not.toHaveTextContent('Salvar alterações')
     expect(save.props.accessibilityLabel).toBe('Salvar alterações')
+  })
+})
+
+// P05-D (D-05, R-18): o "Faltam: …" na barra, ao lado do "Salvar", com os
+// itens que levam ao grupo; com a conta fechada, ele sai e o "Concluir" entra
+describe('"Faltam" na barra (R-18)', () => {
+  const guide = () => within(screen.getByTestId('creation-guide'))
+  // Só faltam as Virtudes
+  const VIRTUES = {
+    ...ALMOST,
+    stamina: 3,
+    conscience: 1,
+    selfControl: 1,
+    courage: 1,
+  }
+
+  it('com a conta aberta: "Faltam:" e os itens como botões, antes do "Salvar"', async () => {
+    await open(PRIORITIES)
+    expect(guide().getByText('Faltam:')).toBeTruthy()
+    // A 390 (264 dp no slot): o primeiro item inteiro e o "e mais N"
+    expect(
+      screen.getByRole('button', {
+        name: 'Físicos 7: Físicos: faltam 7 pontos básicos.',
+      })
+    ).toHaveTextContent('Físicos 7')
+    expect(
+      screen.getByRole('button', {
+        name: 'e mais 8: ver tudo o que falta em Pontos',
+      })
+    ).toBeTruthy()
+    expect(screen.queryByTestId('creation-action')).toBeNull()
+  })
+
+  it('no começo, nem o primeiro cabe: um botão só, que leva à aba', async () => {
+    await open()
+    expect(guide().queryByText('Faltam:')).toBeNull()
+    expect(guide().getByRole('button')).toHaveTextContent('Faltam 5 itens')
+    fireEvent.press(guide().getByRole('button'))
+    expect(screen.getByRole('tab', { name: 'Orçamento' })).toBeSelected()
+    expect(screen.getByTestId('creation-problems')).toBeTruthy()
+  })
+
+  it('tocar "Virtudes 7" leva à aba Vantagens e rola até a seção', async () => {
+    await open(PRIORITIES, VIRTUES)
+    expect(guide().getByText('Falta:')).toBeTruthy()
+    const scrollView = screen.UNSAFE_getAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollTo = jest.spyOn(scrollView, 'scrollTo')
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    fireEvent.press(
+      screen.getByRole('button', {
+        name: 'Virtudes 7: Virtudes: faltam 7 pontos básicos.',
+      })
+    )
+    expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeSelected()
+    // A seção nova é medida depois da troca de aba: o pedido espera por ela
+    layout('section-advantages', 300)
+    await waitFor(() =>
+      expect(scrollTo).toHaveBeenCalledWith({
+        y: 600 + 300 - 120,
+        animated: true,
+      })
+    )
+  })
+
+  it('fechar a conta tira o "Faltam" e mostra o "Concluir"', async () => {
+    await open(PRIORITIES, ALMOST)
+    expect(screen.getByTestId('creation-guide')).toBeTruthy()
+    step('Vigor')
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
+    expect(screen.getByTestId('creation-action')).toHaveTextContent(
+      'Concluir criação'
+    )
+  })
+
+  it('na criação livre (Editar), nada de "Faltam"', async () => {
+    const free = character(PRIORITIES) as {
+      data: Record<string, unknown> & { creation: Record<string, unknown> }
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...free.data, creation: { ...free.data.creation, mode: 'free' } })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    await screen.findByTestId('creation-ready')
+    expect(screen.queryByTestId('creation-guide')).toBeNull()
   })
 })
 
