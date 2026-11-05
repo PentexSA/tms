@@ -1,4 +1,8 @@
-import { createGroupTabsStore, SCROLL_ROOT } from '../groupTabsState'
+import {
+  createGroupTabsStore,
+  JUMP_TTL_MS,
+  SCROLL_ROOT,
+} from '../groupTabsState'
 
 // P05-D (R-18): as âncoras do "ir ao grupo". O pedido de ir a uma seção que
 // ainda não foi medida (a aba acabou de trocar) espera o próximo `anchorAt`
@@ -79,5 +83,38 @@ describe('jumpTo', () => {
     store.jumpTo(['attributes'])
     await frame()
     expect(jumps.map(j => j.y)).toEqual([0])
+  })
+
+  // /code-review 2: o pedido não fica pendente para sempre
+  it('o pedido expira, e a troca de aba à mão o esquece', async () => {
+    const { store, jumps } = setup()
+    const now = jest.spyOn(Date, 'now')
+    now.mockReturnValue(10_000)
+    store.jumpTo(['virtues'])
+    now.mockReturnValue(10_000 + JUMP_TTL_MS + 1)
+    store.anchorAt('virtues', 10)
+    await frame()
+    expect(jumps).toEqual([])
+    now.mockRestore()
+    store.jumpTo(['rites'])
+    store.cancelJump()
+    store.anchorAt('rites', 10)
+    await frame()
+    expect(jumps).toEqual([])
+  })
+
+  // /code-review 4: a faixa cresce com as sub-abas da seção de destino
+  it('a faixa que cresce depois do salto corrige o destino, sem mover o foco', async () => {
+    const { store, jumps } = setup()
+    const focus = jest.fn()
+    store.anchorAt('abilities', 900, focus)
+    store.jumpTo(['abilities'])
+    await frame()
+    expect(jumps).toEqual([{ y: 1380, focus }])
+    store.navHeight(170)
+    expect(jumps.slice(1)).toEqual([{ y: 1330, focus: null }])
+    // A mesma altura não rola de novo
+    store.navHeight(170)
+    expect(jumps).toHaveLength(2)
   })
 })

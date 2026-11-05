@@ -62,6 +62,8 @@ export interface GroupTabsStore {
   ) => void
   /** A âncora saiu da tela (a seção desmontou). */
   readonly dropAnchor: (id: string) => void
+  /** Esquece o pedido pendente (a pessoa trocou de aba à mão). */
+  readonly cancelJump: () => void
   /**
    * Ir à primeira âncora conhecida da lista (a do grupo, depois a da seção).
    * Se nenhuma foi medida ainda (a aba acabou de trocar), o pedido espera o
@@ -85,6 +87,15 @@ interface AnchorNode {
 
 // Um quadro depois da primeira âncora medida: as âncoras irmãs (o grupo
 // dentro da seção) chegam no mesmo layout
+// O pedido que não se resolve logo (a âncora não montou) expira: uma âncora
+// que monta muito depois, sem ação da pessoa, não rola a ficha nem move o
+// foco. A medida da aba nova chega em poucos quadros
+export const JUMP_TTL_MS = 1500
+// Depois do salto, a faixa fixa pode crescer (as sub-abas da seção nova):
+// o destino é corrigido com a altura nova, sem mover o foco de novo
+const SETTLE_MS = 1000
+const SETTLE_FIXES = 2
+
 const nextFrame = (run: () => void) =>
   typeof requestAnimationFrame === 'function'
     ? requestAnimationFrame(() => run())
@@ -135,7 +146,15 @@ export function createGroupTabsStore(): GroupTabsStore {
     (y: number, focus: (() => void) | null) => void
   >()
   let pending: readonly string[] | null = null
+  let requestedAt = 0
   let scheduled = false
+  // O último salto, para corrigir quando a faixa muda de altura logo depois
+  let landed: {
+    readonly id: string
+    readonly at: number
+    y: number
+    fixes: number
+  } | null = null
   // O `y` da âncora: relativo ao painel (`panel`) ou à rolagem (`scroll`)
   const place = (
     id: string,
@@ -148,21 +167,45 @@ export function createGroupTabsStore(): GroupTabsStore {
     const up = place(node.parent, depth + 1)
     return up ? { y: up.y + node.y, root: up.root } : null
   }
+  const target = (id: string): number | null => {
+    const at = place(id)
+    if (!at) return null
+    return Math.max(0, at.root === 'panel' ? panel + at.y - nav : at.y)
+  }
+  const expired = () => Date.now() - requestedAt > JUMP_TTL_MS
   const resolve = () => {
     if (!pending || scheduled) return
+    if (expired()) {
+      pending = null
+      return
+    }
     if (!pending.some(id => place(id) !== null)) return
     scheduled = true
     nextFrame(() => {
       scheduled = false
       const ids = pending
       const id = ids?.find(x => place(x) !== null)
-      const at = id ? place(id) : null
-      if (!id || !at) return
+      const y = id ? target(id) : null
+      if (!id || y === null) return
       pending = null
-      const y = Math.max(0, at.root === 'panel' ? panel + at.y - nav : at.y)
+      landed = { id, at: Date.now(), y, fixes: 0 }
       const focus = anchors.get(id)?.focus ?? null
       for (const listener of jumpListeners) listener(y, focus)
     })
+  }
+  // A faixa mudou de altura logo depois do salto: o começo do destino volta
+  // a ficar logo abaixo dela
+  const settle = () => {
+    if (!landed || landed.fixes >= SETTLE_FIXES) return
+    if (Date.now() - landed.at > SETTLE_MS) {
+      landed = null
+      return
+    }
+    const y = target(landed.id)
+    if (y === null || y === landed.y) return
+    landed.y = y
+    landed.fixes += 1
+    for (const listener of jumpListeners) listener(y, null)
   }
   const notify = () => {
     for (const listener of listeners) listener()
@@ -203,8 +246,10 @@ export function createGroupTabsStore(): GroupTabsStore {
       if (recompute()) notify()
     },
     navHeight(height) {
+      if (height === nav) return
       nav = height
       if (recompute()) notify()
+      settle()
     },
     scrolled(y) {
       scroll = y
@@ -225,8 +270,14 @@ export function createGroupTabsStore(): GroupTabsStore {
     dropAnchor(id) {
       anchors.delete(id)
     },
+    cancelJump() {
+      pending = null
+      landed = null
+    },
     jumpTo(ids) {
       pending = ids.length ? ids : null
+      requestedAt = Date.now()
+      landed = null
       resolve()
     },
     onJump(listener) {

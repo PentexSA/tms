@@ -273,6 +273,14 @@ function SheetBody({
     },
     [groupTabs.store]
   )
+  // A troca de aba à mão esquece um "ir ao grupo" ainda pendente
+  const selectTab = useCallback(
+    (id: string) => {
+      groupTabs.store.cancelJump()
+      showTab(id)
+    },
+    [groupTabs.store, showTab]
+  )
   // "Ver Pontos" nos avisos da recusa (T-07): só com a aba Pontos
   const openBudget = useMemo(
     () => (budget ? () => showTab(BUDGET_TAB) : null),
@@ -402,7 +410,7 @@ function SheetBody({
           key="nav"
           tabs={tabs}
           selected={shownTab ?? ''}
-          onSelect={showTab}
+          onSelect={selectTab}
         />
       ) : null,
       <View
