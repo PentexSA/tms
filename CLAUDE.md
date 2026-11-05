@@ -71,6 +71,7 @@ npx pnpm dev:api                   # API only (builds its packages first, hot re
 npx pnpm dev:web                   # Web only (Metro reads @tms/sheet-core and @tms/ui from src)
 npx pnpm dev:expo                  # Expo dev server (tunnel)
 npx pnpm seed:roteiro              # Test-script accounts and chronicles (API in process)
+npx pnpm metrics:funnel --from 2026-10-01 --to 2026-11-01   # Funnel/retention report (METRICS_DATABASE_URL, restricted role: scripts/metrics-role.sql)
 
 # Individual apps
 cd apps/api && bun run dev     # API only (hot reload)
