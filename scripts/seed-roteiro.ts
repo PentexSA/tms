@@ -34,6 +34,16 @@
 //   - P09-C: "Ficha XP R" em "Vampiro v3/v5", concluída pelo N, com 10 de XP
 //     e um pedido de XP pendente (Força).
 //
+// --apresentacao (opcional, onda 5: doc/planos-pacotes/P14-D-cronica-leitura.md
+// §11.a): grava pela API (PATCH /chronicles/:id) a Descrição de três
+// crônicas do roteiro, para a leitura da Apresentação. Só texto fictício
+// escrito para o roteiro, sem convite nem crônica a mais:
+//   - "Vampiro v3/v5": curta, uma linha;
+//   - "Mago v4": longa, seis parágrafos, com uma linha de marcação que deve
+//     aparecer literal (nem negrito nem link);
+//   - "Lobisomem v4": 4000 caracteres, o limite.
+// As outras três ficam sem Descrição.
+//
 // S-04: por padrão o seed não precisa da API no ar nem de TRUST_PROXY. Ele
 // monta a API em processo (createApp, a mesma dos testes), uma instância por
 // conta: cada uma tem o próprio rate limiter em memória com os limites
@@ -78,6 +88,8 @@ export interface SeedOptions {
   now?: () => Date
   /** --fichas-criacao: as fichas de J1 dos roteiros manuais da onda 3. */
   creationSheets?: boolean
+  /** --apresentacao: a Descrição de três crônicas (P14-D). */
+  presentation?: boolean
 }
 
 export interface SeedResult {
@@ -85,6 +97,44 @@ export interface SeedResult {
   chronicles: { name: string; use: string; n2Invite?: string }[]
   /** As fichas do --fichas-criacao (vazio sem a opção). */
   sheets: { name: string; chronicle: string; state: string }[]
+  /** As Descrições do --apresentacao (vazio sem a opção). */
+  presentations: { chronicle: string; length: number }[]
+}
+
+// --apresentacao: a linha que a leitura mostra literal, sem negrito nem link
+export const PRESENTATION_MARKUP =
+  '*isto não é negrito* [nem link](https://exemplo.test)'
+
+const paragraph = (n: number, sentences: number) =>
+  Array.from(
+    { length: sentences },
+    (_, i) => `Parágrafo de teste do roteiro, número ${n}, frase ${i + 1}.`
+  ).join(' ')
+
+/**
+ * As Descrições do --apresentacao, por crônica ("{Sistema} {uso}"). Texto
+ * fictício, escrito para o roteiro: nenhum texto de livro.
+ */
+export function presentationTexts(): ReadonlyMap<string, string> {
+  const long = [1, 2, 3, 4, 5, 6]
+    .map(n =>
+      n === 4 ? `${PRESENTATION_MARKUP}\n${paragraph(n, 11)}` : paragraph(n, 12)
+    )
+    .join('\n\n')
+  // O limite: parágrafos até passar de 4000, cortados em 4000 sem espaço
+  // nas pontas (o servidor apara antes de contar)
+  let full = ''
+  for (let n = 1; full.length < 4000; n++)
+    full += `${n > 1 ? '\n\n' : ''}${paragraph(n, 10)}`
+  full = `${full.slice(0, 3999).trimEnd().padEnd(3999, '.')}.`
+  return new Map([
+    [
+      'Vampiro v3/v5',
+      'Apresentação curta do roteiro: uma crônica de teste, escrita para conferir o bloco, com uma linha só e nada a esconder.',
+    ],
+    ['Mago v4', long],
+    ['Lobisomem v4', full],
+  ])
 }
 
 // As prioridades da criação por pontos (V20 e M20 usam os mesmos grupos)
@@ -502,6 +552,26 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
         })
       : []
 
+    // --apresentacao: a Descrição pelo PATCH da crônica, como o editor dos
+    // Bastidores grava (o servidor confere limite e texto)
+    const presentations: SeedResult['presentations'] = []
+    if (o.presentation)
+      for (const [key, description] of presentationTexts()) {
+        const c = created.get(key)
+        if (!c) throw new Error(`crônica ${key} não criada`)
+        const { settingsRevision } = await must<{ settingsRevision: number }>(
+          N,
+          'GET',
+          `/chronicles/${c.id}`
+        )
+        await must(N, 'PATCH', `/chronicles/${c.id}`, {
+          clientCommandId: randomUUID(),
+          revision: settingsRevision,
+          description,
+        })
+        presentations.push({ chronicle: c.name, length: description.length })
+      }
+
     return {
       accounts: ACCOUNTS.map(a => ({
         key: a.key,
@@ -510,6 +580,7 @@ export async function runSeed(o: SeedOptions): Promise<SeedResult> {
       })),
       chronicles: rows,
       sheets,
+      presentations,
     }
   } catch (e) {
     if (!(e instanceof RateLimited)) throw e
@@ -589,6 +660,7 @@ async function main() {
       remote: Boolean(remote),
       keep: process.argv.includes('--keep'),
       creationSheets: process.argv.includes('--fichas-criacao'),
+      presentation: process.argv.includes('--apresentacao'),
     })
     console.log(
       `\nAPI: ${remote ?? 'em processo'}\nSenha de todas as contas: ${PASSWORD}\n`
@@ -605,6 +677,11 @@ async function main() {
       console.log('\nFichas de J1 (--fichas-criacao):')
       for (const f of result.sheets)
         console.log(`- ${f.name}  [${f.chronicle}]  ${f.state}`)
+    }
+    if (result.presentations.length) {
+      console.log('\nDescrições (--apresentacao):')
+      for (const p of result.presentations)
+        console.log(`- ${p.chronicle}  ${p.length} caracteres`)
     }
     console.log()
   } finally {
