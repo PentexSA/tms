@@ -368,13 +368,26 @@ for (const system of MATRIX_SYSTEMS) {
       expect((await reveal(s, {}, storyteller, own)).status).toBe(422)
     })
 
-    it('o ex-membro deixa de ler; o narrador antigo perde a revelação', async () => {
+    const stateOf = async () =>
+      (
+        (await (
+          await as(ctx, owner, 'GET', `/characters/${characterId}`)
+        ).json()) as {
+          member: boolean
+          reveal: { sections: string[]; revision: number }
+        }
+      ).reveal
+
+    it('o ex-membro deixa de ler e, de volta, não lê até o narrador revelar de novo', async () => {
       expect((await reveal(s)).status).toBe(200)
-      await ctx.db
-        .deleteFrom('chronicle_members')
-        .where('chronicle_id', '=', chronicleId)
-        .where('user_id', '=', owner.id)
-        .execute()
+      // Sai pela rota (a saída voluntária)
+      const left = await as(
+        ctx,
+        owner,
+        'DELETE',
+        `/chronicles/${chronicleId}/members/me`
+      )
+      expect(left.status).toBe(204)
       const read = await readRevealed(owner)
       expect(read.status).toBe(404)
       expect(await read.text()).not.toContain(SENTINEL)
@@ -386,20 +399,79 @@ for (const system of MATRIX_SYSTEMS) {
       expect(body.member).toBe(false)
       expect(body.reveal.sections).toEqual([])
       expect(JSON.stringify(body)).not.toContain(SENTINEL)
-      // De volta à crônica, a revelação que continua vale de novo
+      // A saída zera a revelação e sobe a revisão
+      const row = await ctx.db
+        .selectFrom('characters')
+        .select(['revealed_sections', 'reveal_revision'])
+        .where('id', '=', characterId)
+        .executeTakeFirstOrThrow()
+      expect(row).toEqual({ revealed_sections: [], reveal_revision: 2 })
+      // De volta à crônica (um convite novo): nada revelado, nem o que o
+      // narrador escreveu enquanto ela estava fora
       await addMember(ctx, chronicleId, owner)
-      expect((await readRevealed(owner)).status).toBe(200)
+      const back = await readRevealed(owner)
+      expect(back.status).toBe(200)
+      expect(await back.json()).toEqual({ revision: 2, sections: [] })
+      expect(await stateOf()).toEqual({ sections: [], revision: 2 })
+      // A revelação de antes, com a revisão velha, não volta
+      expect((await reveal(s, { revision: 1 })).status).toBe(409)
+      expect((await reveal(s, { revision: 2 })).status).toBe(200)
+      expect(
+        JSON.stringify(await (await readRevealed(owner)).json())
+      ).toContain(SENTINEL)
+    })
 
-      // A narração passa ao outro jogador: a narradora antiga perde tudo
-      await ctx.db
-        .updateTable('chronicles')
-        .set({ storyteller_id: player.id })
-        .where('id', '=', chronicleId)
-        .execute()
+    it('o dono removido pelo narrador também perde a revelação', async () => {
+      expect((await reveal(s)).status).toBe(200)
+      const removed = await as(
+        ctx,
+        storyteller,
+        'DELETE',
+        `/chronicles/${chronicleId}/members/${owner.id}`,
+        { revokeInvites: false }
+      )
+      expect(removed.status).toBe(204)
+      await addMember(ctx, chronicleId, owner)
+      expect(await (await readRevealed(owner)).json()).toEqual({
+        revision: 2,
+        sections: [],
+      })
+    })
+
+    it('depois da transferência, o dono não lê até o novo narrador revelar', async () => {
+      expect((await reveal(s)).status).toBe(200)
+      const proposed = await as(
+        ctx,
+        storyteller,
+        'POST',
+        `/chronicles/${chronicleId}/transfer`,
+        { clientCommandId: crypto.randomUUID(), recipientId: player.id }
+      )
+      expect(proposed.status).toBe(201)
+      const transfer = (await proposed.json()) as { id: string }
+      const accepted = await as(
+        ctx,
+        player,
+        'POST',
+        `/chronicles/${chronicleId}/transfer/${transfer.id}/accept`,
+        { clientCommandId: crypto.randomUUID() }
+      )
+      expect(accepted.status).toBe(200)
+      // O novo narrador não herda a revelação que não fez
+      const read = await readRevealed(owner)
+      expect(read.status).toBe(200)
+      expect(await read.json()).toEqual({ revision: 2, sections: [] })
+      expect(await stateOf()).toEqual({ sections: [], revision: 2 })
+      // A narradora antiga perde tudo o que era de narrador
       expect((await readRevealed(storyteller)).status).toBe(404)
-      expect((await reveal(s, { revealed: false, revision: 1 })).status).toBe(
+      expect((await reveal(s, { revealed: false, revision: 2 })).status).toBe(
         404
       )
+      // O novo narrador revela: aí o dono lê
+      expect((await reveal(s, { revision: 2 }, player)).status).toBe(200)
+      expect(
+        JSON.stringify(await (await readRevealed(owner)).json())
+      ).toContain(SENTINEL)
     })
 
     it('comando: reenvio, chave com outro corpo, revisão velha e pedido sem mudança', async () => {
