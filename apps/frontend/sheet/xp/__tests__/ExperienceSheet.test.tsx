@@ -163,6 +163,49 @@ describe('Solicitar evolução (T-50)', () => {
   })
 })
 
+// U-01: o atalho abre a folha já no pedido
+describe('aberta pelo atalho (U-01)', () => {
+  const render = async (
+    initial: Parameters<typeof ExperienceSheet>[0]['initial']
+  ) => {
+    calls.xpGet.mockImplementation((async () => balance(20)) as never)
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    renderWithSession(
+      <ExperienceSheet
+        characterId={CHARACTER}
+        chronicleId={CHRONICLE}
+        model={model}
+        sheet={sheet}
+        roles={['owner']}
+        lifecycle={{ status: 'active', locked: false, member: true }}
+        visible
+        onClose={jest.fn()}
+        initial={initial}
+      />,
+      await signedIn()
+    )
+  }
+
+  it('com o traço: a lista aberta, o rádio marcado e o resumo no rodapé', async () => {
+    await render({ target: { field: 'dexterity' } })
+    const radio = await screen.findByRole('radio', { name: /^Destreza, / })
+    expect(radio.props.accessibilityState).toMatchObject({ checked: true })
+    expect(screen.getByTestId('xp-request-summary')).toHaveTextContent(
+      /^Destreza: /
+    )
+  })
+
+  it('com a busca: a lista filtrada, sem escolha', async () => {
+    await render({ query: 'Disciplinas', field: 'disciplines' })
+    expect(await screen.findByLabelText('Buscar traço')).toHaveProp(
+      'value',
+      'Disciplinas'
+    )
+    expect(screen.queryByLabelText('Talentos')).toBeNull()
+    expect(screen.queryByTestId('xp-request-summary')).toBeNull()
+  })
+})
+
 // T-77: o que o servidor recusaria fica bloqueado com o motivo, tocável
 describe('"Enviar pedido" bloqueado com o motivo (T-77)', () => {
   const brawlOf = () => {

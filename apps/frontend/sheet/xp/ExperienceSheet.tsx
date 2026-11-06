@@ -27,9 +27,10 @@ import {
   type XpRequestData,
 } from '../../lib/queries/xp'
 import type { SheetLifecycle } from '../policy'
-import type { XpCandidate } from './candidates'
+import { type XpCandidate, xpCandidates } from './candidates'
 import { AdjustForm, GrantForm, useCommand, xpCommand } from './forms'
 import { RequestFooter, RequestPicker } from './RequestPicker'
+import type { XpShortcutTarget } from './XpShortcut'
 
 // "Experiência" (doc/plano-v4.md, Etapa 8): saldo, pedidos e extrato da
 // ficha. O jogador pede um nível por vez, vendo o custo antes de enviar; o
@@ -75,6 +76,7 @@ export function ExperienceSheet({
   lifecycle,
   visible,
   onClose,
+  initial,
 }: {
   readonly characterId: string
   readonly chronicleId: string
@@ -85,6 +87,8 @@ export function ExperienceSheet({
   readonly lifecycle: SheetLifecycle
   readonly visible: boolean
   readonly onClose: () => void
+  // U-01: abre já em "Solicitar evolução", com o traço marcado ou a busca
+  readonly initial?: XpShortcutTarget
 }) {
   const { colors } = useTheme()
   const online = useOnline()
@@ -94,7 +98,7 @@ export function ExperienceSheet({
   const requests = useXpRequests(characterId, visible)
   const commands = useXpCommands()
   const [panel, setPanel] = useState<'request' | 'grant' | 'adjust' | null>(
-    null
+    initial ? 'request' : null
   )
   const balance =
     ledger.data?.pages[0]?.balance ?? xpBalance(model, sheet) ?? null
@@ -106,8 +110,14 @@ export function ExperienceSheet({
   const block = requestBlock(lifecycle)
   const hasRules = Boolean(model.template.costs?.xp?.rules?.length)
   // O pedido escolhido mora aqui: o resumo e o envio vão no rodapé da folha
-  const [picked, setPicked] = useState<XpCandidate | null>(null)
-  const [query, setQuery] = useState('')
+  const [picked, setPicked] = useState<XpCandidate | null>(() => {
+    if (!initial || !('target' in initial)) return null
+    const key = xpTargetKey(initial.target)
+    return xpCandidates(model, sheet).find(c => c.key === key) ?? null
+  })
+  const [query, setQuery] = useState(
+    initial && 'query' in initial ? initial.query : ''
+  )
   const request = useCommand(commands, false)
   const picking = owner && !block && panel === 'request'
   // O que o servidor recusaria: o saldo do extrato e os pedidos pendentes

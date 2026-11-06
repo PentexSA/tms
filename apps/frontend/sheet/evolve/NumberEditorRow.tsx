@@ -3,6 +3,7 @@ import { hitTarget, Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Platform, StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
+import { BlockedNote } from './BlockedNote'
 import { EditorShell } from './EditorShell'
 import { fieldHelp } from './help'
 import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
@@ -158,7 +159,15 @@ export function NumberEditorRow(props: FieldViewProps) {
     <EditorShell
       label={def.label}
       help={fieldHelp(def)}
-      sub={blocked}
+      sub={
+        blocked ? (
+          <BlockedNote
+            text={blocked}
+            to={{ target: { field: resolved.id } }}
+            subject={def.label}
+          />
+        ) : null
+      }
       note={feedback.note}
       error={error ?? feedback.notice ?? issue}
       below={

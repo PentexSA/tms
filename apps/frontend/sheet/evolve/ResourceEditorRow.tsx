@@ -3,6 +3,7 @@ import { Stepper, type StepperAdvice, Text, tokens } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useCreation } from '../creation/CreationContext'
 import type { FieldViewProps } from '../views/types'
+import { BlockedNote } from './BlockedNote'
 import { EditorShell } from './EditorShell'
 import { fieldHelp } from './help'
 import { useClassNote, useFieldIssue, useSetDraft } from './hooks'
@@ -80,13 +81,22 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
     onChange: n => write('current', n),
     blocked: play,
   })
-  // A nota do que está desabilitado, uma vez só
+  // A nota do que está desabilitado, uma vez só; com o permanente bloqueado
+  // pela evolução, o atalho para o pedido (U-01)
   const note = rows.find(row => row.blocked)?.blocked ?? null
   return (
     <EditorShell
       label={def.label}
       help={fieldHelp(def)}
-      sub={note}
+      sub={
+        note ? (
+          <BlockedNote
+            text={note}
+            to={{ target: { field: r.id } }}
+            subject={def.label}
+          />
+        ) : null
+      }
       note={feedback.note}
       error={feedback.notice ?? issue}
       testID={`editor-${r.id}`}

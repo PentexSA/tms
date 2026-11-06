@@ -28,7 +28,8 @@ export function EditorShell({
 }: {
   readonly label: string
   readonly help?: Help | null
-  readonly sub?: string | null
+  // A nota sob o rótulo: o texto ou a nota já montada (BlockedNote, U-01)
+  readonly sub?: ReactNode
   // Nota da linha sob o rótulo (o custo do próximo ponto na criação)
   readonly note?: ReactNode
   // Texto (vira alerta) ou o aviso já montado (DraftNoticeText)
@@ -65,11 +66,13 @@ export function EditorShell({
           ) : (
             <Text variant="fieldLabel">{label}</Text>
           )}
-          {sub ? (
+          {typeof sub === 'string' && sub ? (
             <Text variant="caption" color="inkMuted" numberOfLines={2}>
               {sub}
             </Text>
-          ) : null}
+          ) : (
+            sub || null
+          )}
           {note || null}
           {typeof error === 'string' && error ? (
             <Text variant="caption" color="danger" accessibilityRole="alert">
