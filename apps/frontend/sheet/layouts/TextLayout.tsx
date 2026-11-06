@@ -6,6 +6,7 @@ import {
   revealableSections,
 } from '@tms/sheet-core'
 import { Text, tokens } from '@tms/ui'
+import { useEffect } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useFieldEntry, useSheet } from '../context'
 import { drawsEditor, FieldSlot } from '../FieldSlot'
@@ -102,6 +103,12 @@ function TextBlock({ id }: { readonly id: FieldId }) {
 function RevealedBlock({ id }: { readonly id: FieldId }) {
   const { model } = useSheet()
   const reveal = useRevealed()
+  // Ao aparecer (abrir o "Sobre", voltar a ele): a rota de novo, para a nota
+  // que o narrador deixou privada sair na hora, sem esperar os 30 s
+  const refresh = reveal?.refresh
+  useEffect(() => {
+    refresh?.()
+  }, [refresh])
   const label = model.fields.get(id)?.def.label ?? ''
   const text = reveal?.values.get(id)
   const status = reveal?.status ?? 'idle'
