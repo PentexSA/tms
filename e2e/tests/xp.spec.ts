@@ -45,7 +45,7 @@ async function sheetWithXp(browser: Browser, page: Page, xp: number) {
     targets: [{ characterId: id }],
   })
   const playerPage = await playerContext.newPage()
-  return { id, playerPage, playerContext }
+  return { id, playerPage, playerContext, player }
 }
 
 const openExperience = async (page: Page) => {
@@ -143,6 +143,62 @@ test.describe('a 390', () => {
     // aria-disabled sem ele, lição da onda 4)
     await send.click({ force: true })
     await expect(playerPage.getByRole('alert')).toContainText('Faltam')
+    expect(requests).toEqual([])
+  })
+
+  // §11.6, ponto 4 (decisão do PO): o pedido pendente se comporta como o
+  // acima do saldo. No web: aria-disabled sem `disabled`, tocável, o motivo
+  // e nenhum segundo pedido (o servidor também recusaria)
+  test('pedido pendente: aria-disabled sem `disabled`, tocável, o motivo e nenhum pedido (P13)', async ({
+    browser,
+    page,
+  }) => {
+    const { id, playerPage, playerContext, player } = await sheetWithXp(
+      browser,
+      page,
+      20
+    )
+    await apiAs(
+      playerContext,
+      player,
+      'POST',
+      `/characters/${id}/xp-requests`,
+      {
+        clientRequestId: randomUUID(),
+        field: 'brawl',
+      }
+    )
+    const requests: string[] = []
+    playerPage.on('request', r => {
+      if (r.url().endsWith('/xp-requests') && r.method() === 'POST')
+        requests.push(r.url())
+    })
+    await playerPage.goto(`/characters/${id}`)
+    await openExperience(playerPage)
+    await playerPage
+      .getByRole('button', { name: 'Solicitar evolução', exact: true })
+      .click()
+    await playerPage.getByLabel('Buscar traço').fill('brig')
+    const brawl = playerPage.getByRole('radio', {
+      name: /^Briga, .*pedido pendente$/,
+    })
+    await expect(brawl).toHaveAttribute('aria-disabled', 'true')
+    await expect(brawl).not.toHaveAttribute('disabled', /.*/)
+    // Tocável (force: o Playwright não clica em aria-disabled sem ele, lição
+    // da onda 4): a opção é marcada, e o rodapé diz o motivo
+    await brawl.click({ force: true })
+    await expect(brawl).toHaveAttribute('aria-checked', 'true')
+    const reason = 'Já existe um pedido pendente para este traço.'
+    await expect(playerPage.getByTestId('xp-request-refusal')).toHaveText(
+      reason
+    )
+    const send = panel(playerPage).getByRole('button', {
+      name: 'Enviar pedido',
+      exact: true,
+    })
+    await expect(send).toHaveAttribute('aria-disabled', 'true')
+    await send.click({ force: true })
+    await expect(playerPage.getByRole('alert')).toContainText(reason)
     expect(requests).toEqual([])
   })
 

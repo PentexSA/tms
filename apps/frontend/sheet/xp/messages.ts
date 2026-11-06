@@ -29,6 +29,13 @@ export const XP_CODES = [
 ] as const
 export type XpCode = (typeof XP_CODES)[number]
 
+/**
+ * Um pedido do mesmo traço já aguarda o narrador: a recusa do servidor
+ * (XP_REQUEST_PENDING) e a previsão da lista de evolução dizem o mesmo.
+ */
+export const XP_PENDING_MESSAGE =
+  'Já existe um pedido pendente para este traço.'
+
 const body = (error: unknown): Record<string, unknown> | null => {
   const value = (error as { value?: unknown } | null)?.value
   return value && typeof value === 'object'
@@ -82,7 +89,7 @@ export function xpMessage(
     case 'XP_REQUEST_STALE':
       return 'O traço ou o custo mudou. Faça um novo pedido.'
     case 'XP_REQUEST_PENDING':
-      return 'Já existe um pedido pendente para este traço.'
+      return XP_PENDING_MESSAGE
     case 'XP_REQUEST_DECIDED':
       return 'Este pedido já foi decidido.'
     case 'XP_ONE_LEVEL':
