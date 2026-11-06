@@ -113,6 +113,30 @@ describe('Apresentação da crônica (leitura)', () => {
     expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
 
+  it('enquanto carrega, o voltar sem tela de baixo abre a crônica da rota', async () => {
+    // A resposta não chega durante o teste
+    calls.chronicle.get.mockReturnValue(new Promise(() => undefined))
+    renderWithSession(<ChronicleAboutScreen />, await signedIn())
+    const back = await screen.findByRole('button', {
+      name: 'Voltar para Crônica',
+    })
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
+    expect(router.replace).not.toHaveBeenCalledWith('/')
+  })
+
+  it('crônica não encontrada: o voltar sem tela de baixo vai à lista', async () => {
+    calls.chronicle.get.mockResolvedValue(fail(404, 'não encontrado'))
+    renderWithSession(<ChronicleAboutScreen />, await signedIn())
+    await screen.findByRole('header', { name: 'Crônica não encontrada' })
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônicas' })
+    )
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
   it('crônica alheia ou convite não aceito: não encontrada', async () => {
     calls.chronicle.get.mockResolvedValue(fail(404, 'não encontrado'))
     renderWithSession(<ChronicleAboutScreen />, await signedIn())

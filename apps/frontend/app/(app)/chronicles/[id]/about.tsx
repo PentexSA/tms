@@ -34,8 +34,12 @@ export default function ChronicleAboutScreen() {
       { cancelRefetch: false }
     )
   )
+  // Sem tela de baixo (link direto, F5), o "‹" abre a crônica da rota, também
+  // enquanto ela carrega. Só a crônica que não existe (ou de que a pessoa não
+  // participa) volta à lista: abrir ela de novo daria o mesmo 404
+  const missing = chronicle.isError && statusOf(chronicle.error) === 404
   const back = useSheetBack(
-    chronicle.data ? { id, name: chronicle.data.name } : null
+    missing ? null : { id, name: chronicle.data?.name ?? 'Crônica' }
   )
 
   if (chronicle.isPending)
