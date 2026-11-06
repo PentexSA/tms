@@ -310,11 +310,17 @@ export function noticeItems(
  * Disciplina fora do clã, Esfera fora da Tradição (D-07, D-09; o
  * `creationAdvice` do core, pelo `useCreationAdvice`). Eles aparecem na aba
  * Pontos ("Para confirmar com o narrador") e na confirmação de concluir,
- * nunca no "Faltam" da barra. Só com a ficha em criação.
+ * nunca no "Faltam" da barra. Com a ficha em criação e, para o narrador,
+ * também em `pending` (P09-D).
  */
 export function useCreationNotices(): readonly GuideItem[] {
   const { model, roles } = useSheet()
-  const notices = useCreationAdvice(useCreation()?.status === 'creating')
+  const status = useCreation()?.status
+  // P09-D: também em `pending` para o narrador, que confirma na revisão o
+  // que o aviso pede
+  const notices = useCreationAdvice(
+    status === 'creating' || (status === 'pending' && roles.has('storyteller'))
+  )
   return useMemo(
     () => noticeItems(model, roles, notices),
     [model, roles, notices]

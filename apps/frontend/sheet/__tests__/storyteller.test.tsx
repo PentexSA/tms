@@ -433,6 +433,49 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     expect(screen.queryByRole('tab', { name: 'Pontos' })).toBeNull()
   })
 
+  // P09-D (D-10, POA-20): a conta também em `pending`, para o narrador
+  // conferir antes de aprovar ou devolver; nada edita
+  const pendingSheet = (roles: ('owner' | 'storyteller')[] = ['storyteller']) =>
+    ok({
+      ...character(roles).data,
+      ...(
+        creating({ name: 'Nova', clan: 'tremere', strength: 3 }) as {
+          data: Record<string, unknown>
+        }
+      ).data,
+      roles,
+      status: 'pending',
+    })
+
+  it('em pending, a aba Pontos em Leitura, e "Ver Pontos" no aviso leva a ela', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    calls.characterGet.mockResolvedValue(pendingSheet())
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), {
+      post: post as never,
+    })
+    const points = await screen.findByRole('button', { name: 'Ver Pontos' })
+    expect(screen.getByTestId('creation-pending')).toBeTruthy()
+    expect(screen.queryByTestId('creation-panel')).toBeNull()
+    fireEvent.press(points)
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies')).toBeTruthy()
+    // Nada que grave: sem "Regras da casa", sem a troca de fase, sem lote
+    expect(screen.queryByText('Regras da casa')).toBeNull()
+    expect(screen.queryByTestId('creation-budget')).toBeNull()
+    expect(screen.queryByTestId('creation-phase-switch')).toBeNull()
+    expect(screen.queryAllByRole('adjustable')).toHaveLength(0)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('o dono em pending continua sem a aba Pontos e sem "Ver Pontos"', async () => {
+    calls.characterGet.mockResolvedValue(pendingSheet(['owner']))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await screen.findByTestId('creation-pending')).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'Pontos' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ver Pontos' })).toBeNull()
+  })
+
   it('narratorTarget: Criação, Editar ou Jogo', () => {
     expect(narratorTarget({ active: true, status: 'creating' })).toBe('create')
     expect(narratorTarget({ active: true, status: 'pending' })).toBe('create')
