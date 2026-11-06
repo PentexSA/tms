@@ -23,7 +23,7 @@ Como usar: o mesmo da v0 e da v1. Cada etapa é um PR, só termina com os testes
 A v2 está pronta quando esta jornada roda inteira no app e no web, e um teste E2E a repete no CI:
 
 1. O narrador cria uma crônica e escolhe **Lobisomem (W20)** entre os três sistemas publicados.
-2. O jogador entra com o convite e cria a ficha: nome, nome de feito, conceito, raça, augúrio (com a fase da lua), tribo, seita e totem. O formulário sai do template.
+2. O jogador entra com o convite e cria a ficha: nome, nome de feito, conceito, seita, raça, augúrio (com a fase da lua), campo, tribo, nome da matilha, totem e Posto. O formulário sai do template: são os campos de identidade, na ordem das colunas do cabeçalho, e o Posto do resumo no fim. (D-13)
 3. A ficha abre em **Editar**: atributos, habilidades, Fúria, Gnose, FdV, Posto, Renome (permanente e temporário), Dons, Ritos, Fetiches e antecedentes. Salvar grava **um** lote.
 4. Em **Jogo**, o dock mostra Vitalidade, Fúria e Forma. O jogador troca para **Crinos** com a mudança instantânea: um lote só, "Forma Hominídeo → Crinos, Fúria 4 → 3", com aviso e Desfazer. Sem Fúria, a mudança instantânea fica desabilitada e o motivo aparece.
 5. Em Crinos, a grade mostra Força 7 ("3 + 4 Crinos") e Aparência 0, e o Editar continua editando a base (3).
@@ -66,6 +66,28 @@ Ainda falta provar fora desta máquina:
 - a publicação no ambiente de verdade, só depois de a versão do app com a Forma estar no ar, e com a API reiniciada.
 
 ---
+
+## Depois do teste com personas (ondas 1 a 5)
+
+O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz-achados.md)) comparou a tela com este plano. Pela D-13, o §1 foi alinhado ao que a tela faz, no próprio item e sem renumerar (o `journey-werewolf.spec.ts` cita os itens pelo número); cada item revisto leva "(D-13)". As Etapas continuam como registro: onde uma delas afirma algo que a tela não faz mais, uma linha "Revisto" diz o que mudou.
+
+**Decisões que mudam esta jornada** (a tabela "Decisões de produto" da matriz tem o texto inteiro de cada uma):
+
+| Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
+|---|---|---|---|
+| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote abre no "Salvar" (Etapa 4) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-07 | "Adicionar Dom" abre um catálogo de Dons de nível 1, só com nome e nível, que destaca os da Raça, do Augúrio e da Tribo; o texto livre continua para Dom fora do catálogo. Um Dom acima do Posto 1 na criação pede "confirme com o narrador", sem bloquear (item 3) | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 5 |
+| D-08 | Os Dons mostram "Posto N" na linha, e o Posto do Dom muda na folha do item; os Antecedentes ganham o −/+ na linha | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 7 |
+| D-11 | "?" com uma frase curta do template ao lado dos campos, das opções (Raças, Augúrios, Tribos) e dos Dons, na Nova ficha, na Criação e no Editar | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |
+| D-13 | Este registro e o item 2 do §1 | onda 5, P01-D | — |
+
+**Correções que mudam o que o §1 descreve:**
+
+- **T-79** `[a preencher: P13]`: a Força de Vontade aparecia entre os Atributos nos Dados (itens 4 a 6).
+
+**"Escolher da lista".** A identidade do Lobisomem não tem sugestões, como a Natureza e o Comportamento do Vampiro têm; a parte da R-29 que a pediria ficou fora da onda 4 ([onda-4.md](planos-pacotes/onda-4.md) §6, ponto 17, em aberto).
+
+**Ainda não conferido:** o catálogo de Dons e as frases do "?" são rascunho do time, para revisão; o catálogo precisa ser conferido contra o livro ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
 
 ## 2. Ponto de partida
 
@@ -153,6 +175,7 @@ P · depende de: nada
 - o template passa no Ajv e no `validateTemplate`, e compila;
 - as 3 fichas de Lobisomem passam no `validateSheet`;
 - `identityFields` tem os 8 campos das colunas, na ordem, e o Posto do resumo (um `rating`, que o formulário de criação não mostra);
+  - **Revisto:** o Posto aparece no formulário (o `rating` tem editor desde a Etapa 14 da v0), e as colunas trazem também o Campo e o Nome da matilha; a D-13 alinhou o §1, item 2.
 - um `rites` com `value` no item é rejeitado (o `list` sem valor vale para o Lobisomem também);
 - Regenerar na ficha no limite cura 1 nível letal e deixa o agravado.
 
@@ -232,7 +255,7 @@ M · depende de: 1
   - acima do máximo (Força 7 numa escala de 5): os 5 pips e "+2", sem esticar a linha;
   - abaixo da base: os pips perdidos em vazado, não somem;
   - o nome acessível é o `describe` do core (já fala do modificador).
-- Editar: a linha de um atributo modificado edita a **base** e avisa "efetivo 7 em Crinos". O resumo do Concluir não fala de modificador, porque nada gravado muda.
+- Editar: a linha de um atributo modificado edita a **base** e avisa "efetivo 7 em Crinos". O resumo do Salvar (D-01; no plano original, "do Concluir") não fala de modificador, porque nada gravado muda.
 - Renome: a linha de `resource` com `tempUncapped` mostra "Permanente 3 · Temporário 4" em Leitura e Jogo. O `valueLabels` do Posto aparece no fato ("2 · Fostern").
 - `@tms/ui`: o `AugurMoon` (skin `wod`), desenhado do `glyphParam` (0 a 1), com `accessible={false}`. O fato do Augúrio e o editor de `choice` com `glyph` o mostram ao lado do rótulo.
 
