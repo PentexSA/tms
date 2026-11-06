@@ -53,8 +53,8 @@ const SECRET = 'marca-secreta-do-narrador-7f3a'
 // (lista, Mesa, auditoria, identidade)
 const HIDDEN_NPC = 'NPC oculto'
 // A Descrição da crônica do cenário (P14-D, D-15): chega ao narrador e aos
-// membros no GET /chronicles/:id e a nenhuma resposta de quem não é membro.
-// O ex-membro ainda a recebe nessa rota (onda-5.md §6, ponto 5, em aberto)
+// membros no GET /chronicles/:id e a nenhuma resposta de quem não é membro,
+// inclusive o ex-membro
 const DESCRIPTION = 'marca-descricao-da-cronica-5c1e'
 
 interface Scenario {
@@ -243,12 +243,12 @@ async function check(
     expect(text).not.toContain(HIDDEN_NPC)
   }
   // A Descrição: o narrador e os membros a leem no detalhe da crônica; quem
-  // não é membro não a recebe em rota nenhuma. O ex-membro a recebe só no
-  // detalhe (hoje; a D-15 diz "só membro", e a mudança espera o PO)
+  // não é membro (o ex-membro também, D-15) não a recebe em rota nenhuma
+  const member =
+    actor === 'storyteller' || actor === 'owner' || actor === 'player'
   const detail = row.method === 'GET' && row.route === '/chronicles/:id'
-  if (detail && status === 200) expect(text).toContain(DESCRIPTION)
-  else if (actor !== 'storyteller' && actor !== 'owner' && actor !== 'player')
-    expect(text).not.toContain(DESCRIPTION)
+  if (member && detail) expect(text).toContain(DESCRIPTION)
+  if (!member) expect(text).not.toContain(DESCRIPTION)
   // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
   if (actor === 'former')
     for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])

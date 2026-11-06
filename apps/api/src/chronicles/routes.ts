@@ -457,14 +457,18 @@ export function chronicleRoutes(
           name: c.name,
           system: { code: c.systemCode, name: c.systemName },
           storyteller: { id: c.storytellerId, username: c.storyteller },
-          description: c.description,
-          imageUrl: c.image_url,
           options: model ? effectiveChronicleOptions(model, c.options) : {},
           settingsRevision: c.settings_revision,
         }
-        // O ex-membro não recebe os membros
+        // O ex-membro não recebe os membros nem a Apresentação: a Descrição
+        // e a Imagem só chegam a quem é membro (D-15; plano-v5: ele lê só as
+        // próprias fichas arquivadas), como o lastSession da lista
         if (role === 'former')
           return { ...head, role: 'former' as const, members: [] }
+        const presentation = {
+          description: c.description,
+          imageUrl: c.image_url,
+        }
         const members = await db
           .selectFrom('chronicle_members as m')
           .innerJoin('users as u', 'u.id', 'm.user_id')
@@ -482,6 +486,7 @@ export function chronicleRoutes(
           .executeTakeFirst()
         return {
           ...head,
+          ...presentation,
           // Configuração da criação (v4): o narrador ajusta; o jogador vê se
           // a ficha nova passa por aprovação e o orçamento padrão
           creation: {
