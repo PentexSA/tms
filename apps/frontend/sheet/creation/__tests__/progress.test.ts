@@ -282,4 +282,63 @@ describe('fitProgress', () => {
     const one = fitProgress(fresh, 358, 1, 1)
     expect(one.text.length).toBeLessThan(two.text.length)
   })
+
+  // /code-review (P09-D): o bônus acima do saldo é `blocking`, mas continua
+  // o bônus: no fim, fora do "✓ k de n" e fora do "e mais N"
+  it('o bônus acima do saldo fica no fim e não conta como orçamento', () => {
+    const base = check(vtm, ATTRIBUTES, PRIORITIES)
+    const over = creationProgress({
+      ...base,
+      freebies: base.freebies && { ...base.freebies, remaining: -4 },
+    })
+    if (!over) throw new Error('sem progresso')
+    for (const [width, scale] of [
+      [358, 1],
+      [328, 1.3],
+      [200, 1],
+    ] as const) {
+      const fit = fitProgress(over, width, scale)
+      expect(fit.shown.at(-1)?.text).toBe('Bônus: 4 acima do saldo')
+      expect(fit.text).not.toMatch(/de 6/)
+    }
+  })
+
+  it('a conta fechada nunca perde o "A conta fechou", nem bem estreita', () => {
+    const base = check(vtm, ATTRIBUTES, PRIORITIES)
+    const closed = creationProgress({
+      ...base,
+      complete: true,
+      savable: true,
+      problems: [],
+      freebies: base.freebies && { ...base.freebies, remaining: 2 },
+    })
+    if (!closed) throw new Error('sem progresso')
+    const fit = fitProgress(closed, 120, 2)
+    expect(fit.shown[0]?.text).toBe('A conta fechou')
+  })
+})
+
+describe('traços para corrigir', () => {
+  it('dois problemas no mesmo campo são um traço só', () => {
+    const vtm = modelOf('vtm-v20')
+    const base = check(vtm, ATTRIBUTES, PRIORITIES)
+    const p = creationProgress({
+      ...base,
+      problems: [
+        {
+          code: 'CREATION_HARD_CAP',
+          severity: 'blocking',
+          paths: ['values.disciplines#d1'],
+        },
+        {
+          code: 'CREATION_LOCKED',
+          severity: 'blocking',
+          paths: ['values.disciplines#d1'],
+        },
+      ],
+    })
+    expect(p?.parts.find(x => x.key === 'fields')?.text).toBe(
+      '1 traço para corrigir'
+    )
+  })
 })

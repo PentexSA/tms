@@ -126,7 +126,10 @@ export function creationProgress(
     p => !BUDGET_CODES.has(p.code) && p.code !== 'CREATION_FREEBIES_EXCEEDED'
   )
   if (fields.length) {
-    const text = fieldsText(fields.length)
+    // Um traço por caminho: dois problemas no mesmo campo são um traço só
+    const text = fieldsText(
+      new Set(fields.map((p, i) => p.paths[0] ?? `${p.code}:${i}`)).size
+    )
     parts.push({
       key: 'fields',
       kind: fields.some(p => p.severity === 'blocking')
@@ -179,20 +182,30 @@ export function fitProgress(
     joined(parts).length <= capacity
   const all = progress.parts
   if (fits(all)) return { shown: all, text: joined(all) }
-  const budgets = all.filter(p => p.kind !== 'freebies' && p.key !== 'fields')
+  // O bônus é pela chave, não pelo tipo: acima do saldo ele é `blocking`, e
+  // continua no fim, fora da conta dos orçamentos e do "e mais N"
+  const tail = all.filter(p => p.key === 'freebies')
+  const budgets = all.filter(p => p.key !== 'freebies' && p.key !== 'fields')
   const done = all.filter(p => p.kind === 'done')
-  const rest = all.filter(p => p.kind === 'missing' || p.kind === 'blocking')
-  const tail = all.filter(p => p.kind === 'freebies')
-  const head: ProgressPart[] = done.length
-    ? [
-        {
-          key: 'done',
-          kind: 'done',
-          text: `✓ ${done.length} de ${budgets.length}`,
-          spoken: `${done.length} de ${budgets.length} orçamentos completos`,
-        },
-      ]
-    : []
+  const rest = all.filter(
+    p => (p.kind === 'missing' || p.kind === 'blocking') && p.key !== 'freebies'
+  )
+  // "A conta fechou" nunca sai: sem ela, o cartão pronto se leria como um
+  // ainda em criação
+  const closed = all.filter(p => p.kind === 'closed')
+  const head: ProgressPart[] = [
+    ...closed,
+    ...(done.length
+      ? [
+          {
+            key: 'done',
+            kind: 'done' as const,
+            text: `✓ ${done.length} de ${budgets.length}`,
+            spoken: `${done.length} de ${budgets.length} orçamentos completos`,
+          },
+        ]
+      : []),
+  ]
   const merged = [...head, ...rest, ...tail]
   if (fits(merged)) return { shown: merged, text: joined(merged) }
   // "e mais N": os primeiros que cabem, e o bônus no fim

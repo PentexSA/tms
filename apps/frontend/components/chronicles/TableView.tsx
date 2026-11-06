@@ -395,8 +395,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
               columns={columns}
               renderItem={row}
             />
-            {/* Com um filtro de etapa, nenhum NPC entra */}
-            {sections.npcs.length && !stage ? (
+            {/* Com um filtro de etapa, nenhum NPC entra (o stageOf) */}
+            {sections.npcs.length ? (
               <>
                 <View style={styles.section} testID="table-npcs">
                   <SectionHeader title="NPCs" level="group" />
