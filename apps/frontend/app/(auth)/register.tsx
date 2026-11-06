@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { authMessage } from '../../lib/authMessages'
 import { hasPendingInvite } from '../../lib/invite/pending'
 import { usePendingInvite } from '../../lib/invite/usePendingInvite'
 import { nextField } from '../../lib/keyboard'
@@ -36,16 +37,25 @@ export default function RegisterScreen() {
   const [fields, setFields] = useState<FieldErrors<RegisterInput>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Depois do primeiro envio, ou com o campo já com erro, o erro daquele
+  // campo acompanha a digitação: some quando fica certo, muda quando o
+  // problema muda (T-73). Antes do primeiro envio, nada aparece
+  const [submitted, setSubmitted] = useState(false)
   const usernameInput = useRef<TextInputInstance>(null)
   const passwordInput = useRef<TextInputInstance>(null)
-  const set = (key: keyof RegisterInput) => (value: string) =>
-    setForm(f => ({ ...f, [key]: value }))
+  const set = (key: keyof RegisterInput) => (value: string) => {
+    const next = { ...form, [key]: value }
+    setForm(next)
+    if (submitted || fields[key])
+      setFields(f => ({ ...f, [key]: validateRegister(next)[key] }))
+  }
 
   // `latest`: o valor que chega com o Enter da senha. No app, o "Ir" pode
   // vir antes do último onChangeText, e a conta seria criada com a senha
   // cortada (mais fraca do que a digitada)
   const submit = async (latest: Partial<typeof form> = {}) => {
     const current = { ...form, ...latest }
+    setSubmitted(true)
     const problems = validateRegister(current)
     setFields(problems)
     if (Object.keys(problems).length) return
@@ -60,7 +70,9 @@ export default function RegisterScreen() {
       router.replace(hasPendingInvite() ? '/join' : '/')
     } catch (e) {
       setError(
-        e instanceof AuthError ? e.message : 'Não foi possível criar a conta'
+        e instanceof AuthError
+          ? authMessage('register', e.status, e.message)
+          : 'Não foi possível criar a conta'
       )
     } finally {
       setBusy(false)

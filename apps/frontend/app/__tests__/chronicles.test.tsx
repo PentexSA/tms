@@ -553,7 +553,7 @@ describe('Entrar com convite', () => {
     expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
 
-  it('código inválido: mensagem genérica', async () => {
+  it('código inválido: a frase genérica, com o próximo passo (T-73)', async () => {
     calls.acceptPost.mockResolvedValue(
       fail(404, 'convite inválido ou expirado')
     )
@@ -563,7 +563,7 @@ describe('Entrar com convite', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Entrar na crônica' }))
     })
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'convite inválido ou expirado'
+      'Este convite não vale mais ou o código está errado. Confira o código ou peça um novo ao narrador.'
     )
   })
 })

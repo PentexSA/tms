@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet } from 'react-native'
 
-import { messageOf } from '../../lib/errors'
+import { edenAuthMessage } from '../../lib/authMessages'
 import { clearPendingInvite, peekPendingInvite } from '../../lib/invite/pending'
 import { usePendingInvite } from '../../lib/invite/usePendingInvite'
 import { useBackTo } from '../../lib/navigation'
@@ -73,7 +73,11 @@ export default function JoinScreen() {
           {accept.isError ? (
             <Banner
               tone="danger"
-              message={messageOf(accept.error, 'Não foi possível entrar')}
+              message={edenAuthMessage(
+                'join',
+                accept.error,
+                'Não foi possível entrar'
+              )}
             />
           ) : null}
           <TextField
