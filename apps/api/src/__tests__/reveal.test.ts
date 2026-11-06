@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { compileTemplate } from '@tms/sheet-core'
+import { revealedOf, revealedValues } from '../sheets/reveal'
 import {
   addMember,
   as,
@@ -9,6 +11,7 @@ import {
   freeCreation,
   publish,
   type TestUser,
+  template,
 } from '../test/factories'
 import {
   createTestContext,
@@ -462,3 +465,33 @@ for (const system of MATRIX_SYSTEMS) {
     })
   })
 }
+
+// U-11: o servidor só revela seção do layout `text` (o único com o bloco de
+// leitura do dono e o controle do narrador), pela mesma regra do core
+describe('revealedOf: só seções reveláveis do modelo', () => {
+  it('seção restrita de texto com outro layout não é revelada', () => {
+    const t = template('vtm-v20') as {
+      fields: Record<string, unknown>
+      sections: Record<string, unknown>[]
+    }
+    t.fields.secretFact = { type: 'text', label: 'Segredo', maxLength: 80 }
+    t.sections.push({
+      id: 'facts',
+      zone: 'lore',
+      title: 'Fatos',
+      layout: 'fields',
+      fields: ['secretFact'],
+      permissions: { read: ['storyteller'], write: ['storyteller'] },
+    })
+    const model = compileTemplate(t)
+    expect(revealedOf(model, ['facts', 'storyteller'])).toEqual(['storyteller'])
+    expect(
+      revealedValues(
+        model,
+        { values: { secretFact: 'x', storytellerNotes: 'y' } },
+        ['owner'],
+        revealedOf(model, ['facts'])
+      )
+    ).toEqual([])
+  })
+})

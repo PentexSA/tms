@@ -265,6 +265,15 @@ describe('revelação ao dono (U-11)', () => {
       stripRestricted(model, sheet, ['owner']).values.storytellerNotes
     ).toBeUndefined()
   })
+
+  it('seção restrita de texto com outro layout não é revelável', () => {
+    const m = withSections({
+      ...restricted('facts', ['secretText']),
+      layout: 'fields',
+    })
+    expect(revealableSections(m)).toEqual(['storyteller'])
+    expect(canRead(m, 'secretText', ['owner'], ['facts'])).toBe(false)
+  })
 })
 
 describe('isEditableIn (UX, não é controle de acesso)', () => {

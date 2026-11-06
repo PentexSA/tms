@@ -30,8 +30,8 @@ const allows = (list: readonly RoleName[], roles: Set<RoleName>) =>
 
 // U-11 (P16-D): seções que o narrador pode revelar ao dono, ficha a ficha, só
 // em leitura. A regra sai das permissions do template, sem chave nova: a
-// seção é lida pelo narrador e por nenhum outro papel, tem campos e todos são
-// texto, e nenhum campo dela está numa seção que o dono não lê e que não seja
+// seção é lida pelo narrador e por nenhum outro papel, usa o layout `text`,
+// tem campos e todos são texto, e nenhum campo dela está numa seção que o dono não lê e que não seja
 // revelável também. Nos templates do repositório, é a seção do narrador.
 const TEXT_TYPES: ReadonlySet<string> = new Set(['text', 'longText'])
 
@@ -50,6 +50,9 @@ export function revealableSections(model: SheetModel): readonly string[] {
   const ids = new Set<string>()
   for (const s of model.sections.values()) {
     if (!storytellerOnly(s.def.permissions?.read)) continue
+    // Só o layout de texto tem o bloco de leitura do dono e o controle do
+    // narrador: outra seção restrita não é revelável
+    if (s.def.layout !== 'text') continue
     if (s.fieldIds.length === 0) continue
     const textOnly = s.fieldIds.every(id =>
       TEXT_TYPES.has(model.fields.get(id)?.type ?? '')
