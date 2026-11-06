@@ -96,8 +96,12 @@ export function useDice(
   // O resultado do topo vale para a parada que o gerou (T-79): mudou a
   // intenção, ele sai do topo e fica só em "Nesta sessão"
   const [fresh, setFresh] = useState(false)
+  // A intenção de agora: um número que sobe a cada mudança. A resposta que
+  // chega depois de a parada mudar não volta ao topo (T-79)
+  const intent = useRef(0)
   const changedIntent = useCallback(() => {
     pendingKey.current = null
+    intent.current += 1
     setFresh(false)
   }, [])
 
@@ -133,14 +137,18 @@ export function useDice(
     [model, values, slots, difficulty, specialty, boosts, preset, roles]
   )
 
-  const record = useCallback((entry: SessionRoll) => {
+  const record = useCallback((entry: SessionRoll, at: number) => {
     setRolls(list => [entry, ...list])
-    setFresh(true)
+    setFresh(at === intent.current)
     AccessibilityInfo.announceForAccessibility(entry.announcement)
   }, [])
 
   const local = useCallback(
-    (ready: Extract<PoolPlan, { ok: true }>, manual?: ManualEntry) => {
+    (
+      ready: Extract<PoolPlan, { ok: true }>,
+      manual?: ManualEntry,
+      at: number = intent.current
+    ) => {
       const result: PoolResult | null = manual
         ? manualResult(manual.successes, manual.botch ?? false, ready.auto)
         : rollPool(ready, random)
@@ -157,18 +165,21 @@ export function useDice(
           return
         }
       }
-      record({
-        id: uuid(),
-        label: ready.label,
-        text: result.text,
-        total: result.total,
-        outcome: result.outcome,
-        faces: result.faces,
-        difficulty: ready.difficulty,
-        manual: Boolean(manual),
-        local: true,
-        announcement: `${ready.label}: ${describePool(result)} Rolado no aparelho, sem rede.`,
-      })
+      record(
+        {
+          id: uuid(),
+          label: ready.label,
+          text: result.text,
+          total: result.total,
+          outcome: result.outcome,
+          faces: result.faces,
+          difficulty: ready.difficulty,
+          manual: Boolean(manual),
+          local: true,
+          announcement: `${ready.label}: ${describePool(result)} Rolado no aparelho, sem rede.`,
+        },
+        at
+      )
     },
     [random, record, store, uuid]
   )
@@ -176,6 +187,9 @@ export function useDice(
   const submit = useCallback(
     async (manual?: ManualEntry) => {
       if (!plan.ok || busy) return
+      // A intenção do envio: se a parada mudar até a resposta, ela não volta
+      // ao topo
+      const at = intent.current
       setBusy(true)
       setError(null)
       try {
@@ -225,18 +239,21 @@ export function useDice(
           faces: r.faces,
           text: r.text,
         } as PoolResult
-        record({
-          id: r.id,
-          label: r.label,
-          text: r.text,
-          total: r.total,
-          outcome: r.outcome as PoolOutcome,
-          faces: r.faces,
-          difficulty: r.difficulty,
-          manual: r.manual,
-          local: false,
-          announcement: `${r.label}: ${describePool(result)}`,
-        })
+        record(
+          {
+            id: r.id,
+            label: r.label,
+            text: r.text,
+            total: r.total,
+            outcome: r.outcome as PoolOutcome,
+            faces: r.faces,
+            difficulty: r.difficulty,
+            manual: r.manual,
+            local: false,
+            announcement: `${r.label}: ${describePool(result)}`,
+          },
+          at
+        )
       } catch {
         if (hidden && storyteller) {
           setError(
@@ -245,7 +262,7 @@ export function useDice(
           return
         }
         // Sem rede: rola no aparelho
-        local(plan, manual)
+        local(plan, manual, at)
         pendingKey.current = null
       } finally {
         setBusy(false)

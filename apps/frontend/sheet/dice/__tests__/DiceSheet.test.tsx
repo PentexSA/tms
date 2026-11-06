@@ -535,6 +535,23 @@ describe('Dados: o resultado e os grupos do slot (T-79)', () => {
     expect(screen.getByText('Nesta sessão')).toBeTruthy()
   })
 
+  it('a resposta que chega depois de a parada mudar não volta ao topo', async () => {
+    let answer: (value: unknown) => void = () => undefined
+    calls.rollsPost.mockImplementationOnce(
+      () => new Promise(resolve => (answer = resolve))
+    )
+    await open()
+    pick('Atributo', 'des', /^Destreza, 2/)
+    fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    // Ainda sem resposta, a pessoa troca o Atributo
+    pick('Atributo', 'for', /^Força, /)
+    await act(async () => {
+      answer(serverRoll())
+    })
+    expect(screen.queryByText('Dados: 10 · 6')).toBeNull()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+  })
+
   const headers = () =>
     screen.queryAllByRole('header').map(h => h.props.children as string)
 
