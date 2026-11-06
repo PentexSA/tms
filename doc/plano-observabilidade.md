@@ -585,16 +585,18 @@ tem uma ação clara.
 
 ### Fase 8. App nativo
 
-**Gatilho:** quando o app for distribuído. Hoje não há `eas.json`, e o CI só faz
-build de debug. Se a loja vier antes, esta fase sobe na ordem, logo depois da Fase 5.
+**Gatilho:** quando o app for distribuído. Hoje não há `eas.json`, e o CI não compila
+o nativo desde o PR #49 (04/11/2026): o build de debug roda à mão, na integração de
+cada onda. Se a loja vier antes, esta fase sobe na ordem, logo depois da Fase 5.
 
 1. `@sentry/react-native` com `npx expo install`, plugin no `app.json` e
    `getSentryExpoConfig` no `metro.config.js`, mantendo o `withNativeWind` e o
    resolver `SOURCE`.
 2. Preencher `telemetry.native.ts` com a mesma interface, e ligar o `report` de
    `sheet/sync/storage.native.ts`.
-3. Rodar `pnpm check:native` e `expo install --check`. Os jobs `native-android` e
-   `native-ios` do CI confirmam o build.
+3. Rodar `pnpm check:native` e `expo install --check`. O build nativo da integração
+   confirma o build (o CI não compila o nativo desde o PR #49; a revisão da D-00
+   está com o PO, [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16).
 4. Conferir que o header da Fase 2 sai com a versão do build instalado no aparelho,
    e não com a da última release.
 5. Upload de símbolos nativos no build de distribuição, e ligar o PostHog no nativo.
