@@ -766,7 +766,7 @@ describe('migrations', () => {
         const down = await migrator.migrateTo('0022_user_commands')
         expect(down.error).toBeUndefined()
         expect(down.results?.map(r => r.migrationName)).toEqual([
-          '0025_character_reveal',
+          '0026_character_reveal',
           '0023_templates_onda4',
         ])
         expect(await versions(db)).toEqual(before)
@@ -952,7 +952,7 @@ describe('migrations', () => {
     }
   })
 
-  it('0025: a ficha nasce privada; NPC e mais de 8 seções são recusados; desce e sobe', async () => {
+  it('0026: a ficha nasce privada; NPC e mais de 8 seções são recusados; desce e sobe', async () => {
     const { db, destroy } = await createPGliteTestDb()
     try {
       const migrator = new Migrator({ db, provider: migrationProvider })
@@ -988,7 +988,7 @@ describe('migrations', () => {
           })
           .returning('id')
           .executeTakeFirstOrThrow()
-      // Uma ficha de antes da 0025
+      // Uma ficha de antes da 0026
       const old = await insert('antiga', 'pc')
       expect((await migrator.migrateToLatest()).error).toBeUndefined()
       const npc = await insert('npc', 'npc')
