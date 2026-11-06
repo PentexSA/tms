@@ -83,7 +83,7 @@ O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz
 
 **Correções que mudam o que o §1 descreve:**
 
-- **T-79** `[a preencher: P13]`: a Força de Vontade aparecia entre os Atributos nos Dados (itens 4 a 6).
+- **T-79** (onda 5, P13): a Força de Vontade aparecia entre os Atributos nos Dados. Agora a lista do slot separa "Atributos" e "Em jogo" (Fúria, Gnose e Força de Vontade), e o resultado sai do topo quando a parada muda (itens 4 a 6).
 
 **"Escolher da lista".** A identidade do Lobisomem não tem sugestões, como a Natureza e o Comportamento do Vampiro têm; a parte da R-29 que a pediria ficou fora da onda 4 ([onda-4.md](planos-pacotes/onda-4.md) §6, ponto 17, em aberto).
 

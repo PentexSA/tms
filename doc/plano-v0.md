@@ -29,7 +29,7 @@ A v0 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 5. A ficha abre em **Editar** (ou em **Criação**, quando a crônica usa a criação por pontos da v4): atributos, habilidades, disciplinas, antecedentes, especializações e Força de Vontade. Salvar grava **um** lote. (D-13)
 6. A ficha ativa abre em **Jogo** para o dono e em **Leitura** para quem não é dono; a ficha ainda em criação reabre em **Editar** para o dono, que passa a Jogo pelo seletor de modo (T-05). A ficha tem identidade, 3 abas (Ficha · Vantagens · Sobre) e dock (Vitalidade, Sangue, FdV). (D-13)
 7. Em jogo, o jogador gasta Sangue, leva dano letal, cura com Sangue, desperta e desfaz. Tudo funciona offline e sincroniza ao reconectar.
-8. O narrador vê a mesa e edita a ficha do jogador, com a alteração assinada no histórico. Ele escreve as Notas do Narrador, que o aparelho do jogador nunca recebe.
+8. O narrador vê a mesa e edita a ficha do jogador, com a alteração assinada no histórico. Ele escreve as Notas do Narrador, que o aparelho do jogador não recebe até o narrador revelá-las (D-17, onda 5, P16-D).
 9. O jogador rola a parada: Atributo + Habilidade, dificuldade, penalidade, especialização e FdV. **Este passo é a linha de corte** (Etapa 21).
 
 O que fica fora está no §8.
@@ -86,14 +86,14 @@ O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz
 | D-09 | As Disciplinas do clã vêm primeiro, com o selo "do clã"; outra Disciplina avisa "confirme com o narrador", sem bloquear. A Fraqueza mostra o resumo do clã, escrito pelo time, como padrão editável: ele não é gravado sozinho | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 8 |
 | D-11 | "?" com uma frase curta do template ao lado dos campos, das opções e das Disciplinas, na Nova ficha, na Criação e no Editar (itens 4 e 5) | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |
 | D-13 | Este registro e os itens 4, 5 e 6 do §1 | onda 5, P01-D | — |
-| D-14 | `[a preencher: P12]`: o convite por link, com o código no fragmento; os itens 2 e 3 do §1, a decisão 2 do §7 e o "Convite por e-mail ou por link" do §8 | onda 5, P12 | — |
+| D-14 | O convite por link: o narrador gera o convite e manda `https://<web>/join#<código>` com uma mensagem pronta ("Copiar link", "Compartilhar" ou "Copiar mensagem"); quem abre cai em "Entrar com convite" já preenchido e entra com um toque, também sem sessão (passa pelo login ou pelo cadastro e volta ao convite); o app trata `tms://join#<código>`. O código vai só no fragmento, sai da URL e do histórico depois de lido e não chega aos logs nem ao Sentry; o servidor continua guardando só o hash. Cada convite ativo mostra o número, o dia e a hora, e "Revogar" pede confirmação. Vale para os itens 2 e 3 do §1, a decisão 2 do §7 e o "Convite por e-mail ou por link" do §8 (o link entrou; o e-mail não) | onda 5, P12 | rótulo livre, final do código e App Links: [onda-5.md](planos-pacotes/onda-5.md) §6, ponto 7 |
 
 **Correções que mudam o que o §1 descreve:**
 
 - **T-05** (onda 2, P04-C): a ficha em criação da dona abre na montagem por qualquer entrada (lista, link, recarga): em Criação com a conta por pontos, em Editar na criação livre (item 5).
 - **T-33** (onda 3, P09-C): o narrador abre a ficha do jogador em Leitura, sem seletor de modo, e entra na edição pelo "Editar como narrador" (item 8).
-- **T-53** `[a preencher: P13]`: o "De" efetivo no toast de gasto e na reversão do Histórico. O "Estado da v0" o dá como corrigido, e o teste o viu voltar numa ficha nova (item 7).
-- **T-79** `[a preencher: P13]`: a Força de Vontade fora dos Atributos nos Dados (item 9).
+- **T-53** (onda 5, P13): o "De" efetivo no toast de gasto e na reversão do Histórico. O "Estado da v0" o dava como corrigido, e o teste o viu voltar numa ficha nova. Agora a folha do recurso diz "Sangue 10 → 9" e o desfazer fica "Sangue: 9 → 10" no Histórico, também com o recurso no valor padrão; desfazer o desfazer continua recusado quando a ficha mudou depois (item 7).
+- **T-79** (onda 5, P13): os Dados tiram o resultado do topo quando a parada muda, e a lista do slot separa os grupos; a Força de Vontade não aparece mais entre os Atributos (item 9).
 
 **Ainda não conferido:** os resumos da Fraqueza e as frases do "?" são rascunho do time, para revisão; não foram conferidos contra o livro ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
 

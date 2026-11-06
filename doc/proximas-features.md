@@ -104,4 +104,6 @@ A D-03 pôs o selo na Mesa e deixou o push para depois. Ele entra na lista do it
 
 ### 5.3 Revelar uma Nota do Narrador ao jogador (D-17)
 
-`[a preencher: P16-D]`
+Entrou na onda 5 ([P16-D](planos-pacotes/P16-D-revelar-nota-narrador.md)), com a revelação viva: o narrador toca "Revelar ao jogador" nas Notas do Narrador de uma ficha de jogador, confirma, e o dono passa a ler a nota inteira, só em leitura, enquanto for membro, inclusive o que o narrador salvar depois. "Deixar privadas" esconde de novo. Cada passo fica no Histórico. O texto chega por uma rota própria e não fica no cache do aparelho; sair da crônica, ser removido ou a transferência da narração zera a revelação. O NPC não tem revelação.
+
+Ficam para depois: uma lista de notas (hoje é um texto só por ficha), um retrato do texto no momento da revelação, e um selo ou notificação para o jogador.
