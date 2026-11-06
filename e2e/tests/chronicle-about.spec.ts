@@ -172,7 +172,14 @@ test('a Apresentação da crônica: trecho, leitura, ex-membro e convidado', asy
     ).toBeVisible()
     const field = page.getByRole('textbox', { name: 'Descrição', exact: true })
     await field.fill(`${DESCRIPTION}\n\nFrase nova do roteiro.`)
+    // Espera o PATCH responder antes de sair da tela
+    const saved = page.waitForResponse(
+      res =>
+        res.url().endsWith(`/chronicles/${chronicle.id}`) &&
+        res.request().method() === 'PATCH'
+    )
     await page.getByRole('button', { name: 'Salvar apresentação' }).click()
+    expect((await saved).status()).toBe(200)
     await page.goto(`/chronicles/${chronicle.id}/about`)
     await expect(page.getByText('Frase nova do roteiro.')).toBeVisible()
     const column = await page.getByTestId('chronicle-about-text').boundingBox()
