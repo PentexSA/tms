@@ -53,6 +53,7 @@ export interface CharacterEvents {
   id: Generated<string>
   path: string
   seq: number
+  to_absent: Generated<boolean>
   to_value: Json | null
 }
 
