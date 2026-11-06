@@ -249,6 +249,34 @@ describe('o narrador revela e esconde', () => {
     expect(body(2).clientCommandId).not.toBe(body(0).clientCommandId)
   })
 
+  it('no sucesso, a ficha em cache já traz o estado novo, sem esperar a rebusca', async () => {
+    const { queryClient } = await open(['storyteller'])
+    calls.revealPost.mockResolvedValue(
+      ok({
+        section: 'storyteller',
+        revealed: true,
+        sections: ['storyteller'],
+        revision: 1,
+        duplicate: false,
+      })
+    )
+    // A rebusca da ficha não volta: o que muda vem da resposta do comando
+    calls.characterGet.mockReturnValue(new Promise(() => undefined))
+    fireEvent.press(screen.getByRole('button', { name: /^Revelar ao jogador/ }))
+    await screen.findByText('Revelar as Notas do Narrador a dona?')
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar notas' }))
+    expect(
+      await screen.findByText('Notas do Narrador · reveladas: dona lê')
+    ).toBeTruthy()
+    expect(
+      (
+        queryClient.getQueryData(['characters', ID]) as {
+          reveal: { sections: string[]; revision: number }
+        }
+      ).reveal
+    ).toEqual({ sections: ['storyteller'], revision: 1 })
+  })
+
   it('o 409 da revisão velha aparece dentro da folha', async () => {
     await open(['storyteller'])
     calls.revealPost.mockResolvedValue(

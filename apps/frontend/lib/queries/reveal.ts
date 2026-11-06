@@ -70,9 +70,28 @@ export const useSetReveal = (characterId: string) => {
       readonly revealed: boolean
       readonly revision: number
     }) => unwrap(await api.characters({ id: characterId }).reveal.post(input)),
-    // Pelo prefixo, a ficha leva junto o Histórico e a consulta revelada
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['characters', characterId] }),
+    // O estado novo entra na ficha em cache na hora (o rótulo e a revisão do
+    // próximo envio não esperam a rebusca); depois, pelo prefixo, a ficha, o
+    // Histórico e a consulta revelada são rebuscados
+    onSuccess: result => {
+      const sections = (result as { sections?: unknown }).sections
+      const revision = (result as { revision?: unknown }).revision
+      if (Array.isArray(sections) && Number.isInteger(revision))
+        queryClient.setQueryData(['characters', characterId], (old: unknown) =>
+          isObject(old)
+            ? {
+                ...old,
+                reveal: {
+                  sections: sections.filter(s => typeof s === 'string'),
+                  revision,
+                },
+              }
+            : old
+        )
+      return queryClient.invalidateQueries({
+        queryKey: ['characters', characterId],
+      })
+    },
     // Revisão velha (a ficha do cache restaurado): o erro fica na folha, e a
     // ficha rebusca o estado e a revisão atuais
     onError: error =>
