@@ -392,6 +392,31 @@ Os pontos para o PO das ondas 1 a 4 ([onda-1.md](onda-1.md) §6 a [onda-4.md](on
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementação em 05/11/2026, na `pacote/p14-d-cronica-leitura` (base `52dbe0f`), em paralelo com os outros pacotes da onda. Os pontos para o PO e as perguntas técnicas seguiram a recomendação deste plano; nada foi decidido aqui.
+
+**O que ficou fora, e por quê:**
+
+1. **O commit 1 entrou só com os testes.** O ponto 1 da §9 (o ponto 5 do [onda-5.md](onda-5.md) §6) segue em aberto, então o `routes.ts` não mudou: **o ex-membro continua recebendo a Descrição e a Imagem** no `GET /chronicles/:id`. A matriz de AuthZ registra isso: a sentinela da Descrição aparece no detalhe para o narrador, a dona, o outro jogador e o ex-membro, e em nenhuma resposta de nenhuma rota para o narrador de outra crônica, o estranho e o anônimo; ao ex-membro, em nenhuma rota além do detalhe. O `members.test.ts` não mudou (o `not.toHaveProperty('description')` só faz sentido com a mudança). Se o PO aceitar, a mudança é a do §3.6, e a linha do `check` em `authz.test.ts` passa a esperar a falta da sentinela para o `former`.
+2. **A Imagem** (ponto 2): fora, como recomendado. A CSP não mudou.
+3. **O campo maior no celular** (pergunta técnica 4): fica para a medida no AVD (U-09h); o `numberOfLines` da "Descrição" não mudou.
+
+**Desvios de desenho:**
+
+4. **A Descrição com 4001 caracteres volta 400, não 422.** O schema da rota (`maxLength: 4000`) recusa antes do `safeText`. O teste fixa o 400 e confere que a resposta não ecoa o texto; o texto com `<` continua 422.
+5. **O ex-membro:** como a API ainda manda a Descrição, o bloco e a tela de leitura não a mostram a ele pelo `role` (defesa em profundidade). O E2E confere só a tela dele, e não a resposta (§4.3, passo 4, condicionado ao ponto 1).
+6. **Os tamanhos do seed** (`--apresentacao`): "Vampiro v3/v5" com 119 caracteres, "Mago v4" com 3625 em seis parágrafos (a marcação abre o quarto) e "Lobisomem v4" com 4000 em oito parágrafos. O texto é gerado no script ("Parágrafo de teste do roteiro, número N, frase M."), e o `main` lista crônica e tamanho, sem o texto.
+7. **O spec E2E** (`chronicle-about.spec.ts`) foi escrito e passou no typecheck e no lint, mas **não rodou**: o E2E é da integração (portas fixas). A medida do bloco (até 104 px) e o `y` da `tablist` ficam para lá, já com o topo do P09-D.
+
+**Revisões:**
+
+8. **`/security-review`** no diff do pacote: nenhum achado. A rota da API não mudou; o texto é desenhado em `Text`, sem `dangerouslySetInnerHTML`, parser, link nem `Linking`; o `id` da URL só vai ao `GET /chronicles/:id`, que aplica o `chronicleAccess`; nenhum log novo; o seed só lista crônica e tamanho.
+9. **Revisão de código** (feita no próprio agente, sem subagentes): um achado, corrigido em `fix(e2e)`: o narrador saía da tela antes de o `PATCH` responder, e a leitura podia mostrar o texto antigo.
+
+**Para o rebase (onda-5.md §3 e §4.1):**
+
+10. O bloco está dentro do `styles.info` de `chronicles/[id]/index.tsx`, logo depois de "Você narra esta crônica." / "Narrador: …", e antes do `TransferOffer`, do `CreationSettings` e das abas. O P09-D, que entra antes, mexe no `CreationSettings`; este pacote não o toca. O P12 leva o `about.tsx` junto se mover o `useSheetBack`.
+11. Um teste do `CampaignBackstage.test.tsx` ("sem catálogo não desenha regras da casa…") falhou uma vez na rodada completa do Jest com cobertura, com a máquina em carga 27, e passou nas três rodadas isoladas e na rodada completa seguinte. Não é do pacote, mas fica anotado.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir o item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias e só texto fictício. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
