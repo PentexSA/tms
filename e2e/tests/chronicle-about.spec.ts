@@ -189,11 +189,19 @@ test('a Apresentação da crônica: trecho, leitura, ex-membro e convidado', asy
     const column = await page.getByTestId('chronicle-about-text').boundingBox()
     expect(column?.width ?? 0).toBeLessThanOrEqual(640)
 
-    // Ex-membro a 390: sem bloco na crônica; a leitura direta diz que saiu.
-    // A API ainda lhe manda a Descrição (onda-5.md §6, ponto 5, em aberto):
-    // aqui se confere só a tela
+    // Ex-membro a 390: a resposta não traz a Descrição (D-15), sem bloco na
+    // crônica, e a leitura direta diz que saiu. O teste só procura a marca,
+    // não a imprime
     const formerPage = await formerContext.newPage()
+    const formerDetail = formerPage.waitForResponse(
+      res =>
+        res.url().endsWith(`/chronicles/${chronicle.id}`) &&
+        res.request().method() === 'GET'
+    )
     await formerPage.goto(`/chronicles/${chronicle.id}`)
+    const formerBody = await (await formerDetail).text()
+    expect(formerBody).not.toContain(MARKER)
+    expect(formerBody).not.toContain('"description"')
     await expect(formerPage.getByTestId('former-banner')).toBeVisible()
     await expect(
       formerPage.getByRole('button', { name: READ_ALL, exact: true })
