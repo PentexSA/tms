@@ -40,9 +40,11 @@ import {
   arrange,
   buildItem,
   bySection,
+  stageCounts,
   type TableItem,
   type TableRowData,
   type TableSort,
+  type TableStage,
 } from './tableItems'
 import { XpRequestsSheet } from './XpSheets'
 
@@ -69,6 +71,24 @@ export function tableColumns(width: number, stacked: boolean): number {
   return Math.max(
     1,
     Math.min(TABLE_COLUMNS_MAX, Math.floor(usable / TABLE_CARD_MIN))
+  )
+}
+
+/**
+ * A largura do texto de um cartão (P09-D: o progresso cabe sem cortar), pela
+ * janela e pela coluna, sem `onLayout`: na coluna única, a tela menos o
+ * recuo do cartão; na grade, a célula menos o recuo dela, a borda e o recuo
+ * do cartão.
+ */
+export function cardTextWidth(width: number, columns: number): number {
+  const content = Math.min(width, tokens.layout.contentMaxExpanded)
+  if (columns <= 1) return content - 2 * tokens.layout.gutter
+  const grid = content - 2 * (tokens.layout.gutter - tokens.space[3] / 2)
+  return (
+    grid / columns -
+    tokens.space[3] -
+    2 * tokens.borderWidth.hair -
+    2 * tokens.layout.gutter
   )
 }
 
@@ -192,8 +212,11 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [scope, setScope] = useState<TableScope>('playing')
   const [sort, setSort] = useState<TableSort>('name')
   const [onlyAlerts, setOnlyAlerts] = useState(false)
+  // P09-D (D-10): a etapa da criação, "Em criação" ou "Pendentes"
+  const [stage, setStage] = useState<TableStage | null>(null)
   const { width, stacked } = useLayout()
   const columns = tableColumns(width, stacked)
+  const textWidth = cardTextWidth(width, columns)
   // A seleção vive na crônica (T-49): a barra fica fora da rolagem
   const selection = useTableSelection()
   const { selecting, selected, toggle: select, sync } = selection
@@ -215,9 +238,26 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
     if (loaded) sync(items)
   }, [loaded, items, sync])
   const shown = useMemo(
-    () => arrange(items, { sort, onlyAlerts }),
-    [items, sort, onlyAlerts]
+    () => arrange(items, { sort, onlyAlerts, stage }),
+    [items, sort, onlyAlerts, stage]
   )
+  // A contagem é de todos os PCs do escopo, não só dos que aparecem com
+  // "Só com alerta"
+  const counts = useMemo(() => stageCounts(items), [items])
+  const pcs = useMemo(
+    () => items.filter(i => i.row.kind !== 'npc').length,
+    [items]
+  )
+  const stageChip = (id: TableStage, label: string) =>
+    scope === 'playing' && (counts[id] > 0 || stage === id) ? (
+      <Chip
+        label={`${label} (${counts[id]})`}
+        selected={stage === id}
+        testID={`table-stage-${id}`}
+        // Um exclui o outro; tocar o ativo desliga
+        onPress={() => setStage(s => (s === id ? null : id))}
+      />
+    ) : null
   // PCs e, depois, NPCs numa seção própria (T-52)
   const sections = useMemo(() => bySection(shown), [shown])
   // A ordem da tela, lida ao abrir: o callback não muda com o filtro, e as
@@ -241,6 +281,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
       selected={selected.has(item.row.id)}
       onSelect={select}
       framed={framed}
+      width={textWidth}
     />
   )
 
@@ -259,6 +300,8 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
           onSelect={id => {
             setScope(id as TableScope)
             selection.clear()
+            // O filtro de etapa é do escopo "Em jogo"
+            setStage(null)
           }}
         />
         <View style={styles.chips}>
@@ -279,7 +322,22 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             selected={onlyAlerts}
             onPress={() => setOnlyAlerts(v => !v)}
           />
+          {stageChip('creating', 'Em criação')}
+          {stageChip('pending', 'Pendentes')}
         </View>
+        {stage ? (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            aria-live="polite"
+            accessibilityLiveRegion="polite"
+            testID="table-filter-status"
+          >
+            {`Mostrando ${sections.pcs.length} de ${pcs}: ${
+              stage === 'creating' ? 'em criação' : 'pendentes'
+            }.`}
+          </Text>
+        ) : null}
         <UpdatedAt at={table.dataUpdatedAt} />
         {xpRequests.data?.length ? (
           <Button
@@ -312,13 +370,24 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
             />
           </View>
         ) : shown.length === 0 ? (
-          <Text color="inkMuted" style={styles.hint}>
-            {onlyAlerts && rows.length
-              ? 'Ninguém com alerta agora.'
-              : scope === 'out'
-                ? 'Nenhuma ficha arquivada ou fora de jogo.'
-                : 'Nenhuma ficha na crônica ainda.'}
-          </Text>
+          <View style={styles.hint}>
+            <Text color="inkMuted">
+              {stage === 'creating' && rows.length
+                ? 'Nenhuma ficha em criação.'
+                : stage === 'pending' && rows.length
+                  ? 'Nenhuma ficha pendente.'
+                  : onlyAlerts && rows.length
+                    ? 'Ninguém com alerta agora.'
+                    : scope === 'out'
+                      ? 'Nenhuma ficha arquivada ou fora de jogo.'
+                      : 'Nenhuma ficha na crônica ainda.'}
+            </Text>
+            {!rows.length && scope === 'playing' ? (
+              <Text variant="caption" color="inkMuted">
+                As fichas aparecem aqui com a etapa da criação e o que falta.
+              </Text>
+            ) : null}
+          </View>
         ) : (
           <>
             <TableGrid
@@ -326,6 +395,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
               columns={columns}
               renderItem={row}
             />
+            {/* Com um filtro de etapa, nenhum NPC entra (o stageOf) */}
             {sections.npcs.length ? (
               <>
                 <View style={styles.section} testID="table-npcs">

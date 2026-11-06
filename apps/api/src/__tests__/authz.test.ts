@@ -306,6 +306,125 @@ for (const system of MATRIX_SYSTEMS) {
       }
       expect(JSON.stringify(rows)).not.toContain('created_by')
     })
+
+    // P09-D (R-15): a entrada da conta da criação (escolhas e camada) sai só
+    // na Mesa, só para o narrador, e nunca para o NPC oculto
+    it('a Mesa do narrador: creationInput só para ele, nunca no NPC', async () => {
+      const reason = 'motivo-do-ajuste-da-matriz-p09d'
+      const layer = {
+        choices: {
+          priorities: { attributes: ['mental', 'social', 'physical'] },
+        },
+        config: { freebies: 13 },
+      }
+      const points = await createCharacter(
+        shared.ctx,
+        shared.users.owner,
+        shared.chronicleId,
+        { name: 'Por pontos' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({
+          creation: JSON.stringify({
+            ...layer,
+            adjust: { reason, at: '2026-11-05T10:00:00Z' },
+          }),
+        })
+        .where('id', '=', points)
+        .execute()
+      const path = `/chronicles/${shared.chronicleId}/table`
+      const res = await as(shared.ctx, shared.users.storyteller, 'GET', path)
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      // O motivo do ajuste não sai nem para o narrador, pela Mesa
+      expect(text).not.toContain(reason)
+      const rows = JSON.parse(text) as {
+        id: string
+        creationInput: unknown
+      }[]
+      expect(rows.find(r => r.id === points)?.creationInput).toEqual(layer)
+      // O NPC oculto e a ficha da criação livre não têm entrada
+      expect(rows.find(r => r.id === shared.npcId)?.creationInput).toBeNull()
+      expect(
+        rows.find(r => r.id === shared.characterId)?.creationInput
+      ).toBeNull()
+      for (const actor of [
+        'owner',
+        'player',
+        'former',
+        'otherStoryteller',
+        'stranger',
+      ] as const) {
+        const denied = await as(shared.ctx, shared.users[actor], 'GET', path)
+        expect(denied.status).toBe(404)
+        const body = await denied.text()
+        expect(body).not.toContain('creationInput')
+        expect(body).not.toContain('mental')
+      }
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', '=', points)
+        .execute()
+    })
+
+    // P09-D (R-15): "N fichas em criação" na lista só para o narrador; o NPC
+    // (oculto ou revelado) nunca entra, e quem o lê como viewer recebe 0
+    it('a lista de crônicas: creatingCount só para o narrador, sem NPC', async () => {
+      const countOf = async (actor: Exclude<Actor, 'anonymous'>) => {
+        const res = await as(
+          shared.ctx,
+          shared.users[actor],
+          'GET',
+          '/chronicles'
+        )
+        expect(res.status).toBe(200)
+        const rows = (await res.json()) as {
+          id: string
+          creatingCount: number
+        }[]
+        return rows.find(r => r.id === shared.chronicleId)?.creatingCount
+      }
+      // As linhas da matriz que criam ficha mudam o cenário: a prova é a
+      // diferença. Uma ficha nova de jogador conta; o NPC, não
+      const base = await countOf('storyteller')
+      expect(base).toBeGreaterThanOrEqual(1)
+      const extra = await createCharacter(
+        shared.ctx,
+        shared.users.player,
+        shared.chronicleId,
+        { name: 'Mais uma' }
+      )
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      for (const actor of ['owner', 'player', 'former'] as const)
+        expect(await countOf(actor)).toBe(0)
+      for (const actor of ['otherStoryteller', 'stranger'] as const)
+        expect(await countOf(actor)).toBeUndefined()
+      const revealed = await createCharacter(
+        shared.ctx,
+        shared.users.storyteller,
+        shared.chronicleId,
+        { name: 'NPC revelado' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility: 'full' })
+        .where('id', '=', revealed)
+        .execute()
+      const seen = await as(
+        shared.ctx,
+        shared.users.player,
+        'GET',
+        `/characters/${revealed}`
+      )
+      expect(await seen.json()).toMatchObject({ roles: ['viewer'] })
+      expect(await countOf('player')).toBe(0)
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', 'in', [revealed, extra])
+        .execute()
+    })
   })
 
   describe(`matriz de AuthZ: ${system}, linhas que mudam o estado`, () => {

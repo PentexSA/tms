@@ -15,12 +15,22 @@ import {
   useTheme,
   useToast,
 } from '@tms/ui'
-import { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AccessibilityInfo,
+  type HostInstance,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native'
 
 import { messageOf } from '../../lib/errors'
 import { useChronicleCreationSettings } from '../../lib/queries/creation'
-import { layerOf } from '../../sheet/creation/summary'
+import {
+  chronicleCreationSummary,
+  layerOf,
+  summaryLine,
+} from '../../sheet/creation/summary'
 import { useCompiled, useLatestTemplate } from '../../sheet/data'
 import { ReloadButton, unsupportedShort } from '../../sheet/UnsupportedTemplate'
 import { UnsavedChangesGuard } from '../UnsavedChangesGuard'
@@ -33,7 +43,40 @@ export interface ChronicleCreationInfo {
   readonly revision: number
 }
 
-/** Regras padrão das próximas fichas, configuradas pelo narrador. */
+/** O salvo da crônica: as regras e se já houve uma gravação. */
+const savedOf = (creation: ChronicleCreationInfo) => ({
+  approval: creation.approval,
+  defaults: layerOf(creation.defaults),
+  stored: creation.revision > 0,
+})
+
+/**
+ * O foco programático num controle de dentro de uma vista (o botão "Editar",
+ * o primeiro rádio): no web, o primeiro elemento focável dela; no app, o
+ * leitor de tela vai até a vista. Os componentes do @tms/ui não expõem `ref`.
+ */
+function focusInside(view: HostInstance | null) {
+  if (!view) return
+  if (Platform.OS === 'web') {
+    const el = view as unknown as {
+      querySelector?: (s: string) => { focus?: () => void } | null
+    }
+    el.querySelector?.('[role="radio"],button,[tabindex="0"]')?.focus?.()
+    return
+  }
+  AccessibilityInfo.sendAccessibilityEvent(view, 'focus')
+}
+
+/**
+ * Regras padrão das próximas fichas, configuradas pelo narrador.
+ *
+ * P09-D (T-36, D-10): depois de salvas, as regras ficam num resumo de uma
+ * linha (o mesmo `summaryLine` que o jogador lê sob "Suas fichas") com
+ * "Editar", e as abas da crônica sobem. Numa crônica que nunca salvou
+ * (`revision === 0`), o painel abre aberto, e salvar o padrão sem mudança
+ * já recolhe. Só recolhe por "Cancelar" (descarta) ou por salvar; sair da
+ * tela com o painel aberto e mudado continua perguntando (T-56).
+ */
 export function CreationSettings({
   chronicleId,
   systemCode,
@@ -49,12 +92,27 @@ export function CreationSettings({
   const toast = useToast()
   const { colors } = useTheme()
   const { breakpoint, stacked } = useLayout()
+  // O que está salvo, até onde a tela sabe: o da crônica e, logo depois de
+  // salvar (antes da rebusca chegar), o que acabou de ser salvo. O resumo, o
+  // "mudou" e o "Cancelar" partem daqui, não da prop ainda velha
+  const [saved, setSaved] = useState(() => savedOf(creation))
   const [approval, setApproval] = useState(creation.approval)
   const [defaults, setDefaults] = useState<CreationConfigLayer>(() =>
     layerOf(creation.defaults)
   )
+  const [open, setOpen] = useState(creation.revision === 0)
+  // O foco depois de abrir (o primeiro controle) e de recolher ("Editar")
+  const [focus, setFocus] = useState<'first' | 'edit' | null>(null)
+  const editRef = useRef<HostInstance>(null)
+  const firstRef = useRef<HostInstance>(null)
+  useEffect(() => {
+    if (!focus) return
+    focusInside((focus === 'edit' ? editRef : firstRef).current)
+    setFocus(null)
+  }, [focus])
 
   useEffect(() => {
+    setSaved(savedOf(creation))
     setApproval(creation.approval)
     setDefaults(layerOf(creation.defaults))
   }, [creation])
@@ -64,8 +122,8 @@ export function CreationSettings({
     [model, defaults]
   )
   const changed =
-    approval !== creation.approval ||
-    JSON.stringify(defaults) !== JSON.stringify(layerOf(creation.defaults))
+    approval !== saved.approval ||
+    JSON.stringify(defaults) !== JSON.stringify(saved.defaults)
   // L-01: "não carregou" e "não suportado" não são "criação livre". Sem as
   // regras do sistema, o narrador não salva (nem a aprovação): decidiria sem
   // ver as regras, e os padrões voltariam sem ele ter visto. O servidor
@@ -74,8 +132,12 @@ export function CreationSettings({
   const rulesKnown = Boolean(model)
   // T-56: "Descartar e sair" volta ao que está salvo
   const reset = () => {
-    setApproval(creation.approval)
-    setDefaults(layerOf(creation.defaults))
+    setApproval(saved.approval)
+    setDefaults(saved.defaults)
+  }
+  const collapse = () => {
+    setOpen(false)
+    setFocus('edit')
   }
 
   const setBudget = (id: string, value: number | readonly number[]) =>
@@ -94,6 +156,56 @@ export function CreationSettings({
       budget.rule !== 'priority-budget'
   )
 
+  if (!open)
+    return (
+      <View style={styles.collapsed} testID="creation-settings">
+        <SectionHeader
+          title="Criação de fichas"
+          right={
+            <View ref={editRef}>
+              <Button
+                title="Editar"
+                variant="secondary"
+                accessibilityLabel="Editar regras da criação"
+                testID="creation-settings-edit"
+                onPress={() => {
+                  setOpen(true)
+                  setFocus('first')
+                }}
+              />
+            </View>
+          }
+        />
+        {/* L-01: sem as regras do sistema, nunca "criação livre" */}
+        {loadFailed ? (
+          <View style={styles.rules}>
+            <Text color="danger" accessibilityRole="alert">
+              Não foi possível carregar as regras deste sistema.
+            </Text>
+            <View style={styles.start}>
+              <Button
+                title="Tentar de novo"
+                variant="secondary"
+                onPress={() => latest.refetch()}
+              />
+            </View>
+          </View>
+        ) : (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            testID="creation-settings-summary"
+          >
+            {model === undefined
+              ? 'Carregando as regras do sistema…'
+              : model === null
+                ? unsupportedShort('regras')
+                : summaryLine(chronicleCreationSummary(model, saved))}
+          </Text>
+        )}
+      </View>
+    )
+
   return (
     <View style={styles.panel} testID="creation-settings">
       <UnsavedChangesGuard
@@ -111,24 +223,26 @@ export function CreationSettings({
       >
         <View style={[styles.rules, columns && styles.column]}>
           <SectionHeader title="Como funciona" level="group" />
-          <Choice
-            label="Aprovação do narrador"
-            value={approval ? 'on' : 'off'}
-            onChange={value => setApproval(value === 'on')}
-            // O efeito de cada opção (R-10, T-29): o comportamento de hoje
-            options={[
-              {
-                id: 'off',
-                label: 'Desligada',
-                meta: 'Na criação por pontos, a ficha entra em jogo quando o jogador conclui.',
-              },
-              {
-                id: 'on',
-                label: 'Ligada',
-                meta: 'Na criação por pontos, o jogador envia a ficha e ela fica só para leitura até você aprovar ou devolver.',
-              },
-            ]}
-          />
+          <View ref={firstRef}>
+            <Choice
+              label="Aprovação do narrador"
+              value={approval ? 'on' : 'off'}
+              onChange={value => setApproval(value === 'on')}
+              // O efeito de cada opção (R-10, T-29): o comportamento de hoje
+              options={[
+                {
+                  id: 'off',
+                  label: 'Desligada',
+                  meta: 'Na criação por pontos, a ficha entra em jogo quando o jogador conclui.',
+                },
+                {
+                  id: 'on',
+                  label: 'Ligada',
+                  meta: 'Na criação por pontos, o jogador envia a ficha e ela fica só para leitura até você aprovar ou devolver.',
+                },
+              ]}
+            />
+          </View>
           {loadFailed ? (
             <View style={styles.rules}>
               <Text color="danger" accessibilityRole="alert">
@@ -237,11 +351,28 @@ export function CreationSettings({
         </Text>
       ) : null}
       <View style={styles.actions}>
+        {/* Só quem já salvou recolhe sem salvar: "Cancelar" descarta */}
+        {saved.stored ? (
+          <Button
+            title="Cancelar"
+            variant="ghost"
+            testID="creation-settings-cancel"
+            disabled={mutation.isPending}
+            onPress={() => {
+              reset()
+              collapse()
+            }}
+          />
+        ) : null}
         <Button
           title="Salvar regras da criação"
           testID="creation-settings-save"
           busy={mutation.isPending}
-          disabled={!changed || mutation.isPending || !rulesKnown}
+          // A primeira gravação vale sem mudança: salvar o padrão do sistema
+          // é a primeira configuração, e o painel recolhe
+          disabled={
+            (!changed && saved.stored) || mutation.isPending || !rulesKnown
+          }
           accessibilityHint={
             rulesKnown
               ? undefined
@@ -255,8 +386,11 @@ export function CreationSettings({
                 defaults: defaults as Record<string, unknown>,
               },
               {
-                onSuccess: () =>
-                  toast.show({ message: 'Regras da criação salvas.' }),
+                onSuccess: () => {
+                  setSaved({ approval, defaults, stored: true })
+                  toast.show({ message: 'Regras da criação salvas.' })
+                  collapse()
+                },
               }
             )
           }
@@ -340,6 +474,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.layout.gutter,
     paddingVertical: tokens.space[4],
   },
+  collapsed: {
+    gap: tokens.space[1],
+    paddingHorizontal: tokens.layout.gutter,
+    paddingVertical: tokens.space[3],
+  },
   rules: { gap: tokens.space[3] },
   columns: {
     flexDirection: 'row',
@@ -361,6 +500,10 @@ const styles = StyleSheet.create({
     gap: tokens.space[2],
   },
   flex: { flex: 1 },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end' },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: tokens.space[2],
+  },
   start: { flexDirection: 'row' },
 })

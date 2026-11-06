@@ -8,7 +8,7 @@ import {
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Dimensions, ScrollView, StyleSheet } from 'react-native'
-
+import { cardTextWidth } from '../../components/chronicles/TableView'
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
 import { clearChronicleScroll, scrollOf } from '../../lib/chronicleScroll'
@@ -658,5 +658,187 @@ describe('para o jogador a Mesa não existe', () => {
       await screen.findByText('Você ainda não tem ficha nesta crônica.')
     ).toBeTruthy()
     expect(calls.chronicle.tableGet).not.toHaveBeenCalled()
+  })
+})
+
+// P09-D (D-10, R-15): o progresso da criação por pontos no cartão, pela
+// mesma conta da barra do jogador
+describe('o progresso da criação no cartão', () => {
+  const NEW = '00000000-0000-4000-8000-00000000d001'
+  const NPC = '00000000-0000-4000-8000-00000000d002'
+  const OLD = '00000000-0000-4000-8000-00000000d003'
+  const BROKEN = '00000000-0000-4000-8000-00000000d004'
+  const fresh = (id: string, name: string, extra = {}) => ({
+    ...row(id, 'helena', 'vtm-v20'),
+    name,
+    sheet: { values: { name }, specialties: {} },
+    status: 'creating',
+    creationMode: 'points',
+    creationInput: { choices: {}, config: {} },
+    ...extra,
+  })
+
+  it('a ficha em criação por pontos diz o que falta; o nome acessível também', async () => {
+    const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
+    const before = Dimensions.get('window')
+    Dimensions.set({ window: PHONE, screen: PHONE })
+    try {
+      calls.chronicle.tableGet.mockResolvedValue(
+        ok([
+          fresh(NEW, 'Nova'),
+          // NPC com entrada (resposta adulterada): sem linha
+          fresh(NPC, 'Sentinela', { kind: 'npc', visibility: 'hidden' }),
+          // API antiga, sem o campo: o cartão de antes
+          fresh(OLD, 'Antiga', { creationInput: undefined }),
+          // Escolha fora do formato: vale como ausente, sem quebrar
+          fresh(BROKEN, 'Quebrada', {
+            creationInput: {
+              choices: { priorities: { attributes: ['x'] } },
+              config: { freebies: 'muitos' },
+            },
+          }),
+        ])
+      )
+      await openTable()
+      const line = await screen.findByTestId(`table-progress-${NEW}`)
+      // A 390, as duas linhas não levam tudo: o bônus fica no fim
+      expect(line).toHaveTextContent(/^Atributos \(prioridade\) · /)
+      expect(line).toHaveTextContent(/Bônus: restam 15 de 15$/)
+      const label = String(
+        screen.getByTestId(`table-row-${NEW}`).props.accessibilityLabel
+      )
+      // Depois do estado, antes do resto, com tudo e com palavras
+      expect(label).toContain(
+        'Em criação · por pontos. Atributos: falta escolher a prioridade, Habilidades: falta escolher a prioridade, Disciplinas: faltam 3, Antecedentes: faltam 5, Virtudes: faltam 7, Bônus: restam 15 de 15.'
+      )
+      expect(screen.queryByTestId(`table-progress-${NPC}`)).toBeNull()
+      expect(screen.queryByTestId(`table-progress-${OLD}`)).toBeNull()
+      expect(screen.getByTestId(`table-progress-${BROKEN}`)).toHaveTextContent(
+        /^Atributos \(prioridade\)/
+      )
+    } finally {
+      Dimensions.set({ window: before, screen: before })
+    }
+  })
+
+  it('a ficha em jogo não tem a linha', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(HELENA, 'helena', 'vtm-v20', {
+          status: 'active',
+          creationInput: null,
+        }),
+      ])
+    )
+    await openTable()
+    expect(await screen.findByTestId(`table-row-${HELENA}`)).toBeTruthy()
+    expect(screen.queryByTestId(`table-progress-${HELENA}`)).toBeNull()
+  })
+
+  it('a largura do texto do cartão: coluna única e grade', () => {
+    expect(cardTextWidth(390, 1)).toBe(358)
+    expect(cardTextWidth(360, 1)).toBe(328)
+    // A 1280, a grade fica nos 1200 do conteúdo, em 3 colunas
+    expect(cardTextWidth(1280, 3)).toBeCloseTo((1200 - 20) / 3 - 12 - 2 - 32)
+  })
+})
+
+// P09-D (D-10, R-15): o filtro da etapa da criação na Mesa
+describe('o filtro "Em criação" e "Pendentes"', () => {
+  const ids = [1, 2, 3, 4, 5].map(
+    n => `00000000-0000-4000-8000-00000000e00${n}`
+  )
+  const rows = () => [
+    row(ids[0] as string, 'helena', 'vtm-v20', {
+      name: 'Ana',
+      status: 'creating',
+      creationMode: 'points',
+    }),
+    row(ids[1] as string, 'helena', 'vtm-v20', {
+      name: 'Bia',
+      status: 'creating',
+      adjust: true,
+    }),
+    row(ids[2] as string, 'helena', 'vtm-v20', {
+      name: 'Caio',
+      status: 'pending',
+      creationMode: 'points',
+    }),
+    row(ids[3] as string, 'helena', 'vtm-v20', {
+      name: 'Duda',
+      status: 'active',
+    }),
+    row(ids[4] as string, 'helena', 'vtm-v20', {
+      name: 'Sentinela',
+      kind: 'npc',
+      visibility: 'hidden',
+      status: 'creating',
+    }),
+  ]
+
+  it('os chips contam, filtram, excluem um ao outro e tiram os NPCs', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok(rows()))
+    await openTable()
+    await screen.findByTestId(`table-row-${ids[0]}`)
+    expect(screen.getByTestId('table-npcs')).toBeTruthy()
+    const creating = screen.getByRole('button', { name: 'Em criação (2)' })
+    expect(screen.getByRole('button', { name: 'Pendentes (1)' })).toBeTruthy()
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    fireEvent.press(creating)
+    expect(screen.getByTestId('table-filter-status')).toHaveTextContent(
+      'Mostrando 2 de 4: em criação.'
+    )
+    expect(screen.getByTestId('table-filter-status').props['aria-live']).toBe(
+      'polite'
+    )
+    expect(screen.getByTestId(`table-row-${ids[0]}`)).toBeTruthy()
+    expect(screen.getByTestId(`table-row-${ids[1]}`)).toBeTruthy()
+    for (const hidden of [ids[2], ids[3], ids[4]])
+      expect(screen.queryByTestId(`table-row-${hidden}`)).toBeNull()
+    expect(screen.queryByTestId('table-npcs')).toBeNull()
+    // O outro troca; tocar o ativo desliga
+    fireEvent.press(screen.getByRole('button', { name: 'Pendentes (1)' }))
+    expect(screen.getByTestId('table-filter-status')).toHaveTextContent(
+      'Mostrando 1 de 4: pendentes.'
+    )
+    expect(screen.getByTestId(`table-row-${ids[2]}`)).toBeTruthy()
+    expect(screen.queryByTestId(`table-row-${ids[0]}`)).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Pendentes (1)' }))
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    expect(screen.getByTestId(`table-row-${ids[3]}`)).toBeTruthy()
+  })
+
+  it('trocar de escopo desliga o filtro; sem ficha na etapa, sem chip', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok(rows()))
+    await openTable()
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Em criação (2)' })
+    )
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(ids[3] as string, 'helena', 'vtm-v20', {
+          name: 'Duda',
+          status: 'archived',
+        }),
+      ])
+    )
+    fireEvent.press(
+      screen.getByRole('tab', { name: 'Arquivadas e fora de jogo' })
+    )
+    await screen.findByTestId(`table-row-${ids[3]}`)
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    expect(screen.queryByTestId('table-stage-creating')).toBeNull()
+    expect(screen.queryByTestId('table-stage-pending')).toBeNull()
+  })
+
+  it('a Mesa vazia diz o que vai aparecer', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok([]))
+    await openTable()
+    expect(
+      await screen.findByText(
+        'As fichas aparecem aqui com a etapa da criação e o que falta.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByTestId('table-stage-creating')).toBeNull()
   })
 })

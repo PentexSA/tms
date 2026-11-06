@@ -522,6 +522,29 @@ describe('R-26: as Disciplinas do clã, o selo e o "fora do clã"', () => {
     )
   })
 
+  // P09-D: o narrador confirma na revisão o que o aviso pede, também em
+  // `pending`, na aba Pontos em Leitura
+  it('em pending, o narrador lê o "fora do clã" na aba Pontos', async () => {
+    const sent = character({
+      clan: 'brujah',
+      disciplines: [{ id: 'd1', name: 'Dominação', value: 1 }],
+    }) as { data: Record<string, unknown> }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...sent.data, roles: ['storyteller'], status: 'pending' })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateWithIdentity('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    fireEvent.press(await screen.findByRole('button', { name: 'Ver Pontos' }))
+    expect(screen.getByTestId('creation-notices')).toHaveTextContent(
+      /Disciplinas: 1 fora do clã\./
+    )
+  })
+
   it('a Disciplina do clã leva o selo na linha e no nome acessível', async () => {
     await open(
       {

@@ -1,6 +1,6 @@
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { usePreventRemove } from 'expo-router'
-import { Dimensions } from 'react-native'
+import { AccessibilityInfo, Dimensions } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
@@ -38,7 +38,7 @@ afterEach(() => {
   Dimensions.set({ window: PHONE, screen: PHONE })
 })
 
-async function renderPanel(systemCode = 'vtm-v20') {
+async function renderPanel(systemCode = 'vtm-v20', revision = 3) {
   const { session } = testSession(
     () => json(200, tokens()),
     memoryStore(true, 'r')
@@ -48,14 +48,22 @@ async function renderPanel(systemCode = 'vtm-v20') {
     <CreationSettings
       chronicleId={CHRONICLE}
       systemCode={systemCode}
-      creation={{ approval: false, defaults: {}, revision: 3 }}
+      creation={{ approval: false, defaults: {}, revision }}
     />,
     session
   )
 }
 
+// P09-D (T-36): com as regras já salvas, o painel abre recolhido; os casos
+// que mexem nos controles abrem pelo "Editar"
+const openPanel = async () =>
+  fireEvent.press(
+    await screen.findByRole('button', { name: 'Editar regras da criação' })
+  )
+
 async function render() {
   await renderPanel()
+  await openPanel()
   await screen.findByTestId('creation-settings-budgets')
 }
 
@@ -185,6 +193,7 @@ describe('Regras da criação sem as regras do sistema', () => {
     t.schema = 2
     calls.templateGet.mockResolvedValue(ok(t))
     await renderPanel()
+    await openPanel()
     expect(
       await screen.findByText(/^As regras deste sistema são mais novas/)
     ).toBeTruthy()
@@ -196,6 +205,7 @@ describe('Regras da criação sem as regras do sistema', () => {
   it('o template não carregou: erro com "Tentar de novo", e não salva', async () => {
     calls.templateGet.mockResolvedValue(fail(500, 'erro no servidor'))
     await renderPanel()
+    await openPanel()
     expect(
       await screen.findByText(
         'Não foi possível carregar as regras deste sistema.'
@@ -218,6 +228,7 @@ describe('Regras da criação sem as regras do sistema', () => {
     calls.templateGet.mockResolvedValue(ok(templateJson('coc7e')))
     calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
     await renderPanel('coc7e')
+    await openPanel()
     expect(await screen.findByText(FREE)).toBeTruthy()
     turnApprovalOn()
     expect(save()).toBeEnabled()
@@ -228,5 +239,164 @@ describe('Regras da criação sem as regras do sistema', () => {
       CHRONICLE,
       { revision: 3, approval: true, defaults: {} }
     )
+  })
+})
+
+// P09-D (T-36, D-10): depois de salvas, as regras ficam num resumo de uma
+// linha com "Editar", e as abas da crônica sobem
+describe('o painel recolhido', () => {
+  const SUMMARY =
+    'Criação por pontos · Atributos 7/5/3 · Habilidades 13/9/5 · Disciplinas 3 · Antecedentes 5 · Virtudes 7 · 15 de bônus · aprovação desligada'
+  let focus: jest.SpyInstance
+  beforeEach(() => {
+    focus = jest
+      .spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
+      .mockImplementation(() => undefined)
+  })
+  afterEach(() => focus.mockRestore())
+
+  it('com as regras salvas: o título, o resumo que o jogador lê e "Editar"', async () => {
+    await renderPanel()
+    expect(await screen.findByText(SUMMARY)).toBeTruthy()
+    expect(screen.getByTestId('creation-settings-summary')).toHaveTextContent(
+      SUMMARY
+    )
+    expect(screen.getByText('Criação de fichas')).toBeTruthy()
+    expect(screen.getByTestId('creation-settings')).toBeTruthy()
+    // Sem os controles nem os ids de dentro
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    expect(screen.queryByTestId('creation-settings-budgets')).toBeNull()
+    expect(screen.queryByTestId('creation-settings-save')).toBeNull()
+    expect(screen.queryByText('Orçamento')).toBeNull()
+    // O texto visível começa o nome acessível (WCAG 2.5.3)
+    const edit = screen.getByRole('button', {
+      name: 'Editar regras da criação',
+    })
+    expect(edit).toHaveTextContent('Editar')
+  })
+
+  it('"Editar" abre e leva o foco à aprovação; "Cancelar" descarta e recolhe', async () => {
+    await renderPanel()
+    await openPanel()
+    expect(await screen.findByTestId('creation-settings-budgets')).toBeTruthy()
+    expect(focus).toHaveBeenCalledTimes(1)
+    turnApprovalOn()
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(
+      await screen.findByTestId('creation-settings-summary')
+    ).toHaveTextContent(/aprovação desligada$/)
+    // O foco volta ao "Editar"
+    expect(focus).toHaveBeenCalledTimes(2)
+    expect(calls.chronicle.creationSettingsPatch).not.toHaveBeenCalled()
+    // Reabrir: o descartado não voltou
+    await openPanel()
+    expect(screen.getByRole('radio', { name: /^Desligada, / })).toBeChecked()
+    expect(jest.mocked(usePreventRemove).mock.calls.at(-1)?.[0]).toBe(false)
+  })
+
+  it('salvar recolhe, com o aviso de hoje', async () => {
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
+    await render()
+    turnApprovalOn()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(await screen.findByTestId('creation-settings-summary')).toBeTruthy()
+    expect(screen.getByText('Regras da criação salvas.')).toBeTruthy()
+  })
+
+  // /code-review (P09-D): antes da rebusca, o resumo, o "mudou" e o
+  // "Cancelar" partem do que acabou de ser salvo, não da prop velha
+  it('depois de salvar, o resumo diz o novo antes da rebusca', async () => {
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
+    await render()
+    turnApprovalOn()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(
+      await screen.findByTestId('creation-settings-summary')
+    ).toHaveTextContent(/aprovação ligada$/)
+    // Reaberto, nada mudou em relação ao que acabou de ser salvo
+    await openPanel()
+    expect(jest.mocked(usePreventRemove).mock.calls.at(-1)?.[0]).toBe(false)
+    expect(screen.getByRole('radio', { name: /^Ligada, / })).toBeChecked()
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByTestId('creation-settings-summary')).toHaveTextContent(
+      /aprovação ligada$/
+    )
+  })
+
+  it('erro ao salvar: continua aberto, com o erro', async () => {
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(
+      fail(409, 'as regras mudaram')
+    )
+    await render()
+    turnApprovalOn()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(
+      await screen.findByText(/as regras mudaram|Não foi possível salvar/)
+    ).toBeTruthy()
+    expect(screen.getByTestId('creation-settings-budgets')).toBeTruthy()
+    expect(screen.queryByTestId('creation-settings-summary')).toBeNull()
+  })
+
+  it('crônica que nunca salvou: aberto, e salvar o padrão sem mudança vale', async () => {
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
+    await renderPanel('vtm-v20', 0)
+    expect(await screen.findByTestId('creation-settings-budgets')).toBeTruthy()
+    // Sem "Cancelar": não há o que restaurar
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull()
+    expect(save()).toBeEnabled()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(calls.chronicle.creationSettingsPatch).toHaveBeenCalledWith(
+      CHRONICLE,
+      { revision: 0, approval: false, defaults: {} }
+    )
+    expect(await screen.findByTestId('creation-settings-summary')).toBeTruthy()
+  })
+
+  it('sem as regras do sistema, o resumo nunca diz "criação livre"', async () => {
+    const t = templateJson('vtm-v20')
+    t.schema = 2
+    calls.templateGet.mockResolvedValue(ok(t))
+    await renderPanel()
+    expect(
+      await screen.findByText(/^As regras deste sistema são mais novas/)
+    ).toBeTruthy()
+    expect(screen.queryByText(FREE)).toBeNull()
+  })
+
+  it('o template não carregou: o erro com "Tentar de novo", recolhido', async () => {
+    calls.templateGet.mockResolvedValue(fail(500, 'erro no servidor'))
+    await renderPanel()
+    expect(
+      await screen.findByText(
+        'Não foi possível carregar as regras deste sistema.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByText(FREE)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeTruthy()
+  })
+
+  it('carregando: "Carregando as regras do sistema…"', async () => {
+    calls.templateGet.mockImplementation(() => new Promise(() => undefined))
+    await renderPanel()
+    expect(
+      await screen.findByText('Carregando as regras do sistema…')
+    ).toBeTruthy()
+    expect(screen.queryByText(FREE)).toBeNull()
+  })
+
+  it('sistema sem criação por pontos: "Criação livre · o narrador conclui"', async () => {
+    calls.templateGet.mockResolvedValue(ok(templateJson('coc7e')))
+    await renderPanel('coc7e')
+    expect(
+      await screen.findByText('Criação livre · o narrador conclui')
+    ).toBeTruthy()
   })
 })

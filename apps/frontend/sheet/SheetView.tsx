@@ -47,6 +47,7 @@ import {
   CreationPanel,
   CreationStatusPanel,
   useCreating,
+  useCreationReview,
 } from './creation/CreationPanel'
 import { type GuideTarget, MISSING_TARGET, POINTS_TAB } from './creation/guide'
 import {
@@ -220,8 +221,12 @@ function SheetBody({
   // recusas e as "Regras da casa") continua só na Criação
   const narrator = roles.includes('storyteller') && !roles.includes('owner')
   const budgetEdit = editable && mode === 'create' && creating
+  // P09-D (D-10): também em `pending`, para o narrador conferir a conta
+  // antes de aprovar ou devolver (POA-20)
+  const reviewing = useCreationReview()
   const budget =
-    budgetEdit || (editable && mode === 'read' && creating && narrator)
+    budgetEdit ||
+    (editable && mode === 'read' && (creating || reviewing) && narrator)
   const onBudget = budget && tab === BUDGET_TAB
   const active: CompiledZone | undefined = onBudget
     ? undefined
