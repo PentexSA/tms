@@ -83,7 +83,11 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
   })
   // A nota do que está desabilitado, uma vez só; com o permanente bloqueado
   // pela evolução, o atalho para o pedido (U-01)
-  const note = rows.find(row => row.blocked)?.blocked ?? null
+  const noted = rows.find(row => row.blocked)
+  const note = noted?.blocked ?? null
+  // Só a linha de evolução (o permanente, o máximo gravado) leva ao pedido;
+  // o atual é de jogo e não se pede ao narrador
+  const advanceNote = noted !== undefined && noted.key !== 'current'
   return (
     <EditorShell
       label={def.label}
@@ -92,7 +96,7 @@ export function ResourceEditorRow({ resolved }: FieldViewProps) {
         note ? (
           <BlockedNote
             text={note}
-            to={{ target: { field: r.id } }}
+            to={advanceNote ? { target: { field: r.id } } : null}
             subject={def.label}
           />
         ) : null

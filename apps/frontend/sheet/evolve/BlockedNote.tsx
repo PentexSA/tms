@@ -15,7 +15,8 @@ export function BlockedNote({
   subject,
 }: {
   readonly text: string
-  readonly to: XpShortcutTarget
+  // Sem alvo (a nota não é da evolução), só a frase
+  readonly to: XpShortcutTarget | null
   // O nome do traço ou da lista, para o nome acessível do atalho
   readonly subject: string
 }) {
@@ -24,6 +25,7 @@ export function BlockedNote({
   const shortcut = useXpShortcut()
   const offered =
     shortcut !== null &&
+    to !== null &&
     blockedBy(roles, lifecycle, 'advance') === 'NEEDS_XP_APPROVAL' &&
     shortcut.offers(to)
   return (
