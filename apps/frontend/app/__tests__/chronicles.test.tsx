@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { FlatList, Platform, Share } from 'react-native'
@@ -283,9 +289,46 @@ describe('Crônicas (lista)', () => {
         name: 'Você ainda não participa de nenhuma crônica',
       })
     ).toBeTruthy()
+    // T-51 (P12): quem chega por convite vê "Entrar com convite" primeiro,
+    // como primário
+    const buttons = screen
+      .getAllByRole('button')
+      .map(b => b.props.accessibilityLabel)
+      .filter(name => name === 'Criar crônica' || name === 'Entrar com convite')
+    expect(buttons).toEqual(['Entrar com convite', 'Criar crônica'])
+    expect(
+      screen.getByText(
+        'Recebeu um link ou um código do narrador? Entre com o convite. Para narrar, crie uma crônica.'
+      )
+    ).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
     fireEvent.press(screen.getByRole('button', { name: 'Entrar com convite' }))
     expect(router.push.mock.calls).toEqual([['/chronicles/new'], ['/join']])
+  })
+
+  it('T-51: com crônicas, criar e entrar no topo, antes de "Suas crônicas"', async () => {
+    calls.chroniclesGet.mockResolvedValue(
+      ok(
+        Array.from({ length: 7 }, (_, n) => ({
+          id: `c${n}`,
+          name: `Crônica ${n + 1}`,
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'ana' },
+          characterCount: 1,
+        }))
+      )
+    )
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    await screen.findByText('Crônica 1')
+    const list = screen.UNSAFE_getByType(FlatList)
+    const header = render(list.props.ListHeaderComponent)
+    expect(header.getByRole('button', { name: 'Criar crônica' })).toBeTruthy()
+    expect(
+      header.getByRole('button', { name: 'Entrar com convite' })
+    ).toBeTruthy()
+    expect(list.props.ListFooterComponent).toBeUndefined()
+    header.unmount()
   })
 
   it('erro: mensagem e tentar de novo', async () => {
