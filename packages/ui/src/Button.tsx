@@ -1,5 +1,7 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { type ComponentRef, useEffect, useRef } from 'react'
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native'
 import { Pressable } from './Pressable'
+import { markSoftDisabled } from './Stepper'
 import { Text } from './Text'
 import { type Colors, useTheme } from './theme'
 import { tokens } from './tokens'
@@ -11,6 +13,16 @@ export interface ButtonProps {
   readonly onPress: () => void
   readonly variant?: ButtonVariant
   readonly disabled?: boolean
+  /**
+   * Bloqueado pela previsão (o servidor recusaria): a cara de indisponível
+   * (opacidade e `aria-disabled`), mas **continua tocável**, e o toque chega
+   * ao `onPress`, que explica o motivo e não envia. Nunca vira `disabled`: o
+   * react-native-web faria do <button> um elemento morto, sem foco nem toque
+   * (o mesmo contrato do "+" do Stepper, `markSoftDisabled`).
+   */
+  readonly blocked?: boolean
+  /** No web, o id do texto do motivo (`aria-describedby`). */
+  readonly hintID?: string
   // Ação em andamento: anunciada como ocupada e sem novo toque.
   readonly busy?: boolean
   readonly accessibilityHint?: string
@@ -34,6 +46,8 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled = false,
+  blocked = false,
+  hintID,
   busy = false,
   accessibilityHint,
   accessibilityLabel,
@@ -41,16 +55,34 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme()
   const p = palette(theme.colors, variant)
+  const web = Platform.OS === 'web'
+  const off = disabled || busy
+  const soft = !off && blocked
+  // No web, o aria-disabled do bloqueado vai direto no elemento
+  const ref = useRef<ComponentRef<typeof View>>(null)
+  useEffect(() => {
+    if (web && !off) markSoftDisabled(ref.current, soft)
+  }, [web, off, soft])
   return (
     <Pressable
+      ref={ref}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
       aria-busy={busy}
-      disabled={disabled || busy}
+      // No app, o `disabled` fica de fora no bloqueado: com ele, o Pressable do
+      // React Native apagaria o `aria-disabled` do estado acessível
+      disabled={soft && !web ? undefined : off}
+      // No app, o leitor de tela diz "indisponível", e o toque continua
+      {...(soft && !web ? { 'aria-disabled': true } : {})}
+      {...(web && hintID ? { 'aria-describedby': hintID } : {})}
       onPress={onPress}
-      style={[styles.button, { backgroundColor: p.bg, borderColor: p.border }]}
+      style={[
+        styles.button,
+        { backgroundColor: p.bg, borderColor: p.border },
+        soft && styles.blocked,
+      ]}
     >
       <View style={styles.row}>
         {busy ? <ActivityIndicator color={p.ink} /> : null}
@@ -71,4 +103,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: tokens.space[2] },
+  blocked: { opacity: 0.5 },
 })

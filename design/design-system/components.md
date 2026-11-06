@@ -105,8 +105,10 @@ Ação com verbo. Uma ação primária por tela.
     label: string; onPress: () => void
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; size?: 'md' | 'lg'
     icon?: IconName; block?: boolean; disabled?: boolean; busy?: boolean
+    blocked?: boolean; hintID?: string
   }
   ```
+- **Bloqueado pela previsão (`blocked`, P13):** o que o servidor recusaria ("Enviar pedido" sem saldo) fica com a cara de indisponível (opacidade 0,5 e `aria-disabled`), mas **continua tocável**: o toque chega ao `onPress`, que mostra o motivo perto do botão e não envia. Nunca `disabled`: o react-native-web faria do `<button>` um elemento morto, sem foco nem toque. No web, o `aria-disabled` vai direto no elemento (`markSoftDisabled`, o mesmo do "+" do Stepper), e `hintID` aponta o motivo com `aria-describedby`; no app, o estado acessível é "indisponível". `disabled` e `busy` vencem o `blocked`.
 - **Estados:** hover, pressionado, foco, desabilitado (`disabled` ou `aria-disabled`: fundo transparente, borda `border-subtle`, texto `ink-disabled`), ocupado (`aria-busy`: spinner e sem clique).
 - **A11y:** web `<button type="button">`; `aria-disabled` mantém o foco (usado no "Excluir" até digitar o nome). RN `accessibilityRole="button"` + `accessibilityState={{ disabled, busy }}`. `accessibilityLabel` (padrão: o título) separa botões de mesmo título na tela ("Escolher da lista: Natureza" e "…: Comportamento"); começa pelo título inteiro (WCAG 2.5.3).
   - **Linhas "Rótulo: valor" do Editar:** no app, o rótulo é o campo e o valor vai no `accessibilityValue` (sem "Nome: X, X"); no web, que descarta o `accessibilityValue`, o rótulo fica "Nome: X" (`fieldA11y`, `apps/frontend/sheet/evolve/a11y.ts`).
@@ -241,11 +243,12 @@ Escolha única em lista vertical; com `state`, a escolha aplica modificadores a 
   ```ts
   type ChoiceProps<T extends string> = {
     label: string; value: T; onChange: (id: T) => void
-    options: { id: T; label: string; hint?: string }[]; disabled?: boolean
+    options: { id: T; label: string; hint?: string; blocked?: boolean }[]
+    disabled?: boolean
     showLabel?: boolean // título visível acima do grupo; padrão true
   }
   ```
-  `showLabel={false}` só quando o nome já está na tela (o título da folha que abre a escolha). `disabled` tira o toque de todas as opções (pedido em andamento), sem esmaecer a marcada por ser a atual.
+  `showLabel={false}` só quando o nome já está na tela (o título da folha que abre a escolha). `disabled` tira o toque de todas as opções (pedido em andamento), sem esmaecer a marcada por ser a atual. A opção com `blocked` (P13: o traço acima do saldo na lista de evolução) fica esmaecida e com `aria-disabled`, **tocável** e no foco itinerante: o toque a escolhe, e quem escolhe explica o motivo.
 - **Estados:** marcado, pressionado, somente leitura (nota "Somente leitura." e toque sem efeito).
 - **A11y:** `role="radiogroup"` com `aria-label`; opções `role="radio"` + `aria-checked`, tabindex itinerante e setas. RN `radiogroup`/`radio` + `checked`. A troca aparece no toast.
   - **Título:** no web, o grupo aponta para ele com `aria-labelledby`; no Android fica `aria-hidden` (o TalkBack lê o nome do grupo); no iOS, onde `radiogroup` não tem traço, é o texto lido antes das opções. O estado ("botão de opção, não marcado") sai em português porque o app declara `pt-BR` no `Info.plist` (`app.json`, `ios.infoPlist`).
