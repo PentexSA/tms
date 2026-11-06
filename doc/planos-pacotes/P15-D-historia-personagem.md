@@ -516,6 +516,65 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição A2 d
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementação em 05 e 06/11/2026, na `pacote/p15-d-historia-personagem`, a partir da `5da45b2` (a onda com as respostas do usuário), em paralelo com o P13 e os outros pacotes, cada um no seu worktree.
+
+**Respostas do usuário aplicadas** ([onda-5.md](onda-5.md) §6):
+
+- **D-16: saída A, os dois escrevem.** A seção `backstory` tem só `read: ["owner", "storyteller"]`, sem `write`.
+- **Ordem do release: não há app nativo na loja.** A `0025` vai no deploy da API.
+- **As fichas antigas: saída 1** (§3.6), a recomendação. A ficha antiga não ganha o campo.
+- Os outros pontos (§9.1, pontos 3 e 4; §9.2) seguiram a recomendação deste plano. Nada foi decidido aqui:
+  - os nomes "História" e "História / Prelúdio";
+  - a História do NPC só com o narrador;
+  - 8000 de tamanho;
+  - sem marca na legenda da Leitura.
+
+**Depende do P13 (o rebase é do orquestrador):**
+
+1. **Ninguém edita a História pela tela nesta branch sozinha.** O `TextLayout` não desenha editor (é o T-84), e a História não é "só do narrador", então não ganha botão na barra. Na branch, o campo só se escreve pela API, e é assim que a matriz de AuthZ o prova.
+   - **O ponto de encaixe:** o aviso "O jogador lê este texto." já está no `TextEditorRow` (`editorNotice`, em `sheet/storyteller/privacy.ts`). O T-84 só precisa desenhar o `TextEditorRow` (ou o editor que ele escolher) para a seção `text` no Editar e na Criação, com o `testID` `editor-<campo>` de hoje.
+   - Se o P13 usar outro editor, ele chama o mesmo `editorNotice(model, id, roles, npc)`.
+2. **O segundo teste do `e2e/tests/backstory.spec.ts`** ("a narradora e a dona editam a História pelo Editar") falha sem o T-84: o `editor-backstory` não existe no Sobre. Ele roda na integração, depois do merge do P13. O primeiro teste não depende do P13.
+3. **O `privacy.ts`, o `TextEditorRow.tsx` e o `StorytellerBar.tsx`** também são tocados pelo P13 (`barEdits`) e pelo P16-D. O aviso está numa função à parte (`editorNotice`) para o rebase ficar textual.
+
+**Desvios de desenho:**
+
+4. **O NPC não recebe "O jogador lê este texto.".**
+   - O plano diz "quando quem edita é o narrador, e não o dono". No NPC, o narrador tem só o papel `storyteller` (`authz.ts`), e não há jogador dono, então a frase seria falsa.
+   - O store da ficha ganhou `npc` (de `character.kind`, no `SheetScreen`), usado só para o texto.
+   - O aviso de privado das Notas continua no NPC, como hoje.
+   - Os stores montados fora do `SheetScreen` (a Mesa, as prévias) ficam com `npc: false`. Hoje nenhum deles desenha editor de texto.
+5. **O aviso vale para todo texto que o dono lê, quando o narrador edita.** Isso inclui a Citação, as Notas do jogador e os textos da identidade no Editar do narrador, como o §3.3 previu.
+   - No app, a dica junta o aviso, o erro e a ajuda do template.
+   - No web, o `aria-describedby` aponta só o aviso: a ajuda continua visível abaixo do campo, e o erro sai como `alert`.
+6. **O `help` do campo ficou "A história do personagem antes da crônica.",** sem "O jogador e o narrador leem." (achado do `/code-review`). A segunda frase repetia o aviso do editor no leitor de tela e era falsa no NPC. O §3.1 traz o rascunho anterior.
+7. **Onde ficaram os testes U-10e e U-10f:**
+   - ficaram no `authz.test.ts`, num describe "U-10" por sistema, e não no `events.test.ts`, para valerem nos três sistemas com o cenário da matriz;
+   - a marca `SHARED` entrou no `check` de todas as linhas da matriz: nenhum ator além do narrador e do dono a recebe, em nenhuma rota;
+   - o U-10d (NPC revelado) também ficou lá.
+8. **O `SheetView.test.tsx`** mudou no commit 1, e não no 3: a seção nova quebrava o `expectEveryField` assim que o template mudou.
+9. **O commit de versão também levou o `doc/planos-pacotes/P10-D-frases.json` e o `.md`.** O `help-phrases.test.ts` confere a versão da lista contra a do template, como no commit de versão da onda 4 (`9d1dcb2`).
+10. **A ordem dos commits:** o `fix` do `/code-review` muda o conteúdo dos templates, por isso foi posto antes do commit de versão, que continua o último da branch. A ordem foi refeita com `cherry-pick`, e o conteúdo final é o mesmo.
+11. **A migration é a `0025`, e não a `0024`** (pedido do orquestrador, 06/11). O P13 entra antes na onda, com a `0024_character_events_to_absent` (schema), e o Migrator não aceita migration fora de ordem. A troca é o commit `fix(db): a migration dos templates vira 0025 (ordem da onda)`, logo depois do commit de versão.
+    - O teste da `0025` desce até a migration anterior pela lista de arquivos: a `0023` nesta branch, e a `0024` do P13 depois do rebase.
+    - O caso "descer a 0023" espera tudo o que vem depois da `0022`, também pela lista.
+    - O `tms_p15d` não existia no Postgres local: não havia o que recriar.
+
+**Revisões:**
+
+- **`/security-review`:** nenhum achado com confiança alta ou média.
+- **`/code-review` (high):** 9 achados.
+  - Corrigidos no `fix(templates): a ajuda da História sem repetir quem lê`:
+    - o `help` que repetia quem lê;
+    - o comentário do `aria-describedby`, que prometia mais do que o web faz;
+    - o `npc` do `SheetScreen`, que agora usa o `kind` local.
+  - Registrados, sem mudar:
+    - a edição pela tela e o segundo E2E dependem do T-84 (itens 1 e 2);
+    - o espalhamento da dica repetido entre o `TextEditor` e o `TextEditorRow` (um `noteA11y` comum cabe no rebase com o P13, que mexe nos dois);
+    - o E2E da outra jogadora prova o 404 da ficha, e não a permissão da seção (a seção é provada na matriz da API, com o `viewer` de NPC revelado);
+    - o `npc` fora do `SheetScreen` (item 4);
+    - o `previousOf` do teste da `0025` supõe minor maior que 0, como o da `0023`.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir o U-10 na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas e textos fictícios. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
