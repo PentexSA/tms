@@ -156,6 +156,13 @@ export function CreationSettings({
       budget.rule !== 'priority-budget'
   )
 
+  const summary =
+    model === undefined
+      ? 'Carregando as regras do sistema…'
+      : model === null
+        ? unsupportedShort('regras')
+        : summaryLine(chronicleCreationSummary(model, saved))
+
   if (!open)
     return (
       <View style={styles.collapsed} testID="creation-settings">
@@ -195,12 +202,14 @@ export function CreationSettings({
             variant="caption"
             color="inkMuted"
             testID="creation-settings-summary"
+            // A1 (onda-5.md §11.6): uma linha só, e as abas sobem. O texto
+            // inteiro fica no nome acessível. No web, o corte é só CSS: o
+            // texto inteiro continua no DOM, e um aria-label num elemento
+            // genérico é proibido pelo ARIA
+            numberOfLines={1}
+            accessibilityLabel={Platform.OS === 'web' ? undefined : summary}
           >
-            {model === undefined
-              ? 'Carregando as regras do sistema…'
-              : model === null
-                ? unsupportedShort('regras')
-                : summaryLine(chronicleCreationSummary(model, saved))}
+            {summary}
           </Text>
         )}
       </View>

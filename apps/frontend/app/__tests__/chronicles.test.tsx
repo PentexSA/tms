@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
@@ -899,30 +900,53 @@ describe('Crônica (detalhe)', () => {
         members: [],
       })
 
-    it.each(['player', 'storyteller'] as const)(
-      '%s vê o trecho e "Ler tudo", que abre a leitura',
-      async role => {
-        calls.chronicle.get.mockResolvedValue(withDescription(role, long))
-        renderWithSession(<ChronicleScreen />, await signedIn())
-        const read = await screen.findByRole('button', {
-          name: 'Ler tudo: apresentação da crônica',
-        })
-        expect(screen.getByText('Apresentação')).toBeTruthy()
-        const excerpt = screen.getByTestId('chronicle-about-excerpt')
-        const shown = excerpt.props.children as string
-        // Sem um segundo corte no desenho: a tela mostra o que o leitor lê
-        expect(excerpt.props.numberOfLines).toBeUndefined()
-        // O trecho é o começo, cortado no código: o leitor de tela não recebe
-        // os 600 caracteres
-        expect(Array.from(shown).length).toBeLessThanOrEqual(81)
-        expect(shown.endsWith('…')).toBe(true)
-        expect(long.startsWith(shown.slice(0, -1))).toBe(true)
-        fireEvent.press(read)
-        expect(router.push).toHaveBeenCalledWith(
-          `/chronicles/${CHRONICLE_ID}/about`
-        )
-      }
-    )
+    it('o jogador vê o trecho e "Ler tudo", que abre a leitura', async () => {
+      calls.chronicle.get.mockResolvedValue(withDescription('player', long))
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      const read = await screen.findByRole('button', {
+        name: 'Ler tudo: apresentação da crônica',
+      })
+      expect(screen.getByText('Apresentação')).toBeTruthy()
+      const excerpt = screen.getByTestId('chronicle-about-excerpt')
+      const shown = excerpt.props.children as string
+      // Sem um segundo corte no desenho: a tela mostra o que o leitor lê
+      expect(excerpt.props.numberOfLines).toBeUndefined()
+      // O trecho é o começo, cortado no código: o leitor de tela não recebe
+      // os 600 caracteres
+      expect(Array.from(shown).length).toBeLessThanOrEqual(81)
+      expect(shown.endsWith('…')).toBe(true)
+      expect(long.startsWith(shown.slice(0, -1))).toBe(true)
+      fireEvent.press(read)
+      expect(router.push).toHaveBeenCalledWith(
+        `/chronicles/${CHRONICLE_ID}/about`
+      )
+    })
+
+    // A1 (onda-5.md §11.6): quem narra escreveu o texto; o topo dele fica
+    // em "Apresentação · Ler tudo", e as abas sobem
+    it('o narrador vê só "Apresentação · Ler tudo", sem o trecho', async () => {
+      calls.chronicle.get.mockResolvedValue(
+        withDescription('storyteller', long)
+      )
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      const read = await screen.findByRole('button', {
+        name: 'Ler tudo: apresentação da crônica',
+      })
+      const block = screen.getByTestId('chronicle-about')
+      expect(within(block).getByText('Apresentação')).toBeTruthy()
+      // O "·" é só desenho: fora da árvore de acessibilidade
+      expect(within(block).queryByText('·')).toBeNull()
+      expect(
+        within(block).getByText('·', { includeHiddenElements: true })
+      ).toBeTruthy()
+      expect(screen.queryByTestId('chronicle-about-excerpt')).toBeNull()
+      // Nenhum pedaço da Descrição na tela
+      expect(screen.queryByText(/Parágrafo de teste/)).toBeNull()
+      fireEvent.press(read)
+      expect(router.push).toHaveBeenCalledWith(
+        `/chronicles/${CHRONICLE_ID}/about`
+      )
+    })
 
     it('texto curto aparece inteiro, sem "…", e com "Ler tudo"', async () => {
       calls.chronicle.get.mockResolvedValue(

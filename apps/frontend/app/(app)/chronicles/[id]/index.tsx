@@ -181,6 +181,17 @@ export default function ChronicleScreen() {
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
   const showing: ChronicleView = former ? 'sheets' : viewOf(view, narrating)
   scrollKey.current = showing
+  // D-15: a Apresentação, depois de sistema e narrador e antes do painel da
+  // criação e das abas (onda-5.md §4.1). O ex-membro não a vê (defesa em
+  // profundidade; quem decide é a API). A1: quem narra escreveu o texto e
+  // vê só "Apresentação · Ler tudo", sem o trecho
+  const about = former ? null : (
+    <ChronicleAbout
+      chronicleId={c.id}
+      description={c.description ?? ''}
+      compact={narrating}
+    />
+  )
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
@@ -220,24 +231,26 @@ export default function ChronicleScreen() {
               testID="former-banner"
             />
           ) : null}
-          <View style={styles.info}>
-            <Text variant="caption" color="inkMuted">
-              {c.system.name}
-            </Text>
-            <Text>
-              {narrating
-                ? 'Você narra esta crônica.'
-                : `Narrador: ${c.storyteller.username}`}
-            </Text>
-            {/* D-15: a Apresentação, depois de sistema e narrador e antes do
-                painel da criação e das abas (onda-5.md §4.1). O ex-membro
-                não a vê (defesa em profundidade; quem decide é a API) */}
-            {!former ? (
-              <ChronicleAbout
-                chronicleId={c.id}
-                description={c.description ?? ''}
-              />
-            ) : null}
+          <View
+            style={[styles.info, narrating && c.creation && styles.infoTight]}
+          >
+            {/* A1 (onda-5.md §11.6): para quem narra, a linha "Apresentação ·
+                Ler tudo" fica ao lado de sistema e narrador quando cabe (no
+                web largo) e quebra para baixo quando não cabe */}
+            <View style={narrating ? styles.top : styles.lines}>
+              <View style={styles.lines}>
+                <Text variant="caption" color="inkMuted">
+                  {c.system.name}
+                </Text>
+                <Text>
+                  {narrating
+                    ? 'Você narra esta crônica.'
+                    : `Narrador: ${c.storyteller.username}`}
+                </Text>
+              </View>
+              {narrating ? about : null}
+            </View>
+            {narrating ? null : about}
           </View>
 
           {c.role === 'player' && transfer.data?.available ? (
@@ -471,6 +484,17 @@ function SheetsPanel({
 const styles = StyleSheet.create({
   content: { gap: tokens.space[2], paddingBottom: tokens.space[12] },
   info: { gap: tokens.space[1], padding: tokens.layout.gutter },
+  // O painel "Criação de fichas" logo abaixo já abre com o próprio respiro
+  infoTight: { paddingBottom: tokens.space[2] },
+  lines: { gap: tokens.space[1] },
+  top: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: tokens.space[3],
+    rowGap: tokens.space[1],
+  },
   empty: { paddingHorizontal: tokens.layout.gutter },
   header: { paddingHorizontal: tokens.layout.gutter },
   danger: {
