@@ -71,10 +71,13 @@ describe('usernameError', () => {
 
 describe('validateLogin', () => {
   it('o e-mail e a senha', () => {
-    expect(validateLogin({ email: 'nome@', password: '' })).toEqual({
+    expect(validateLogin({ email: 'nome', password: '' })).toEqual({
       email: 'Informe um e-mail válido.',
       password: 'Informe a senha.',
     })
+    // O login não recusa o que a API aceita: o formato fica com ela
+    expect(validateLogin({ email: 'nome@', password: 'x' })).toEqual({})
+    expect(validateLogin({ email: 'a@b', password: 'x' })).toEqual({})
     expect(
       validateLogin({ email: ' nome@example.test ', password: 'x' })
     ).toEqual({})

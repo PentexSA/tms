@@ -21,6 +21,7 @@ import {
   type FieldErrors,
   PASSWORD_MIN,
   type RegisterInput,
+  registerFieldError,
   validateRegister,
 } from '../../lib/validation'
 
@@ -43,11 +44,13 @@ export default function RegisterScreen() {
   const [submitted, setSubmitted] = useState(false)
   const usernameInput = useRef<TextInputInstance>(null)
   const passwordInput = useRef<TextInputInstance>(null)
+  // Funcional: o preenchimento automático muda dois campos no mesmo lote, e
+  // o `form` do fechamento perderia o primeiro. O erro de um campo só
+  // depende do valor dele
   const set = (key: keyof RegisterInput) => (value: string) => {
-    const next = { ...form, [key]: value }
-    setForm(next)
+    setForm(f => ({ ...f, [key]: value }))
     if (submitted || fields[key])
-      setFields(f => ({ ...f, [key]: validateRegister(next)[key] }))
+      setFields(f => ({ ...f, [key]: registerFieldError(key, value) }))
   }
 
   // `latest`: o valor que chega com o Enter da senha. No app, o "Ir" pode

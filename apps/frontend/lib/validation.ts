@@ -43,6 +43,16 @@ export function passwordError(password: string): string | undefined {
   return undefined
 }
 
+/** O erro de um campo do cadastro, só pelo valor dele. */
+export function registerFieldError(
+  key: keyof RegisterInput,
+  value: string
+): string | undefined {
+  if (key === 'email') return emailError(value)
+  if (key === 'username') return usernameError(value)
+  return passwordError(value)
+}
+
 export function validateRegister(
   input: RegisterInput
 ): FieldErrors<RegisterInput> {
@@ -61,11 +71,15 @@ export interface LoginInput {
   readonly password: string
 }
 
-/** O login confere o e-mail antes do envio (POA-34), sem o "dados inválidos". */
+/**
+ * O login confere antes do envio só o que não pode ser e-mail (vazio ou sem
+ * "@"; POA-34): ele não recusa o que a API aceita. O formato fica com a API,
+ * que responde 401 genérico como sempre.
+ */
 export function validateLogin(input: LoginInput): FieldErrors<LoginInput> {
   const errors: { -readonly [K in keyof LoginInput]?: string } = {}
-  const email = emailError(input.email)
-  if (email) errors.email = email
+  if (!input.email.trim().includes('@'))
+    errors.email = 'Informe um e-mail válido.'
   if (!input.password) errors.password = 'Informe a senha.'
   return errors
 }

@@ -77,10 +77,10 @@ describe('LoginScreen', () => {
     expect(screen.queryByText(/texto da api/)).toBeNull()
   })
 
-  it('o e-mail sem domínio é conferido antes, com o erro no campo', async () => {
+  it('o e-mail sem "@" é conferido antes, com o erro no campo', async () => {
     const { session, fetch } = testSession(() => json(200, tokens()))
     renderWithSession(<LoginScreen />, session)
-    fireEvent.changeText(screen.getByTestId('login-email'), 'nome@')
+    fireEvent.changeText(screen.getByTestId('login-email'), 'nome')
     fireEvent.changeText(screen.getByTestId('login-password'), 'qualquer')
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Entrar' }))
@@ -179,6 +179,29 @@ describe('RegisterScreen', () => {
       'lucas@example.test'
     )
     expect(screen.queryByText('Informe um e-mail válido.')).toBeNull()
+  })
+
+  // O preenchimento automático muda dois campos no mesmo lote
+  it('dois campos no mesmo lote: os dois valores chegam à API', async () => {
+    const { session, fetch } = testSession(() => json(201, tokens()))
+    renderWithSession(<RegisterScreen />, session)
+    act(() => {
+      screen
+        .getByTestId('register-email')
+        .props.onChangeText('ana@example.test')
+      screen.getByTestId('register-username').props.onChangeText('ana')
+      screen
+        .getByTestId('register-password')
+        .props.onChangeText('correct horse battery staple')
+    })
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar conta' }))
+    })
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
+      email: 'ana@example.test',
+      username: 'ana',
+      password: 'correct horse battery staple',
+    })
   })
 
   it('cria a conta e entra', async () => {
