@@ -319,6 +319,12 @@ Os planos não foram editados na consolidação. O que muda em relação a eles:
 
 ## 6. Pontos para o PO (nenhum decidido nos planos)
 
+**Respostas do usuário em 05/11/2026, no início da implementação** (os outros pontos desta seção seguem abertos; os pacotes aplicam a recomendação do plano e registram no §10):
+
+- **D-16 (ponto 1): A, os dois escrevem.** O dono escreve pelo Sobre no Editar (o T-84 do P13), e o narrador pela barra. O P15-D entra depois do P13.
+- **D-17 (ponto 2): o P16-D entra nesta onda, com a revelação viva.** O dono lê a nota inteira enquanto for membro, inclusive o que o narrador salvar depois; o narrador pode esconder de novo; sem selo nem notificação. A nota continua um texto só (`storytellerNotes`), sem lista.
+- **A ordem do release (ponto 4): não há app nativo na loja.** A `0024` vai no mesmo deploy da API, sem janela de "Atualize o app".
+
 **Bloqueiam o início da implementação:**
 
 1. **Quem escreve a História (D-16).** A D-16 diz que o narrador e o jogador leem, e não diz quem escreve.
