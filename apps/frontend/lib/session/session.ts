@@ -1,4 +1,5 @@
 import { withErrorCode } from '../errors'
+import { clearPendingInvite } from '../invite/pending'
 import { NO_STORE_HEADERS } from '../noStore'
 import type {
   SessionChannel,
@@ -235,6 +236,9 @@ export class Session {
    * avisa o servidor. Sem rede, a revogação fica pendente e vai depois.
    */
   async logout(): Promise<void> {
+    // O convite pendente (P12) sai só no "Sair" explícito: a abertura sem
+    // sessão também passa por signedOut e apagaria o link que acabou de chegar
+    clearPendingInvite()
     const { store } = this.#deps
     const userId = this.#state.user?.id
     if (store.refreshInBody) {

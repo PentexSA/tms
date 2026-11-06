@@ -1,6 +1,11 @@
 import * as SecureStore from 'expo-secure-store'
 import { createMemoryStorage } from '../../sheet/sync/kv'
 import { json, memoryStore, testSession, tokens } from '../../test/session'
+import {
+  clearPendingInvite,
+  peekPendingInvite,
+  setPendingInvite,
+} from '../invite/pending'
 import { MAX_PENDING_LOGOUTS, type SessionUser } from '../session/session'
 import {
   createSessionMarker,
@@ -527,5 +532,22 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     await marker.write('signed-in', 'abc-123')
     expect(storage.data.get(SESSION_MARKER_KEY)).toBe('signed-in:abc-123')
     expect(await marker.read()).toEqual({ state: 'signed-in', id: 'abc-123' })
+  })
+})
+
+// P12, D-14: o convite que chegou por link sobrevive à abertura sem sessão
+// (o caminho do login) e sai no "Sair" explícito
+describe('convite pendente e a sessão', () => {
+  afterEach(() => clearPendingInvite())
+
+  it('a abertura sem sessão não apaga; o logout apaga', async () => {
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    const store = memoryStore(true, null)
+    const { session } = testSession(noContent, store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedOut')
+    expect(peekPendingInvite()).not.toBeNull()
+    await session.logout()
+    expect(peekPendingInvite()).toBeNull()
   })
 })
