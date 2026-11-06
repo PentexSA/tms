@@ -91,7 +91,9 @@ test.describe('a 390', () => {
     const ownerPage = await owner.context.newPage()
     const response = ownerPage.waitForResponse(
       r =>
-        r.url().endsWith(`/characters/${id}`) && r.request().method() === 'GET'
+        r.request().resourceType() === 'fetch' &&
+        r.url().endsWith(`/characters/${id}`) &&
+        r.request().method() === 'GET'
     )
     await ownerPage.goto(`/characters/${id}`)
     const body = await (await response).text()
@@ -115,7 +117,9 @@ test.describe('a 390', () => {
     const otherPage = await other.context.newPage()
     const denied = otherPage.waitForResponse(
       r =>
-        r.url().endsWith(`/characters/${id}`) && r.request().method() === 'GET'
+        r.request().resourceType() === 'fetch' &&
+        r.url().endsWith(`/characters/${id}`) &&
+        r.request().method() === 'GET'
     )
     await otherPage.goto(`/characters/${id}`)
     const deniedBody = await (await denied).text()
