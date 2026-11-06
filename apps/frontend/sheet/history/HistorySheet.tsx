@@ -38,6 +38,9 @@ export interface HistoryItem {
     | 'creation.returned'
     | 'creation.adjust'
     | 'creation.ready'
+    // U-11 (P16-D): o narrador revelou ou escondeu as notas, sem conteúdo
+    | 'section.revealed'
+    | 'section.hidden'
   readonly reversible?: boolean
   readonly changes: readonly {
     readonly label: string
@@ -47,7 +50,7 @@ export interface HistoryItem {
 
 export const DELETED_ACCOUNT = 'Conta excluída'
 
-const EVENT_LABELS: Readonly<
+export const EVENT_LABELS: Readonly<
   Record<NonNullable<HistoryItem['event']>, string>
 > = {
   'creation.completed': 'Criação concluída',
@@ -55,6 +58,8 @@ const EVENT_LABELS: Readonly<
   'creation.returned': 'Devolvida para correção',
   'creation.adjust': 'Ajuste pedido',
   'creation.ready': 'Avisou que terminou',
+  'section.revealed': 'Notas privadas reveladas ao jogador',
+  'section.hidden': 'Notas voltaram a ser privadas',
 }
 
 export const whoLabel = (item: Pick<HistoryItem, 'by' | 'byRole'>) =>

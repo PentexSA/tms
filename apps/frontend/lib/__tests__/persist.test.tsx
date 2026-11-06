@@ -1,4 +1,5 @@
 import {
+  dehydrate,
   hashKey,
   QueryClient,
   QueryClientProvider,
@@ -90,6 +91,43 @@ describe('o que vai para o disco', () => {
       should({ queryKey: ['chronicles'], state: { status: 'success', data } })
     ).toBe(false)
     expect(dehydrateOptions.shouldDehydrateMutation()).toBe(false)
+  })
+})
+
+// U-11 (P16-D): a nota revelada ao dono nunca vai ao disco do aparelho
+describe('as Notas do Narrador reveladas', () => {
+  const REVEALED_KEY = ['characters', ID, 'revealed'] as const
+  const SENTINEL = 'SENTINELA-P16-cache'
+
+  it('a consulta revelada não é persistível; a ficha vai só com os ids', () => {
+    expect(persistable(REVEALED_KEY)).toBeNull()
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(CHARACTER_KEY, {
+      ...character(),
+      reveal: { sections: ['storyteller'], revision: 1 },
+    })
+    queryClient.setQueryData(REVEALED_KEY, {
+      revision: 1,
+      sections: [{ id: 'storyteller', values: { storytellerNotes: SENTINEL } }],
+    })
+    const state = dehydrate(queryClient, dehydrateOptions)
+    const serialized = JSON.stringify(state)
+    expect(serialized).not.toContain(SENTINEL)
+    expect(state.queries.map(q => q.queryKey)).toEqual([CHARACTER_KEY])
+    // A ficha restaurada traz o estado, e nenhuma consulta revelada
+    const restored = sanitizeClient(
+      client([
+        query(TEMPLATE_KEY, templateJson('vtm-v20')),
+        ...state.queries.map(q => query(q.queryKey, q.state.data)),
+        query(REVEALED_KEY, { revision: 1, sections: [] }),
+      ])
+    )
+    expect(keysOf(restored)).toEqual([TEMPLATE_KEY, CHARACTER_KEY])
+    const data = restored.clientState.queries[1]?.state.data as
+      | { reveal?: unknown }
+      | undefined
+    expect(data?.reveal).toEqual({ sections: ['storyteller'], revision: 1 })
+    queryClient.clear()
   })
 })
 

@@ -9,6 +9,7 @@ import { AnchorHeader } from './layouts/AnchorHeader'
 import { useAnchor } from './layouts/anchor'
 import { StripScope, useGroupTabsContext } from './layouts/groupTabsState'
 import { sectionList } from './layouts/headedList'
+import { useRevealed } from './storyteller/revealed'
 
 /**
  * Uma seção com título e layout. Seção que os papéis não leem não aparece
@@ -22,6 +23,7 @@ export function SectionView({
   readonly hideTitle?: boolean
 }) {
   const { model, roles } = useSheet()
+  const reveal = useRevealed()
   const shared = useGroupTabsContext()
   const inPanel = useContext(StripScope)
   // O "ir ao grupo" (P05-D): toda seção do painel diz onde começa, e o
@@ -36,7 +38,8 @@ export function SectionView({
   const anchor = useAnchor(inPanel ? section.id : null, {
     onY: reportsPlace && store ? y => store.sectionAt(section.id, y) : null,
   })
-  if (!canReadSection(model, section.id, roles)) return null
+  // U-11 (P16-D): a seção que o narrador revelou ao dono aparece, só leitura
+  if (!canReadSection(model, section.id, roles, reveal?.sections)) return null
   const Layout = layoutFor(section.def.layout)
   return (
     <View

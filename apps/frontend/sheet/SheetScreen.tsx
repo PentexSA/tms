@@ -68,6 +68,7 @@ import {
   RevealNpcSheet,
   revealsMore,
 } from './storyteller/RevealNpcSheet'
+import { RevealedProvider } from './storyteller/revealed'
 import {
   StatusMenuButton,
   type StatusMenuDraft,
@@ -612,25 +613,36 @@ function LiveSheet({
     <>
       <LifecycleContext.Provider value={lifecycle}>
         <CreationContext.Provider value={creationValue}>
-          {/* O painel do NPC e a barra do narrador: fixos acima da ficha
+          {/* U-11 (P16-D): o estado da revelação das notas; o texto
+              revelado do dono fica só na memória */}
+          <RevealedProvider
+            characterId={id}
+            model={state.model}
+            roles={state.roles}
+            kind={kind}
+            ownerName={state.character.owner.username}
+            reveal={(state.character as { reveal?: unknown }).reveal}
+          >
+            {/* O painel do NPC e a barra do narrador: fixos acima da ficha
               fora do celular; no celular, rolam com ela (T-27) */}
-          <SheetView
-            store={store}
-            editable
-            // T-40: puxar rebusca a ficha; a resposta passa pelo received
-            onRefresh={() =>
-              queryClient.invalidateQueries(
-                { queryKey: sheetKeys.character(id) },
-                { cancelRefetch: false }
-              )
-            }
-            header={
-              <>
-                <NpcVisibilityBar state={state} />
-                <StorytellerBar ownerName={state.character.owner.username} />
-              </>
-            }
-          />
+            <SheetView
+              store={store}
+              editable
+              // T-40: puxar rebusca a ficha; a resposta passa pelo received
+              onRefresh={() =>
+                queryClient.invalidateQueries(
+                  { queryKey: sheetKeys.character(id) },
+                  { cancelRefetch: false }
+                )
+              }
+              header={
+                <>
+                  <NpcVisibilityBar state={state} />
+                  <StorytellerBar ownerName={state.character.owner.username} />
+                </>
+              }
+            />
+          </RevealedProvider>
           <LeaveGuard store={store} />
           <DraftRecovery
             persistence={persistence}

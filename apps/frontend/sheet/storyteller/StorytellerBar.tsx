@@ -18,9 +18,13 @@ import { useCommit } from '../useCommit'
 import {
   ADJUST_HINT,
   hiddenFromOwner,
+  inRevealed,
   PRIVATE_NOTE_A11Y,
   PRIVATE_NOTE_SHEET,
+  revealedNoteA11y,
+  revealedNoteSheet,
 } from './privacy'
+import { useRevealed } from './revealed'
 
 // O narrador abre a ficha de um jogador em Leitura; editar é explícito
 // ("Editar como narrador", design/telas/prototipo.js) e fica assinado no
@@ -63,6 +67,7 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
   const creation = useCreation()
   const [editing, setEditing] = useState<FieldId | null>(null)
   const notes = useMemo(() => storytellerOnlyText(model), [model])
+  const reveal = useRevealed()
   // A ficha do próprio narrador é dele: vale o fluxo do dono
   if (!roles.has('storyteller') || roles.has('owner')) return null
   const narrating = mode !== 'read'
@@ -103,7 +108,11 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
                 // a dica não chega ao DOM no web
                 accessibilityLabel={
                   hiddenFromOwner(model, f.id)
-                    ? `Editar ${f.def.label}. ${PRIVATE_NOTE_A11Y}`
+                    ? `Editar ${f.def.label}. ${
+                        reveal && inRevealed(model, f.id, reveal.sections)
+                          ? revealedNoteA11y(reveal.ownerName)
+                          : PRIVATE_NOTE_A11Y
+                      }`
                     : undefined
                 }
                 onPress={() => setEditing(f.id)}
@@ -137,6 +146,12 @@ function TextFieldSheet({
   const commit = useCommit()
   const creating = useCreation()?.status === 'creating'
   const noticeId = `${useId()}-privacy`
+  const reveal = useRevealed()
+  // U-11: revelada, o dono lê o que for salvo aqui (revelação viva)
+  const notice =
+    reveal && inRevealed(model, id, reveal.sections)
+      ? revealedNoteSheet(reveal.ownerName)
+      : PRIVATE_NOTE_SHEET
   const field = model.fields.get(id)
   const stored = useSheetSelector(s => s.values.values[id])
   const [text, setText] = useState(typeof stored === 'string' ? stored : '')
@@ -164,7 +179,7 @@ function TextFieldSheet({
       {hiddenFromOwner(model, id) ? (
         <View style={styles.notice}>
           <Text variant="caption" nativeID={noticeId}>
-            {PRIVATE_NOTE_SHEET}
+            {notice}
           </Text>
           {creating ? (
             <Text variant="caption" color="inkMuted">
@@ -180,7 +195,7 @@ function TextFieldSheet({
         onChange={next => setText(String(next))}
         note={
           hiddenFromOwner(model, id)
-            ? { id: noticeId, text: PRIVATE_NOTE_SHEET }
+            ? { id: noticeId, text: notice }
             : undefined
         }
       />
