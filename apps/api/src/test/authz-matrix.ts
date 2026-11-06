@@ -55,7 +55,9 @@ const denied = {
 
 export const MATRIX: readonly MatrixRow[] = [
   {
-    // O ex-membro lê o nome, o sistema e o narrador, sem os membros
+    // O ex-membro lê o nome, o sistema e o narrador, sem os membros. Ainda
+    // recebe a Descrição e a Imagem (P14-D: tirar espera o PO, onda-5.md §6,
+    // ponto 5); a matriz confere a Descrição pela sentinela
     method: 'GET',
     route: '/chronicles/:id',
     expect: {

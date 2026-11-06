@@ -362,6 +362,40 @@ describe('GET /chronicles/:id', () => {
     expect(foreign.status).toBe(404)
     expect(await missing.json()).toEqual(await foreign.json())
   })
+
+  // P14-D (U-09, D-15): o convite não cria vínculo; quem ainda não entrou
+  // não lê a Descrição, e quem entrou lê
+  it('o convidado que não entrou recebe 404 sem a Descrição; depois do aceite, lê', async () => {
+    const marker = 'marca-descricao-convite-91b2'
+    await ctx.db
+      .updateTable('chronicles')
+      .set({ description: `Abertura. ${marker}` })
+      .where('id', '=', chronicleId)
+      .execute()
+    const invite = await newInvite()
+    const before = await as(ctx, stranger, 'GET', `/chronicles/${chronicleId}`)
+    const missing = await as(
+      ctx,
+      stranger,
+      'GET',
+      `/chronicles/${crypto.randomUUID()}`
+    )
+    expect(before.status).toBe(404)
+    const text = await before.text()
+    expect(text).not.toContain(marker)
+    expect(text).toEqual(await missing.text())
+    const accepted = await as(ctx, stranger, 'POST', '/invites/accept', {
+      code: invite.code,
+    })
+    expect(accepted.status).toBe(200)
+    expect(await accepted.text()).not.toContain(marker)
+    const after = await as(ctx, stranger, 'GET', `/chronicles/${chronicleId}`)
+    expect(after.status).toBe(200)
+    expect(await after.json()).toMatchObject({
+      role: 'player',
+      description: `Abertura. ${marker}`,
+    })
+  })
 })
 
 describe('convites', () => {
