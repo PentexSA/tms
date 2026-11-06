@@ -385,6 +385,58 @@ describe('convites', () => {
     expect(list[0]).toMatchObject({ uses: 0, maxUses: 10, active: true })
   })
 
+  it('cada convite tem o número na crônica, estável depois de revogar (T-45)', async () => {
+    const first = await newInvite()
+    ctx.clock.advance(1000)
+    const second = await newInvite()
+    ctx.clock.advance(1000)
+    const third = await newInvite()
+    await as(
+      ctx,
+      storyteller,
+      'DELETE',
+      `/chronicles/${chronicleId}/invites/${second.id}`
+    )
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { id: string; number: number; active: boolean }[]
+    // A lista vem da mais nova para a mais velha
+    expect(list.map(i => [i.id, i.number, i.active])).toEqual([
+      [third.id, 3, true],
+      [second.id, 2, false],
+      [first.id, 1, true],
+    ])
+    // Um convite de outra crônica não muda a contagem desta
+    const other = await createChronicle(ctx, storyteller, 'vtm-v20', 'Segunda')
+    await as(ctx, storyteller, 'POST', `/chronicles/${other}/invites`)
+    const again = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { number: number }[]
+    expect(again.map(i => i.number)).toEqual([3, 2, 1])
+    // O jogador não lê a lista (nem o número): 403, como antes
+    const denied = await as(
+      ctx,
+      player,
+      'GET',
+      `/chronicles/${chronicleId}/invites`
+    )
+    expect(denied.status).toBe(403)
+    expect(await denied.text()).not.toContain('number')
+  })
+
+  it('o número é contado antes do limite de 50: o 51º continua 51', async () => {
+    for (let i = 0; i < 51; i++) {
+      await newInvite()
+      ctx.clock.advance(1000)
+    }
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { number: number }[]
+    expect(list).toHaveLength(50)
+    expect(list[0]?.number).toBe(51)
+    expect(list.at(-1)?.number).toBe(2)
+  })
+
   it('aceitar põe o usuário na crônica como jogador', async () => {
     const invite = await newInvite()
     const res = await as(ctx, stranger, 'POST', '/invites/accept', {
