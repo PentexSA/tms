@@ -128,14 +128,17 @@ Os testes rodam no CI:
 - **Defesa:**
   - JWT HS256 fixo, com `exp`, `iss` e `aud`, de 15 minutos;
   - refresh opaco, com rotação e revogação da família no reuso;
+  - tolerância do token anterior (reuse interval, onda 5): até 30 s depois do giro (`REFRESH_REUSE_GRACE_MS`), um token revogado por rotação cujo sucessor nunca foi usado nem revogado ganha um novo sucessor, uma vez, na mesma família e sem estender a `family_expires_at` nem a validade do sucessor; o sucessor substituído sai revogado e, apresentado depois, revoga a família; logout, revogação da família, token vencido, segunda apresentação e o resto seguem a detecção de reuso. A rotação trava a pessoa, o token apresentado e o sucessor (`FOR UPDATE`, nessa ordem); o log é fixo ("refresh dentro da tolerância", `event: auth.refresh_grace`), sem token nem id;
   - no web, cookie HttpOnly e SameSite=Strict;
   - no nativo, SecureStore.
 - **Testes:**
   - `api/__tests__/auth.test.ts`:
     - "web: refresh só no cookie HttpOnly, SameSite=Strict e em /auth";
     - reuso do refresh revoga a família;
+    - "POST /auth/refresh: tolerância do token anterior" (caso feliz, borda dos 30 s, logout, sucessor usado, segunda tolerância, sucessor apresentado depois e a expiração que não aumenta);
     - algoritmo e audience;
     - "10 falhas no mesmo e-mail bloqueiam".
+  - `api/__tests__/auth.pg.test.ts` (Postgres real, à mão com `PG_TEST_URL`): apresentações simultâneas do token anterior e do sucessor, só uma ganha token e a família cai, sem deadlock;
   - `app/lib/__tests__/session.test.ts`: "login guarda só o refresh token" e "sair com um refresh em voo é definitivo".
   - `e2e/auth.spec.ts`.
 

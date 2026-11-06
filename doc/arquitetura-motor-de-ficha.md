@@ -461,7 +461,7 @@ Table users {
 Table refresh_tokens {                      // 0009: sessão
   id uuid [pk]
   user_id uuid [not null, ref: > users.id]  // on delete cascade
-  family_id uuid [not null]                 // reuso revoga a família inteira
+  family_id uuid [not null]                 // reuso revoga a família inteira (tolerância de 30 s: onda 5)
   token_hash text [not null, unique]        // sha256; o token opaco não é guardado
   expires_at timestamptz [not null]         // 30 dias por token
   family_expires_at timestamptz [not null]  // 90 dias absolutos
