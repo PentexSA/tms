@@ -93,10 +93,13 @@ test.describe('no celular', () => {
     await page.getByRole('button', { name: 'Gastar 1', exact: true }).click()
     await spent
     await expect(page.getByText('Sangue 10 → 9', { exact: true })).toBeVisible()
+    // No web, o aviso ainda fica por baixo da folha aberta (o ModalToastHost
+    // só vale no nativo; o P12 o leva para dentro da folha): fecha a folha e
+    // desfaz pelo aviso, que continua à vista
+    await close(page)
     const undone = saved(page)
     await page.getByRole('button', { name: 'Desfazer' }).click()
     await undone
-    await close(page)
     await page.getByRole('button', { name: 'Mais opções' }).click()
     await page.getByRole('button', { name: 'Histórico', exact: true }).click()
     await expect(

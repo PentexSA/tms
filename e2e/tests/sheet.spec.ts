@@ -128,6 +128,11 @@ test.describe('a 390', () => {
     await page.getByTestId('editor-quote').last().click()
     await page.getByRole('textbox', { name: 'Citação' }).fill('Uma frase nova.')
     await page.getByRole('button', { name: 'Aplicar' }).click()
+    // No Editar, o botão diz "Salvar alterações" (D-01) e confirma antes
+    await page
+      .getByRole('button', { name: 'Salvar alterações', exact: true })
+      .click()
+    await expect(page.getByText('Salvar 1 alteração?')).toBeVisible()
     const saved = page.waitForResponse(
       r =>
         /\/characters\/[0-9a-f-]{36}\/events$/.test(r.url()) &&

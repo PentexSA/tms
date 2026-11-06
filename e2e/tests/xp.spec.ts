@@ -49,6 +49,14 @@ async function sheetWithXp(browser: Browser, page: Page, xp: number) {
 }
 
 const openExperience = async (page: Page) => {
+  // A ficha carregada: abaixo de 900, a Experiência fica no "Mais opções"
+  // (T-11); o isVisible não espera, então espera o "Histórico", que está
+  // sempre no menu ou no cabeçalho, para a dona e para o narrador
+  await expect(
+    page
+      .getByRole('button', { name: 'Mais opções' })
+      .or(page.getByRole('button', { name: 'Histórico', exact: true }))
+  ).toBeVisible()
   const more = page.getByRole('button', { name: 'Mais opções' })
   if (await more.isVisible()) await more.click()
   await page.getByRole('button', { name: 'Experiência', exact: true }).click()
@@ -120,7 +128,11 @@ test.describe('a 390', () => {
       .getByRole('button', { name: 'Solicitar evolução', exact: true })
       .click()
     await playerPage.getByLabel('Buscar traço').fill('brig')
-    await playerPage.getByRole('radio', { name: /^Briga, .*faltam/ }).click()
+    // A opção acima do saldo é tocável e diz o motivo (aria-disabled; force:
+    // o Playwright não clica em aria-disabled sem ele, lição da onda 4)
+    await playerPage
+      .getByRole('radio', { name: /^Briga, .*faltam/ })
+      .click({ force: true })
     const send = playerPage.getByRole('button', {
       name: 'Enviar pedido',
       exact: true,
@@ -142,7 +154,10 @@ test.describe('a 390', () => {
     await playerPage.goto(`/characters/${id}`)
     await playerPage.getByRole('radio', { name: 'Editar', exact: true }).click()
     await playerPage
-      .getByRole('button', { name: 'Solicitar evolução de Força' })
+      .getByRole('button', {
+        name: 'Solicitar evolução de Força',
+        exact: true,
+      })
       .click()
     await expect(
       playerPage.getByRole('radio', { name: /^Força, / })

@@ -100,20 +100,22 @@ test.describe('P13 a 390', () => {
     await page.goto(`/characters/${id}`)
     await page.getByRole('button', { name: 'Dados', exact: true }).click()
     await page.getByRole('button', { name: /^Atributo:/ }).click()
+    // Os títulos da folha de escolha, não os da ficha por baixo
+    const picker = page.getByTestId('bottom-sheet-root')
     await expect(
-      page.getByRole('heading', { name: 'Em jogo', exact: true })
+      picker.getByRole('heading', { name: 'Em jogo', exact: true })
     ).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: 'Atributos', exact: true })
+      picker.getByRole('heading', { name: 'Atributos', exact: true })
     ).toBeVisible()
     await page.getByLabel('Buscar atributo').fill('destreza')
-    await page.getByRole('button', { name: /^Destreza, / }).click()
+    await picker.getByRole('button', { name: /^Destreza, / }).click()
     await page.getByRole('button', { name: 'Rolar no app' }).click()
     const faces = page.getByText(/^Dados: /)
     await expect(faces).toBeVisible()
     await page.getByRole('button', { name: /^Atributo:/ }).click()
     await page.getByLabel('Buscar atributo').fill('força')
-    await page
+    await picker
       .getByRole('button', { name: /^Força, / })
       .first()
       .click()
