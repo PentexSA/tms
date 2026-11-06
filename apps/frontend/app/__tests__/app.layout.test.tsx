@@ -150,7 +150,7 @@ describe('T-26: "Próximo" entre os campos', () => {
       fireEvent(password, 'submitEditing')
     })
     expect(fetch).not.toHaveBeenCalled()
-    expect(screen.getByText('Informe um e-mail válido')).toBeTruthy()
+    expect(screen.getByText('Informe um e-mail válido.')).toBeTruthy()
   })
 })
 

@@ -39,7 +39,9 @@ export function RemoveMemberSheet({
       { userId: member.id, revokeInvites: invites === 'revoke' },
       {
         onSuccess: () => {
-          toast.show({ message: `${member.username} saiu da crônica.` })
+          // "saiu" é de quem sai sozinho (LeaveChronicleSheet); aqui o
+          // narrador removeu (T-82, P12)
+          toast.show({ message: `${member.username} foi removido da crônica.` })
           onClose()
         },
       }

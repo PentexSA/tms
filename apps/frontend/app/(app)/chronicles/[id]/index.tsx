@@ -45,6 +45,7 @@ import { TransferOffer } from '../../../../components/chronicles/TransferOffer'
 import { rememberScroll, scrollOf } from '../../../../lib/chronicleScroll'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
+import { useBackTo } from '../../../../lib/navigation'
 import { useTransfer } from '../../../../lib/queries/backstage'
 import {
   chronicleKeys,
@@ -75,6 +76,7 @@ export default function ChronicleScreen() {
   const params = useLocalSearchParams<{ id: string; view?: string }>()
   const { id } = params
   const router = useRouter()
+  const backToList = useBackTo('/')
   const queryClient = useQueryClient()
   const chronicle = useChronicle(id)
   // T-40: o foco e o puxar rebuscam a crônica e o que a aba aberta mostra
@@ -135,7 +137,10 @@ export default function ChronicleScreen() {
       restore()
     }, [restore])
   )
-  const back = { label: 'Crônicas', onPress: () => router.replace('/') }
+  // Volta pela pilha; o replace('/') de antes punha uma segunda lista em
+  // cima da primeira, e o voltar do Android pedia um toque a mais (P12,
+  // achado 6 da onda 3). Sem tela de baixo (link direto), a lista
+  const back = { label: 'Crônicas', onPress: backToList }
 
   if (chronicle.isPending)
     return (
@@ -418,7 +423,9 @@ function SheetsPanel({
       {c.members.length === 0 ? (
         <Text color="inkMuted" style={styles.empty}>
           {narrating
-            ? 'Ninguém entrou ainda. Convide os jogadores com um código.'
+            ? // Vale para "nunca entrou" e para "saiu" ou "foi removido": a
+              // lista não distingue os dois (T-82, P12)
+              'Nenhum jogador agora. Convide os jogadores com um link.'
             : 'Você é o primeiro jogador.'}
         </Text>
       ) : (

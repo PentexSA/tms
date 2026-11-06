@@ -1,4 +1,10 @@
-import { type ComponentRef, useEffect, useRef } from 'react'
+import {
+  type ComponentRef,
+  type Ref,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react'
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native'
 import { Pressable } from './Pressable'
 import { markSoftDisabled } from './Stepper'
@@ -31,6 +37,9 @@ export interface ButtonProps {
   // inteiro (WCAG 2.5.3).
   readonly accessibilityLabel?: string
   readonly testID?: string
+  // Com o React 19 o ref é prop: para mover o foco por programa (a
+  // confirmação de "Revogar" devolve o foco ao gatilho, P12)
+  readonly ref?: Ref<ComponentRef<typeof View>>
 }
 
 const palette = (c: Colors, variant: ButtonVariant) =>
@@ -52,20 +61,30 @@ export function Button({
   accessibilityHint,
   accessibilityLabel,
   testID,
+  ref,
 }: ButtonProps) {
   const theme = useTheme()
   const p = palette(theme.colors, variant)
   const web = Platform.OS === 'web'
   const off = disabled || busy
   const soft = !off && blocked
-  // No web, o aria-disabled do bloqueado vai direto no elemento
-  const ref = useRef<ComponentRef<typeof View>>(null)
+  // No web, o aria-disabled do bloqueado vai direto no elemento (P13); a
+  // prop `ref` (P12) recebe a mesma vista, para o foco por programa
+  const inner = useRef<ComponentRef<typeof View>>(null)
+  const merged = useCallback(
+    (view: ComponentRef<typeof View> | null) => {
+      inner.current = view
+      if (typeof ref === 'function') ref(view)
+      else if (ref) ref.current = view
+    },
+    [ref]
+  )
   useEffect(() => {
-    if (web && !off) markSoftDisabled(ref.current, soft)
+    if (web && !off) markSoftDisabled(inner.current, soft)
   }, [web, off, soft])
   return (
     <Pressable
-      ref={ref}
+      ref={merged}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}

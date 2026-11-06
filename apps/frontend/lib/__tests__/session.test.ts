@@ -372,19 +372,19 @@ describe('validateRegister', () => {
     ],
     [
       { email: 'ana', username: 'ana', password: 'x'.repeat(15) },
-      { email: 'Informe um e-mail válido' },
+      { email: 'Informe um e-mail válido.' },
     ],
     [
       { email: 'ana@example.test', username: 'Ana', password: 'x'.repeat(15) },
-      { username: 'De 3 a 24 caracteres: letras minúsculas, números e _' },
+      { username: 'Use só letras minúsculas.' },
     ],
     [
       { email: 'ana@example.test', username: 'ana', password: 'x'.repeat(14) },
-      { password: 'Pelo menos 15 caracteres' },
+      { password: 'Pelo menos 15 caracteres.' },
     ],
     [
       { email: 'ana@example.test', username: 'ana', password: 'x'.repeat(129) },
-      { password: 'No máximo 128 caracteres' },
+      { password: 'No máximo 128 caracteres.' },
     ],
   ])('%p', (input, errors) => {
     expect(validateRegister(input)).toEqual(errors)

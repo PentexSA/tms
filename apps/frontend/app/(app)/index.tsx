@@ -69,17 +69,21 @@ export default function ChroniclesScreen() {
   useRefetchOnFocus(() => chronicles.refetch({ cancelRefetch: false }))
   const pull = usePullRefresh(() => chronicles.refetch())
 
+  // As ações principais ficam no topo da lista (T-51, P12): com 7 crônicas no
+  // iPhone SE, o rodapé ficava fora da primeira tela. Na lista vazia, quem
+  // chega por convite vê "Entrar com convite" primeiro (R-30)
+  const create = () => router.push('/chronicles/new')
+  const join = () => router.push('/join')
   const actions = (
     <View style={styles.actions}>
-      <Button
-        title="Criar crônica"
-        onPress={() => router.push('/chronicles/new')}
-      />
-      <Button
-        title="Entrar com convite"
-        variant="secondary"
-        onPress={() => router.push('/join')}
-      />
+      <Button title="Criar crônica" onPress={create} />
+      <Button title="Entrar com convite" variant="secondary" onPress={join} />
+    </View>
+  )
+  const emptyActions = (
+    <View style={styles.actions}>
+      <Button title="Entrar com convite" onPress={join} />
+      <Button title="Criar crônica" variant="secondary" onPress={create} />
     </View>
   )
 
@@ -99,8 +103,8 @@ export default function ChroniclesScreen() {
     body = (
       <EmptyState
         title="Você ainda não participa de nenhuma crônica"
-        message="Crie uma crônica para narrar ou entre com o convite que o narrador enviou."
-        actions={actions}
+        message="Recebeu um link ou um código do narrador? Entre com o convite. Para narrar, crie uma crônica."
+        actions={emptyActions}
       />
     )
   else
@@ -123,6 +127,7 @@ export default function ChroniclesScreen() {
                 />
               ) : null
             )}
+            {actions}
             <SectionHeader title="Suas crônicas" />
           </View>
         }
@@ -135,7 +140,6 @@ export default function ChroniclesScreen() {
             onPress={() => router.push(`/chronicles/${item.id}`)}
           />
         )}
-        ListFooterComponent={<View style={styles.footer}>{actions}</View>}
       />
     )
 
@@ -165,7 +169,6 @@ const styles = StyleSheet.create({
     paddingTop: tokens.space[4],
     gap: tokens.space[3],
   },
-  footer: { padding: tokens.layout.gutter },
   bar: { flexDirection: 'row', gap: tokens.space[1] },
   actions: {
     flexDirection: 'row',

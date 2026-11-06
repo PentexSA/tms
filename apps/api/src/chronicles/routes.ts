@@ -649,7 +649,10 @@ export function chronicleRoutes(
         const me = requireUser(userId)
         await requireStoryteller(me, params.id)
         const now = options.now()
-        const rows = await db
+        // O número do convite na crônica (1 = o primeiro gerado nela),
+        // contado antes do limite: o 51º continua 51. Convites não são
+        // apagados (só revogados), então o número não muda (P12, T-45)
+        const numbered = db
           .selectFrom('chronicle_invites')
           .select([
             'id',
@@ -658,13 +661,20 @@ export function chronicleRoutes(
             'max_uses',
             'uses',
             'revoked_at',
+            sql<number>`(row_number() over (order by created_at, id))::int`.as(
+              'number'
+            ),
           ])
           .where('chronicle_id', '=', params.id)
+        const rows = await db
+          .selectFrom(numbered.as('i'))
+          .selectAll()
           .orderBy('created_at', 'desc')
           .limit(50)
           .execute()
         return rows.map(r => ({
           id: r.id,
+          number: r.number,
           createdAt: r.created_at,
           expiresAt: r.expires_at,
           maxUses: r.max_uses,

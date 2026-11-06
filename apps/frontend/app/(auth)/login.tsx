@@ -11,33 +11,63 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { authMessage } from '../../lib/authMessages'
+import { hasPendingInvite } from '../../lib/invite/pending'
+import { usePendingInvite } from '../../lib/invite/usePendingInvite'
 import { nextField } from '../../lib/keyboard'
 import { AuthError } from '../../lib/session'
 import { useSession } from '../../lib/session/SessionProvider'
+import {
+  type FieldErrors,
+  type LoginInput,
+  validateLogin,
+} from '../../lib/validation'
 
 export default function LoginScreen() {
   const { session } = useSession()
   const router = useRouter()
   // Veio da exclusão de conta (app/(app)/account.tsx)
   const { deleted } = useLocalSearchParams<{ deleted?: string }>()
+  // Um convite chegou por link (P12): o aviso, sem o código nem a crônica
+  const invite = usePendingInvite() !== null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Os erros de campo (T-73): depois do primeiro envio, acompanham a digitação
+  const [fields, setFields] = useState<FieldErrors<LoginInput>>({})
+  const [submitted, setSubmitted] = useState(false)
   const passwordInput = useRef<TextInputInstance>(null)
+  const recheck = (next: LoginInput, key: keyof LoginInput) => {
+    if (!submitted && !fields[key]) return
+    setFields(f => ({ ...f, [key]: validateLogin(next)[key] }))
+  }
+  const changeEmail = (value: string) => {
+    setEmail(value)
+    recheck({ email: value, password }, 'email')
+  }
+  const changePassword = (value: string) => {
+    setPassword(value)
+    recheck({ email, password: value }, 'password')
+  }
 
   const submit = async () => {
-    if (!email.trim() || !password) {
-      setError('Informe o e-mail e a senha')
-      return
-    }
+    setSubmitted(true)
+    const problems = validateLogin({ email, password })
+    setFields(problems)
+    // O e-mail é conferido antes: sem requisição, o erro no campo (POA-34)
+    if (Object.keys(problems).length) return
     setBusy(true)
     setError(null)
     try {
       await session.login(email.trim(), password)
-      router.replace('/')
+      router.replace(hasPendingInvite() ? '/join' : '/')
     } catch (e) {
-      setError(e instanceof AuthError ? e.message : 'Não foi possível entrar')
+      setError(
+        e instanceof AuthError
+          ? authMessage('login', e.status, e.message, e.requestId)
+          : 'Não foi possível entrar'
+      )
     } finally {
       setBusy(false)
     }
@@ -62,11 +92,18 @@ export default function LoginScreen() {
               message="Seus dados foram apagados, inclusive os deste aparelho."
             />
           ) : null}
+          {invite ? (
+            <Banner
+              tone="info"
+              message="Você recebeu um convite para uma crônica. Entre ou crie sua conta para continuar."
+            />
+          ) : null}
           {error ? <Banner tone="danger" message={error} /> : null}
           <TextField
             label="E-mail"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={changeEmail}
+            error={fields.email}
             keyboardType="email-address"
             autoCapitalize="none"
             // O teclado não corrige nem guarda o e-mail (T-38; MASVS-STORAGE-2)
@@ -84,7 +121,8 @@ export default function LoginScreen() {
             ref={passwordInput}
             label="Senha"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={changePassword}
+            error={fields.password}
             secureTextEntry
             autoComplete="current-password"
             textContentType="password"

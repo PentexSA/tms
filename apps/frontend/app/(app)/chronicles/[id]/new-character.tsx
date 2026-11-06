@@ -20,6 +20,7 @@ import {
 
 import { UnsavedChangesGuard } from '../../../../components/UnsavedChangesGuard'
 import { messageOf } from '../../../../lib/errors'
+import { useBackTo } from '../../../../lib/navigation'
 import {
   useChronicle,
   useCreateCharacter,
@@ -43,6 +44,7 @@ const issuesOf = (error: unknown): ServerIssue[] => {
 export default function NewCharacterScreen() {
   const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>()
   const router = useRouter()
+  const backToChronicle = useBackTo(`/chronicles/${id}`)
   const chronicle = useChronicle(id)
   const template = useLatestTemplate(chronicle.data?.system.code)
   const model = useCompiled(template.data)
@@ -74,7 +76,8 @@ export default function NewCharacterScreen() {
       : undefined
   const back = {
     label: chronicle.data?.name ?? 'Crônica',
-    onPress: () => router.back(),
+    // Sem tela de baixo (F5, link direto): a crônica (T-30)
+    onPress: backToChronicle,
   }
 
   let body: React.JSX.Element

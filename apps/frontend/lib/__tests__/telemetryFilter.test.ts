@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   createEventLimiter,
   type EventLike,
+  INVITE_CHAR,
   redact,
   scrubBreadcrumb,
   scrubUrl,
@@ -14,6 +17,14 @@ const JWT =
 const NOTE = 'o vampiro esconde a carta da Camarilla'
 const UUID = '123e4567-e89b-42d3-a456-426614174000'
 
+// Um código fictício no alfabeto do convite (base32 Crockford, 26 caracteres)
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+const fakeInviteCode = () =>
+  Array.from(
+    { length: 26 },
+    () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
+  ).join('')
+
 describe('redact', () => {
   it('e-mail, JWT, Bearer e credencial de URL', () => {
     const out = redact(
@@ -25,6 +36,34 @@ describe('redact', () => {
 
   it('pacote@1.2.3 não é e-mail', () => {
     expect(redact('node_modules/pacote@1.2.3/x.js')).toContain('pacote@1.2.3')
+  })
+
+  it('o código de convite, cru e formatado, e o fragmento de URL (P12)', () => {
+    const code = fakeInviteCode()
+    const formatted = code.replace(/(.{4})(?=.)/g, '$1 ')
+    for (const text of [
+      `x ${code} y`,
+      `x ${formatted} y`,
+      `x ${code.toLowerCase()} y`,
+    ]) {
+      const out = redact(text)
+      expect(out).toBe('x [convite] y')
+    }
+    expect(redact(`https://app.test/join#${code}`)).toBe(
+      'https://app.test/join#[convite]'
+    )
+    expect(redact(`em /join#${formatted.replace(/ /g, '-')}`)).toBe(
+      'em /join#[convite]'
+    )
+  })
+
+  it('não apaga UUID, hash nem método privado do stack', () => {
+    for (const text of [
+      UUID,
+      'f'.repeat(64),
+      'at Foo.#bar (https://app.test/x.js:1:2)',
+    ])
+      expect(redact(text)).toBe(text)
   })
 })
 
@@ -56,6 +95,21 @@ describe('scrubBreadcrumb', () => {
       category: 'navigation',
       data: { from: '/a/:id', to: '/b' },
     })
+    const code = fakeInviteCode()
+    expect(
+      JSON.stringify(
+        scrubBreadcrumb({
+          category: 'navigation',
+          data: { from: '/', to: `/join#${code}` },
+        })
+      )
+    ).not.toContain(code)
+    expect(
+      scrubBreadcrumb({
+        category: 'navigation',
+        data: { from: '/', to: `/join#${code}` },
+      })
+    ).toMatchObject({ data: { to: '/join' } })
     expect(
       scrubBreadcrumb({
         category: 'fetch',
@@ -246,5 +300,48 @@ describe('toCapture', () => {
   it('valor lançado que não é Error vira um Error sem o valor', () => {
     const capture = toCapture(NOTE, { source: 'boundary' })
     expect(capture?.error.message).toBe('valor lançado: string')
+  })
+})
+
+// P12, revisão: a cópia da API sem pacote compartilhado (nenhum dos pacotes
+// que os dois importam é lugar de telemetria). Estes testes prendem a cópia
+// ao alfabeto do invite-code.ts e à classe da API
+describe('redact: a cópia da API, o alfabeto e o tempo', () => {
+  const api = (file: string) =>
+    readFileSync(join(__dirname, '../../../api/src', file), 'utf8')
+
+  it('a classe do código é a da API e cobre o alfabeto do invite-code.ts', () => {
+    const apiChar = /INVITE_CHAR = '([^']+)'/.exec(api('http/safe-error.ts'))
+    expect(apiChar?.[1]).toBe(INVITE_CHAR)
+    const alphabet = /ALPHABET = '([0-9A-Z]+)'/.exec(
+      api('chronicles/invite-code.ts')
+    )?.[1]
+    expect(alphabet).toHaveLength(32)
+    const one = new RegExp(`^${INVITE_CHAR}$`)
+    for (const c of `${alphabet}OIL`) {
+      expect(one.test(c)).toBe(true)
+      expect(one.test(c.toLowerCase())).toBe(true)
+    }
+    expect(one.test('U')).toBe(false)
+  })
+
+  it('linear num token longo de "/" e num base64 de 64 KB', () => {
+    const slashes = '/'.repeat(64 * 1024)
+    const base64 = Buffer.from(
+      Array.from({ length: 48 * 1024 }, (_, i) => i % 256)
+    ).toString('base64')
+    for (const value of [slashes, `${slashes}#x`, base64, `/${base64}#y`]) {
+      const start = Date.now()
+      redact(value)
+      expect(Date.now() - start).toBeLessThan(200)
+    }
+  })
+
+  it('texto acima de 2000 caracteres nem é lido (o teto da API)', () => {
+    const out = scrubWebEvent({
+      exception: { values: [{ type: 'Error', value: 'x'.repeat(2001) }] },
+    })
+    expect(JSON.stringify(out)).toContain('[texto longo omitido]')
+    expect(JSON.stringify(out)).not.toContain('x'.repeat(301))
   })
 })

@@ -7,7 +7,10 @@ module.exports = {
 
   // O @sentry/react (telemetry.web.ts) sai em ESM: o Babel o transforma
   transformIgnorePatterns: reactNative.transformIgnorePatterns.map(p =>
-    p.replace('|@electric-sql)', '|@electric-sql|@sentry/.*)')
+    p.replace(
+      '|@electric-sql)',
+      '|@electric-sql|@sentry/.*|standard-navigation)'
+    )
   ),
 
   // Setup file for test utilities and mocks

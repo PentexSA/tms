@@ -596,7 +596,72 @@ Os commits 1 a 5 são independentes entre si. O 7 depende do 6; o 8, do 4 e do 6
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
-(Vazia: preenchida na implementação.)
+Implementação em 05 e 06/11/2026, na `pacote/p12-convite-entrada` (a partir de `52dbe0f`), em paralelo com os outros pacotes da onda. Os pontos para o PO e as perguntas técnicas seguiram o padrão deste plano (seção 9); nada foi decidido aqui. Rótulo do convite: só o número automático. O rótulo livre, o final do código, App Links/Universal Links e escolher validade e usos ficaram fora.
+
+**Desvios de desenho:**
+
+1. **Commit 1: o teste do log entrou em `chronicles.test.ts`, e não no `logger-output.test.ts`.** O `logger-output` roda o Pino em outro processo, sem a app. O teste espiona o `logger` da API em todos os níveis, como o `observability.test.ts`, e prova que nem o código nem o `sha256` dele aparecem, num aceite válido e num inválido. O log de query do banco não é espionado: ele não exporta o logger, e o `formatEvent` já não leva parâmetros (`packages/db/src/logger.ts`).
+2. **Commit 3: a matriz de AuthZ não ganhou linha.** O `GET /chronicles/:id/invites` já está na matriz, com narrador 200, dono e jogador 403 e os outros papéis 404. O `number` só existe na resposta 200. O `chronicles.test.ts` confere que o 403 do jogador não traz o campo.
+3. **Commit 5: o `BonusNotice` não chama o `useToastOffset`.** Ele é uma `BottomSheet`, não uma barra fixa. Com ele aberto, o aviso já fica dentro do painel e acima do rodapé (commit 4). A captura do "aviso de conclusão sobre o rodapé" (`iniciante-web/68`) é do dock ("Todos os recursos"), que o commit 5 cobre.
+4. **Commit 6: o `+native-intent.tsx` lê o caminho com regex, sem `new URL`.** Assim o resultado é o mesmo no Hermes e no Jest. O `capture.web.ts` também escuta o `popstate`: o roteador do Expo lê `pathname + search + hash` no `popstate` (`browserHistoryAdapter.js`). Como o nosso ouvinte é registrado antes, o código sai da URL antes de o roteador lê-la.
+5. **Commit 9: "Convites ativos" virou um `Text` com `ref` e `tabIndex={-1}`**, passados por spread, como no `AnchorHeader`. O `SectionHeader` não expõe o `ref` do título, e o pacote não o mudou.
+6. **Commit 10: o achado 6 foi reproduzido, e a hipótese (a) se confirmou** com o roteador de verdade (`renderRouter`, `navigation-back.test.tsx`). O `replace('/')` deixava a pilha com duas listas; com `useBackTo`, fica uma. Para o teste rodar fora do mock, o `jest.config.js` do app passou a transformar o `standard-navigation` (ESM). O teste também restaura o mock da safe area, que o `resetMocks` apaga. A hipótese (d), a troca de aba empilhar entradas no web, não foi corrigida: o `navigation.spec.ts` prende o comportamento atual (`history.length` igual) e falha se ela empilhar.
+7. **Commit 12: o 400 do cadastro ganhou frase própria** ("Confira o e-mail, o nome de usuário e a senha."), que a tabela 3.6 não trazia. O login perdeu a faixa "Informe o e-mail e a senha": os dois erros vão para os campos ("Informe um e-mail válido.", "Informe a senha."). As frases do `validateRegister` ganharam ponto final.
+8. **Commit 14: os E2E foram escritos e não rodados.** Eles rodam só na integração, por causa das portas fixas. O `headers.spec.ts` também mudou ("E-mail ou senha incorretos", com maiúscula). As medidas novas no `play.spec.ts` (toast acima do dock) e o `elementFromPoint` do toast de remoção no `journey-storyteller.spec.ts` não entraram. O Jest cobre o deslocamento (`play.test.tsx`), e o roteiro (seção 11) confere os dois na tela.
+
+**O `ref` do `Button` e o P13 (rebase):**
+
+9. Este pacote só repassa a prop `ref` ao `Pressable` (`packages/ui/src/Button.tsx`, tipo `Ref<ComponentRef<typeof View>>`). O P13, que entra antes, põe um `ref` interno para o `blocked` (`markSoftDisabled`). No rebase, o `Button` passa a usar um *callback ref* que entrega a mesma vista aos dois:
+
+   ```tsx
+   const merged = useCallback((view) => {
+     inner.current = view          // o do P13 (blocked)
+     if (typeof ref === 'function') ref(view)
+     else if (ref) ref.current = view
+   }, [ref])
+   <Pressable ref={merged} … />
+   ```
+
+   O teste do P12 (`components.test.tsx`, "o ref chega à vista do botão") e os do `blocked` do P13 têm de passar juntos depois do rebase.
+
+**Revisões:**
+
+10. **`/security-review` no diff inteiro (`52dbe0f..HEAD`): sem achado com confiança alta.** Foram conferidos:
+    - o `capture.web.ts`: o fragmento num formato fechado, que nunca vira rota, e o `replaceState` antes do roteador e do Sentry;
+    - o `+native-intent.tsx`: só `join` guarda o código, e qualquer outra URL perde o fragmento;
+    - as duas `redact`, que são só regex;
+    - o `GET` com `row_number`: sem entrada do usuário no SQL e com o `requireStoryteller` mantido;
+    - o aceite sem toque nenhum: o banner diz a conta que vai entrar;
+    - o redirecionamento pós-login, para um caminho fixo (`/join`).
+
+    Nenhuma rota, limite, status ou texto da API de aceite e de autenticação mudou.
+
+    Resíduos conhecidos, os da seção 5:
+    - o histórico global do navegador guarda a URL original;
+    - a área de transferência ao copiar;
+    - o `tms://` sem App Links.
+11. **`/code-review` (high): 10 achados, todos corrigidos em commits `fix` com teste de regressão:**
+    - **o convite pendente saía só no `logout()`** (`50780e2`). Agora sai também em toda saída de uma sessão aberta: o `#clearLocal` cobre conta excluída, refresh recusado e logout em outra aba. Na abertura sem sessão, não sai.
+    - **o código sobrevivia a sair de "Entrar com convite"** por outro caminho que não o "‹" (o voltar do Android, o gesto do iOS) (`000dd58`). Agora a tela o apaga ao desmontar, um tique depois, para a remontagem do StrictMode não apagar.
+    - **o login recusava o que a API aceita** (`8968486`). Agora confere só que o e-mail não está vazio e tem "@". O cadastro mantém a regra da API. Isto muda o item 7 acima: o "nome@" do POA-34 agora vai à API e volta com o 401 genérico.
+    - **o cadastro perdia campo no preenchimento automático** (`8968486`). Voltou ao `setForm` funcional, e o erro do campo vem de `registerFieldError(key, value)`.
+    - **o "‹ Crônicas" da crônica aberta pela Conta voltava à Conta** (`1b06892`). Foi escolhida a saída menor: o "Abrir <crônica>" da Conta usa `replace`, e a lista fica por baixo. O rótulo continua fixo.
+    - **o `peekPendingInvite` (o getSnapshot) expirava o código na leitura** (`50780e2`). Agora a validade é um `setTimeout` que apaga e avisa.
+    - **a regex do fragmento era quadrática e o web redigia antes de cortar** (`567360f`). Agora é um passe linear por token (`redactFragments`), e o `text()` do web corta acima de 2000 caracteres antes de redigir (o `MAX_MESSAGE_SCAN` da API). O teste usa 64 KB de "/" e de base64, com limite de 200 ms.
+    - **a frase do 5xx lia o sufixo do texto formatado** (`52421a0`). Agora o `AuthError` guarda o `requestId`, e o `authMessage` chama o `withErrorCode`.
+    - **a regex da redação está duplicada entre web e API** (`567360f`). Nenhum pacote que os dois já importam (`@tms/config`, `@tms/sheet-core`) é lugar de telemetria, então a cópia ficou. Em troca, um teste em cada lado prende a classe `INVITE_CHAR` ao `ALPHABET` do `invite-code.ts` (agora exportado). O teste do web também lê a classe do `safe-error.ts` e compara as duas.
+    - **o `ErrorBoundary` da ficha tinha o voltar próprio** (`6236a73`). Agora usa o `useBackTo('/')`.
+
+    A confirmação do revogar continua aberta quando a API falha, com o erro na faixa da folha.
+
+**Para o roteiro (seção 11) e a integração:**
+
+12. O build nativo é obrigatório: o `@tms/ui` mudou (`Toast`, `BottomSheet`, `Button`).
+13. A conferir na tela:
+    - o deep link `tms://join#…` no Android e no iOS;
+    - o aviso dentro da folha no web, também no WebKit;
+    - a confirmação do revogar a 360 dp;
+    - o achado 6 no AVD.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 

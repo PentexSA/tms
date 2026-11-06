@@ -164,7 +164,40 @@ describe('o narrador remove um jogador', () => {
     expect(calls.chronicle.memberDelete).toHaveBeenCalledWith('u2', {
       revokeInvites: true,
     })
-    expect(await screen.findByText('dona saiu da crônica.')).toBeTruthy()
+    expect(
+      await screen.findByText('dona foi removido da crônica.')
+    ).toBeTruthy()
+  })
+
+  // T-82 (P12): "saiu" era de quem sai sozinho; a lista vazia dizia
+  // "Ninguém entrou ainda." depois de uma remoção
+  it('remover a única jogadora: "foi removido", "Nenhum jogador agora" e a ficha arquivada', async () => {
+    calls.chronicle.memberDelete.mockResolvedValue(ok(null))
+    await openChronicle('storyteller')
+    // A busca depois da remoção: sem membros, e a ficha dela arquivada
+    calls.chronicle.get.mockResolvedValue(
+      ok({ ...detail('storyteller').data, members: [] })
+    )
+    calls.chronicle.charactersGet.mockResolvedValue(
+      ok([{ ...helena(false), status: 'archived' }])
+    )
+    fireEvent.press(screen.getByTestId('remove-u2'))
+    await act(async () => {
+      fireEvent.press(
+        screen.getAllByRole('button', { name: 'Remover' }).at(-1)!
+      )
+    })
+    expect(
+      await screen.findByText('dona foi removido da crônica.')
+    ).toBeTruthy()
+    expect(screen.queryByText(/saiu da crônica/)).toBeNull()
+    expect(
+      await screen.findByText(
+        'Nenhum jogador agora. Convide os jogadores com um link.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByText(/Ninguém entrou ainda/)).toBeNull()
+    expect(await screen.findByText('Arquivada')).toBeTruthy()
   })
 
   it('pode manter os convites', async () => {

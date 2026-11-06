@@ -1,9 +1,22 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
-import { FlatList, Share } from 'react-native'
+import { FlatList, Platform, Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
+import { WEB_URL } from '../../lib/env'
+import * as focusModule from '../../lib/focus'
+import {
+  clearPendingInvite,
+  peekPendingInvite,
+  setPendingInvite,
+} from '../../lib/invite/pending'
 import { createMemoryDraftStore } from '../../sheet/sync/draftStore'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import {
@@ -348,9 +361,46 @@ describe('Crônicas (lista)', () => {
         name: 'Você ainda não participa de nenhuma crônica',
       })
     ).toBeTruthy()
+    // T-51 (P12): quem chega por convite vê "Entrar com convite" primeiro,
+    // como primário
+    const buttons = screen
+      .getAllByRole('button')
+      .map(b => b.props.accessibilityLabel)
+      .filter(name => name === 'Criar crônica' || name === 'Entrar com convite')
+    expect(buttons).toEqual(['Entrar com convite', 'Criar crônica'])
+    expect(
+      screen.getByText(
+        'Recebeu um link ou um código do narrador? Entre com o convite. Para narrar, crie uma crônica.'
+      )
+    ).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Criar crônica' }))
     fireEvent.press(screen.getByRole('button', { name: 'Entrar com convite' }))
     expect(router.push.mock.calls).toEqual([['/chronicles/new'], ['/join']])
+  })
+
+  it('T-51: com crônicas, criar e entrar no topo, antes de "Suas crônicas"', async () => {
+    calls.chroniclesGet.mockResolvedValue(
+      ok(
+        Array.from({ length: 7 }, (_, n) => ({
+          id: `c${n}`,
+          name: `Crônica ${n + 1}`,
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'ana' },
+          characterCount: 1,
+        }))
+      )
+    )
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    await screen.findByText('Crônica 1')
+    const list = screen.UNSAFE_getByType(FlatList)
+    const header = render(list.props.ListHeaderComponent)
+    expect(header.getByRole('button', { name: 'Criar crônica' })).toBeTruthy()
+    expect(
+      header.getByRole('button', { name: 'Entrar com convite' })
+    ).toBeTruthy()
+    expect(list.props.ListFooterComponent).toBeUndefined()
+    header.unmount()
   })
 
   it('erro: mensagem e tentar de novo', async () => {
@@ -575,7 +625,7 @@ describe('Entrar com convite', () => {
     expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
   })
 
-  it('código inválido: mensagem genérica', async () => {
+  it('código inválido: a frase genérica, com o próximo passo (T-73)', async () => {
     calls.acceptPost.mockResolvedValue(
       fail(404, 'convite inválido ou expirado')
     )
@@ -585,8 +635,115 @@ describe('Entrar com convite', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Entrar na crônica' }))
     })
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'convite inválido ou expirado'
+      'Este convite não vale mais ou o código está errado. Confira o código ou peça um novo ao narrador.'
     )
+  })
+})
+
+// P12, D-14: o link preenche o campo; o aceite continua no toque
+// T-30 (P12) e o achado 6 da onda 3: o "‹" volta pela pilha; sem tela de
+// baixo (F5, link direto), abre a lista. Nunca replace com tela de baixo
+describe('o "‹" sempre sai', () => {
+  afterEach(() => router.canGoBack.mockReset())
+
+  it.each([
+    ['Entrar com convite', () => <JoinScreen />],
+    ['Nova crônica', () => <NewChronicleScreen />],
+  ])('%s: back com tela de baixo, a lista sem', async (_, screenOf) => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    renderWithSession(screenOf(), await signedIn())
+    const back = screen.getByRole('button', { name: 'Voltar para Crônicas' })
+    router.canGoBack.mockReturnValue(true)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('a crônica volta pela pilha, sem empilhar outra lista', async () => {
+    jest.mocked(useLocalSearchParams).mockReturnValue({ id: CHRONICLE_ID })
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE_ID,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'player',
+        storyteller: { username: 'ana' },
+        members: [],
+      })
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    const back = await screen.findByRole('button', {
+      name: 'Voltar para Crônicas',
+    })
+    router.canGoBack.mockReturnValue(true)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalledWith('/')
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+})
+
+describe('Entrar com convite pelo link', () => {
+  const CODE = 'ABCD2345EFGH6789JKMN0PQRST'
+  afterEach(() => clearPendingInvite())
+
+  it('campo preenchido, a conta dita, nada enviado até o toque', async () => {
+    setPendingInvite(CODE)
+    calls.acceptPost.mockResolvedValue(
+      ok({ chronicleId: CHRONICLE_ID, role: 'player' })
+    )
+    const session = await signedIn()
+    renderWithSession(<JoinScreen />, session)
+    expect(screen.getByTestId('invite-code').props.value).toBe(CODE)
+    const username = session.getState().user?.username ?? ''
+    expect(
+      screen.getByText(`Convite recebido. Você vai entrar como ${username}.`)
+    ).toBeTruthy()
+    expect(calls.acceptPost).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Entrar na crônica' }))
+    })
+    expect(calls.acceptPost).toHaveBeenCalledWith({ code: CODE })
+    expect(peekPendingInvite()).toBeNull()
+    expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
+  })
+
+  it('um link novo com a tela aberta troca o código', async () => {
+    renderWithSession(<JoinScreen />, await signedIn())
+    expect(screen.getByTestId('invite-code').props.value).toBe('')
+    act(() => setPendingInvite(CODE))
+    expect(screen.getByTestId('invite-code').props.value).toBe(CODE)
+  })
+
+  it('o "‹" limpa o convite pendente', async () => {
+    setPendingInvite(CODE)
+    renderWithSession(<JoinScreen />, await signedIn())
+    fireEvent.press(screen.getByRole('button', { name: /Crônicas/ }))
+    expect(peekPendingInvite()).toBeNull()
+  })
+
+  it('sair da tela por qualquer caminho apaga o código pendente', async () => {
+    jest.useFakeTimers()
+    try {
+      setPendingInvite(CODE)
+      const view = renderWithSession(<JoinScreen />, await signedIn())
+      view.unmount()
+      act(() => jest.runOnlyPendingTimers())
+      expect(peekPendingInvite()).toBeNull()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('o campo aceita até 64 caracteres, o teto do aceite', async () => {
+    renderWithSession(<JoinScreen />, await signedIn())
+    expect(screen.getByTestId('invite-code').props.maxLength).toBe(64)
   })
 })
 
@@ -823,51 +980,57 @@ describe('Crônica (detalhe)', () => {
     expect(await screen.findByText('Narrador: ana')).toBeTruthy()
   })
 
-  it('narrador gera o convite, copia, compartilha e revoga', async () => {
-    calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
-    calls.chronicle.invitesGet.mockResolvedValue(
-      ok([
-        {
-          id: 'i1',
-          createdAt: '2026-10-18T12:00:00Z',
-          expiresAt: '2026-10-25T12:00:00Z',
-          maxUses: 10,
-          uses: 2,
-          active: true,
-        },
-        {
-          id: 'i0',
-          createdAt: '2026-10-01T12:00:00Z',
-          expiresAt: '2026-10-08T12:00:00Z',
-          maxUses: 10,
-          uses: 0,
-          active: false,
-        },
-      ])
-    )
-    calls.chronicle.invitesPost.mockResolvedValue(
-      ok({
+  // P12, D-14 e T-43: o convite é um link, com a mensagem pronta, e copiar
+  // responde no botão e na região viva. Código fictício
+  const CODE = 'ABCDEFGHJKMNPQRSTVWXYZ0123'
+  const LINK = `${WEB_URL}/join#${CODE}`
+  const inviteList = () =>
+    ok([
+      {
         id: 'i2',
-        code: 'ABCDEFGHJKMNPQRSTVWXYZ0123',
-        expiresAt: '',
+        number: 3,
+        createdAt: '2026-10-18T13:07:00Z',
+        expiresAt: '2026-10-25T13:07:00Z',
         maxUses: 10,
-      })
-    )
+        uses: 0,
+        active: true,
+      },
+      {
+        id: 'i1',
+        number: 2,
+        createdAt: '2026-10-18T12:00:00Z',
+        expiresAt: '2026-10-25T12:00:00Z',
+        maxUses: 10,
+        uses: 2,
+        active: true,
+      },
+      {
+        id: 'i0',
+        number: 1,
+        createdAt: '2026-10-01T12:00:00Z',
+        expiresAt: '2026-10-08T12:00:00Z',
+        maxUses: 10,
+        uses: 0,
+        active: false,
+      },
+    ])
+  const created = () =>
+    ok({ id: 'i2', code: CODE, expiresAt: '2026-10-25T13:07:00Z', maxUses: 10 })
+
+  it('narrador gera o convite, copia o link, compartilha e revoga', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
+    calls.chronicle.invitesGet.mockResolvedValue(inviteList())
+    calls.chronicle.invitesPost.mockResolvedValue(created())
     calls.chronicle.invitesDelete.mockResolvedValue(ok(null))
     const share = jest
       .spyOn(Share, 'share')
       .mockResolvedValue({ action: 'sharedAction', activityType: undefined })
     renderWithSession(<ChronicleScreen />, await signedIn())
     expect(await screen.findByText('Você narra esta crônica.')).toBeTruthy()
-    expect(
-      screen.getByText(
-        'Ninguém entrou ainda. Convide os jogadores com um código.'
-      )
-    ).toBeTruthy()
     fireEvent.press(screen.getByRole('button', { name: 'Convidar' }))
 
     expect(
-      await screen.findByText('8 usos restantes · vale até 25/10')
+      await screen.findByText(/^8 usos restantes · vale até 25\/10 às /)
     ).toBeTruthy()
     // Só os ativos aparecem
     expect(screen.queryByText(/vale até 08\/10/)).toBeNull()
@@ -878,23 +1041,52 @@ describe('Crônica (detalhe)', () => {
     expect(
       await screen.findByText('ABCD EFGH JKMN PQRS TVWX YZ01 23')
     ).toBeTruthy()
+    expect(screen.getByTestId('invite-link-value')).toHaveTextContent(LINK)
+    // O número vem da lista, buscada de novo depois de gerar
+    expect(await screen.findByText('Convite 3')).toBeTruthy()
+    // A validade e os usos vêm da resposta, não de um texto fixo
+    expect(screen.getByText(/e para até 10 pessoas/)).toBeTruthy()
+
+    jest.useFakeTimers()
+    try {
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Copiar link' }))
+      })
+      expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith(LINK)
+      expect(screen.getByRole('button', { name: 'Copiado' })).toHaveTextContent(
+        'Copiado ✓'
+      )
+      expect(screen.getByTestId('invite-copy-status')).toHaveTextContent(
+        'Link copiado.'
+      )
+      act(() => jest.advanceTimersByTime(2000))
+      expect(screen.getByRole('button', { name: 'Copiar link' })).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
 
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Copiar código' }))
     })
-    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
-      'ABCDEFGHJKMNPQRSTVWXYZ0123'
+    expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith(CODE)
+    expect(screen.getByTestId('invite-copy-status')).toHaveTextContent(
+      'Código copiado.'
     )
-    expect(await screen.findByText('Código copiado')).toBeTruthy()
-
-    fireEvent.press(screen.getByRole('button', { name: 'Compartilhar' }))
-    expect(share).toHaveBeenCalledWith({
-      message:
-        'Entre na crônica "Crônica da Liberdade" no TMS com o código ABCD EFGH JKMN PQRS TVWX YZ01 23',
-    })
+    // O toast de antes sai: o retorno é na folha
+    expect(screen.queryByText('Código copiado')).toBeNull()
 
     await act(async () => {
-      fireEvent.press(screen.getByRole('button', { name: 'Revogar' }))
+      fireEvent.press(screen.getByRole('button', { name: 'Compartilhar' }))
+    })
+    expect(share).toHaveBeenCalledWith({
+      message: `Você foi convidado para a crônica "Crônica da Liberdade" no TMS. Abra o link para entrar: ${LINK} — No app TMS, toque em "Entrar com convite" e use o código ABCD EFGH JKMN PQRS TVWX YZ01 23. Vale até 25/10 e para até 10 pessoas.`,
+    })
+
+    // T-45: o convite 2 pela confirmação na linha
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    expect(calls.chronicle.invitesDelete).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Revogar convite' }))
     })
     await waitFor(() =>
       expect(calls.chronicle.invitesDelete).toHaveBeenCalledWith('i1')
@@ -904,6 +1096,125 @@ describe('Crônica (detalhe)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
     fireEvent.press(screen.getByRole('button', { name: 'Convidar' }))
     expect(screen.queryByText('ABCD EFGH JKMN PQRS TVWX YZ01 23')).toBeNull()
+    expect(screen.queryByTestId('invite-link-value')).toBeNull()
+  })
+
+  it('T-45: revogar pede confirmação, com o foco em Cancelar e de volta', async () => {
+    const focus = jest.spyOn(focusModule, 'focusView')
+    calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
+    calls.chronicle.invitesGet.mockResolvedValue(inviteList())
+    calls.chronicle.invitesDelete.mockResolvedValue(ok(null))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Convidar' }))
+    // Dois do mesmo dia, distinguíveis pelo número e pela hora
+    const t = (iso: string) => {
+      const d = new Date(iso)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    expect(
+      await screen.findByText(
+        `Convite 3 · criado em 18/10 às ${t('2026-10-18T13:07:00Z')}`
+      )
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        `Convite 2 · criado em 18/10 às ${t('2026-10-18T12:00:00Z')}`
+      )
+    ).toBeTruthy()
+
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    expect(
+      screen.getByText(
+        'Revogar o convite 2? Quem ainda não entrou não vai conseguir usar o link nem o código.'
+      )
+    ).toBeTruthy()
+    // O alvo do foco, sem imprimir a árvore se falhar
+    const focused = () => {
+      const view = focus.mock.lastCall?.[0] as
+        | { props?: { accessibilityLabel?: string; children?: unknown } }
+        | null
+        | undefined
+      return String(view?.props?.accessibilityLabel ?? view?.props?.children)
+    }
+    expect(focused()).toBe('Cancelar')
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(calls.chronicle.invitesDelete).not.toHaveBeenCalled()
+    // O foco volta ao gatilho da mesma linha
+    expect(focused()).toBe('Revogar convite 2')
+
+    // Uma confirmação por vez
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 3' }))
+    expect(screen.getAllByRole('button', { name: 'Cancelar' })).toHaveLength(1)
+    expect(
+      screen.getByRole('button', { name: 'Revogar convite 2' })
+    ).toBeTruthy()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Revogar convite' }))
+    })
+    expect(calls.chronicle.invitesDelete).toHaveBeenCalledTimes(1)
+    expect(calls.chronicle.invitesDelete).toHaveBeenCalledWith('i2')
+    // Revogado: o foco vai para "Convites ativos"
+    await waitFor(() => expect(focused()).toBe('Convites ativos'))
+    focus.mockRestore()
+  })
+
+  it('a cópia que falha diz como copiar à mão, sem erro solto', async () => {
+    calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
+    calls.chronicle.invitesGet.mockResolvedValue(inviteList())
+    calls.chronicle.invitesPost.mockResolvedValue(created())
+    jest.mocked(Clipboard.setStringAsync).mockRejectedValueOnce(new Error('x'))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Convidar' }))
+    await act(async () => {
+      fireEvent.press(
+        await screen.findByRole('button', { name: 'Gerar convite' })
+      )
+    })
+    await act(async () => {
+      fireEvent.press(
+        await screen.findByRole('button', { name: 'Copiar link' })
+      )
+    })
+    expect(screen.getByTestId('invite-copy-status')).toHaveTextContent(
+      'Não foi possível copiar. Selecione o link acima e copie.'
+    )
+    expect(screen.queryByRole('button', { name: 'Copiado' })).toBeNull()
+  })
+
+  it('T-44: no web sem Web Share, o botão é "Copiar mensagem"', async () => {
+    const os = Platform.OS
+    const page = globalThis as { navigator?: unknown }
+    const navigator = page.navigator
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    page.navigator = {}
+    try {
+      calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
+      calls.chronicle.invitesGet.mockResolvedValue(inviteList())
+      calls.chronicle.invitesPost.mockResolvedValue(created())
+      const share = jest.spyOn(Share, 'share')
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      fireEvent.press(await screen.findByRole('button', { name: 'Convidar' }))
+      await act(async () => {
+        fireEvent.press(
+          await screen.findByRole('button', { name: 'Gerar convite' })
+        )
+      })
+      expect(screen.queryByRole('button', { name: 'Compartilhar' })).toBeNull()
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Copiar mensagem' }))
+      })
+      expect(share).not.toHaveBeenCalled()
+      expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith(
+        expect.stringContaining(`/join#${CODE}`)
+      )
+      expect(screen.getByTestId('invite-copy-status')).toHaveTextContent(
+        'Mensagem copiada.'
+      )
+    } finally {
+      page.navigator = navigator
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
   })
 
   it('erro ao gerar o convite aparece no sheet', async () => {

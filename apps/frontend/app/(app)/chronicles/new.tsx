@@ -14,10 +14,12 @@ import { useRef, useState } from 'react'
 import { ScrollView, StyleSheet } from 'react-native'
 
 import { messageOf } from '../../../lib/errors'
+import { useBackTo } from '../../../lib/navigation'
 import { useCreateChronicle, useSystems } from '../../../lib/queries/chronicles'
 
 export default function NewChronicleScreen() {
   const router = useRouter()
+  const back = useBackTo('/')
   const systems = useSystems()
   const create = useCreateChronicle()
   const [name, setName] = useState('')
@@ -54,7 +56,7 @@ export default function NewChronicleScreen() {
     <Screen>
       <AppBar
         title="Nova crônica"
-        back={{ label: 'Crônicas', onPress: () => router.back() }}
+        back={{ label: 'Crônicas', onPress: back }}
       />
       {/* Encolhe acima do teclado também no Android (T-26) */}
       <KeyboardArea>

@@ -284,7 +284,7 @@ test('a jornada da v3: concluir, dano em grupo, desfazer, travar e remover', asy
       .last()
       .click()
     await expect(
-      page.getByText(`${playerA.username} saiu da crônica.`)
+      page.getByText(`${playerA.username} foi removido da crônica.`)
     ).toBeVisible()
     const formerRoll = response(rollPage, `/characters/${idA}/rolls`, 403)
     await rollPage.getByRole('button', { name: 'Rolar no app' }).click()
