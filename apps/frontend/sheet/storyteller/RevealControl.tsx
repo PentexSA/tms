@@ -1,6 +1,6 @@
 import { plain } from '@tms/sheet-core'
 import { Button, Text, tokens, useToast } from '@tms/ui'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { useCommandKey } from '../../lib/commandKey'
@@ -43,6 +43,17 @@ function NarratorReveal({
   const [confirm, setConfirm] = useState<'open' | 'closing' | null>(null)
   const [offline, setOffline] = useState(false)
   const done = useRef<string | null>(null)
+  // A revisão observada mudou (outro aparelho revelou ou escondeu, ou a
+  // ficha foi rebuscada depois de um 409): a intenção de antes acabou, e o
+  // próximo envio leva chave nova. Senão, a mesma chave com a revisão nova
+  // seria outra intenção (409 IDEMPOTENCY_CONFLICT) ou repetiria a velha
+  const observed = useRef(reveal.revision)
+  useEffect(() => {
+    if (observed.current === reveal.revision) return
+    observed.current = reveal.revision
+    revealKey.settle(null)
+    hideKey.settle(null)
+  })
   const section = model.sections.get(sectionId)
   const fieldIds = section?.fieldIds ?? []
   // O texto que o narrador confere antes de revelar (o que está salvo)

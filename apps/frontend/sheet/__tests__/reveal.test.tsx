@@ -24,6 +24,10 @@ import { revealOf } from '../storyteller/revealed'
 // confirmação) e as deixa privadas de novo; o dono lê só em leitura, pela
 // rota própria, e o texto sai da tela quando a nota volta a ser privada.
 
+// Chaves de comando de verdade, para comparar uma tentativa com a outra
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => require('node:crypto').randomUUID(),
+}))
 jest.mock('../../lib/api', () => {
   const { createFakeApi } = require('../../test/fake-api')
   const fake = createFakeApi()
@@ -200,6 +204,49 @@ describe('o narrador revela e esconde', () => {
         'As notas voltaram a ser privadas. Quem já leu continua sabendo.'
       )
     ).toBeTruthy()
+  })
+
+  it('a chave de comando fica no reenvio e gira quando a revisão observada muda', async () => {
+    const { queryClient } = await open(['storyteller'])
+    // Resultado desconhecido (5xx): a nova tentativa é a mesma intenção
+    calls.revealPost.mockResolvedValue(fail(503, 'indisponível'))
+    fireEvent.press(screen.getByRole('button', { name: /^Revelar ao jogador/ }))
+    await screen.findByText('Revelar as Notas do Narrador a dona?')
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar notas' }))
+    await waitFor(() => expect(calls.revealPost).toHaveBeenCalledTimes(1))
+    await screen.findByText('indisponível')
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar notas' }))
+    await waitFor(() => expect(calls.revealPost).toHaveBeenCalledTimes(2))
+    const body = (n: number) =>
+      calls.revealPost.mock.calls[n]?.[1] as {
+        clientCommandId: string
+        revision: number
+      }
+    expect(body(1).clientCommandId).toBe(body(0).clientCommandId)
+    // Outro aparelho revelou e escondeu: a ficha volta com a revisão 2
+    calls.characterGet.mockResolvedValue(
+      character(['storyteller'], { sections: [], revision: 2 })
+    )
+    await act(() =>
+      queryClient.invalidateQueries({
+        queryKey: ['characters', ID],
+        exact: true,
+      })
+    )
+    await waitFor(() =>
+      expect(
+        (
+          queryClient.getQueryData(['characters', ID]) as {
+            reveal: { revision: number }
+          }
+        ).reveal.revision
+      ).toBe(2)
+    )
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)))
+    fireEvent.press(screen.getByRole('button', { name: 'Revelar notas' }))
+    await waitFor(() => expect(calls.revealPost).toHaveBeenCalledTimes(3))
+    expect(body(2).revision).toBe(2)
+    expect(body(2).clientCommandId).not.toBe(body(0).clientCommandId)
   })
 
   it('o 409 da revisão velha aparece dentro da folha', async () => {
