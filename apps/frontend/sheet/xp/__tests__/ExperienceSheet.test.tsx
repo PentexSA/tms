@@ -1,10 +1,12 @@
 import {
+  act,
   fireEvent,
   screen,
   waitFor,
   within,
 } from '@testing-library/react-native'
 import type { RoleName } from '@tms/sheet-core'
+import { useState } from 'react'
 import type { ReactTestInstance } from 'react-test-renderer'
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, ok } from '../../../test/fake-api'
@@ -160,6 +162,59 @@ describe('Solicitar evolução (T-50)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
     fireEvent.changeText(screen.getByLabelText('Buscar traço'), 'zzzz')
     expect(screen.getByText('Nada encontrado para “zzzz”.')).toBeTruthy()
+  })
+})
+
+// O custo e o "para" saem da ficha de agora, não da hora do toque
+describe('a ficha muda com a folha aberta', () => {
+  it('o resumo e o pedido usam o custo da ficha nova (sem expectedCost velho)', async () => {
+    calls.xpGet.mockImplementation((async () => balance(50)) as never)
+    calls.xpRequestPost.mockResolvedValue(ok({ id: 'r1' }))
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    let update: (next: typeof sheet) => void = () => undefined
+    function Harness() {
+      const [current, setCurrent] = useState(sheet)
+      update = setCurrent
+      return (
+        <ExperienceSheet
+          characterId={CHARACTER}
+          chronicleId={CHRONICLE}
+          model={model}
+          sheet={current}
+          roles={['owner']}
+          lifecycle={{ status: 'active', locked: false, member: true }}
+          visible
+          onClose={jest.fn()}
+        />
+      )
+    }
+    renderWithSession(<Harness />, await signedIn())
+    await waitFor(() =>
+      expect(screen.getByText('Disponível: 50 XP')).toBeTruthy()
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar traço'), 'brig')
+    fireEvent.press(screen.getByRole('radio', { name: /^Briga, / }))
+    // O narrador aprovou outro pedido: a Briga subiu na ficha confirmada
+    const raised = {
+      ...sheet,
+      values: { ...sheet.values, brawl: 2 },
+    } as typeof sheet
+    const next = xpCandidates(model, raised).find(
+      c => c.target.field === 'brawl'
+    )
+    if (!next?.cost.ok) throw new Error('Briga sem custo')
+    act(() => update(raised))
+    expect(screen.getByTestId('xp-request-summary')).toHaveTextContent(
+      `Briga: 2 → 3. Custo ${next.cost.cost} XP (disponível 50).`
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Enviar pedido' }))
+    await waitFor(() => expect(calls.xpRequestPost).toHaveBeenCalledTimes(1))
+    expect(calls.xpRequestPost.mock.calls[0]?.[1]).toMatchObject({
+      field: 'brawl',
+      to: 3,
+      expectedCost: next.cost.cost,
+    })
   })
 })
 

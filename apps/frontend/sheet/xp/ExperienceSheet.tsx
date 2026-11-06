@@ -2,6 +2,7 @@ import {
   type RoleName,
   type SheetData,
   type SheetModel,
+  type XpTarget,
   xpBalance,
   xpTargetKey,
 } from '@tms/sheet-core'
@@ -27,7 +28,7 @@ import {
   type XpRequestData,
 } from '../../lib/queries/xp'
 import type { SheetLifecycle } from '../policy'
-import { type XpCandidate, xpCandidates } from './candidates'
+import { candidateFor, type XpCandidate, xpCandidates } from './candidates'
 import { AdjustForm, GrantForm, useCommand, xpCommand } from './forms'
 import { RequestFooter, RequestPicker } from './RequestPicker'
 import type { XpShortcutTarget } from './XpShortcut'
@@ -109,12 +110,16 @@ export function ExperienceSheet({
   const mine = commands.unconfirmed.filter(c => c.characterId === characterId)
   const block = requestBlock(lifecycle)
   const hasRules = Boolean(model.template.costs?.xp?.rules?.length)
-  // O pedido escolhido mora aqui: o resumo e o envio vão no rodapé da folha
-  const [picked, setPicked] = useState<XpCandidate | null>(() => {
-    if (!initial || !('target' in initial)) return null
-    const key = xpTargetKey(initial.target)
-    return xpCandidates(model, sheet).find(c => c.key === key) ?? null
-  })
+  // O pedido escolhido mora aqui: o resumo e o envio vão no rodapé da folha.
+  // Guarda só o alvo; o custo e o "para" saem da ficha confirmada de agora
+  const [target, setTarget] = useState<XpTarget | null>(
+    initial && 'target' in initial ? initial.target : null
+  )
+  const candidates = useMemo(() => xpCandidates(model, sheet), [model, sheet])
+  const picked = useMemo(
+    () => candidateFor(model, sheet, candidates, target),
+    [model, sheet, candidates, target]
+  )
   const [query, setQuery] = useState(
     initial && 'query' in initial ? initial.query : ''
   )
@@ -138,7 +143,7 @@ export function ExperienceSheet({
     [requests.data]
   )
   const choose = (c: XpCandidate | null) => {
-    setPicked(c)
+    setTarget(c?.target ?? null)
     request.reset()
   }
   const send = (target: XpCandidate, cost: number, to: number) =>
@@ -162,7 +167,7 @@ export function ExperienceSheet({
       .then(outcome => {
         if (outcome?.status !== 'done') return
         setPanel(null)
-        setPicked(null)
+        setTarget(null)
         setQuery('')
       })
 

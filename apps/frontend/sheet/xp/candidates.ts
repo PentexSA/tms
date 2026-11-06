@@ -62,6 +62,32 @@ export function xpCandidates(
   return out
 }
 
+/**
+ * O candidato do alvo escolhido, sobre a ficha confirmada de agora: o custo
+ * e o "para" são sempre os atuais, nunca os da hora do toque (a ficha pode
+ * ter mudado com a folha aberta, e o `expectedCost` velho daria 409). Um item
+ * de nome livre, fora da lista, ganha o preço do mesmo core.
+ */
+export function candidateFor(
+  model: SheetModel,
+  sheet: SheetData,
+  candidates: readonly XpCandidate[],
+  target: XpTarget | null
+): XpCandidate | null {
+  if (!target) return null
+  const key = xpTargetKey(target)
+  const listed = candidates.find(c => c.key === key)
+  if (listed) return listed
+  const def = model.fields.get(target.field)?.def
+  if (!target.name || def?.type !== 'list') return null
+  return {
+    key,
+    target,
+    label: `${def.label}: ${target.name} (novo)`,
+    cost: costOf(model, sheet, target),
+  }
+}
+
 /** Listas com regra de XP que aceitam um item novo de nome livre. */
 export function freeItemLists(model: SheetModel) {
   const rules = model.template.costs?.xp?.rules ?? []
