@@ -3,6 +3,7 @@ import { createMemoryStorage } from '../../sheet/sync/kv'
 import { json, memoryStore, testSession, tokens } from '../../test/session'
 import {
   clearPendingInvite,
+  hasPendingInvite,
   peekPendingInvite,
   setPendingInvite,
 } from '../invite/pending'
@@ -549,5 +550,24 @@ describe('convite pendente e a sessão', () => {
     expect(peekPendingInvite()).not.toBeNull()
     await session.logout()
     expect(peekPendingInvite()).toBeNull()
+  })
+
+  it('o signOut de uma sessão aberta (conta excluída, refresh recusado) apaga', async () => {
+    const store = memoryStore(true, 'refresh-0')
+    const { session } = testSession(() => json(200, tokens()), store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedIn')
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    await session.signOut()
+    expect(hasPendingInvite()).toBe(false)
+  })
+
+  it('a abertura com o refresh recusado (401) não apaga o link que chegou', async () => {
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    const store = memoryStore(true, 'refresh-velho')
+    const { session } = testSession(() => json(401, { error: 'x' }), store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedOut')
+    expect(hasPendingInvite()).toBe(true)
   })
 })

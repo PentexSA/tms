@@ -290,6 +290,10 @@ export class Session {
     this.#accessToken = null
     // Com sessão aberta, o OfflineProvider apaga o storage deste usuário
     const open = this.#state.user?.id
+    // Saída de uma sessão aberta (conta excluída, refresh recusado, logout
+    // noutra aba): o convite pendente sai junto (P12). Na abertura sem
+    // sessão (status ainda "loading"), não: o link acabou de chegar
+    if (this.#state.status === 'signedIn') clearPendingInvite()
     await this.#deps.store.clear()
     const last = await this.#deps.lastUser?.read().catch(() => null)
     await this.#deps.lastUser?.clear().catch(() => undefined)

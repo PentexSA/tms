@@ -21,14 +21,29 @@ describe('convite pendente', () => {
     expect(hasPendingInvite()).toBe(true)
   })
 
-  it('some depois de 30 min', () => {
+  it('some depois de 30 min e avisa quem assina; a leitura não muda nada', () => {
     jest.useFakeTimers()
+    const listener = jest.fn()
+    const stop = subscribePendingInvite(listener)
     setPendingInvite(CODE)
-    jest.advanceTimersByTime(PENDING_INVITE_TTL_MS)
+    listener.mockClear()
+    jest.advanceTimersByTime(PENDING_INVITE_TTL_MS - 1)
     expect(peekPendingInvite()).toBe(CODE)
+    expect(listener).not.toHaveBeenCalled()
     jest.advanceTimersByTime(1)
     expect(peekPendingInvite()).toBeNull()
     expect(hasPendingInvite()).toBe(false)
+    expect(listener).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
+  it('um código novo renova a validade', () => {
+    jest.useFakeTimers()
+    setPendingInvite(CODE)
+    jest.advanceTimersByTime(PENDING_INVITE_TTL_MS - 10)
+    setPendingInvite('OUTRO')
+    jest.advanceTimersByTime(20)
+    expect(peekPendingInvite()).toBe('OUTRO')
   })
 
   it('clear apaga e avisa quem assina; o novo substitui o velho', () => {

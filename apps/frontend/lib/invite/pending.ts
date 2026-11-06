@@ -7,7 +7,8 @@
 /** Depois disso o código pendente some, mesmo sem uso. */
 export const PENDING_INVITE_TTL_MS = 30 * 60 * 1000
 
-let pending: { readonly code: string; readonly at: number } | null = null
+let pending: string | null = null
+let expiry: ReturnType<typeof setTimeout> | undefined
 const listeners = new Set<() => void>()
 
 const notify = () => {
@@ -16,28 +17,26 @@ const notify = () => {
 
 /** Guarda o código (o mais novo substitui o anterior) e avisa quem assina. */
 export function setPendingInvite(code: string): void {
-  pending = { code, at: Date.now() }
+  pending = code
+  clearTimeout(expiry)
+  // A validade apaga e avisa: a leitura (peek) fica pura
+  expiry = setTimeout(clearPendingInvite, PENDING_INVITE_TTL_MS)
   notify()
 }
 
 /**
- * O código pendente, sem consumir: ler duas vezes devolve o mesmo (o
- * StrictMode chama o inicializador do useState duas vezes).
+ * O código pendente, sem consumir nem mudar nada: é o getSnapshot do
+ * useSyncExternalStore, e ler duas vezes devolve o mesmo.
  */
-export function peekPendingInvite(): string | null {
-  if (!pending) return null
-  if (Date.now() - pending.at > PENDING_INVITE_TTL_MS) {
-    pending = null
-    return null
-  }
-  return pending.code
-}
+export const peekPendingInvite = (): string | null => pending
 
-export const hasPendingInvite = (): boolean => peekPendingInvite() !== null
+export const hasPendingInvite = (): boolean => pending !== null
 
-/** No aceite, no "‹" de Entrar com convite e no logout explícito. */
+/** No aceite, ao sair de Entrar com convite, na validade e ao sair da conta. */
 export function clearPendingInvite(): void {
-  if (!pending) return
+  clearTimeout(expiry)
+  expiry = undefined
+  if (pending === null) return
   pending = null
   notify()
 }
