@@ -514,7 +514,17 @@ Implementação em 05/11/2026, na `pacote/p01-d-planos-tela` a partir de `52dbe0
 - a "Casa ou subgrupo" com o `placeholder` "Opcional";
 - o rótulo e o nome acessível do "Salvar".
 
-O `/code-review` (high) foi disparado em segundo plano no diff `52dbe0f..HEAD`. Se ele achar algo, o orquestrador recebe os achados no resumo do pacote.
+**`/code-review` (high) no diff `52dbe0f..HEAD`.** Achou 9 frases que ainda não batiam com a tela. Cada uma foi conferida no código e corrigida em `fcae933`:
+
+1. **O "Salvar" da D-01.** No Editar, o botão diz "Salvar alterações". Só diz "Salvar" quando o "Avisar que terminei" da criação livre fica ao lado (`useNextStep.ts`). A correção vale para o v0, o v1 e o v2.
+2. **v0, item 6.** A ficha ainda em criação reabre em Editar para o dono (T-05); só a ativa abre em Jogo.
+3. **v1, item 4.** O `hard-cap` vale também para o narrador quando a ficha está em criação ou pendente: o `checkCreationBatch` de `sheets/events.ts` roda para os dois. A Esfera inativa vale no Editar da criação livre e da ficha ativa.
+4. **Outras menções ao job `postgres`.** Estão no v0 (Etapa 15), no v3 (l.45, l.47 e l.393), no v4 §6.3 e no v5. Cada uma ganhou uma linha "Revisto" curta que aponta para a D-00 no registro do v0. O v5 recebeu só esse fato.
+5. **Duas Etapas do v0 com texto que a tela não tem mais.** São a 14 ("Distribua os pontos da ficha") e a 17 ("muda só em Evoluir"); as duas ganharam "Revisto".
+6. **"O nome do modo".** A Criação é um modo próprio (`create`).
+7. **v1 e v2, item 3.** Acrescentado "ou em Criação" na criação por pontos.
+8. **v4, item 5, e a linha da D-05.** A folha de bônus aparece "uma vez por ficha neste aparelho", com o ponto 4 do onda-4 §6.
+9. **A explicação da D-00 repetida em cinco lugares.** As linhas novas apontam para o registro do v0, que fica como fonte única. O `plano-observabilidade.md` mantém a frase própria, porque descreve um passo da Fase 8.
 
 ## 11. Conferência das divergências na tela (web, Android com AVD, iOS com idb)
 
