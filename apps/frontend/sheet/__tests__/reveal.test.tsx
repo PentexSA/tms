@@ -46,6 +46,7 @@ beforeEach(() => {
   calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
   calls.revealPost.mockReset()
   calls.revealedGet.mockReset()
+  calls.characterGet.mockClear()
 })
 
 afterEach(() => onlineManager.setOnline(true))
@@ -318,7 +319,7 @@ describe('o dono lê as notas reveladas', () => {
     expect(screen.queryByText(SENTINEL)).toBeNull()
   })
 
-  it('o 404 da rota tira o bloco', async () => {
+  it('o 404 da rota tira o bloco, pede a rota uma vez só e rebusca a ficha', async () => {
     calls.revealedGet.mockResolvedValue(fail(404, 'não encontrado'))
     await open(
       ['owner'],
@@ -327,6 +328,13 @@ describe('o dono lê as notas reveladas', () => {
     await waitFor(() =>
       expect(screen.queryByText(/reveladas pelo narrador/)).toBeNull()
     )
+    // A ficha é rebuscada depois do 404 (a abertura foi o primeiro pedido)
+    await waitFor(() =>
+      expect(calls.characterGet.mock.calls.length).toBeGreaterThanOrEqual(2)
+    )
+    // Sem laço: a consulta desligada não volta a pedir
+    await act(() => new Promise(resolve => setTimeout(resolve, 200)))
+    expect(calls.revealedGet).toHaveBeenCalledTimes(1)
   })
 })
 

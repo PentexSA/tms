@@ -11,6 +11,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react'
 
 import { statusOf } from '../../lib/errors'
@@ -91,10 +92,25 @@ export function RevealedProvider({
     pc && roles.includes('storyteller') && !roles.includes('owner')
   const owner = pc && roles.includes('owner') && !roles.includes('storyteller')
   const reads = owner && state.sections.length > 0
-  const query = useRevealedNotes(characterId, reads)
-  // A nota voltou a ser privada (a ficha rebuscada diz), ou o dono perdeu o
-  // acesso (404): a consulta sai da memória, e o bloco some
-  const lost = statusOf(query.error) === 404
+  // O 404 da rota (o dono perdeu o acesso, ou a nota já voltou a ser
+  // privada noutro aparelho) desliga a consulta até a ficha mudar de
+  // revisão: sem isso, zerar a consulta com o observador ligado pediria de
+  // novo, em laço. A ficha é rebuscada para trazer o estado atual
+  const [goneAt, setGoneAt] = useState<number | null>(null)
+  const lost = goneAt !== null && goneAt === state.revision
+  const query = useRevealedNotes(characterId, reads && !lost)
+  const notFound = statusOf(query.error) === 404
+  const revision = state.revision
+  useEffect(() => {
+    if (!notFound) return
+    setGoneAt(revision)
+    void queryClient.invalidateQueries({
+      queryKey: ['characters', characterId],
+      exact: true,
+    })
+  }, [notFound, revision, characterId, queryClient])
+  // A nota voltou a ser privada (a ficha rebuscada diz), ou a rota deu 404:
+  // a consulta sai da memória, e o bloco some
   useEffect(() => {
     if (reads && !lost) return
     const queryKey = revealKeys.revealed(characterId)
@@ -134,7 +150,6 @@ export function RevealedProvider({
         : state.sections
   // Mesma identidade enquanto a lista não muda: a ficha memoiza por ela
   const idsKey = ids.join('\u0000')
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a chave é a lista
   const sections = useMemo<ReadonlySet<string>>(() => new Set(ids), [idsKey])
   const values = useMemo<ReadonlyMap<FieldId, string>>(() => {
     if (!fresh) return EMPTY
@@ -158,7 +173,6 @@ export function RevealedProvider({
         : query.isError
           ? 'error'
           : 'loading'
-  const revision = state.revision
   const value = useMemo<RevealedValue>(
     () => ({
       characterId,
