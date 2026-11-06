@@ -20,11 +20,14 @@ describe('authMessage', () => {
       expect(authMessage(screen, 429, 'x')).toBe(TOO_MANY)
   })
 
-  it('5xx: a frase do servidor, com o código do erro que já veio', () => {
+  it('5xx: a frase do servidor, com o código do requestId', () => {
+    expect(authMessage('login', 500, 'erro interno', REQUEST_ID)).toBe(
+      `${SERVER_ERROR} (código do erro: 123e4567)`
+    )
+    // Sem id válido (502 do proxy): só a frase; o texto não é lido
     expect(
-      authMessage('login', 500, 'erro interno (código do erro: 123e4567)')
-    ).toBe(`${SERVER_ERROR} (código do erro: 123e4567)`)
-    expect(authMessage('register', 503, 'erro')).toBe(SERVER_ERROR)
+      authMessage('register', 503, 'erro (código do erro: deadbeef)')
+    ).toBe(SERVER_ERROR)
   })
 
   it('o status sem frase própria fica com o texto que veio', () => {

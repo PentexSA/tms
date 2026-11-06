@@ -65,7 +65,7 @@ export default function LoginScreen() {
     } catch (e) {
       setError(
         e instanceof AuthError
-          ? authMessage('login', e.status, e.message)
+          ? authMessage('login', e.status, e.message, e.requestId)
           : 'Não foi possível entrar'
       )
     } finally {

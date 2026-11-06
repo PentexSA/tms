@@ -62,10 +62,16 @@ describe('LoginScreen', () => {
 
   it.each([
     [429, 'Muitas tentativas. Espere alguns minutos e tente de novo.'],
-    [500, 'Algo deu errado do nosso lado. Tente de novo.'],
+    [
+      500,
+      'Algo deu errado do nosso lado. Tente de novo. (código do erro: 123e4567)',
+    ],
   ])('%i: %s', async (status, text) => {
     const { session } = testSession(() =>
-      json(status, { error: 'texto da api' })
+      json(status, {
+        error: 'texto da api',
+        requestId: '123e4567-e89b-42d3-a456-426614174000',
+      })
     )
     renderWithSession(<LoginScreen />, session)
     fireEvent.changeText(screen.getByTestId('login-email'), 'ana@example.test')

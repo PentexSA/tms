@@ -74,7 +74,7 @@ export default function RegisterScreen() {
     } catch (e) {
       setError(
         e instanceof AuthError
-          ? authMessage('register', e.status, e.message)
+          ? authMessage('register', e.status, e.message, e.requestId)
           : 'Não foi possível criar a conta'
       )
     } finally {

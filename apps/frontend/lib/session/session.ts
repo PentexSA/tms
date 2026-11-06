@@ -1,4 +1,4 @@
-import { withErrorCode } from '../errors'
+import { requestIdOf, withErrorCode } from '../errors'
 import { clearPendingInvite } from '../invite/pending'
 import { NO_STORE_HEADERS } from '../noStore'
 import type {
@@ -34,11 +34,14 @@ export interface SessionState {
 
 export class AuthError extends Error {
   readonly status: number
+  // O id do 5xx, para a tela montar a própria frase com o código (P12)
+  readonly requestId?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, requestId?: string) {
     super(message)
     this.name = 'AuthError'
     this.status = status
+    if (requestId) this.requestId = requestId
   }
 }
 
@@ -457,7 +460,8 @@ export class Session {
         res.status,
         typeof data.error === 'string'
           ? withErrorCode(data.error, res.status, data)
-          : OFFLINE
+          : OFFLINE,
+        requestIdOf(data)
       )
     }
     const data = (await res.json()) as TokenResponse

@@ -5,7 +5,7 @@
 // expirado ou esgotado), e nenhuma diz mais do que o status já diz. Texto do
 // time, revisável. A API não muda.
 
-import { messageOf, statusOf, withErrorCode } from './errors'
+import { messageOf, requestIdOf, statusOf, withErrorCode } from './errors'
 
 export type AuthScreen = 'login' | 'register' | 'join'
 
@@ -28,22 +28,21 @@ const BY_STATUS: Record<AuthScreen, Partial<Record<number, string>>> = {
   },
 }
 
-const CODE_SUFFIX = / \(código do erro: [0-9a-f]{8}\)$/i
-
 /**
  * A frase da tela para um status. `raw` é o texto que a sessão ou o Eden
- * já montou (sem resposta, o aviso de conexão; num 5xx, com o código do
- * erro no fim), usado quando o status não tem frase própria.
+ * já montou (sem resposta, o aviso de conexão), usado quando o status não
+ * tem frase própria. Num 5xx, o código do erro sai do `requestId`.
  */
 export function authMessage(
   screen: AuthScreen,
   status: number | undefined,
-  raw: string
+  raw: string,
+  requestId?: string
 ): string {
   // Sem resposta: o aviso de conexão de sempre
   if (!status) return raw
   if (status === 429) return TOO_MANY
-  if (status >= 500) return `${SERVER_ERROR}${CODE_SUFFIX.exec(raw)?.[0] ?? ''}`
+  if (status >= 500) return withErrorCode(SERVER_ERROR, status, { requestId })
   return BY_STATUS[screen][status] ?? raw
 }
 
@@ -56,7 +55,7 @@ export function edenAuthMessage(
   const status = statusOf(error)
   if (status !== undefined && status >= 500) {
     const value = (error as { value?: unknown }).value
-    return withErrorCode(SERVER_ERROR, status, value)
+    return authMessage(screen, status, '', requestIdOf(value))
   }
   return authMessage(screen, status, messageOf(error, fallback))
 }
