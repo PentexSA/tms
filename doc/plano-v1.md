@@ -23,8 +23,8 @@ A v1 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 
 1. O narrador cria uma crônica e escolhe **Mago (M20)** entre os sistemas publicados.
 2. O jogador entra com o convite e cria a ficha: nome, conceito, tradição, essência, casa ou subgrupo (opcional), natureza e comportamento. O formulário sai do template. (D-12)
-3. A ficha abre em **Editar**: atributos, habilidades, Arete, Esferas, afinidade, antecedentes (Avatar, Nodo), Foco (paradigma, prática e instrumentos) e rotinas. Salvar grava **um** lote.
-4. No Editar (criação livre, ou o narrador), uma Esfera acima do Arete é aceita e aparece como **inativa**; baixar o Arete não apaga ponto nenhum. Na Criação (por pontos, v4), o `hard-cap` do template não deixa passar (Arete até 3, Esfera até o Arete): a recusa aparece perto do toque, e o servidor recusa o lote. No pedido de XP, a Esfera também não passa do Arete. (D-13)
+3. A ficha abre em **Editar** (ou em **Criação**, quando a crônica usa a criação por pontos da v4): atributos, habilidades, Arete, Esferas, afinidade, antecedentes (Avatar, Nodo), Foco (paradigma, prática e instrumentos) e rotinas. Salvar grava **um** lote.
+4. No Editar da criação livre ou da ficha ativa, uma Esfera acima do Arete é aceita e aparece como **inativa**; baixar o Arete não apaga ponto nenhum. Na criação por pontos (v4), com a ficha em criação ou pendente, o `hard-cap` do template não deixa passar (Arete até 3, Esfera até o Arete): a recusa aparece perto do toque, e o servidor recusa o lote, também quando quem edita é o narrador. No pedido de XP, a Esfera também não passa do Arete. (D-13)
 5. Em **Jogo**, o dock mostra Vitalidade, a roda de Quintessência e Paradoxo e FdV. O jogador ganha Quintessência, ganha Paradoxo com a roda cheia (consome 1 de Quintessência, com aviso e Desfazer) e leva dano. Tudo funciona offline.
 6. O narrador vê a mesa com a roda de cada mago e lê no histórico "Paradoxo 2 → 3".
 7. O jogador rola **Conjurar efeito**: a parada de Arete, com a dificuldade informada. **Este passo é a linha de corte** (Etapa 6).
@@ -70,7 +70,7 @@ O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz
 
 | Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
 |---|---|---|---|
-| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote, com os campos que ficam com pontos inativos, abre no "Salvar" (Etapa 5) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-01 | No Editar, a barra mostra "Salvar alterações" (só "Salvar", com o mesmo nome acessível, quando o "Avisar que terminei" da criação livre fica ao lado), e o resumo do lote, com os campos que ficam com pontos inativos, abre no "Salvar" (Etapa 5) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
 | D-08 | −/+ na própria linha dos itens de lista com valor (os Antecedentes, como Avatar e Nodo); a folha do item fica para nome, especialização e notas (item 3) | onda 4, P07-D | — |
 | D-09 | A Esfera de afinidade da Tradição tem o selo "da Tradição"; escolher outra avisa "fora da Tradição: confirme com o narrador", sem bloquear | onda 4, P07-D | — |
 | D-11 | "?" com uma frase curta do template ao lado dos campos, das opções (Tradições, Essências) e das Esferas, na Nova ficha, na Criação e no Editar | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |
@@ -254,7 +254,7 @@ M · depende de: 1
 
 **Objetivo.** O jogador entende o `cap` sem ler a regra: vê o teto, pode passar dele e sabe o que acontece.
 
-**Revisto:** vale para o Editar. A criação por pontos da v4 aplica o `hard-cap` do `mta-m20` (Arete até 3, Esfera até o Arete), e a Esfera não passa do Arete na Criação nem no pedido de XP (§1, item 4; D-13).
+**Revisto:** vale para o Editar da criação livre e da ficha ativa. A criação por pontos da v4 aplica, ao dono e ao narrador, o `hard-cap` do `mta-m20` (Arete até 3, Esfera até o Arete), e a Esfera não passa do Arete na Criação nem no pedido de XP (§1, item 4; D-13).
 
 **Entrega.**
 

@@ -27,7 +27,7 @@ A v0 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 3. O jogador entra na crônica com o código.
 4. O jogador cria a ficha pelos campos de identidade do template: no Vampiro, nome, natureza e comportamento (com "Escolher da lista"), conceito, clã e senhor. A Geração não é escolhida aqui: ela vem do Antecedente Geração (13 menos os pontos, até a 8ª) e aparece no cabeçalho. O formulário sai do template, não de uma tela escrita para o Vampiro. (D-13)
 5. A ficha abre em **Editar** (ou em **Criação**, quando a crônica usa a criação por pontos da v4): atributos, habilidades, disciplinas, antecedentes, especializações e Força de Vontade. Salvar grava **um** lote. (D-13)
-6. A ficha abre em **Jogo** para o dono e em **Leitura** para quem não é dono: identidade, 3 abas (Ficha · Vantagens · Sobre) e dock (Vitalidade, Sangue, FdV). (D-13)
+6. A ficha ativa abre em **Jogo** para o dono e em **Leitura** para quem não é dono; a ficha ainda em criação reabre em **Editar** para o dono, que passa a Jogo pelo seletor de modo (T-05). A ficha tem identidade, 3 abas (Ficha · Vantagens · Sobre) e dock (Vitalidade, Sangue, FdV). (D-13)
 7. Em jogo, o jogador gasta Sangue, leva dano letal, cura com Sangue, desperta e desfaz. Tudo funciona offline e sincroniza ao reconectar.
 8. O narrador vê a mesa e edita a ficha do jogador, com a alteração assinada no histórico. Ele escreve as Notas do Narrador, que o aparelho do jogador nunca recebe.
 9. O jogador rola a parada: Atributo + Habilidade, dificuldade, penalidade, especialização e FdV. **Este passo é a linha de corte** (Etapa 21).
@@ -73,14 +73,14 @@ O checklist de segurança, item por item, está em [`checklist-seguranca-v0.md`]
 
 O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz-achados.md)) comparou a tela com este plano. Pela D-13, o §1 foi alinhado ao que a tela faz, no próprio item e sem renumerar (os specs citam os itens pelo número); cada item revisto leva "(D-13)". As Etapas continuam como registro de como a v0 foi construída: onde uma delas afirma algo que a tela não faz mais, uma linha "Revisto" diz o que mudou e quando.
 
-**O nome do modo.** "Evoluir" é o nome interno do modo (`evolve`), no contrato do template (`editableIn`) e no design system. A tela o chama de "Editar" desde `f514520` (18/10/2026), e de "Criação" na criação por pontos da v4 (`MODE_LABELS` em `apps/frontend/sheet/evolve/ModeBar.tsx`).
+**O nome do modo.** "Evoluir" é o nome interno do modo (`evolve`), no contrato do template (`editableIn`) e no design system. A tela o chama de "Editar" desde `f514520` (18/10/2026). A criação por pontos da v4 tem um modo próprio, `create`, que a tela chama de "Criação" (`MODE_LABELS` em `apps/frontend/sheet/evolve/ModeBar.tsx`).
 
 **Decisões que mudam esta jornada** (a tabela "Decisões de produto" da matriz tem o texto inteiro de cada uma):
 
 | Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
 |---|---|---|---|
 | D-00 | Decidida em 01/11/2026 como "Android e iOS compilados no CI em todo PR" (P01-C, onda 1). O PR #49 (04/11/2026) tirou do CI os jobs nativos e o `postgres` (Etapa 1): o build nativo e os `*.pg.test` rodam à mão na integração de cada onda, e o job `check` continua conferindo as versões nativas. A revisão da decisão está com o PO | onda 1, P01-C; PR #49 | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16 |
-| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote abre no "Salvar", não mais no "Concluir" (Etapa 18). Na Criação, "Salvar" fica sempre, com "Concluir criação" ou "Enviar para aprovação" ao lado quando a conta fecha. Sair com rascunho oferece "Salvar e sair" | onda 3, P03-D | o rótulo no Editar e ficar no Editar depois de salvar: [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-01 | No Editar, a barra mostra "Salvar alterações" (só "Salvar", com o mesmo nome acessível, quando o "Avisar que terminei" da criação livre fica ao lado), e o resumo do lote abre no "Salvar", não mais no "Concluir" (Etapa 18). Na Criação, "Salvar" fica sempre, com "Concluir criação" ou "Enviar para aprovação" ao lado quando a conta fecha. Sair com rascunho oferece "Salvar e sair" | onda 3, P03-D | o rótulo no Editar e ficar no Editar depois de salvar: [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
 | D-06 | Na criação por pontos da v4, a Qualidade se compra com bônus, pelo custo do item; a recusa aparece na folha e mantém o nome digitado. Na criação livre desta jornada, nada muda | ondas 2 e 4, P07-C e P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 6 |
 | D-08 | −/+ na própria linha das Disciplinas e dos Antecedentes; a folha do item fica para nome, especialização e notas (item 5) | onda 4, P07-D | — |
 | D-09 | As Disciplinas do clã vêm primeiro, com o selo "do clã"; outra Disciplina avisa "confirme com o narrador", sem bloquear. A Fraqueza mostra o resumo do clã, escrito pelo time, como padrão editável: ele não é gravado sozinho | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 8 |
@@ -631,6 +631,7 @@ M · depende de: 12, 13
   - renderiza `model.identityFields` na variante `editor`; nesta etapa entram os editores de `text`, `choice` e `number`;
   - valida com o core antes de enviar: nome obrigatório e limites de cada campo.
 - Depois de criar, abre a ficha. A partir da Etapa 18, ela abre direto em Evoluir com o aviso "Distribua os pontos da ficha". Não há orçamento de pontos: a criação por pontos é futura (§11 da arquitetura).
+  - **Revisto:** a ficha nova abre em Editar na criação livre, ou em Criação na criação por pontos da v4, e o aviso "Distribua os pontos da ficha" não existe mais: a barra mostra o próximo passo (D-03, D-05; D-13).
 
 **Testes.**
 
@@ -696,6 +697,7 @@ G · depende de: 4, 12
 - o histórico não tem conteúdo de texto, e o jogador não vê caminhos restritos;
 - um spy no logger mostra que um texto "segredo" nas notas nunca aparece em log;
 - no job `postgres` do CI, dois lotes concorrentes com o mesmo `from` resultam em exatamente um 200 e um 409. O PGLite tem uma conexão só e não prova a trava.
+  - **Revisto:** o job `postgres` saiu do CI no PR #49; os `*.pg.test` rodam à mão (D-00, no registro "Depois do teste com personas").
 
 #### Etapa 16. Store, fila e Desfazer
 
@@ -744,6 +746,7 @@ G · depende de: 5, 16
 - Menu ⋯ com as ações do template (Despertar), sempre com prévia (`planAction`).
 - Modo padrão: o dono abre em Jogo; os demais, em Leitura.
 - Em Jogo, só mudam os campos com `play` em `editableIn`. Um traço permanente abre o detalhe com a nota "Traço permanente: muda só em Evoluir".
+  - **Revisto:** a nota diz "Traço permanente: muda só em Editar." (D-13).
 - Háptico com `expo-haptics`: seleção no stepper, impacto na ação padrão e um padrão mais forte no dano agravado.
 
 **Testes.**

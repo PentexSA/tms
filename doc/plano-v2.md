@@ -24,7 +24,7 @@ A v2 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 
 1. O narrador cria uma crônica e escolhe **Lobisomem (W20)** entre os três sistemas publicados.
 2. O jogador entra com o convite e cria a ficha: nome, nome de feito, conceito, seita, raça, augúrio (com a fase da lua), campo, tribo, nome da matilha, totem e Posto. O formulário sai do template: são os campos de identidade, na ordem das colunas do cabeçalho, e o Posto do resumo no fim. (D-13)
-3. A ficha abre em **Editar**: atributos, habilidades, Fúria, Gnose, FdV, Posto, Renome (permanente e temporário), Dons, Ritos, Fetiches e antecedentes. Salvar grava **um** lote.
+3. A ficha abre em **Editar** (ou em **Criação**, quando a crônica usa a criação por pontos da v4): atributos, habilidades, Fúria, Gnose, FdV, Posto, Renome (permanente e temporário), Dons, Ritos, Fetiches e antecedentes. Salvar grava **um** lote.
 4. Em **Jogo**, o dock mostra Vitalidade, Fúria e Forma. O jogador troca para **Crinos** com a mudança instantânea: um lote só, "Forma Hominídeo → Crinos, Fúria 4 → 3", com aviso e Desfazer. Sem Fúria, a mudança instantânea fica desabilitada e o motivo aparece.
 5. Em Crinos, a grade mostra Força 7 ("3 + 4 Crinos") e Aparência 0, e o Editar continua editando a base (3).
 6. O jogador rola **Força + Briga**: a parada usa o valor efetivo e mostra "Crinos +4". O atalho **Teste de Fúria** monta a parada de Fúria.
@@ -75,7 +75,7 @@ O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz
 
 | Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
 |---|---|---|---|
-| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote abre no "Salvar" (Etapa 4) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-01 | No Editar, a barra mostra "Salvar alterações" (só "Salvar", com o mesmo nome acessível, quando o "Avisar que terminei" da criação livre fica ao lado), e o resumo do lote abre no "Salvar" (Etapa 4) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
 | D-07 | "Adicionar Dom" abre um catálogo de Dons de nível 1, só com nome e nível, que destaca os da Raça, do Augúrio e da Tribo; o texto livre continua para Dom fora do catálogo. Um Dom acima do Posto 1 na criação pede "confirme com o narrador", sem bloquear (item 3) | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 5 |
 | D-08 | Os Dons mostram "Posto N" na linha, e o Posto do Dom muda na folha do item; os Antecedentes ganham o −/+ na linha | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 7 |
 | D-11 | "?" com uma frase curta do template ao lado dos campos, das opções (Raças, Augúrios, Tribos) e dos Dons, na Nova ficha, na Criação e no Editar | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |

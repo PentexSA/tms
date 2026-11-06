@@ -27,7 +27,7 @@ A jornada principal será `e2e/tests/journey-creation.spec.ts`, com sessões sep
 2. O jogador cria a ficha pela identidade e entra no modo de criação por pontos.
 3. Escolhe as prioridades e distribui pontos básicos, acompanhando os contadores por grupo.
 4. Com um grupo incompleto, a barra mostra "Faltam: …" no lugar de "Concluir criação"; cada item leva ao grupo, e a aba Pontos lista o que falta. O servidor recusa a conclusão com a conta aberta (`completionRefusal`). (D-13; o botão escondido até a conta fechar é ponto para o PO em aberto: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 2.)
-5. Distribui os pontos restantes e bônus, salva as escolhas e espera a sincronização. Ao fechar os pontos básicos, a folha "Começaram os pontos de bônus" aparece uma vez por ficha, e a aba Pontos mostra a fase em texto ("Fase: pontos básicos" ou "Fase: pontos de bônus"). Quando a conta fecha, a barra diz "A conta fechou: você conclui." (ou "envie ao narrador", com a aprovação ligada), e o botão aparece. (D-13, D-05)
+5. Distribui os pontos restantes e bônus, salva as escolhas e espera a sincronização. Ao fechar os pontos básicos, a folha "Começaram os pontos de bônus" aparece uma vez por ficha neste aparelho (a marca fica no aparelho: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 4, em aberto), e a aba Pontos mostra a fase em texto ("Fase: pontos básicos" ou "Fase: pontos de bônus"). Quando a conta fecha, a barra diz "A conta fechou: você conclui." (ou "envie ao narrador", com a aprovação ligada), e o botão aparece. (D-13, D-05)
 6. Conclui a criação; a ficha passa a `pending` e o jogador não consegue alterá-la.
 7. O narrador aprova; a ficha passa a `active`. `[a preencher: P09-D]`
 8. O narrador concede XP ao grupo, com motivo. Cada ficha recebe seu crédito e extrato, uma única vez.
@@ -52,7 +52,7 @@ O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz
 | D-02 | O estado aparece sob o nome da ficha, na lista da crônica, na aba Fichas e na Mesa ("Em criação · livre" ou "· por pontos", "Aguardando aprovação", "Aguardando ajuste", "Devolvida", "Concluída em dd/mm"); o Histórico registra "Criação concluída" (itens 6 e 7) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 6, 7 e 10 |
 | D-03 | Na criação livre, "Avisar que terminei" põe um selo na Mesa do narrador; push fica para depois. Em todo modo, a barra diz o próximo passo e quem conclui (§3.4) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, ponto 11 |
 | D-04 | "Pedir ajuste", com motivo, só do narrador, com a aprovação ligada ou não (§3.4). "Reabrir criação" fica fora deste ciclo, em [proximas-features.md](proximas-features.md) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 8 e 9 |
-| D-05 | "Faltam: …" na barra, com itens que levam ao grupo; a aba "Orçamento" passou a "Pontos", com o "O que falta"; a folha "Começaram os pontos de bônus" uma vez por ficha; a fase em texto, com a troca manual como opção secundária (itens 3 a 5) | onda 4, P05-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 2, 4 e 15 |
+| D-05 | "Faltam: …" na barra, com itens que levam ao grupo; a aba "Orçamento" passou a "Pontos", com o "O que falta"; a folha "Começaram os pontos de bônus" uma vez por ficha neste aparelho; a fase em texto, com a troca manual como opção secundária (itens 3 a 5) | onda 4, P05-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 2, 4 e 15 |
 | D-06 | A Qualidade se compra com bônus, pelo custo do item; a recusa aparece na folha e mantém o nome digitado (item 5) | ondas 2 e 4, P07-C e P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 6 |
 | D-10 | `[a preencher: P09-D]`: o progresso no cartão da Mesa, o filtro "Em criação / Pendentes", a contagem na lista de crônicas, a aba Pontos em leitura para o narrador também em `pending`, o painel "Criação de fichas" em uma linha e as abas no topo (itens 1 e 7) | onda 5, P09-D | o nome "Orçamento" nas regras da crônica: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 15 |
 | D-13 | Este registro e os itens 4 e 5 do §1 | onda 5, P01-D | — |
@@ -641,7 +641,7 @@ Privacidade é comprovada no corpo e nas contagens, não só na interface. Lista
 
 ### 6.3 Concorrência em Postgres real
 
-Acrescentar testes ao job `postgres` de `.github/workflows/ci.yml`, usando pool com conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos arquivos existentes. PGLite não prova essas travas.
+Acrescentar testes ao job `postgres` de `.github/workflows/ci.yml` (**Revisto:** o job saiu do CI no PR #49; os `*.pg.test` rodam à mão, ver a D-00 no registro do [plano-v0.md](plano-v0.md)), usando pool com conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos arquivos existentes. PGLite não prova essas travas.
 
 | Cenário | Resultado obrigatório |
 |---|---|
