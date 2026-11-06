@@ -152,6 +152,78 @@ test('T-36: o painel recolhido, com o resumo que o jogador lê, e as abas no top
   }
 })
 
+// A1 (onda-5.md §11.6): com a Descrição longa e o painel recolhido, o topo
+// do narrador continua nos mesmos limites. Quem narra vê "Apresentação · Ler
+// tudo", sem o trecho, e o resumo das regras numa linha; o jogador continua
+// com o trecho. Texto fictício, escrito para o teste
+const LONG_DESCRIPTION = Array.from({ length: 12 }, (_, n) =>
+  `Parágrafo fictício ${n + 1} da crônica de teste, escrito só para medir o topo da tela. `.repeat(
+    4
+  )
+)
+  .join('\n\n')
+  .slice(0, 3600)
+
+test('A1: o topo do narrador com a Descrição longa e o painel recolhido', async ({
+  browser,
+}) => {
+  const c = await contexts(browser)
+  try {
+    const d = await desk(c.st, c.pl)
+    await saveRules(c.st, d)
+    await apiAs(c.st, d.storyteller, 'PATCH', `/chronicles/${d.chronicleId}`, {
+      clientCommandId: randomUUID(),
+      revision: 0,
+      description: LONG_DESCRIPTION,
+    })
+
+    // A jogadora continua com o trecho
+    const pp = await c.pl.newPage()
+    await pp.goto(`/chronicles/${d.chronicleId}`)
+    await expect(pp.getByTestId('chronicle-about-excerpt')).toBeVisible()
+    const line = (await pp.getByTestId('creation-summary').textContent()) ?? ''
+
+    const page = await c.st.newPage()
+    await page.goto(`/chronicles/${d.chronicleId}`)
+    const readAll = page.getByRole('button', {
+      name: 'Ler tudo: apresentação da crônica',
+      exact: true,
+    })
+    await expect(readAll).toBeVisible()
+    await expect(page.getByTestId('chronicle-about')).toContainText(
+      'Apresentação'
+    )
+    await expect(page.getByTestId('chronicle-about-excerpt')).toHaveCount(0)
+    // O resumo inteiro no DOM (o leitor de tela lê tudo), numa linha
+    const summary = page.getByTestId('creation-settings-summary')
+    await expect(summary).toHaveText(line)
+    const tops: Record<number, number> = {}
+    for (const [width, height, limit] of [
+      [390, 844, 340],
+      [1280, 800, 260],
+    ] as const) {
+      await page.setViewportSize({ width, height })
+      expect((await summary.boundingBox())?.height ?? 99).toBeLessThanOrEqual(
+        24
+      )
+      tops[width] = await tabsTop(page)
+      expect(tops[width]).toBeLessThan(limit)
+    }
+    test.info().annotations.push({
+      type: 'abas',
+      description: `narrador com Descrição longa: 390 → ${tops[390]}; 1280 → ${tops[1280]}`,
+    })
+
+    // "Ler tudo" abre a mesma leitura
+    await readAll.click()
+    await expect(page).toHaveURL(
+      new RegExp(`/chronicles/${d.chronicleId}/about$`)
+    )
+  } finally {
+    await c.close()
+  }
+})
+
 test('T-36: Editar, Cancelar e Salvar, com o foco', async ({ browser }) => {
   const c = await contexts(browser)
   try {

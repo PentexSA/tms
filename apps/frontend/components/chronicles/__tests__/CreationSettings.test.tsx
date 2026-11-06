@@ -275,6 +275,17 @@ describe('o painel recolhido', () => {
     expect(edit).toHaveTextContent('Editar')
   })
 
+  // A1 (onda-5.md §11.6): o resumo numa linha, e o texto inteiro no nome
+  // acessível (o leitor de tela não perde o que a tela corta)
+  it('o resumo ocupa uma linha, com o texto inteiro no nome acessível', async () => {
+    await renderPanel()
+    await screen.findByText(SUMMARY)
+    const summary = screen.getByTestId('creation-settings-summary')
+    expect(summary.props.numberOfLines).toBe(1)
+    expect(summary).toHaveAccessibleName(SUMMARY)
+    expect(screen.getByLabelText(SUMMARY)).toBe(summary)
+  })
+
   it('"Editar" abre e leva o foco à aprovação; "Cancelar" descarta e recolhe', async () => {
     await renderPanel()
     await openPanel()
