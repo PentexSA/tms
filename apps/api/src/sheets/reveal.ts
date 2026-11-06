@@ -145,10 +145,13 @@ export function revealRoutes(
               { code: 'REVISION_CONFLICT', revision: row.revealRevision }
             )
 
-          const stored = row.revealedSections
+          // Só o que o modelo da ficha deixa revelar: um id gravado fora da
+          // regra (dado antigo ou adulterado) sai na próxima gravação, e a
+          // lista nunca passa do CHECK de até 8
+          const stored = revealedOf(model, row.revealedSections)
           const has = stored.includes(body.section)
           let revision = row.revealRevision
-          let next = [...stored]
+          let next = stored
           if (has !== body.revealed) {
             next = body.revealed
               ? [...stored, body.section]

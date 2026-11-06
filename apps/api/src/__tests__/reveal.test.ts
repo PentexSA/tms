@@ -448,6 +448,30 @@ for (const system of MATRIX_SYSTEMS) {
       expect(after.revealed_sections).toEqual([s.revealSection])
     })
 
+    it('com 8 ids fora do modelo gravados, revelar dá 200 e guarda só a seção válida', async () => {
+      // Dado antigo ou adulterado: 8 ids, o máximo do CHECK. Antes, a
+      // próxima revelação somava o nono e o banco recusava (500)
+      await ctx.db
+        .updateTable('characters')
+        .set({
+          revealed_sections: Array.from({ length: 8 }, (_, i) => `velha${i}`),
+        })
+        .where('id', '=', characterId)
+        .execute()
+      const res = await reveal(s)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({
+        sections: [s.revealSection],
+        revision: 1,
+      })
+      const row = await ctx.db
+        .selectFrom('characters')
+        .select('revealed_sections')
+        .where('id', '=', characterId)
+        .executeTakeFirstOrThrow()
+      expect(row.revealed_sections).toEqual([s.revealSection])
+    })
+
     it('id de seção que o modelo deixou de revelar não abre nada', async () => {
       // Um valor gravado fora da rota (dado legado ou adulterado) é ignorado
       await ctx.db
