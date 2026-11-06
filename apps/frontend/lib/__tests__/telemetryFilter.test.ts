@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   createEventLimiter,
   type EventLike,
+  INVITE_CHAR,
   redact,
   scrubBreadcrumb,
   scrubUrl,
@@ -297,5 +300,48 @@ describe('toCapture', () => {
   it('valor lançado que não é Error vira um Error sem o valor', () => {
     const capture = toCapture(NOTE, { source: 'boundary' })
     expect(capture?.error.message).toBe('valor lançado: string')
+  })
+})
+
+// P12, revisão: a cópia da API sem pacote compartilhado (nenhum dos pacotes
+// que os dois importam é lugar de telemetria). Estes testes prendem a cópia
+// ao alfabeto do invite-code.ts e à classe da API
+describe('redact: a cópia da API, o alfabeto e o tempo', () => {
+  const api = (file: string) =>
+    readFileSync(join(__dirname, '../../../api/src', file), 'utf8')
+
+  it('a classe do código é a da API e cobre o alfabeto do invite-code.ts', () => {
+    const apiChar = /INVITE_CHAR = '([^']+)'/.exec(api('http/safe-error.ts'))
+    expect(apiChar?.[1]).toBe(INVITE_CHAR)
+    const alphabet = /ALPHABET = '([0-9A-Z]+)'/.exec(
+      api('chronicles/invite-code.ts')
+    )?.[1]
+    expect(alphabet).toHaveLength(32)
+    const one = new RegExp(`^${INVITE_CHAR}$`)
+    for (const c of `${alphabet}OIL`) {
+      expect(one.test(c)).toBe(true)
+      expect(one.test(c.toLowerCase())).toBe(true)
+    }
+    expect(one.test('U')).toBe(false)
+  })
+
+  it('linear num token longo de "/" e num base64 de 64 KB', () => {
+    const slashes = '/'.repeat(64 * 1024)
+    const base64 = Buffer.from(
+      Array.from({ length: 48 * 1024 }, (_, i) => i % 256)
+    ).toString('base64')
+    for (const value of [slashes, `${slashes}#x`, base64, `/${base64}#y`]) {
+      const start = Date.now()
+      redact(value)
+      expect(Date.now() - start).toBeLessThan(200)
+    }
+  })
+
+  it('texto acima de 2000 caracteres nem é lido (o teto da API)', () => {
+    const out = scrubWebEvent({
+      exception: { values: [{ type: 'Error', value: 'x'.repeat(2001) }] },
+    })
+    expect(JSON.stringify(out)).toContain('[texto longo omitido]')
+    expect(JSON.stringify(out)).not.toContain('x'.repeat(301))
   })
 })

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 // Código de convite: 128 bits aleatórios em base32 Crockford (sem I, L, O e
 // U, que confundem), 26 caracteres. Mostrado uma vez; o banco guarda o hash.
 
-const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+export const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
 export function newInviteCode(): string {
   const bytes = new Uint8Array(16)

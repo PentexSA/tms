@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
-import { newInviteCode } from '../chronicles/invite-code'
-import { redact, safeError } from '../http/safe-error'
+import { ALPHABET, newInviteCode } from '../chronicles/invite-code'
+import { INVITE_CHAR, redact, safeError } from '../http/safe-error'
 
 const EMAIL = 'pessoa.canario@empresa.com.br'
 const JWT =
@@ -298,5 +298,30 @@ describe('redact: código de convite (P12)', () => {
   it('a mensagem do erro sai sem o código', () => {
     const safe = safeError(new Error(`convite ${formatted} recusado`))
     expect(safe.message).toBe('convite [convite] recusado')
+  })
+})
+
+describe('redact: alfabeto e tempo (P12, revisão)', () => {
+  it('a classe do código é o alfabeto do invite-code.ts, mais O, I e L, sem U', () => {
+    const one = new RegExp(`^${INVITE_CHAR}$`)
+    for (const c of ALPHABET) {
+      expect(one.test(c)).toBe(true)
+      expect(one.test(c.toLowerCase())).toBe(true)
+    }
+    for (const c of 'OILoil') expect(one.test(c)).toBe(true)
+    for (const c of 'Uu-_ ') expect(one.test(c)).toBe(false)
+  })
+
+  it('linear num token longo de "/" e num base64 de 64 KB', () => {
+    const slashes = '/'.repeat(64 * 1024)
+    const base64 = Buffer.from(
+      Array.from({ length: 48 * 1024 }, (_, i) => i % 256)
+    ).toString('base64')
+    for (const text of [slashes, `${slashes}#x`, base64, `/${base64}#y`]) {
+      const start = performance.now()
+      redact(text)
+      expect(performance.now() - start).toBeLessThan(200)
+    }
+    expect(redact(`${slashes}#x`).endsWith('#[convite]')).toBe(true)
   })
 })

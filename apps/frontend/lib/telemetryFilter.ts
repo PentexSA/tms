@@ -9,21 +9,31 @@ import { classifyError, requestIdOf } from './errors'
 // O alfabeto do código (apps/api/src/chronicles/invite-code.ts) em qualquer
 // caixa, sem o U, mais O, I e L, que o aceite normaliza. Cru (26 seguidos) ou
 // formatado (4 × 6 + 2).
-const INVITE_CHAR = '[0-9A-TV-Za-tv-z]'
+export const INVITE_CHAR = '[0-9A-TV-Za-tv-z]'
 const INVITE_CODE = new RegExp(
   `(^|[^0-9A-Za-z])(?:${INVITE_CHAR}{26}|${INVITE_CHAR}{4}(?:[ -]${INVITE_CHAR}{4}){5}[ -]${INVITE_CHAR}{2})(?![0-9A-Za-z])`,
   'g'
 )
-// O fragmento de uma URL ou de um caminho ("/join#…"); o "#" de um método
-// privado no stack ("at Foo.#bar") não vem depois de "/"
-const INVITE_FRAGMENT =
-  /((?:[a-z][a-z0-9+.-]*:\/\/|\/)[^\s'"<>#]*)#[^\s'"<>]+/gi
+// O fragmento de uma URL ou de um caminho ("/join#…"): num token sem espaço
+// nem aspas, o que vem depois do primeiro "#" que tem um "/" antes. O "#"
+// de um método privado no stack ("at Foo.#bar") não tem "/" antes. Um passe
+// por token, linear: a regex com o prefixo opcional era quadrática num
+// token longo de "/"
+const TOKEN = /[^\s'"<>]+/g
+export const redactFragments = (text: string): string =>
+  text.replace(TOKEN, token => {
+    const hash = token.indexOf('#')
+    if (hash < 1 || hash === token.length - 1) return token
+    return token.lastIndexOf('/', hash) === -1
+      ? token
+      : `${token.slice(0, hash)}#[convite]`
+  })
 
 // Copiado de apps/api/src/http/safe-error.ts (são poucas linhas; um pacote
 // novo custaria mais). Mudou lá, mude aqui.
 export function redact(text: string): string {
   return (
-    text
+    redactFragments(text)
       .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s'"<>]*@/gi, '$1[credencial]@')
       .replace(/\beyJ[\w-]+\.[\w-]+(?:\.[\w-]*)?/g, '[jwt]')
       .replace(/\bBearer\s+[^\s,;'"]+/gi, 'Bearer [token]')
@@ -35,7 +45,6 @@ export function redact(text: string): string {
       // no formato da tela (grupos de 4), e o fragmento de URL que o link leva.
       // Toda sequência do alfabeto conta: um falso positivo só apaga texto de
       // diagnóstico. Sem lookbehind, que nem todo motor de regex do app tem
-      .replace(INVITE_FRAGMENT, '$1#[convite]')
       .replace(INVITE_CODE, '$1[convite]')
   )
 }
@@ -129,8 +138,14 @@ function debugImages(event: EventLike) {
 
 const TAGS = ['source', 'request_id', 'status', 'events'] as const
 
-const text = (value: unknown, max = MAX_TEXT): string | undefined =>
-  typeof value === 'string' && value ? redact(value).slice(0, max) : undefined
+// O mesmo teto da API (safe-error.ts, MAX_MESSAGE_SCAN): acima disso o texto
+// nem é lido, e nenhuma regex corre num despejo
+const MAX_TEXT_SCAN = 2000
+const text = (value: unknown, max = MAX_TEXT): string | undefined => {
+  if (typeof value !== 'string' || !value) return undefined
+  if (value.length > MAX_TEXT_SCAN) return '[texto longo omitido]'
+  return redact(value).slice(0, max)
+}
 
 const finite = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
