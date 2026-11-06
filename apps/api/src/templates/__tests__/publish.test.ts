@@ -25,7 +25,9 @@ const beforeProductTemplates = {
     Object.fromEntries(
       Object.entries(migrations).filter(
         ([name]) =>
-          name !== '0020_product_templates' && name !== '0023_templates_onda4'
+          name !== '0020_product_templates' &&
+          name !== '0023_templates_onda4' &&
+          name !== '0025_templates_onda5'
       )
     ),
 }
@@ -183,7 +185,7 @@ describe('publishTemplate', () => {
     expect(result).toMatchObject({
       status: 'published',
       system: 'vtm-v20',
-      version: '1.9.0',
+      version: '1.10.0',
     })
     expect(result.hash).toMatch(/^[0-9a-f]{64}$/)
     const system = await db
@@ -195,7 +197,7 @@ describe('publishTemplate', () => {
       .selectFrom('trait_templates')
       .selectAll()
       .executeTakeFirstOrThrow()
-    expect(row.version).toBe('1.9.0')
+    expect(row.version).toBe('1.10.0')
     expect(row.published_at).toBeInstanceOf(Date)
     expect(canonicalJson(row.template_data)).toBe(
       canonicalJson(template('vtm-v20'))
@@ -226,7 +228,7 @@ describe('publishTemplate', () => {
         stage: 'version',
         path: 'templateVersion',
         message:
-          'vtm-v20@1.9.0 já foi publicado com outro conteúdo: suba o templateVersion',
+          'vtm-v20@1.10.0 já foi publicado com outro conteúdo: suba o templateVersion',
       },
     ])
   })
@@ -234,15 +236,20 @@ describe('publishTemplate', () => {
   it('uma versão nova convive com a anterior', async () => {
     await publishTemplate(db, template('vtm-v20'))
     const next = template('vtm-v20')
-    next.templateVersion = '1.10.0'
+    // A versão seguinte, derivada da de hoje (a minor de depois)
+    const [major, minor, patch] = String(next.templateVersion)
+      .split('.')
+      .map(Number)
+    const following = `${major}.${(minor ?? 0) + 1}.${patch}`
+    next.templateVersion = following
     expect((await publishTemplate(db, next)).status).toBe('published')
     const versions = await db
       .selectFrom('trait_templates')
       .select('version')
-      .orderBy('version')
       .execute()
-    // A ordem da coluna é a de texto: '1.10.0' vem antes de '1.9.0'
-    expect(versions.map(v => v.version)).toEqual(['1.10.0', '1.9.0'])
+    expect(versions.map(v => v.version).sort()).toEqual(
+      [String(template('vtm-v20').templateVersion), following].sort()
+    )
   })
 
   it.each([
@@ -510,10 +517,10 @@ describe('pnpm templates:publish (CLI)', () => {
     expect(await run(['vtm.json'])).toBe(0)
     expect(out).toHaveLength(1)
     expect(out[0]).toMatch(
-      /^publicado: vtm-v20@1\.9\.0 \(sha256 [0-9a-f]{12}\)$/
+      /^publicado: vtm-v20@1\.10\.0 \(sha256 [0-9a-f]{12}\)$/
     )
     expect(await run(['vtm.json'])).toBe(0)
-    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.9.0')
+    expect(out[1]).toStartWith('sem mudança: vtm-v20@1.10.0')
   })
 
   it('sai com 1 e lista os problemas quando recusa', async () => {
@@ -537,9 +544,9 @@ describe('pnpm templates:publish (CLI)', () => {
   it('--published grava os templates do produto, na ordem', async () => {
     expect(await run(['--published'])).toBe(0)
     expect(out.map(l => l.split(' (')[0])).toEqual([
-      'publicado: vtm-v20@1.9.0',
-      'publicado: mta-m20@1.7.0',
-      'publicado: wta-w20@1.7.0',
+      'publicado: vtm-v20@1.10.0',
+      'publicado: mta-m20@1.8.0',
+      'publicado: wta-w20@1.8.0',
     ])
   })
 })

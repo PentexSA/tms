@@ -39,8 +39,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   const model = compileTemplate(vtm())
 
   it('identifica o template', () => {
-    expect(model.key).toBe('vtm-v20@1.9.0')
-    expect(model.version).toBe('1.9.0')
+    expect(model.key).toBe('vtm-v20@1.10.0')
+    expect(model.version).toBe('1.10.0')
     expect(model.skin).toBe('wod')
   })
 
@@ -54,7 +54,7 @@ describe('compileTemplate: o modelo do Vampiro', () => {
       play: ['play'],
       build: ['attributes', 'abilities'],
       powers: ['advantages', 'merits-flaws', 'experience'],
-      lore: ['about', 'storyteller'],
+      lore: ['about', 'backstory', 'storyteller'],
     })
   })
 
@@ -115,6 +115,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   it('marca a seção do narrador como restrita', () => {
     expect(model.sections.get('storyteller')?.restricted).toBe(true)
     expect(model.sections.get('about')?.restricted).toBe(false)
+    // A História declara `read` (dono e narrador, sem `viewer`)
+    expect(model.sections.get('backstory')?.restricted).toBe(true)
   })
 
   it('identityFields são os campos da criação de ficha', () => {
@@ -235,9 +237,9 @@ describe('compileTemplate: o Lobisomem (W20, v2)', () => {
 
 describe('os campos da ficha de papel nos três sistemas', () => {
   it.each([
-    ['vtm-v20', '1.9.0'],
-    ['mta-m20', '1.7.0'],
-    ['wta-w20', '1.7.0'],
+    ['vtm-v20', '1.10.0'],
+    ['mta-m20', '1.8.0'],
+    ['wta-w20', '1.8.0'],
   ])('%s %s: Qualidades e Defeitos com custo de 1 a 10', (system, version) => {
     const t = templates[system] as Json
     expect(t.templateVersion).toBe(version)
@@ -257,6 +259,7 @@ describe('os campos da ficha de papel nos três sistemas', () => {
     const lore = model.zones.find(z => z.id === 'lore')?.sections ?? []
     expect(lore.map(s => s.id)).toEqual([
       'about',
+      'backstory',
       'battle-scars',
       'storyteller',
     ])

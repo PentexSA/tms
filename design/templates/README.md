@@ -366,6 +366,14 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 - Sem `permissions`: dono, narrador e viewer leem; só dono e narrador escrevem. `viewer` nunca escreve e não acessa histórico, rolagens, criação ou XP.
 - `read` restrito: o **servidor** remove os campos da seção antes de responder a quem não pode ler (§11). Esconder na UI não basta. Por isso esses campos não podem aparecer em `identity` (header, cartões, mesa) nem no `dock`: `validateTemplate` rejeita.
 - `write` restrito: o servidor rejeita a escrita de quem não está na lista.
+- Um texto que o dono e o narrador leem, e o `viewer` não, fica numa seção própria com `read` dos dois e sem `write` (os dois escrevem). É a "História" dos três templates do WoD (D-16):
+
+  ```json
+  { "id": "backstory", "zone": "lore", "title": "História", "layout": "text",
+    "fields": ["backstory"], "permissions": { "read": ["owner", "storyteller"] } }
+  ```
+
+  Dentro da seção `about`, que não declara `permissions`, o `viewer` de um NPC revelado o leria. O id é `backstory`, e não `history`, para não colidir com a perícia "História" do D&D e do CoC.
 
 **Multi-sistema:** a mesma seção "Narrador" serve a "Mestre" (D&D), "Guardião" (CoC) e "MC" (PbtA), só com outro `title`. Uma seção "Sombra" da Aparição, legível só pelo jogador que faz a Sombra, exigiria um papel novo na lista fechada (§9).
 

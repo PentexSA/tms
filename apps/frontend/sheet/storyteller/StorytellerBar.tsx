@@ -17,9 +17,9 @@ import { useCommit } from '../useCommit'
 import {
   ADJUST_HINT,
   barEdits,
+  editorNotice,
   hiddenFromOwner,
   PRIVATE_NOTE_A11Y,
-  PRIVATE_NOTE_SHEET,
 } from './privacy'
 
 // O narrador abre a ficha de um jogador em Leitura; editar é explícito
@@ -128,12 +128,16 @@ function TextFieldSheet({
   readonly id: FieldId
   readonly onClose: () => void
 }) {
-  const { model } = useSheet()
+  const { model, roles } = useSheet()
   const commit = useCommit()
   const creating = useCreation()?.status === 'creating'
   const noticeId = `${useId()}-privacy`
   const field = model.fields.get(id)
   const stored = useSheetSelector(s => s.values.values[id])
+  const npc = useSheetSelector(s => s.npc)
+  // R-09 e U-10: privado (as Notas do Narrador) ou "O jogador lê este texto."
+  const notice = editorNotice(model, id, roles, npc)
+  const secret = hiddenFromOwner(model, id)
   const [text, setText] = useState(typeof stored === 'string' ? stored : '')
   if (!field) return null
   const save = () => {
@@ -156,12 +160,12 @@ function TextFieldSheet({
         </>
       }
     >
-      {hiddenFromOwner(model, id) ? (
+      {notice ? (
         <View style={styles.notice}>
           <Text variant="caption" nativeID={noticeId}>
-            {PRIVATE_NOTE_SHEET}
+            {notice}
           </Text>
-          {creating ? (
+          {creating && secret ? (
             <Text variant="caption" color="inkMuted">
               {ADJUST_HINT}
             </Text>
@@ -173,11 +177,7 @@ function TextFieldSheet({
         def={field.def}
         value={text}
         onChange={next => setText(String(next))}
-        note={
-          hiddenFromOwner(model, id)
-            ? { id: noticeId, text: PRIVATE_NOTE_SHEET }
-            : undefined
-        }
+        note={notice ? { id: noticeId, text: notice } : undefined}
       />
     </BottomSheet>
   )

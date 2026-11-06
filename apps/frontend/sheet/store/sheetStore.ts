@@ -185,6 +185,8 @@ export interface SheetStoreInit {
   readonly creation?: CreationInput | null
   // A política deixa editar; sem ela, o padrão é sim (prévia, testes)
   readonly editable?: boolean
+  // NPC: não há jogador dono (o aviso "O jogador lê este texto." não vale)
+  readonly npc?: boolean
 }
 
 export interface SheetState {
@@ -216,6 +218,8 @@ export interface SheetState {
   // A política deixa editar (não travada, arquivada nem de quem saiu). Sem
   // ela, nada entra em Criação/Editar: o rascunho fica guardado no aparelho
   readonly editable: boolean
+  // A ficha é um NPC (sem jogador dono). Só para textos da tela
+  readonly npc: boolean
 }
 
 export interface SheetActions {
@@ -701,6 +705,7 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       conflict: null,
       fieldIssues: NO_ISSUES,
       editable: init.editable ?? true,
+      npc: init.npc ?? false,
 
       commit,
       received,

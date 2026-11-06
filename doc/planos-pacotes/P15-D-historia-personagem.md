@@ -7,7 +7,7 @@ Este plano implementa o pacote [P15-D da matriz de achados](../testes/2026-11-01
 - a ficha do Vampiro, do Mago e do Lobisomem tem o campo **"História / Prelúdio"**, numa seção própria da aba Sobre, que o narrador da crônica e o dono da ficha leem;
 - as Notas do Narrador continuam como estão: outra seção, privadas, e o servidor continua a não mandá-las ao dono;
 - quando o narrador edita um texto que o jogador lê, o editor diz "O jogador lê este texto.", e o editor das Notas continua dizendo que elas são privadas;
-- os três templates sobem uma versão (`vtm-v20` 1.10.0, `wta-w20` 1.8.0 e `mta-m20` 1.8.0), publicada pela migration `0024`, só de dados. Este pacote faz o aumento único de versão da onda 5.
+- os três templates sobem uma versão (`vtm-v20` 1.10.0, `wta-w20` 1.8.0 e `mta-m20` 1.8.0), publicada pela migration `0025`, só de dados. Este pacote faz o aumento único de versão da onda 5.
 
 É um pacote de decisão de produto, quase todo de template. O pacote não remove campo, não muda regra do jogo e não afrouxa limite, e o servidor continua a autoridade:
 
@@ -51,7 +51,7 @@ Todas as linhas citadas são do `05c5d7d` (a `main` depois do merge da onda 4, P
 
 1. **Quem escreve.** A D-16 diz quem lê, não quem escreve. A matriz deixa a pergunta para o plano ("o jogador edita ou só lê: fechar no plano do pacote"). **Vai ao PO** (ponto 1 da §9.1), com a recomendação "os dois escrevem". As três saídas estão na §3.2.
 2. **"Narrador e jogador".** No código, "jogador" é o **dono** da ficha (`owner`). Outro jogador da crônica não tem papel na ficha alheia e recebe 404 (`apps/api/src/authz.ts:9-12`, `:100-118`; plano-v3, Etapa 2). O `viewer`, o membro diante de um NPC revelado por inteiro, também fica fora: a seção nova restringe a leitura a dono e narrador. Se o PO quiser que os jogadores leiam a História de um NPC revelado, é acrescentar `viewer` ao `read` (ponto 4 da §9.1). A recomendação é não acrescentar.
-3. **"Sem migration" (matriz, "Conversa com" e recomendação do U-10).** Não vale desde a onda 4. Uma versão nova de template do produto ganha a sua migration só de dados (`packages/db/src/migrations/0020_product_templates.ts:5-9`, [onda-4.md](onda-4.md) §4.7). Este pacote traz a `0024`, sem mudança de schema (§3.7).
+3. **"Sem migration" (matriz, "Conversa com" e recomendação do U-10).** Não vale desde a onda 4. Uma versão nova de template do produto ganha a sua migration só de dados (`packages/db/src/migrations/0020_product_templates.ts:5-9`, [onda-4.md](onda-4.md) §4.7). Este pacote traz a `0025`, sem mudança de schema (§3.7).
 4. **"`wod-w20`".** O template do Lobisomem é o `wta-w20` (`design/templates/wta-w20.json:3`). A matriz escreve "wod-w20" por engano.
 
 **Fica fora deste pacote, e com quem fica:**
@@ -66,7 +66,7 @@ Todas as linhas citadas são do `05c5d7d` (a `main` depois do merge da onda 4, P
 
 - [onda-4.md](onda-4.md) §6, **ponto 3** (a ordem do release: o app na loja antes da versão nova dos templates): §3.7. Como a onda 4 foi à produção não está no repositório, e vai como pergunta ao usuário (§9.3);
 - [onda-4.md](onda-4.md) §6, **ponto 9** (fichas na versão anterior, sem caminho de atualização): §3.6;
-- [onda-4.md](onda-4.md) §8, **pergunta 3** (a validação dentro da migration; §11, "Fica para decisão"): a `0024` repete o padrão da `0023`, sem validar dentro dela, e a pergunta segue para decisão (§9.2, pergunta 3);
+- [onda-4.md](onda-4.md) §8, **pergunta 3** (a validação dentro da migration; §11, "Fica para decisão"): a `0025` repete o padrão da `0023`, sem validar dentro dela, e a pergunta segue para decisão (§9.2, pergunta 3);
 - [onda-4.md](onda-4.md) §8, **pergunta 4** (quem faz o commit de versão): §3.7.
 
 ## 3. Desenho por item
@@ -103,7 +103,7 @@ Todas as linhas citadas são do `05c5d7d` (a `main` depois do merge da onda 4, P
 - **A publicação:**
   - o `publishProductTemplates` grava os arquivos de `design/templates` na ordem de `PRODUCT_TEMPLATES` (`vtm-v20`, `mta-m20`, `wta-w20`) e recusa a versão já gravada com outro conteúdo (`packages/db/src/templates.ts:11`, `:101-115`);
   - a `0023_templates_onda4.ts` é só a chamada dele, sem `down`, registrada em `packages/db/src/migrations.ts:24` e `:54`;
-  - a última migration é a `0023`, então **a próxima é a `0024`**;
+  - a última migration é a `0023`, então **a próxima é a `0025`**;
   - num banco novo, a `0020` grava os arquivos de hoje (`0020_product_templates.ts:10-21`), e as seguintes só confirmam. **Um banco novo não tem a versão anterior de nenhum template**, o que importa para o roteiro (§11.a).
 
 **Onde a causa provável da matriz não vale:**
@@ -227,7 +227,7 @@ O R-09 fez o editor das Notas dizer que elas são privadas. Com um texto privado
 
 ### 3.5 U-10 · Nada passa das Notas do Narrador para a História
 
-- **A `0024` não toca em ficha.** Ela só chama o `publishProductTemplates`, que grava em `game_systems` e `trait_templates` (`templates.ts:51-99`). Um teste prova que nenhum `characters.sheet_data` nem `template_version` muda (§4.1).
+- **A `0025` não toca em ficha.** Ela só chama o `publishProductTemplates`, que grava em `game_systems` e `trait_templates` (`templates.ts:51-99`). Um teste prova que nenhum `characters.sheet_data` nem `template_version` muda (§4.1).
 - **Sem atalho.** Nenhum botão "Copiar das Notas", nenhuma sugestão e nenhum texto inicial vindo das Notas. O campo nasce vazio em toda ficha nova.
 - **O narrador copia à mão,** pelo editor das Notas: selecionar, copiar e colar no editor da História. O `<Text>` da Leitura não é selecionável no app nativo, mas o `TextArea` do editor é.
   - Na saída A, esse caminho só existe com o T-84.
@@ -267,7 +267,7 @@ O R-09 fez o editor das Notas dizer que elas são privadas. Com um texto privado
 | `mta-m20` | 1.7.0 (`mta-m20.json:7`) | **1.8.0** | idem |
 
 - **Minor:** o conteúdo é aditivo, e o contrato não muda.
-- **A migration:** `packages/db/src/migrations/0024_templates_onda5.ts`, cópia da `0023` (só `publishProductTemplates(db)`, `down` vazio), registrada em `packages/db/src/migrations.ts`. É só de dados, sem mudança de schema, sem `codegen`.
+- **A migration:** `packages/db/src/migrations/0025_templates_onda5.ts`, cópia da `0023` (só `publishProductTemplates(db)`, `down` vazio), registrada em `packages/db/src/migrations.ts`. É só de dados, sem mudança de schema, sem `codegen`.
 - O D&D, o CoC e o Fate não sobem: não são publicados (`apps/api/src/templates/published.ts`).
 
 **Outros pacotes da onda 5 que podem mexer em template** (conferido no código; a decisão é de cada plano):
@@ -283,12 +283,12 @@ O R-09 fez o editor das Notas dizer que elas são privadas. Com um texto privado
 - **Proposta:** o último commit da branch do P15-D, depois do rebase dela sobre a onda com o P13. Se o P16-D também mudar template, o commit vai para o fim da branch do P16-D, que entra depois do P15-D. É a regra da onda 4: o commit fica no fim da branch do último pacote que muda template, na ordem de merge.
 - **O que o commit traz** (a lição A2: tudo o que entra, por arquivo):
   - `design/templates/vtm-v20.json`, `mta-m20.json` e `wta-w20.json`: o `templateVersion` de cada um;
-  - `packages/db/src/migrations/0024_templates_onda5.ts` e o registro em `packages/db/src/migrations.ts`;
+  - `packages/db/src/migrations/0025_templates_onda5.ts` e o registro em `packages/db/src/migrations.ts`;
   - `packages/db/src/__tests__/migrations.test.ts`:
-    - um `describe('0024: as versões da onda 5')`, cópia do da `0023` (`:676-779`), com as versões derivadas dos arquivos e o caso "a 0024 não toca nenhuma ficha" (§4.1);
-    - o caso "descer a 0023" (`:761-779`) passa a esperar `['0024_templates_onda5', '0023_templates_onda4']` ao descer até a `0022`;
+    - um `describe('0025: as versões da onda 5')`, cópia do da `0023` (`:676-779`), com as versões derivadas dos arquivos e o caso "a 0025 não toca nenhuma ficha" (§4.1);
+    - o caso "descer a 0023" (`:761-779`) passa a esperar `['0025_templates_onda5', '0023_templates_onda4']` ao descer até a `0022`;
   - `apps/api/src/templates/__tests__/publish.test.ts`:
-    - o `beforeProductTemplates` (`:23-31`) deixa a `0024` de fora também;
+    - o `beforeProductTemplates` (`:23-31`) deixa a `0025` de fora também;
     - `:186`, `:198` e `:229` passam a 1.10.0;
     - o caso "uma versão nova convive" (`:234-246`) monta a versão seguinte derivada da atual (1.11.0), e o comentário da ordem de texto muda, porque `'1.10.0'` e `'1.11.0'` já saem em ordem;
     - `:508-517` e `:537-543` passam às versões novas;
@@ -309,11 +309,11 @@ O R-09 fez o editor das Notas dizer que elas são privadas. Com um texto privado
 
 **A ordem do release** (onda-4 §6, ponto 3, em aberto).
 
-- A `0024` roda no deploy da API. Se o P13 e o P16-D não puserem chave nova, a janela de "Atualize o app" desta onda é só a de quem ainda tiver um app anterior à onda 4.
-- **Como a onda 4 foi à produção** (a loja antes ou depois da `0023`, ou se o app nativo está na loja) **não está no repositório**. Vai como pergunta ao usuário (§9.3), e a resposta decide se a `0024` pode ir no deploy da API ou espera a loja.
+- A `0025` roda no deploy da API. Se o P13 e o P16-D não puserem chave nova, a janela de "Atualize o app" desta onda é só a de quem ainda tiver um app anterior à onda 4.
+- **Como a onda 4 foi à produção** (a loja antes ou depois da `0023`, ou se o app nativo está na loja) **não está no repositório**. Vai como pergunta ao usuário (§9.3), e a resposta decide se a `0025` pode ir no deploy da API ou espera a loja.
 - As saídas da onda 4 continuam: segurar a migration até a loja; aceitar a janela; publicar pelo `templates:publish` manual depois da loja.
 
-**A validação dentro da migration** (onda-4 §11, pergunta 3): segue para decisão. A `0024` repete a `0023` sem validar, e o teste da API que passa cada arquivo pelo schema, pelo contrato, pela publicação e pelo `compileTemplate` (`publish.test.ts:557-558`) cobre os arquivos novos. Não é resolvida aqui.
+**A validação dentro da migration** (onda-4 §11, pergunta 3): segue para decisão. A `0025` repete a `0023` sem validar, e o teste da API que passa cada arquivo pelo schema, pelo contrato, pela publicação e pelo `compileTemplate` (`publish.test.ts:557-558`) cobre os arquivos novos. Não é resolvida aqui.
 
 ## 4. Testes
 
@@ -327,7 +327,7 @@ O R-09 fez o editor das Notas dizer que elas são privadas. Com um texto privado
 | U-10d | NPC: o narrador grava a História de um NPC. Revelado por inteiro, o membro (`viewer`) recebe a ficha sem `backstory`. Oculto, recebe 404. Nos três sistemas | `apps/api/src/__tests__/authz.test.ts` (ou `backstage.test.ts`, onde a revelação já é montada) | Bun + PGLite |
 | U-10e | A escrita do dono: A, 200 em `creating` e em `active`; 403 com `reason: 'pending'` em `pending`; 403 `SHEET_LOCKED` com a trava; 403 `NOT_MEMBER` para o ex-membro na própria ficha. B, 403 em todo estado, e nada muda (como `authz.test.ts:266-281`). O narrador grava em todo estado | `apps/api/src/__tests__/events.test.ts` | Bun + PGLite |
 | U-10f | O Histórico: o dono vê a entrada do lote do narrador na História, assinada "narrador", sem o texto (`from`/`to` nulos). O lote das Notas continua fora do Histórico do dono | `apps/api/src/__tests__/events.test.ts` | Bun + PGLite |
-| U-10g | **Nada passa das Notas:** um banco na `0023`, com uma ficha na versão anterior com as Notas preenchidas. Depois da `0024`, `sheet_data` e `template_version` da ficha são os mesmos, byte a byte, e ela não tem `backstory`. Uma ficha nova nasce na versão nova, com a História vazia | `packages/db/src/__tests__/migrations.test.ts` (no `describe` da `0024`) | Bun + PGLite |
+| U-10g | **Nada passa das Notas:** um banco na `0023`, com uma ficha na versão anterior com as Notas preenchidas. Depois da `0025`, `sheet_data` e `template_version` da ficha são os mesmos, byte a byte, e ela não tem `backstory`. Uma ficha nova nasce na versão nova, com a História vazia | `packages/db/src/__tests__/migrations.test.ts` (no `describe` da `0025`) | Bun + PGLite |
 | U-10h | Na Leitura, o dono vê "História / Prelúdio" e o texto na aba Sobre, e não vê as Notas do Narrador. O narrador vê as duas, e só as Notas com "privadas: o jogador não vê" | `apps/frontend/sheet/__tests__/storyteller.test.tsx` | Jest + RNTL |
 | U-10i | O editor do narrador: na folha da História, "O jogador lê este texto." visível e na dica do campo. Na das Notas, "Privadas: o jogador não vê estas notas." e não o aviso novo. Na do dono, nenhum dos dois. Saída A: no `TextEditorRow`, com o T-84. Saída B: na `TextFieldSheet` | `apps/frontend/sheet/__tests__/storyteller.test.tsx` e um teste do `TextEditorRow` | Jest + RNTL |
 
@@ -379,14 +379,14 @@ O que só o E2E pega: o `aria-describedby` real no DOM e a resposta da rede sem 
 
 | Ameaça | O que o desenho evita |
 |---|---|
-| **As Notas do Narrador chegam ao jogador** pela mudança (migration, cópia, sugestão) | A `0024` não lê nem escreve ficha (teste U-10g). Nenhum botão nem texto inicial copia as Notas. A seção `storyteller` não muda. A marca `SECRET` da matriz continua em toda resposta a quem não é narrador (U-10c) |
+| **As Notas do Narrador chegam ao jogador** pela mudança (migration, cópia, sugestão) | A `0025` não lê nem escreve ficha (teste U-10g). Nenhum botão nem texto inicial copia as Notas. A seção `storyteller` não muda. A marca `SECRET` da matriz continua em toda resposta a quem não é narrador (U-10c) |
 | **A História chega a quem não deve** (outro jogador, ex-membro, `viewer`, outro narrador, NPC oculto) | `read: ["owner", "storyteller"]` na seção. O `stripRestricted` corre em toda saída (§3.0), com os papéis resolvidos no banco, nunca vindos do cliente. A matriz de AuthZ prova nos três sistemas (U-10c, U-10d). O app só esconde o que o servidor já não manda |
 | **Escrita indevida** (o jogador no `pending`, com a trava, fora da crônica; o `viewer`) | `canWrite` e `writePolicy` no servidor, como hoje (U-10e). Na saída B, o `write` só do narrador. O `viewer` nunca escreve. Fail secure: papel desconhecido não lê nem escreve (`permissions.ts:5-8`) |
 | **Injeção** (HTML, script, link) pelo texto | O valor sai sempre em `<Text>`, nunca como HTML, sem markdown, sem `dangerouslySetInnerHTML` e sem detecção de link (`TextLayout.tsx:12-14`). O rótulo, o título e o `help` são `safeText` (sem `<`, `>`, controle nem bidi), e o `help` passa pela regra "sem link, uma linha" da publicação |
 | **Tamanho** | O `maxLength` de 8000 é aplicado pelo `validateSheet` no servidor. O lote tem teto de 64 KB, e o limite de lotes por usuário e por ficha não muda. A Mesa leva a ficha inteira ao narrador (`table.ts:18-23`): no pior caso, 20 fichas com 8000 caracteres cada (cerca de 160 mil caracteres a mais). O P09-D, que mexe na Mesa, sabe disso (§8.4) |
 | **Logs, Sentry e Histórico** | `longText` entra no Histórico sem conteúdo (`events.ts:104-106`). O `scrubLog` e o Sentry reconstroem o evento por allowlist e não têm campo de ficha. A mensagem de recusa do validador traz o caminho e o limite, não o valor |
 | **Cache no aparelho** | A ficha do dono já fica no cache de leitura por usuário, apagado no logout (`apps/frontend/lib/persist.tsx:38-41`). A História é da mesma classe das "Notas" do jogador, que já estão lá. O cache não é cifrado, e cifrá-lo seria pacote à parte. O rascunho continua no armazenamento cifrado (P03-C). O aparelho do jogador nunca recebe as Notas do Narrador |
-| **Dado de produção** | O texto do U-10 em produção não é lido, copiado nem migrado. Nenhuma saída da §3.6 recomendada mexe direto no banco de produção. A `0024` só insere templates, sem SQL concatenado |
+| **Dado de produção** | O texto do U-10 em produção não é lido, copiado nem migrado. Nenhuma saída da §3.6 recomendada mexe direto no banco de produção. A `0025` só insere templates, sem SQL concatenado |
 
 **`/security-review` antes do merge**, como a §5 do brief pede para o P15-D: a AuthZ nova de leitura (o `read` da seção) e o dado que o jogador passa a receber.
 
@@ -422,7 +422,7 @@ Os passos do "PR local" da matriz ("Como executar"):
 7. **Resumo para a seção do pacote no PR da onda:**
    - o que mudou e como foi testado;
    - a resposta do PO (quem escreve);
-   - as versões publicadas e a `0024`;
+   - as versões publicadas e a `0025`;
    - o que acontece com a ficha antiga (§3.6) e a saída escolhida;
    - os achados das duas revisões.
 
@@ -453,7 +453,7 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição A2 d
 
 - a matriz de AuthZ nos três sistemas (commit 2);
 - o commit de versão da onda, com a migration e os testes que fixam versão (commit 5);
-- o roteiro manual nas três plataformas, com uma ficha na versão anterior preparada antes da `0024` (§11.a).
+- o roteiro manual nas três plataformas, com uma ficha na versão anterior preparada antes da `0025` (§11.a).
 
 ### 8.3 Riscos
 
@@ -461,7 +461,7 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição A2 d
 - **"Atualize o app" no nativo.** O P15-D sozinho não cria janela nova para o app da onda 4 (§3.7). Uma chave nova do P13 ou do P16-D no mesmo aumento cria. Cada plano diz se põe chave nova.
 - **O narrador do U-10 não vê a mudança na ficha dele** (§3.6). É o risco de produto mais visível do pacote, e a resposta é do PO.
 - **Bancos locais com a versão nova e outro conteúdo.** Um banco que publicar a 1.10.0 antes do commit 5 trava o seguinte com "já está no banco com outro conteúdo". Por isso o roteiro usa um banco próprio do pacote (§11.a), e o `templates:publish` não roda na branch antes do commit 5.
-- **Um banco novo não tem a versão anterior** (§3.0). A ficha antiga do roteiro é criada antes da `0024` (§11.a).
+- **Um banco novo não tem a versão anterior** (§3.0). A ficha antiga do roteiro é criada antes da `0025` (§11.a).
 - **E2E com texto repetido.** "Notas do Narrador" no `help` quebraria três specs. "História" e "Histórico" são diferentes, e os seletores usam `exact`.
 - **Leitor de tela e texto longo.** O bloco do `TextLayout` é um elemento acessível só, com o texto inteiro no nome (`TextLayout.tsx:39-46`). Com 3.700 caracteres, o VoiceOver e o TalkBack leem tudo de uma vez, sem parar por parágrafo. Isso já vale para as Notas. É pergunta técnica para o P13, que mexe no `TextLayout` (§9.2, pergunta 4).
 
@@ -481,7 +481,7 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição A2 d
 ### 8.5 Arquivos tocados
 
 - **Templates:** `design/templates/vtm-v20.json`, `design/templates/mta-m20.json`, `design/templates/wta-w20.json`, `design/templates/README.md` (§4), `design/telas/dados.js` (gerado).
-- **Banco:** `packages/db/src/migrations/0024_templates_onda5.ts` (novo), `packages/db/src/migrations.ts`, `packages/db/src/__tests__/migrations.test.ts`.
+- **Banco:** `packages/db/src/migrations/0025_templates_onda5.ts` (novo), `packages/db/src/migrations.ts`, `packages/db/src/__tests__/migrations.test.ts`.
 - **Core (só testes):** `packages/sheet-core/src/__tests__/permissions.test.ts`, `packages/sheet-core/src/__tests__/compile.test.ts`.
 - **API (só testes):** `apps/api/src/test/matrix-systems.ts`, `apps/api/src/__tests__/authz.test.ts`, `apps/api/src/__tests__/events.test.ts`, `apps/api/src/__tests__/characters.test.ts`, `apps/api/src/__tests__/mage.test.ts`, `apps/api/src/__tests__/werewolf.test.ts`, `apps/api/src/templates/__tests__/publish.test.ts` (e `backstage.test.ts`, se o caso do NPC ficar lá).
 - **App:** `apps/frontend/sheet/storyteller/privacy.ts`, `apps/frontend/sheet/storyteller/StorytellerBar.tsx`, `apps/frontend/sheet/evolve/TextEditorRow.tsx`, `apps/frontend/sheet/__tests__/storyteller.test.tsx`, `apps/frontend/sheet/__tests__/SheetView.test.tsx`, um teste do `TextEditorRow` em `apps/frontend/sheet/__tests__/`.
@@ -503,18 +503,77 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição A2 d
 
 1. **O tamanho: 8000 ou 4000?** 8000 dá folga ao prelúdio e cabe no lote. 4000 é o limite das Notas e deixa a Mesa menor. Proposta: 8000.
 2. **O commit de versão** fica no fim da branch do P15-D (proposto) ou no do P16-D, se ele mudar template (§3.7)? Depende do plano do P16-D.
-3. **A validação dentro da migration** (onda-4 §11, pergunta 3) segue para decisão. A `0024` repete a `0023`. Não é resolvida aqui.
+3. **A validação dentro da migration** (onda-4 §11, pergunta 3) segue para decisão. A `0025` repete a `0023`. Não é resolvida aqui.
 4. ⚙ **O texto longo no leitor de tela:** o bloco do `TextLayout` como um elemento só, com o texto inteiro no nome, ou o rótulo como elemento e o texto à parte, para o VoiceOver e o TalkBack lerem por linha? O `TextLayout` é do P13 nesta onda.
 5. **Uma marca na legenda da Leitura** ("História / Prelúdio · o jogador lê"), além do aviso no editor? Proposta: não, para não marcar todo texto que o dono lê.
 6. **Provar que o app da onda 4 abre a 1.10.0:** um teste automático pediria o core do `05c5d7d` no repositório. Proposta: a conferência manual com o bundle web do `05c5d7d` (§11, U-10i), opcional, e o argumento da §3.1 (nenhuma chave nova).
 
 ### 9.3 Para o usuário
 
-1. **Como a onda 4 foi à produção:** o app nativo foi à loja antes ou depois do deploy da API com a `0023`? Há app nativo na loja? A resposta não está no repositório e decide se a `0024` vai no deploy da API ou espera a loja (onda-4 §6, ponto 3).
+1. **Como a onda 4 foi à produção:** o app nativo foi à loja antes ou depois do deploy da API com a `0023`? Há app nativo na loja? A resposta não está no repositório e decide se a `0025` vai no deploy da API ou espera a loja (onda-4 §6, ponto 3).
 
 ## 10. Desvios
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
+
+Implementação em 05 e 06/11/2026, na `pacote/p15-d-historia-personagem`, a partir da `5da45b2` (a onda com as respostas do usuário), em paralelo com o P13 e os outros pacotes, cada um no seu worktree.
+
+**Respostas do usuário aplicadas** ([onda-5.md](onda-5.md) §6):
+
+- **D-16: saída A, os dois escrevem.** A seção `backstory` tem só `read: ["owner", "storyteller"]`, sem `write`.
+- **Ordem do release: não há app nativo na loja.** A `0025` vai no deploy da API.
+- **As fichas antigas: saída 1** (§3.6), a recomendação. A ficha antiga não ganha o campo.
+- Os outros pontos (§9.1, pontos 3 e 4; §9.2) seguiram a recomendação deste plano. Nada foi decidido aqui:
+  - os nomes "História" e "História / Prelúdio";
+  - a História do NPC só com o narrador;
+  - 8000 de tamanho;
+  - sem marca na legenda da Leitura.
+
+**Depende do P13 (o rebase é do orquestrador):**
+
+1. **Ninguém edita a História pela tela nesta branch sozinha.** O `TextLayout` não desenha editor (é o T-84), e a História não é "só do narrador", então não ganha botão na barra. Na branch, o campo só se escreve pela API, e é assim que a matriz de AuthZ o prova.
+   - **O ponto de encaixe:** o aviso "O jogador lê este texto." já está no `TextEditorRow` (`editorNotice`, em `sheet/storyteller/privacy.ts`). O T-84 só precisa desenhar o `TextEditorRow` (ou o editor que ele escolher) para a seção `text` no Editar e na Criação, com o `testID` `editor-<campo>` de hoje.
+   - Se o P13 usar outro editor, ele chama o mesmo `editorNotice(model, id, roles, npc)`.
+2. **O segundo teste do `e2e/tests/backstory.spec.ts`** ("a narradora e a dona editam a História pelo Editar") falha sem o T-84: o `editor-backstory` não existe no Sobre. Ele roda na integração, depois do merge do P13. O primeiro teste não depende do P13.
+3. **O `privacy.ts`, o `TextEditorRow.tsx` e o `StorytellerBar.tsx`** também são tocados pelo P13 (`barEdits`) e pelo P16-D. O aviso está numa função à parte (`editorNotice`) para o rebase ficar textual.
+
+**Desvios de desenho:**
+
+4. **O NPC não recebe "O jogador lê este texto.".**
+   - O plano diz "quando quem edita é o narrador, e não o dono". No NPC, o narrador tem só o papel `storyteller` (`authz.ts`), e não há jogador dono, então a frase seria falsa.
+   - O store da ficha ganhou `npc` (de `character.kind`, no `SheetScreen`), usado só para o texto.
+   - O aviso de privado das Notas continua no NPC, como hoje.
+   - Os stores montados fora do `SheetScreen` (a Mesa, as prévias) ficam com `npc: false`. Hoje nenhum deles desenha editor de texto.
+5. **O aviso vale para todo texto que o dono lê, quando o narrador edita.** Isso inclui a Citação, as Notas do jogador e os textos da identidade no Editar do narrador, como o §3.3 previu.
+   - No app, a dica junta o aviso, o erro e a ajuda do template.
+   - No web, o `aria-describedby` aponta só o aviso: a ajuda continua visível abaixo do campo, e o erro sai como `alert`.
+6. **O `help` do campo ficou "A história do personagem antes da crônica.",** sem "O jogador e o narrador leem." (achado do `/code-review`). A segunda frase repetia o aviso do editor no leitor de tela e era falsa no NPC. O §3.1 traz o rascunho anterior.
+7. **Onde ficaram os testes U-10e e U-10f:**
+   - ficaram no `authz.test.ts`, num describe "U-10" por sistema, e não no `events.test.ts`, para valerem nos três sistemas com o cenário da matriz;
+   - a marca `SHARED` entrou no `check` de todas as linhas da matriz: nenhum ator além do narrador e do dono a recebe, em nenhuma rota;
+   - o U-10d (NPC revelado) também ficou lá.
+8. **O `SheetView.test.tsx`** mudou no commit 1, e não no 3: a seção nova quebrava o `expectEveryField` assim que o template mudou.
+9. **O commit de versão também levou o `doc/planos-pacotes/P10-D-frases.json` e o `.md`.** O `help-phrases.test.ts` confere a versão da lista contra a do template, como no commit de versão da onda 4 (`9d1dcb2`).
+10. **A ordem dos commits:** o `fix` do `/code-review` muda o conteúdo dos templates, por isso foi posto antes do commit de versão, que continua o último da branch. A ordem foi refeita com `cherry-pick`, e o conteúdo final é o mesmo.
+11. **A migration é a `0025`, e não a `0024`** (pedido do orquestrador, 06/11). O P13 entra antes na onda, com a `0024_character_events_to_absent` (schema), e o Migrator não aceita migration fora de ordem. A troca é o commit `fix(db): a migration dos templates vira 0025 (ordem da onda)`, logo depois do commit de versão.
+    - O teste da `0025` desce até a migration anterior pela lista de arquivos: a `0023` nesta branch, e a `0024` do P13 depois do rebase.
+    - O caso "descer a 0023" espera tudo o que vem depois da `0022`, também pela lista.
+    - O `tms_p15d` não existia no Postgres local: não havia o que recriar.
+
+**Revisões:**
+
+- **`/security-review`:** nenhum achado com confiança alta ou média.
+- **`/code-review` (high):** 9 achados.
+  - Corrigidos no `fix(templates): a ajuda da História sem repetir quem lê`:
+    - o `help` que repetia quem lê;
+    - o comentário do `aria-describedby`, que prometia mais do que o web faz;
+    - o `npc` do `SheetScreen`, que agora usa o `kind` local.
+  - Registrados, sem mudar:
+    - a edição pela tela e o segundo E2E dependem do T-84 (itens 1 e 2);
+    - o espalhamento da dica repetido entre o `TextEditor` e o `TextEditorRow` (um `noteA11y` comum cabe no rebase com o P13, que mexe nos dois);
+    - o E2E da outra jogadora prova o 404 da ficha, e não a permissão da seção (a seção é provada na matriz da API, com o `viewer` de NPC revelado);
+    - o `npc` fora do `SheetScreen` (item 4);
+    - o `previousOf` do teste da `0025` supõe minor maior que 0, como o da `0023`.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
@@ -522,20 +581,20 @@ Roteiro para conferir o U-10 na interface, nas três plataformas, com a API loca
 
 ### 11.a Preparação
 
-1. **Banco do pacote, com uma ficha na versão anterior.** Um banco novo só tem a versão de hoje dos arquivos (§3.0). Por isso a ficha antiga nasce antes da `0024`:
+1. **Banco do pacote, com uma ficha na versão anterior.** Um banco novo só tem a versão de hoje dos arquivos (§3.0). Por isso a ficha antiga nasce antes da `0025`:
    - `createdb tms_p15d` no Postgres local (credenciais do `docker-compose.yml`). **Sem `db:down`:** o Postgres do Docker é um só para todos os worktrees;
    - **num worktree na ponta da onda, sem o P15-D** (antes do merge dele): `DATABASE_URL=…/tms_p15d npx pnpm db:migrate`, até a `0023`. Conferir pela tabela `kysely_migration`, porque o `db:migrate` pode travar na saída. O banco fica com `vtm-v20` 1.9.0, `mta-m20` 1.7.0 e `wta-w20` 1.7.0;
    - ainda nesse worktree e nesse banco: `npx pnpm seed:roteiro --fichas-criacao > <scratchpad>/p15d/seed.log 2>&1`. Ler só com `grep -v -i senha`;
    - pela tela (web, script Playwright), J1 cria, em cada crônica "v3/v5" (criação livre), uma ficha só com o nome e a conclui: **"Antiga Mago R"**, **"Antiga Vampiro R"** e **"Antiga Lobisomem R"**. N escreve nas Notas do Narrador da "Antiga Mago R" um texto fictício em ASCII com a marca `SEGREDO-P15D-ANTIGA`. São as fichas da versão anterior, como a do U-10;
-   - **no worktree do P15-D** (depois do commit 5): `npx pnpm build`, `DATABASE_URL=…/tms_p15d npx pnpm db:migrate`, e conferir na `kysely_migration` a `0024_templates_onda5`. Em `trait_templates`, as duas versões de cada sistema;
+   - **no worktree do P15-D** (depois do commit 5): `npx pnpm build`, `DATABASE_URL=…/tms_p15d npx pnpm db:migrate`, e conferir na `kysely_migration` a `0025_templates_onda5`. Em `trait_templates`, as duas versões de cada sistema;
    - **na integração**, o mesmo, no banco da onda: a ficha antiga é criada antes do merge do P15-D, e o `db:migrate` roda depois.
 2. **API e Metro:** `npx pnpm dev:api` (3001) e `cd apps/frontend && npx expo start` (8081), com `--clear`.
 3. **O seed:**
    - **contas:** N (`roteiro_narrador`), J1 (`roteiro_jogador1`), J2 (`roteiro_jogador2`) e N2, todas `@roteiro.test`. A senha é a constante do `scripts/seed-roteiro.ts` e não é escrita aqui nem nas evidências; os scripts de login a leem em tempo de execução;
-   - **um seed só,** antes da `0024`, para as três plataformas. Rodar o seed de novo depois da `0024` apagaria as fichas antigas (sem `--keep`). Este roteiro **não gera convite**, então o limite de aceites não pesa;
+   - **um seed só,** antes da `0025`, para as três plataformas. Rodar o seed de novo depois da `0025` apagaria as fichas antigas (sem `--keep`). Este roteiro **não gera convite**, então o limite de aceites não pesa;
    - **o que o seed já cobre:** as crônicas "Vampiro/Mago/Lobisomem v3/v5" e "v4", com J1 e J2 dentro; com o `--fichas-criacao`, as fichas de J1 da onda 3 (na versão anterior, também úteis lado a lado);
    - **o que o seed não tem, e o roteiro cria pela tela:** as fichas antigas (acima); as fichas novas de cada plataforma (abaixo); as Notas do Narrador com texto; a História com texto longo. **O seed não muda** neste pacote.
-4. **Fichas novas** (versão nova, depois da `0024`), criadas por J1 em "Mago v3/v5" e concluídas: **"Historia Web R"**, **"Historia Android R"** e **"Historia iOS R"**, sem acento por causa do `adb input text` e do idb. No web, também **"Historia Vampiro R"** e **"Historia Lobisomem R"** nas crônicas desses sistemas.
+4. **Fichas novas** (versão nova, depois da `0025`), criadas por J1 em "Mago v3/v5" e concluídas: **"Historia Web R"**, **"Historia Android R"** e **"Historia iOS R"**, sem acento por causa do `adb input text` e do idb. No web, também **"Historia Vampiro R"** e **"Historia Lobisomem R"** nas crônicas desses sistemas.
 5. **O texto longo:** cerca de 3.700 caracteres fictícios, montados no script repetindo uma frase neutra do time ("Texto de teste do roteiro, sem conteúdo de jogo.") e terminados por uma marca `FIM-P15D`. É escrito pelo N no web (`fill()` do Playwright) na "Historia Android R" e na "Historia iOS R". O U-10 é o narrador escrevendo e o jogador lendo: a leitura é o que precisa do Android.
 6. **Evidências:** no scratchpad, `p15d-<plataforma>-<ID>-<passo>.png`. Sem e-mail na captura. Nenhum código de convite em lugar nenhum.
 
