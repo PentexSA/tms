@@ -23,13 +23,17 @@ import { usePullRefresh, useRefetchOnFocus } from '../../lib/queries/focus'
 /**
  * "Narrador: ana · 2 personagens · Última sessão: 01/11 · Convite para
  * narrar". A última sessão é data civil (U-04); a proposta, só para quem a
- * recebeu (U-03).
+ * recebeu (U-03). Para o narrador, "2 fichas em criação" (a vez do jogador,
+ * P09-D) antes de "1 ficha aguarda revisão" (a vez dele): as duas contagens
+ * não se sobrepõem, e só ele as recebe.
  */
 function chronicleMeta(item: {
   readonly role: 'storyteller' | 'player' | 'former'
   readonly storyteller: { readonly username: string }
   readonly characterCount: number
   readonly pendingReview: number
+  // Ausente na API antiga: vale como 0
+  readonly creatingCount?: number
   readonly lastSession?: string | null
   readonly transferOffer?: unknown
 }) {
@@ -43,6 +47,9 @@ function chronicleMeta(item: {
         ? 'Você saiu'
         : `Narrador: ${item.storyteller.username}`,
     plural(item.characterCount, 'personagem', 'personagens'),
+    item.role === 'storyteller' && item.creatingCount
+      ? `${plural(item.creatingCount, 'ficha', 'fichas')} em criação`
+      : null,
     item.pendingReview
       ? `${plural(item.pendingReview, 'ficha aguarda', 'fichas aguardam')} revisão`
       : null,

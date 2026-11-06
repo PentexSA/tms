@@ -161,6 +161,78 @@ describe('Crônicas (lista)', () => {
     }
   })
 
+  // P09-D (R-15): o narrador vê quantas fichas estão em criação, antes das
+  // que aguardam revisão; o jogador não vê nenhuma das duas
+  it('"2 fichas em criação · 1 ficha aguarda revisão" só para o narrador', async () => {
+    const OTHER = '00000000-0000-4000-8000-0000000000c2'
+    calls.chroniclesGet.mockResolvedValue(
+      ok([
+        {
+          id: CHRONICLE_ID,
+          name: 'Crônica da Liberdade',
+          system: VTM,
+          role: 'storyteller',
+          storyteller: { username: 'ana' },
+          characterCount: 6,
+          creatingCount: 2,
+          pendingReview: 1,
+        },
+        {
+          id: OTHER,
+          name: 'Crônica da Bia',
+          system: VTM,
+          role: 'player',
+          storyteller: { username: 'bia' },
+          characterCount: 1,
+          // Mesmo que a resposta trouxesse um número, o jogador não o lê
+          creatingCount: 3,
+          pendingReview: 0,
+        },
+      ])
+    )
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: `Crônica da Liberdade, ${VTM.name}, Você narra · 6 personagens · 2 fichas em criação · 1 ficha aguarda revisão`,
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: `Crônica da Bia, ${VTM.name}, Narrador: bia · 1 personagem`,
+      })
+    ).toBeTruthy()
+  })
+
+  it('"1 ficha em criação" no singular; sem o campo (API antiga), nada', async () => {
+    const base = {
+      id: CHRONICLE_ID,
+      name: 'Crônica da Liberdade',
+      system: VTM,
+      role: 'storyteller',
+      storyteller: { username: 'ana' },
+      characterCount: 2,
+      pendingReview: 0,
+    }
+    calls.chroniclesGet.mockResolvedValue(ok([{ ...base, creatingCount: 1 }]))
+    const { unmount } = renderWithSession(
+      <ChroniclesScreen />,
+      await signedIn()
+    )
+    expect(
+      await screen.findByRole('button', {
+        name: `Crônica da Liberdade, ${VTM.name}, Você narra · 2 personagens · 1 ficha em criação`,
+      })
+    ).toBeTruthy()
+    unmount()
+    calls.chroniclesGet.mockResolvedValue(ok([base]))
+    renderWithSession(<ChroniclesScreen />, await signedIn())
+    expect(
+      await screen.findByRole('button', {
+        name: `Crônica da Liberdade, ${VTM.name}, Você narra · 2 personagens`,
+      })
+    ).toBeTruthy()
+  })
+
   it('mostra a última sessão como data civil, sem fuso (U-04)', async () => {
     calls.chroniclesGet.mockResolvedValue(
       ok([
