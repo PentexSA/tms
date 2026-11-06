@@ -1,7 +1,6 @@
 import {
   type ActionPlan,
   describe,
-  describeBatch,
   IMPLEMENTED_EFFECTS,
   planAction,
   type ResolvedResource,
@@ -15,7 +14,7 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector, useSheetStore } from '../../context'
 import { ActionPreview } from '../../play/ActionPreview'
-import { eventTo, useEditable } from '../../play/editable'
+import { changeLabel, eventTo, useEditable } from '../../play/editable'
 import { haptics } from '../../play/haptics'
 import { useCommit } from '../../useCommit'
 import type { FieldViewProps } from '../types'
@@ -45,8 +44,9 @@ export function ResourceSheet({ resolved, sheet }: FieldViewProps) {
   > | null>(null)
 
   const change = (to: ResourceValue) => {
-    const events = [eventTo(store.getState().values, r.id, to)]
-    const result = commit(events, describeBatch(model, events))
+    const values = store.getState().values
+    const events = [eventTo(values, r.id, to)]
+    const result = commit(events, changeLabel(model, values, events))
     if (result.ok) haptics.selection()
   }
   const base = stored(r, sheet) as ResourceValue

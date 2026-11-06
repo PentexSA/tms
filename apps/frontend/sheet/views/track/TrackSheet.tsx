@@ -1,6 +1,5 @@
 import {
   describe,
-  describeBatch,
   fmtPenalty,
   planDamage,
   plural,
@@ -22,7 +21,7 @@ import {
 } from '@tms/ui'
 import { StyleSheet, View } from 'react-native'
 import { useSheet, useSheetStore } from '../../context'
-import { eventTo, useEditable } from '../../play/editable'
+import { changeLabel, eventTo, useEditable } from '../../play/editable'
 import { haptics } from '../../play/haptics'
 import { useCommit } from '../../useCommit'
 import type { FieldViewProps } from '../types'
@@ -143,10 +142,10 @@ function BoxesSheet({
     const current = stored(r, sheet) as Record<string, boolean[]>
     const marks = [...(current[rowId] ?? [])]
     marks[index] = !marks[index]
-    const events = [
-      eventTo(store.getState().values, r.id, { ...current, [rowId]: marks }),
-    ]
-    if (commit(events, describeBatch(model, events)).ok) haptics.selection()
+    const values = store.getState().values
+    const events = [eventTo(values, r.id, { ...current, [rowId]: marks })]
+    if (commit(events, changeLabel(model, values, events)).ok)
+      haptics.selection()
   }
   return (
     <View style={styles.box}>

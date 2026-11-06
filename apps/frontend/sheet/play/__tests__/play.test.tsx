@@ -385,6 +385,22 @@ describe('sheet do Sangue', () => {
     expect(screen.getByText('Gasto máximo por turno: 3')).toBeTruthy()
   })
 
+  it('ficha nova (Sangue no padrão): "Gastar 1" diz o efetivo, e o "Desfazer" também (T-53)', () => {
+    // Sem Sangue guardado: o padrão da 13ª geração, 10
+    const { batches } = setup({ values: { name: 'Nova' }, specialties: {} })
+    fireEvent.press(screen.getByTestId('dock-blood'))
+    fireEvent.press(screen.getByRole('button', { name: 'Gastar 1' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
+    expect(batches().map(b => b.label)).toEqual([
+      'Sangue 10 → 9',
+      'Desfeito: Sangue 10 → 9',
+    ])
+    // O lote leva o `from` cru, que o conflito compara
+    expect(batches()[0]?.events).toEqual([
+      { path: 'values.blood', from: null, to: { current: 9 } },
+    ])
+  })
+
   it('FdV: o permanente só muda em Editar', () => {
     setup(helena())
     fireEvent.press(screen.getByTestId('dock-willpower'))

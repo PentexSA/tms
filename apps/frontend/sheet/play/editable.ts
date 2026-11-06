@@ -1,10 +1,13 @@
 import {
   type ActionPlan,
   canWrite,
+  describeBatch,
   type FieldId,
   isEditableIn,
   type SheetData,
   type SheetEvent,
+  type SheetModel,
+  withEffectiveFrom,
 } from '@tms/sheet-core'
 import { useSheet } from '../context'
 import { blockedBy, blockedNote, useLifecycle } from '../policy'
@@ -66,3 +69,15 @@ export function planLabel(plan: Extract<ActionPlan, { ok: true }>): string {
     ? plan.label
     : `${only.label} ${only.change}`
 }
+
+/**
+ * O texto do aviso de um lote do Jogo com o "de" efetivo ("Sangue 10 → 9"),
+ * como a prévia (T-53). Sem valor guardado, o "de" é o padrão que a pessoa
+ * via. Só para mostrar: o lote enviado leva o `from` cru, que é o que o
+ * conflito compara.
+ */
+export const changeLabel = (
+  model: SheetModel,
+  values: SheetData,
+  events: readonly SheetEvent[]
+): string => describeBatch(model, withEffectiveFrom(model, values, events))
