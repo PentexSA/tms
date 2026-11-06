@@ -367,6 +367,64 @@ for (const system of MATRIX_SYSTEMS) {
         .where('id', '=', points)
         .execute()
     })
+
+    // P09-D (R-15): "N fichas em criação" na lista só para o narrador; o NPC
+    // (oculto ou revelado) nunca entra, e quem o lê como viewer recebe 0
+    it('a lista de crônicas: creatingCount só para o narrador, sem NPC', async () => {
+      const countOf = async (actor: Exclude<Actor, 'anonymous'>) => {
+        const res = await as(
+          shared.ctx,
+          shared.users[actor],
+          'GET',
+          '/chronicles'
+        )
+        expect(res.status).toBe(200)
+        const rows = (await res.json()) as {
+          id: string
+          creatingCount: number
+        }[]
+        return rows.find(r => r.id === shared.chronicleId)?.creatingCount
+      }
+      // As linhas da matriz que criam ficha mudam o cenário: a prova é a
+      // diferença. Uma ficha nova de jogador conta; o NPC, não
+      const base = await countOf('storyteller')
+      expect(base).toBeGreaterThanOrEqual(1)
+      const extra = await createCharacter(
+        shared.ctx,
+        shared.users.player,
+        shared.chronicleId,
+        { name: 'Mais uma' }
+      )
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      for (const actor of ['owner', 'player', 'former'] as const)
+        expect(await countOf(actor)).toBe(0)
+      for (const actor of ['otherStoryteller', 'stranger'] as const)
+        expect(await countOf(actor)).toBeUndefined()
+      const revealed = await createCharacter(
+        shared.ctx,
+        shared.users.storyteller,
+        shared.chronicleId,
+        { name: 'NPC revelado' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility: 'full' })
+        .where('id', '=', revealed)
+        .execute()
+      const seen = await as(
+        shared.ctx,
+        shared.users.player,
+        'GET',
+        `/characters/${revealed}`
+      )
+      expect(await seen.json()).toMatchObject({ roles: ['viewer'] })
+      expect(await countOf('player')).toBe(0)
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', 'in', [revealed, extra])
+        .execute()
+    })
   })
 
   describe(`matriz de AuthZ: ${system}, linhas que mudam o estado`, () => {

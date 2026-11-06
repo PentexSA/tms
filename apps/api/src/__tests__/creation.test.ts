@@ -1721,6 +1721,71 @@ describe('estado da ficha na lista, na Mesa, no Histórico e na contagem', () =>
     expect(await pendingReview(storyteller)).toBe(1)
   })
 
+  // P09-D (R-15): a contagem das fichas em criação, na vez do jogador
+  it('a contagem de fichas em criação: só PCs de outras pessoas, sem o "terminei", só para o narrador', async () => {
+    const counts = async (user: TestUser, id = chronicleId) => {
+      const rows = (await (
+        await as(ctx, user, 'GET', '/chronicles')
+      ).json()) as {
+        id: string
+        creatingCount: number
+        pendingReview: number
+      }[]
+      return rows.find(r => r.id === id)
+    }
+    expect((await counts(storyteller))?.creatingCount).toBe(0)
+    await character({ name: 'Montando' })
+    const free = await character({ name: 'Livre' })
+    await freeCreation(ctx, free)
+    expect((await counts(storyteller))?.creatingCount).toBe(2)
+    // O "terminei" sai desta conta e entra na de revisão
+    expect((await ready(free)).status).toBe(200)
+    expect(await counts(storyteller)).toMatchObject({
+      creatingCount: 1,
+      pendingReview: 1,
+    })
+    // Não contam: NPC oculto ou revelado, a ficha do próprio narrador, a
+    // enviada, a ativa, a excluída e a de outra crônica
+    for (const visibility of ['hidden', 'identity'] as const) {
+      const npc = await createCharacter(ctx, storyteller, chronicleId, {
+        name: `NPC ${visibility}`,
+      })
+      await ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility })
+        .where('id', '=', npc)
+        .execute()
+    }
+    await createCharacter(ctx, storyteller, chronicleId, { name: 'Própria' })
+    const sent = await character({ name: 'Enviada' })
+    await setStatus(ctx, sent, 'pending')
+    const active = await character({ name: 'Ativa' })
+    await setStatus(ctx, active, 'active')
+    const deleted = await character({ name: 'Excluída' })
+    await ctx.db
+      .updateTable('characters')
+      .set({ deleted_at: new Date() })
+      .where('id', '=', deleted)
+      .execute()
+    const other = await createChronicle(ctx, storyteller, 'acct-teste', 'Outra')
+    await addMember(ctx, other, player)
+    await createCharacter(ctx, player, other, { name: 'Na outra' })
+    expect((await counts(storyteller))?.creatingCount).toBe(1)
+    expect((await counts(storyteller, other))?.creatingCount).toBe(1)
+    // Quem não narra recebe 0: a dona, o outro jogador, o ex-membro e o
+    // narrador de outra crônica (que não tem a linha)
+    expect((await counts(owner))?.creatingCount).toBe(0)
+    expect((await counts(player))?.creatingCount).toBe(0)
+    await ctx.db
+      .deleteFrom('chronicle_members')
+      .where('user_id', '=', owner.id)
+      .execute()
+    expect(await counts(owner)).toMatchObject({ creatingCount: 0 })
+    const stranger = await createUser(ctx, 'outra-narradora')
+    await createChronicle(ctx, stranger, 'acct-teste', 'Dela')
+    expect(await counts(stranger)).toBeUndefined()
+  })
+
   it('o Histórico mostra enviar, devolver, pedir ajuste e avisar, sem o motivo (R-12)', async () => {
     const secret = 'motivo-do-historico-71'
     const tick = () => ctx.clock.advance(1000)

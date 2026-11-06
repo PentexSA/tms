@@ -380,6 +380,22 @@ export function chronicleRoutes(
             )
             .where('c.storyteller_id', '=', me)
             .as('pendingReview'),
+          // P09-D (R-15): os PCs de outras pessoas ainda em criação, na vez
+          // do jogador (sem o "terminei", que já está no pendingReview). O
+          // NPC fica fora, oculto ou não. Só o narrador recebe a conta
+          eb
+            .selectFrom('characters as ch')
+            .select(eb.fn.countAll<string>().as('n'))
+            .whereRef('ch.chronicle_id', '=', 'c.id')
+            .where('ch.deleted_at', 'is', null)
+            .where('ch.kind', '=', 'pc')
+            .where('ch.user_id', '<>', me)
+            .where('ch.status', '=', 'creating')
+            .where(
+              sql<boolean>`jsonb_typeof(ch.creation -> 'ready' -> 'at') is distinct from 'string'`
+            )
+            .where('c.storyteller_id', '=', me)
+            .as('creatingCount'),
           // A data civil da última sessão (U-04), no formato do sessionDate.
           // O índice chronicle_sessions_recent_idx atende
           eb
@@ -409,6 +425,7 @@ export function chronicleRoutes(
           storyteller: { username: r.storyteller },
           characterCount: Number(r.characterCount ?? 0),
           pendingReview: Number(r.pendingReview ?? 0),
+          creatingCount: Number(r.creatingCount ?? 0),
           // Só narrador e membro: o ex-membro não acompanha a crônica
           // (plano v5 §3.5)
           lastSession: role === 'former' ? null : (r.lastSession ?? null),
