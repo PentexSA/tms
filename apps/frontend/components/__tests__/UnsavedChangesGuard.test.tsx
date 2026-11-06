@@ -225,4 +225,48 @@ describe('UnsavedChangesGuard', () => {
     expect(repeat).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Sair sem salvar?')).toBeNull()
   })
+
+  // O usePreventRemove avisa (LogBox) quando o repeat roda e a prop segue
+  // verdadeira: a ficha recém-criada sai com o rascunho ainda "sujo"
+  it('com allowLeave, a prevenção desliga junto com o repeat', () => {
+    const { leave, prevents } = setup({ allowLeave: { current: true } })
+    expect(prevents()).toBe(true)
+    leave()
+    expect(prevents()).toBe(false)
+  })
+
+  it('"Salvar e sair" com o rascunho ainda pendente: sai sem prevenção', async () => {
+    const { leave, repeat, prevents } = setup({ onSave: () => ({ ok: true }) })
+    leave()
+    fireEvent.press(screen.getByRole('button', { name: 'Salvar e sair' }))
+    await sheetsDismissed()
+    expect(repeat).toHaveBeenCalledTimes(1)
+    // `when` continua verdadeiro (a gravação ainda vai ao servidor)
+    expect(prevents()).toBe(false)
+  })
+
+  it('liberada a saída, uma alteração nova volta a proteger', () => {
+    const hook = jest.mocked(usePreventRemove)
+    const view = (when: boolean) => (
+      <ThemeProvider>
+        <UnsavedChangesGuard
+          when={when}
+          message="1 alteração se perde."
+          allowLeave={{ current: true }}
+        />
+      </ThemeProvider>
+    )
+    const { rerender } = render(view(true))
+    const last = () => hook.mock.calls[hook.mock.calls.length - 1]
+    act(() =>
+      last()?.[1]?.({
+        data: { action: { type: 'GO_BACK' } },
+        repeat: jest.fn(),
+      } as never)
+    )
+    expect(last()?.[0]).toBe(false)
+    rerender(view(false))
+    rerender(view(true))
+    expect(last()?.[0]).toBe(true)
+  })
 })
