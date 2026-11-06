@@ -1,9 +1,9 @@
 import {
+  costOf,
   type FieldId,
   type SheetData,
   type SheetModel,
   type XpTarget,
-  xpTargetKey,
 } from '@tms/sheet-core'
 import { createContext, useContext, useMemo } from 'react'
 import { xpCandidates } from './candidates'
@@ -39,16 +39,14 @@ export function useXpShortcutValue(
 ): XpShortcut | null {
   return useMemo(() => {
     if (!enabled || !model || !sheet) return null
-    // Só o que tem custo agora: no máximo ou sem pré-requisito, o atalho
-    // levaria a um pedido que o servidor recusa
-    const candidates = xpCandidates(model, sheet).filter(c => c.cost.ok)
-    const keys = new Set(candidates.map(c => c.key))
-    const fields = new Set(candidates.map(c => c.target.field))
+    // Sob demanda: só o alvo do editor que mostra a nota, nunca a lista
+    // inteira a cada ficha nova do Jogo. Só o que tem custo agora (no
+    // máximo ou sem pré-requisito, o servidor recusaria)
     return {
       offers: to =>
         'target' in to
-          ? keys.has(xpTargetKey(to.target))
-          : fields.has(to.field),
+          ? costOf(model, sheet, to.target).ok
+          : xpCandidates(model, sheet, to.field).some(c => c.cost.ok),
       open,
     }
   }, [enabled, model, sheet, open])

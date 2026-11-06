@@ -28,7 +28,9 @@ const itemsOf = (sheet: SheetData, id: string): ListItem[] => {
 
 export function xpCandidates(
   model: SheetModel,
-  sheet: SheetData
+  sheet: SheetData,
+  // Só os de um campo (o atalho de uma lista, U-01), sem calcular o resto
+  only?: string
 ): XpCandidate[] {
   const rules = model.template.costs?.xp?.rules ?? []
   const out: XpCandidate[] = []
@@ -41,6 +43,7 @@ export function xpCandidates(
     })
   for (const rule of rules)
     for (const id of rule.targets) {
+      if (only !== undefined && id !== only) continue
       const def = model.fields.get(id)?.def
       if (!def) continue
       if (def.type !== 'list') {
