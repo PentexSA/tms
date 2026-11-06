@@ -766,6 +766,7 @@ describe('migrations', () => {
         const down = await migrator.migrateTo('0022_user_commands')
         expect(down.error).toBeUndefined()
         expect(down.results?.map(r => r.migrationName)).toEqual([
+          '0025_character_reveal',
           '0023_templates_onda4',
         ])
         expect(await versions(db)).toEqual(before)
@@ -946,6 +947,87 @@ describe('migrations', () => {
         .select('user_id')
         .execute()
       expect(left).toEqual([{ user_id: b.id }])
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0025: a ficha nasce privada; NPC e mais de 8 seções são recusados; desce e sobe', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect(
+        (await migrator.migrateTo('0023_templates_onda4')).error
+      ).toBeUndefined()
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'u', email: 'u@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'sistema-teste', name: 'Teste' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const insert = (name: string, kind: 'pc' | 'npc') =>
+        db
+          .insertInto('characters')
+          .values({
+            name,
+            kind,
+            chronicle_id: chronicle.id,
+            system_id: system.id,
+            user_id: user.id,
+            template_version: '1.0.0',
+            sheet_data: JSON.stringify({ values: { name } }),
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      // Uma ficha de antes da 0025
+      const old = await insert('antiga', 'pc')
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
+      const npc = await insert('npc', 'npc')
+      const pc = await insert('nova', 'pc')
+      const rows = await db
+        .selectFrom('characters')
+        .select(['id', 'revealed_sections', 'reveal_revision'])
+        .orderBy('name')
+        .execute()
+      for (const row of rows) {
+        expect(row.revealed_sections).toEqual([])
+        expect(row.reveal_revision).toBe(0)
+      }
+      expect(rows.map(r => r.id).sort()).toEqual([old.id, npc.id, pc.id].sort())
+      const reveal = (id: string, sections: string[]) =>
+        db
+          .updateTable('characters')
+          .set({ revealed_sections: sections })
+          .where('id', '=', id)
+          .execute()
+      await reveal(pc.id, ['storyteller'])
+      await expect(reveal(npc.id, ['storyteller'])).rejects.toThrow()
+      await expect(
+        reveal(
+          pc.id,
+          Array.from({ length: 9 }, (_, i) => `s${i}`)
+        )
+      ).rejects.toThrow()
+
+      const down = await migrator.migrateTo('0023_templates_onda4')
+      expect(down.error).toBeUndefined()
+      const { rows: columns } = await sql<{ column_name: string }>`
+        select column_name from information_schema.columns
+        where table_name = 'characters'
+          and column_name in ('revealed_sections', 'reveal_revision')`.execute(
+        db
+      )
+      expect(columns).toEqual([])
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
     } finally {
       await destroy()
     }
