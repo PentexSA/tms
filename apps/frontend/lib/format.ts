@@ -52,13 +52,15 @@ export const excerpt = (text: string, max: number): string => {
   const points = Array.from(trimmed)
   if (points.length <= max) return trimmed
   const head = points.slice(0, max)
-  // O último espaço antes do limite, se ele não deixar o trecho vazio
+  // O limite cai num espaço: a última palavra está inteira, e o corte é ali.
+  // Senão, o último espaço antes do limite, se ele não deixar o trecho vazio
   let cut = head.length
-  for (let i = head.length - 1; i > 0; i--)
-    if (/\s/.test(head[i] ?? '')) {
-      cut = i
-      break
-    }
+  if (points[max] !== ' ')
+    for (let i = head.length - 1; i > 0; i--)
+      if (head[i] === ' ') {
+        cut = i
+        break
+      }
   return `${head.slice(0, cut).join('').trimEnd()}…`
 }
 

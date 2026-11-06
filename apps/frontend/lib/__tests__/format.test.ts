@@ -21,6 +21,11 @@ describe('excerpt', () => {
     expect(excerpt(`alfa\n\n\n\n${'beta '.repeat(5)}`, 12)).toBe('alfa beta…')
   })
 
+  it('should keep the last word when the limit falls right before a space', () => {
+    // "alfa beta" tem 9 pontos, e o 10º é espaço: a palavra está inteira
+    expect(excerpt('alfa beta gama', 9)).toBe('alfa beta…')
+  })
+
   it('should cut at the limit when there is no space', () => {
     expect(excerpt('a'.repeat(200), 140)).toBe(`${'a'.repeat(140)}…`)
   })
