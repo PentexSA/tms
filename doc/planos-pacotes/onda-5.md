@@ -697,15 +697,20 @@ O `/code-review` (high) dos pacotes cujo agente não pôde chamar a skill rodou 
 | P16-D | 10 | **Segurança:** a revelação sobrevivia à saída, à remoção e à transferência (`739361f`); o parâmetro `revealed` do `stripRestricted`, sem uso, abria caminho para a nota ir na ficha persistida (`5641de7`). Também: o laço de GET no 404, o modelo lido fora da transação, ids não reveláveis gravados, a chave de idempotência e a numeração da migration |
 | P09-D, P15-D, P01-D | 9, 9 e 9 | Rodados pelos próprios agentes; ver o §10 de cada plano |
 
-O `/security-review` da onda inteira (`05c5d7d..HEAD`) roda uma vez, depois deste documento, como na onda 4 (seção 2). Os agentes do P13 e do P16-D fizeram a revisão de segurança à mão; o P13 pede a conferência do `6d82f18`, do `dcc44dd` e do `2a53ee4` (o desfazer).
+**O `/security-review` da onda inteira (`05c5d7d..HEAD`, 06/11) não achou vulnerabilidade de alta confiança.** Cobriu a revelação das notas (só o narrador revela; o dono lê enquanto membro; zera na saída, na remoção e na transferência; a nota nunca vai na ficha), a Mesa e o progresso (só o narrador, sem o motivo do ajuste), a Descrição (o ex-membro não recebe), a História (o `viewer` não lê), o convite (fragmento, redação, memória e aceite por toque) e o desfazer com o `to_absent` (`6d82f18`, `dcc44dd`, `2a53ee4`, que o P13 pedia). Uma observação abaixo do limite: o narrador pode revelar a nota na ficha arquivada de quem saiu, e se essa pessoa voltar à crônica ela lê; é ação explícita do narrador.
 
 ### 11.4 Suítes
 
-`[a preencher na rodada final]`: os totais de `pnpm test` (core, config, db, API, `@tms/ui` e frontend) e o resultado do E2E completo no Chromium e no WebKit.
+Na ponta da onda, depois do merge do P12 (06/11), `pnpm test` passou inteiro: `@tms/sheet-core` 1165, `@tms/config` 38, `@tms/db` 46, `@tms/api` 2089, `@tms/ui` 235 e frontend 1849, sem falha. Os commits seguintes são só de spec e de documentação.
+
+O E2E completo passou **246 de 246** no Chromium e no WebKit (16,4 min), depois de um último `fix` de spec:
+
+- **`d16f44f`, a jornada da v0** (falhava nos dois navegadores, determinística). Com o aviso acima do dock (`26ed892`, T-43), o toque longo no Sangue saía antes de a folha "Salvar 7 alterações?" terminar de sair; com o Modal montado, o toque longo virava toque e abria a folha do recurso. No WebKit, o aviso do dano, agora dentro da folha (`ccc1788`), ficava sobre "Curar" com o ponteiro parado em cima, e o prazo pausava (T-76). O spec espera a folha sair e tira o ponteiro; nenhuma asserção mudou.
 
 ### 11.5 O que fica para o roteiro manual (seção 10)
 
 - **O topo da crônica do narrador com a Apresentação e o painel juntos.** O `table-creation.spec.ts` (abas abaixo de 340 a 390) roda numa crônica sem Descrição, e o `chronicle-about.spec.ts` mede só a tela do jogador, sem o painel. Nenhum spec mede os dois juntos (a estimativa da seção 4.1 era ~374 px). Conferir no X-cronica, no web a 390 e no AVD a 393; se passar do limite, a saída é encurtar o trecho (seção 4.1).
+- **Dois efeitos do aviso do P12 a conferir na tela** (do `d16f44f`; nenhum é bug de regra): um toque longo que começa enquanto uma folha ainda sai vira toque; no web, o aviso dentro de uma folha sem rodapé cobre a última ação dela (por exemplo, "Curar") até sumir, e o ponteiro em cima segura o prazo. É o desenho do T-43 (`offset` 0 sem rodapé); se incomodar no roteiro, vira um achado para o PO.
 - **O `play.spec.ts` fecha a folha antes de desfazer** (`ec63397`). Com o P12, o `ModalToastHost` também vale no web: dá para voltar a desfazer pelo aviso com a folha aberta, e o roteiro confere isso na tela.
 - **O build nativo** de Android e iOS: o `@tms/ui` mudou (`Button.blocked` e o `ref`, `ChoiceOption.blocked`, o `Toast` e a `BottomSheet`), e o CI não compila o nativo.
 - **As plataformas:** a seção 10 inteira, com os itens obrigatórios da 10.9 e a acessibilidade da 10.10. A migration dos templates agora é a `0025_templates_onda5`: a ficha da versão anterior é criada antes dela (seção 10.1).
