@@ -742,3 +742,103 @@ describe('o progresso da criação no cartão', () => {
     expect(cardTextWidth(1280, 3)).toBeCloseTo((1200 - 20) / 3 - 12 - 2 - 32)
   })
 })
+
+// P09-D (D-10, R-15): o filtro da etapa da criação na Mesa
+describe('o filtro "Em criação" e "Pendentes"', () => {
+  const ids = [1, 2, 3, 4, 5].map(
+    n => `00000000-0000-4000-8000-00000000e00${n}`
+  )
+  const rows = () => [
+    row(ids[0] as string, 'helena', 'vtm-v20', {
+      name: 'Ana',
+      status: 'creating',
+      creationMode: 'points',
+    }),
+    row(ids[1] as string, 'helena', 'vtm-v20', {
+      name: 'Bia',
+      status: 'creating',
+      adjust: true,
+    }),
+    row(ids[2] as string, 'helena', 'vtm-v20', {
+      name: 'Caio',
+      status: 'pending',
+      creationMode: 'points',
+    }),
+    row(ids[3] as string, 'helena', 'vtm-v20', {
+      name: 'Duda',
+      status: 'active',
+    }),
+    row(ids[4] as string, 'helena', 'vtm-v20', {
+      name: 'Sentinela',
+      kind: 'npc',
+      visibility: 'hidden',
+      status: 'creating',
+    }),
+  ]
+
+  it('os chips contam, filtram, excluem um ao outro e tiram os NPCs', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok(rows()))
+    await openTable()
+    await screen.findByTestId(`table-row-${ids[0]}`)
+    expect(screen.getByTestId('table-npcs')).toBeTruthy()
+    const creating = screen.getByRole('button', { name: 'Em criação (2)' })
+    expect(screen.getByRole('button', { name: 'Pendentes (1)' })).toBeTruthy()
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    fireEvent.press(creating)
+    expect(screen.getByTestId('table-filter-status')).toHaveTextContent(
+      'Mostrando 2 de 4: em criação.'
+    )
+    expect(screen.getByTestId('table-filter-status').props['aria-live']).toBe(
+      'polite'
+    )
+    expect(screen.getByTestId(`table-row-${ids[0]}`)).toBeTruthy()
+    expect(screen.getByTestId(`table-row-${ids[1]}`)).toBeTruthy()
+    for (const hidden of [ids[2], ids[3], ids[4]])
+      expect(screen.queryByTestId(`table-row-${hidden}`)).toBeNull()
+    expect(screen.queryByTestId('table-npcs')).toBeNull()
+    // O outro troca; tocar o ativo desliga
+    fireEvent.press(screen.getByRole('button', { name: 'Pendentes (1)' }))
+    expect(screen.getByTestId('table-filter-status')).toHaveTextContent(
+      'Mostrando 1 de 4: pendentes.'
+    )
+    expect(screen.getByTestId(`table-row-${ids[2]}`)).toBeTruthy()
+    expect(screen.queryByTestId(`table-row-${ids[0]}`)).toBeNull()
+    fireEvent.press(screen.getByRole('button', { name: 'Pendentes (1)' }))
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    expect(screen.getByTestId(`table-row-${ids[3]}`)).toBeTruthy()
+  })
+
+  it('trocar de escopo desliga o filtro; sem ficha na etapa, sem chip', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok(rows()))
+    await openTable()
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Em criação (2)' })
+    )
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(ids[3] as string, 'helena', 'vtm-v20', {
+          name: 'Duda',
+          status: 'archived',
+        }),
+      ])
+    )
+    fireEvent.press(
+      screen.getByRole('tab', { name: 'Arquivadas e fora de jogo' })
+    )
+    await screen.findByTestId(`table-row-${ids[3]}`)
+    expect(screen.queryByTestId('table-filter-status')).toBeNull()
+    expect(screen.queryByTestId('table-stage-creating')).toBeNull()
+    expect(screen.queryByTestId('table-stage-pending')).toBeNull()
+  })
+
+  it('a Mesa vazia diz o que vai aparecer', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(ok([]))
+    await openTable()
+    expect(
+      await screen.findByText(
+        'As fichas aparecem aqui com a etapa da criação e o que falta.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByTestId('table-stage-creating')).toBeNull()
+  })
+})

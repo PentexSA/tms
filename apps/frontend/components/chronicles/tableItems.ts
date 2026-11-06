@@ -178,16 +178,56 @@ export function bySection(items: readonly TableItem[]): {
 
 export type TableSort = 'name' | 'updated'
 
+// P09-D (D-10, R-15): a etapa da criação, para o filtro "Em criação" e
+// "Pendentes". Em criação: a vez é do jogador (montando, devolvida,
+// aguardando ajuste). Pendentes: a vez é do narrador (avisou que terminou,
+// aguardando aprovação). O NPC fica fora dos dois, oculto ou não.
+export type TableStage = 'creating' | 'pending'
+
+export function stageOf(item: TableItem): TableStage | null {
+  if (item.row.kind === 'npc') return null
+  switch (item.state?.id) {
+    case 'creating':
+    case 'returned':
+    case 'adjust':
+      return 'creating'
+    case 'ready':
+    case 'pending':
+      return 'pending'
+    default:
+      return null
+  }
+}
+
+/** Quantas fichas em cada etapa, de todos os PCs da Mesa. */
+export function stageCounts(
+  items: readonly TableItem[]
+): Readonly<Record<TableStage, number>> {
+  const counts = { creating: 0, pending: 0 }
+  for (const item of items) {
+    const stage = stageOf(item)
+    if (stage) counts[stage] += 1
+  }
+  return counts
+}
+
 const byName = new Intl.Collator('pt-BR', { sensitivity: 'base' })
 
 /** A ordem e o filtro da tela, sem copiar os itens. */
 export function arrange(
   items: readonly TableItem[],
-  options: { readonly sort: TableSort; readonly onlyAlerts: boolean }
+  options: {
+    readonly sort: TableSort
+    readonly onlyAlerts: boolean
+    readonly stage?: TableStage | null
+  }
 ): TableItem[] {
-  const shown = options.onlyAlerts
-    ? items.filter(i => i.alerts.length > 0)
-    : [...items]
+  const { stage } = options
+  const shown = items.filter(
+    i =>
+      (!options.onlyAlerts || i.alerts.length > 0) &&
+      (!stage || stageOf(i) === stage)
+  )
   return shown.sort((a, b) =>
     options.sort === 'name'
       ? byName.compare(a.row.name, b.row.name)
