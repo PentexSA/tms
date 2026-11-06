@@ -544,12 +544,16 @@ Implementação em 05 e 06/11/2026, na `pacote/p13-ficha-em-uso`, num worktree p
    - O toast foi testado no `sheet/play/__tests__/play.test.tsx` (a folha do Sangue já era testada ali). O `ResourceSheet.test.tsx` não foi criado (pergunta 7).
    - O Histórico foi testado no `apps/api/src/__tests__/operations.test.ts`, nos três sistemas: Sangue no V20, Fúria no W20 pelo Augúrio e FdV no M20 (padrão fixo). O M20 não usa a Quintessência, porque a roda é um `clock`, e o gasto padrão do M20 é a FdV.
    - O core ganhou um export a mais, `effectiveOf(model, sheet)`. É o valor efetivo de um caminho, usado pelo `withEffectiveFrom`, pelo `withEffectiveTo` e pelo `invertBatch`.
-4. **T-53, a comparação do desfazer** (revisão de segurança, abaixo). Com o "para" efetivo gravado, o `invertBatch` passa a comparar o valor que a pessoa vê, e não o cru:
-   - o caminho vazio cujo efetivo é igual ao "para" gravado conta como "sem mudança" (o caso pedido);
-   - também conta como "sem mudança" gravar depois, explicitamente, o mesmo valor que o lote deixou;
-   - e também esvaziar um caminho que já mostrava o padrão.
+4. **T-53, a comparação do desfazer: aberta, para o orquestrador** (revisão de segurança, abaixo). O código do `invertBatch` é exatamente a condição da §3.3: o cru igual ao "para" gravado, ou o caminho cru vazio com o efetivo de agora igual ao "para" gravado. Mas, com o "para" efetivo gravado no `to_value`, dois casos que antes eram conflito deixam de ser, e **o §3.3 está errado ao dizer "fora desse caso, nada muda"**:
+   - **(A)** o lote esvaziou o caminho (o "para" cru era vazio, gravado como o efetivo), e depois alguém grava explicitamente o mesmo valor. O cru de agora é igual ao gravado, e conta como "sem mudança". Isso vem da gravação, não do caso novo;
+   - **(B)** o lote gravou explicitamente o valor do padrão, e depois alguém esvazia o caminho. Os dados são idênticos aos do caso do plano (cru vazio, efetivo igual ao gravado), e o caso novo o aceita.
    
-   Nos dois últimos casos, o valor visto não mudou, e o inverso devolve o valor de antes do lote. A propriedade do `group.test.ts` ("qualquer mudança posterior recusa") passou a valer para a mudança do valor visto, e esse caso tem um teste próprio. Mudar o efetivo continua sendo conflito: o teste muda o padrão da FdV pela Coragem.
+   Nos dois, o valor visto é o mesmo, e o inverso devolve o valor de antes do lote, mas a detecção pelo cru fica mais frouxa que antes do pacote. **Sem saber se o "para" cru era vazio, o `invertBatch` não distingue (A) e (B) do caso do plano.** As saídas que preservam o conflito pelo cru:
+   1. a coluna `to_absent` em `character_events`, com o `to_value` cru como antes (a alternativa da §3.3 e a pergunta 1 da §9; migration de schema, número depois da `0025`);
+   2. voltar a gravar o "para" cru e tirar o caso novo, o que perde o "9 → 10" no Histórico do desfazer (o toast do commit `a34c938` fica);
+   3. aceitar (A) e (B) como estão, com o registro deste item.
+   
+   Nada disso foi decidido aqui. O teste de propriedade do `group.test.ts` está restrito à mudança do valor visto (o que hoje vale), com um teste próprio para o caso (B).
 5. **T-77, o boost.** A primeira versão bloqueava o boost em toda recusa do Jogo. A revisão corrigiu em `1d44199`: só `SHEET_LOCKED` bloqueia com "a rolagem sai sem gastar". Nas fichas arquivada, fora de jogo ou sem vínculo, o servidor recusa a rolagem inteira, e vale a recusa de hoje. Sem escolha, "Enviar pedido" também fica bloqueado, com "Escolha um traço para ver o custo.".
 6. **U-01.**
    - O atalho fica de fora também quando o papel inclui `storyteller`, mesmo que seja dono.
