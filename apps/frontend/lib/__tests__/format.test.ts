@@ -13,6 +13,14 @@ describe('excerpt', () => {
     expect(excerpt('alfa beta gama delta', 12)).toBe('alfa beta…')
   })
 
+  it('should collapse line breaks and repeated spaces before cutting', () => {
+    expect(excerpt('um\n\ndois   três\r\nquatro', 140)).toBe(
+      'um dois três quatro'
+    )
+    // Os parágrafos em branco não gastam o trecho
+    expect(excerpt(`alfa\n\n\n\n${'beta '.repeat(5)}`, 12)).toBe('alfa beta…')
+  })
+
   it('should cut at the limit when there is no space', () => {
     expect(excerpt('a'.repeat(200), 140)).toBe(`${'a'.repeat(140)}…`)
   })

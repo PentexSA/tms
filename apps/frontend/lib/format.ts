@@ -46,7 +46,9 @@ export const hhmm = (d: Date) =>
  * trecho, nunca o texto inteiro.
  */
 export const excerpt = (text: string, max: number): string => {
-  const trimmed = text.trim()
+  // Uma linha corrida: quebras e espaços seguidos viram um espaço, senão o
+  // trecho gastaria as linhas com parágrafos em branco
+  const trimmed = text.replace(/\s+/g, ' ').trim()
   const points = Array.from(trimmed)
   if (points.length <= max) return trimmed
   const head = points.slice(0, max)
