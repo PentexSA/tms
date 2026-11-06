@@ -640,7 +640,19 @@ Implementação em 05 e 06/11/2026, na `pacote/p12-convite-entrada` (a partir de
     - o histórico global do navegador guarda a URL original;
     - a área de transferência ao copiar;
     - o `tms://` sem App Links.
-11. **Revisão de código (feita no próprio pacote, sem achado bloqueante):** a confirmação do revogar continua aberta quando a API falha, com o erro na faixa da folha.
+11. **`/code-review` (high): 10 achados, todos corrigidos em commits `fix` com teste de regressão:**
+    - **o convite pendente saía só no `logout()`** (`50780e2`). Agora sai também em toda saída de uma sessão aberta: o `#clearLocal` cobre conta excluída, refresh recusado e logout em outra aba. Na abertura sem sessão, não sai.
+    - **o código sobrevivia a sair de "Entrar com convite"** por outro caminho que não o "‹" (o voltar do Android, o gesto do iOS) (`000dd58`). Agora a tela o apaga ao desmontar, um tique depois, para a remontagem do StrictMode não apagar.
+    - **o login recusava o que a API aceita** (`8968486`). Agora confere só que o e-mail não está vazio e tem "@". O cadastro mantém a regra da API. Isto muda o item 7 acima: o "nome@" do POA-34 agora vai à API e volta com o 401 genérico.
+    - **o cadastro perdia campo no preenchimento automático** (`8968486`). Voltou ao `setForm` funcional, e o erro do campo vem de `registerFieldError(key, value)`.
+    - **o "‹ Crônicas" da crônica aberta pela Conta voltava à Conta** (`1b06892`). Foi escolhida a saída menor: o "Abrir <crônica>" da Conta usa `replace`, e a lista fica por baixo. O rótulo continua fixo.
+    - **o `peekPendingInvite` (o getSnapshot) expirava o código na leitura** (`50780e2`). Agora a validade é um `setTimeout` que apaga e avisa.
+    - **a regex do fragmento era quadrática e o web redigia antes de cortar** (`567360f`). Agora é um passe linear por token (`redactFragments`), e o `text()` do web corta acima de 2000 caracteres antes de redigir (o `MAX_MESSAGE_SCAN` da API). O teste usa 64 KB de "/" e de base64, com limite de 200 ms.
+    - **a frase do 5xx lia o sufixo do texto formatado** (`52421a0`). Agora o `AuthError` guarda o `requestId`, e o `authMessage` chama o `withErrorCode`.
+    - **a regex da redação está duplicada entre web e API** (`567360f`). Nenhum pacote que os dois já importam (`@tms/config`, `@tms/sheet-core`) é lugar de telemetria, então a cópia ficou. Em troca, um teste em cada lado prende a classe `INVITE_CHAR` ao `ALPHABET` do `invite-code.ts` (agora exportado). O teste do web também lê a classe do `safe-error.ts` e compara as duas.
+    - **o `ErrorBoundary` da ficha tinha o voltar próprio** (`6236a73`). Agora usa o `useBackTo('/')`.
+
+    A confirmação do revogar continua aberta quando a API falha, com o erro na faixa da folha.
 
 **Para o roteiro (seção 11) e a integração:**
 
