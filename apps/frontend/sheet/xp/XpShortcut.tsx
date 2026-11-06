@@ -39,7 +39,9 @@ export function useXpShortcutValue(
 ): XpShortcut | null {
   return useMemo(() => {
     if (!enabled || !model || !sheet) return null
-    const candidates = xpCandidates(model, sheet)
+    // Só o que tem custo agora: no máximo ou sem pré-requisito, o atalho
+    // levaria a um pedido que o servidor recusa
+    const candidates = xpCandidates(model, sheet).filter(c => c.cost.ok)
     const keys = new Set(candidates.map(c => c.key))
     const fields = new Set(candidates.map(c => c.target.field))
     return {
