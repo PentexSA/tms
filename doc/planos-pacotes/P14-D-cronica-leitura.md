@@ -69,7 +69,7 @@ Todas as linhas citadas são da ponta `05c5d7d`. A matriz cita o `1db3db9`; onde
 |---|---|---|---|
 | Narrador da crônica | 200, com `description` e `imageUrl` | Só o `TextArea` nos Bastidores (`CampaignBackstage.tsx:319-327`, `minHeight` 120 em `packages/ui/src/TextField.tsx:125`) | Bloco + tela de leitura + editor com o aviso |
 | Jogador (membro), inclusive "outro jogador" e o `viewer` de um NPC revelado | 200, com `description` e `imageUrl` (o app recebe e descarta) | Nada | Bloco + tela de leitura |
-| Ex-membro (`former`: saiu e tem ficha) | 200, **com** `description` e `imageUrl`, sem `members` nem `creation` (`:464-466`) | Nada (sem abas) | **Sem** `description` e `imageUrl` (commit 1, se o PO confirmar) |
+| Ex-membro (`former`: saiu e tem ficha) | 200, **com** `description` e `imageUrl`, sem `members` nem `creation` (`:464-466`) | Nada (sem abas) | **Sem** `description` e `imageUrl` (os campos saem da resposta; `38fee1d`, pela D-15) |
 | Convidado que ainda não entrou | 404: o convite não cria vínculo, e o `chronicleAccess` devolve `null` (`authz.ts:49-52`). O aceite devolve só `chronicleId` e `role` (`routes.ts:700-764`); não há prévia do convite | — | Igual |
 | Narrador de outra crônica, estranho | 404 | — | Igual |
 | Anônimo | 401 | — | Igual |
@@ -392,30 +392,36 @@ Os pontos para o PO das ondas 1 a 4 ([onda-1.md](onda-1.md) §6 a [onda-4.md](on
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
-Implementação em 05/11/2026, na `pacote/p14-d-cronica-leitura` (base `52dbe0f`), em paralelo com os outros pacotes da onda. Os pontos para o PO e as perguntas técnicas seguiram a recomendação deste plano; nada foi decidido aqui.
+Implementação em 05/11/2026, na `pacote/p14-d-cronica-leitura` (base `52dbe0f`), em paralelo com os outros pacotes da onda. Os pontos para o PO e as perguntas técnicas seguiram a recomendação deste plano; nada foi decidido aqui, salvo o ponto 1 da §9, aplicado pelo orquestrador a partir da D-15 (item 1 abaixo).
+
+**O ex-membro e a D-15:**
+
+1. **O commit 1 entrou em duas partes.** Primeiro só os testes (`3b9f407`), com o ex-membro registrado como quem lê o detalhe, porque o ponto 1 da §9 (o ponto 5 do [onda-5.md](onda-5.md) §6) estava em aberto. Depois, pela revisão de código do orquestrador, a mudança do §3.6 (`38fee1d`): a D-15 da matriz diz que "a Descrição só chega a quem é membro da crônica (AuthZ no servidor)", e o plano-v5 l.32 diz que o ex-membro lê só as próprias fichas arquivadas. No `GET /chronicles/:id`, o `former` recebe o `head` sem `description` e `imageUrl` (os campos saem da resposta, como os `members` e o `lastSession`); o narrador e o membro recebem o `head` mais a Apresentação. A matriz de AuthZ, nos três sistemas, proíbe a sentinela da Descrição ao ex-membro em todas as rotas; o `members.test.ts` confere os dois campos ausentes e a leitura de volta depois do convite; o E2E confere a resposta do ex-membro. O ex-membro continua recebendo `options` e `settingsRevision` (fora da D-15, §3.6). O app filtra pelo `role` também (defesa em profundidade).
 
 **O que ficou fora, e por quê:**
 
-1. **O commit 1 entrou só com os testes.** O ponto 1 da §9 (o ponto 5 do [onda-5.md](onda-5.md) §6) segue em aberto, então o `routes.ts` não mudou: **o ex-membro continua recebendo a Descrição e a Imagem** no `GET /chronicles/:id`. A matriz de AuthZ registra isso: a sentinela da Descrição aparece no detalhe para o narrador, a dona, o outro jogador e o ex-membro, e em nenhuma resposta de nenhuma rota para o narrador de outra crônica, o estranho e o anônimo; ao ex-membro, em nenhuma rota além do detalhe. O `members.test.ts` não mudou (o `not.toHaveProperty('description')` só faz sentido com a mudança). Se o PO aceitar, a mudança é a do §3.6, e a linha do `check` em `authz.test.ts` passa a esperar a falta da sentinela para o `former`.
 2. **A Imagem** (ponto 2): fora, como recomendado. A CSP não mudou.
 3. **O campo maior no celular** (pergunta técnica 4): fica para a medida no AVD (U-09h); o `numberOfLines` da "Descrição" não mudou.
+4. **O estado comum de carregamento e erro** de `about.tsx` e `index.tsx` (item 7 da revisão, opcional) não foi extraído: o `index.tsx` é tocado pelo P09-D e pelo P12 nesta onda, e mexer no topo dele agora aumentaria o conflito no rebase. As duas telas repetem o mesmo `Skeleton` e os mesmos dois `EmptyState` ("Crônica não encontrada" e "Não foi possível carregar a crônica"); um componente comum cabe depois do P12.
 
 **Desvios de desenho:**
 
-4. **A Descrição com 4001 caracteres volta 400, não 422.** O schema da rota (`maxLength: 4000`) recusa antes do `safeText`. O teste fixa o 400 e confere que a resposta não ecoa o texto; o texto com `<` continua 422.
-5. **O ex-membro:** como a API ainda manda a Descrição, o bloco e a tela de leitura não a mostram a ele pelo `role` (defesa em profundidade). O E2E confere só a tela dele, e não a resposta (§4.3, passo 4, condicionado ao ponto 1).
-6. **Os tamanhos do seed** (`--apresentacao`): "Vampiro v3/v5" com 119 caracteres, "Mago v4" com 3625 em seis parágrafos (a marcação abre o quarto) e "Lobisomem v4" com 4000 em oito parágrafos. O texto é gerado no script ("Parágrafo de teste do roteiro, número N, frase M."), e o `main` lista crônica e tamanho, sem o texto.
-7. **O spec E2E** (`chronicle-about.spec.ts`) foi escrito e passou no typecheck e no lint, mas **não rodou**: o E2E é da integração (portas fixas). A medida do bloco (até 104 px) e o `y` da `tablist` ficam para lá, já com o topo do P09-D.
+5. **O trecho tem 80 pontos de código, não 140, e sem `numberOfLines`** (`fddd68e`). Com 140 e duas linhas, a tela cortava de novo (a 390 cabem uns 100 caracteres) e o leitor de tela anunciava o que a tela não mostrava. Com 80, o trecho cabe em duas linhas de `body` de 360 a 411 com a fonte a 100%, e o que a tela mostra é o que o leitor lê. O bloco continua em até 104 px a 390 (44 + 4 + 2 × 22 = 92). Com a fonte a 130%, o trecho pode ir a três linhas: anotar no U-09i.
+6. **O `excerpt` colapsa quebras e espaços** antes de cortar (`6c974b6`) e **não perde a última palavra** quando o limite cai num espaço (`0b35b7c`). O **`paragraphs`** aceita linha em branco com espaço Unicode, como o NBSP, sem atravessar linhas (`a351834`).
+7. **O "‹" da leitura** abre a crônica da rota também enquanto ela carrega, com o rótulo "Crônica" até o nome chegar; só o 404 volta à lista (`3567332`).
+8. **A Descrição com 4001 caracteres volta 400, não 422.** O schema da rota (`maxLength: 4000`) recusa antes do `safeText`. O teste fixa o 400 e confere que a resposta não ecoa o texto; o texto com `<` continua 422.
+9. **Os tamanhos do seed** (`--apresentacao`): "Vampiro v3/v5" com 119 caracteres, "Mago v4" com 3625 em seis parágrafos (a marcação abre o quarto) e "Lobisomem v4" com 4000 em oito parágrafos. O texto é gerado no script ("Parágrafo de teste do roteiro, número N, frase M."), e o `main` lista crônica e tamanho, sem o texto.
+10. **O spec E2E** (`chronicle-about.spec.ts`) foi escrito e passou no typecheck e no lint, mas **não rodou**: o E2E é da integração (portas fixas). A medida do bloco (até 104 px), o `y` da `tablist` e a falta do `-webkit-line-clamp` ficam para lá, já com o topo do P09-D.
 
 **Revisões:**
 
-8. **`/security-review`** no diff do pacote: nenhum achado. A rota da API não mudou; o texto é desenhado em `Text`, sem `dangerouslySetInnerHTML`, parser, link nem `Linking`; o `id` da URL só vai ao `GET /chronicles/:id`, que aplica o `chronicleAccess`; nenhum log novo; o seed só lista crônica e tamanho.
-9. **Revisão de código** (feita no próprio agente, sem subagentes): um achado, corrigido em `fix(e2e)`: o narrador saía da tela antes de o `PATCH` responder, e a leitura podia mostrar o texto antigo.
+11. **`/security-review`** no diff do pacote antes da mudança do ex-membro: nenhum achado (o texto em `Text`, sem `dangerouslySetInnerHTML`, parser, link nem `Linking`; o `id` da URL só vai ao `GET /chronicles/:id`, que aplica o `chronicleAccess`; nenhum log novo; o seed só lista crônica e tamanho). **No `38fee1d`**, revisto no próprio agente: a resposta do `former` só perde campos, o `chronicleAccess` e os status não mudam, e o narrador e o membro recebem o mesmo de antes; nenhum achado.
+12. **Revisão de código:** a do agente achou um ponto, corrigido em `35aae8f` (o narrador saía da tela antes de o `PATCH` responder). O `/code-review` (high) do orquestrador achou sete. Seis foram corrigidos, cada um num `fix` com teste: o ex-membro (item 1 acima), o trecho na tela e no leitor (item 5), o colapso dos espaços e o corte no limite (item 6), o voltar enquanto carrega (item 7) e os parágrafos com espaço Unicode (item 6). O sétimo, opcional, ficou registrado no item 4.
 
 **Para o rebase (onda-5.md §3 e §4.1):**
 
-10. O bloco está dentro do `styles.info` de `chronicles/[id]/index.tsx`, logo depois de "Você narra esta crônica." / "Narrador: …", e antes do `TransferOffer`, do `CreationSettings` e das abas. O P09-D, que entra antes, mexe no `CreationSettings`; este pacote não o toca. O P12 leva o `about.tsx` junto se mover o `useSheetBack`.
-11. Um teste do `CampaignBackstage.test.tsx` ("sem catálogo não desenha regras da casa…") falhou uma vez na rodada completa do Jest com cobertura, com a máquina em carga 27, e passou nas três rodadas isoladas e na rodada completa seguinte. Não é do pacote, mas fica anotado.
+13. O bloco está dentro do `styles.info` de `chronicles/[id]/index.tsx`, logo depois de "Você narra esta crônica." / "Narrador: …", e antes do `TransferOffer`, do `CreationSettings` e das abas. O P09-D, que entra antes, mexe no `CreationSettings`; este pacote não o toca. O P12 leva o `about.tsx` junto se mover o `useSheetBack`. O `routes.ts` muda no `GET /chronicles/:id` (o `head` e a `presentation`); o P09-D e o P12 mexem em outros handlers do mesmo arquivo.
+14. Um teste do `CampaignBackstage.test.tsx` ("sem catálogo não desenha regras da casa…") falhou uma vez na rodada completa do Jest com cobertura, com a máquina em carga 27, e passou nas três rodadas isoladas e na rodada completa seguinte. Não é do pacote, mas fica anotado.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
