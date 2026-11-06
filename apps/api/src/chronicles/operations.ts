@@ -238,6 +238,8 @@ export async function writeBatch(
           from_value: hide ? null : JSON.stringify(e.from ?? null),
           to_value: hide ? null : JSON.stringify(e.to ?? null),
           from_absent: (args.events[seq]?.from ?? null) === null,
+          // O "para" cru era vazio: o to_value guarda o efetivo (T-53)
+          to_absent: (args.events[seq]?.to ?? null) === null,
         }
       })
     )
@@ -587,7 +589,13 @@ export function operationRoutes(
                 const c = locked.get(b.character_id) as Locked
                 const events = await trx
                   .selectFrom('character_events')
-                  .select(['path', 'from_value', 'to_value', 'from_absent'])
+                  .select([
+                    'path',
+                    'from_value',
+                    'to_value',
+                    'from_absent',
+                    'to_absent',
+                  ])
                   .where('batch_id', '=', b.id)
                   .orderBy('seq')
                   .execute()
@@ -600,6 +608,7 @@ export function operationRoutes(
                       from: e.from_value,
                       to: e.to_value,
                       fromAbsent: e.from_absent,
+                      toAbsent: e.to_absent,
                     })
                   )
                 )

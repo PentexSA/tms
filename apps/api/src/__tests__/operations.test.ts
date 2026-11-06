@@ -631,11 +631,13 @@ describe('o "para" efetivo no Histórico (T-53), nos três sistemas', () => {
       ])
       const stored = await ctx.db
         .selectFrom('character_events')
-        .select(['to_value', 'from_absent'])
+        .select(['to_value', 'from_absent', 'to_absent'])
         .where('batch_id', '=', items[0]?.id as string)
         .executeTakeFirstOrThrow()
       expect(stored.to_value).toMatchObject({ current })
       expect(stored.from_absent).toBe(false)
+      // O "para" cru era vazio (0026): só assim o caminho vazio passa
+      expect(stored.to_absent).toBe(true)
       // O narrador desfaz o desfazer: o caminho vazio mostra o mesmo valor
       // que o lote deixou, então não há conflito, e o gasto volta
       ctx.clock.advance(1000)
@@ -661,6 +663,29 @@ describe('o "para" efetivo no Histórico (T-53), nos três sistemas', () => {
       expect(sheet.values[field]).toBeUndefined()
       const [reverted] = await changes(id)
       expect(reverted?.changes[0]?.change).toBe(`${current - 1} → ${current}`)
+    })
+
+    it(`${system}: gravar depois o mesmo valor que se via continua conflito (o cru mudou)`, async () => {
+      const { chronicle, id, plan, current } = await fresh()
+      expect((await events(id, plan.events)).status).toBe(200)
+      ctx.clock.advance(1000)
+      expect((await events(id, inverse(plan.events))).status).toBe(200)
+      const [undone] = await changes(id)
+      const stored = await ctx.db
+        .selectFrom('character_events')
+        .select('to_value')
+        .where('batch_id', '=', undone?.id as string)
+        .executeTakeFirstOrThrow()
+      expect(stored.to_value).toMatchObject({ current })
+      // A jogadora grava explicitamente o valor que já via
+      ctx.clock.advance(1000)
+      const path = plan.events[0]?.path as string
+      expect(
+        (await events(id, [{ path, from: null, to: stored.to_value }])).status
+      ).toBe(200)
+      const res = await revertBatch(chronicle, undone?.id as string)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'REVERT_CONFLICT' })
     })
 
     it(`${system}: uma escrita depois do desfazer continua conflito`, async () => {

@@ -99,6 +99,9 @@ export function planGroupDamage(
 export interface HistoryEvent extends SheetEvent {
   // O caminho não tinha valor guardado antes do lote (§7, decisão 3)
   readonly fromAbsent?: boolean
+  // O "para" cru era vazio: o lote esvaziou o caminho, e o `to` gravado é o
+  // efetivo de então (T-53, migration 0026)
+  readonly toAbsent?: boolean
 }
 
 // Texto, texto longo e especialização entram no histórico sem conteúdo: não
@@ -156,17 +159,17 @@ export function invertBatch(
       kind: 'irreversible',
       paths: blocked.map(e => e.path),
     }
-  // O histórico guarda o "para" efetivo (T-53): o caminho que o lote deixou
-  // vazio está gravado com o padrão de então. Caminho ainda vazio e o efetivo
-  // de agora igual ao gravado: a pessoa vê o mesmo valor, sem mudança. Fora
-  // disso, o cru decide, como sempre: qualquer escrita depois é conflito, e
-  // a mudança do efetivo (o máximo derivado mudou) também.
+  // O histórico guarda o "para" efetivo (T-53): o lote que esvaziou o
+  // caminho (`toAbsent`) está gravado com o padrão de então. Ele só conta
+  // como "sem mudança" com o caminho ainda vazio e o efetivo de agora igual
+  // ao gravado. Fora desse caso, o cru decide, como antes do T-53: qualquer
+  // escrita depois (mesmo com o valor que se via) é conflito, e a mudança
+  // do efetivo (um padrão derivado que mudou) também
   const effective = effectiveOf(model, sheet)
   const unchanged = (e: HistoryEvent) => {
     const now = raw(sheet, e.path)
-    const to = e.to ?? null
-    if (jsonEqual(now, to)) return true
-    return now === null && to !== null && jsonEqual(effective(e.path), to)
+    if (!e.toAbsent) return jsonEqual(now, e.to ?? null)
+    return now === null && jsonEqual(effective(e.path) ?? null, e.to ?? null)
   }
   const conflicts = events.filter(e => !unchanged(e)).map(e => e.path)
   if (conflicts.length) return { ok: false, kind: 'conflict', paths: conflicts }

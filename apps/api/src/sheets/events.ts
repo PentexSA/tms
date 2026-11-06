@@ -415,6 +415,8 @@ export function eventRoutes(
                   // O `from` cru é o valor atual (o conflito já conferiu):
                   // null é caminho vazio, que a reversão devolve vazio
                   from_absent: (body.events[seq]?.from ?? null) === null,
+                  // O "para" cru era vazio: o to_value guarda o efetivo (T-53)
+                  to_absent: (body.events[seq]?.to ?? null) === null,
                 }
               })
             )
