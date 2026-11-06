@@ -26,6 +26,18 @@ const MAX_FRAMES = 30
 const MAX_FRAME = 300
 const MAX_CAUSE_DEPTH = 3
 
+// O alfabeto do código (invite-code.ts) em qualquer caixa, sem o U, mais O, I e
+// L, que o aceite normaliza. Cru (26 seguidos) ou formatado (4 × 6 + 2).
+const INVITE_CHAR = '[0-9A-TV-Za-tv-z]'
+const INVITE_CODE = new RegExp(
+  `(^|[^0-9A-Za-z])(?:${INVITE_CHAR}{26}|${INVITE_CHAR}{4}(?:[ -]${INVITE_CHAR}{4}){5}[ -]${INVITE_CHAR}{2})(?![0-9A-Za-z])`,
+  'g'
+)
+// O fragmento de uma URL ou de um caminho ("/join#…"); o "#" de um método
+// privado no stack ("at Foo.#bar") não vem depois de "/"
+const INVITE_FRAGMENT =
+  /((?:[a-z][a-z0-9+.-]*:\/\/|\/)[^\s'"<>#]*)#[^\s'"<>]+/gi
+
 /** Redação por padrão, para mensagem e frames. */
 export function redact(text: string): string {
   return (
@@ -39,6 +51,12 @@ export function redact(text: string): string {
         /[^\s@'"<>(),:;=/[\]]+@([\p{L}\p{N}.-]+)/gu,
         (match, domain: string) => (/^[\d.]+$/.test(domain) ? match : '[email]')
       )
+      // O código de convite (P12): 26 caracteres do base32 Crockford, cru ou
+      // no formato da tela (grupos de 4), e o fragmento de URL que o link leva.
+      // Toda sequência do alfabeto conta: um falso positivo só apaga texto de
+      // diagnóstico. Sem lookbehind, que nem todo motor de regex do app tem
+      .replace(INVITE_FRAGMENT, '$1#[convite]')
+      .replace(INVITE_CODE, '$1[convite]')
   )
 }
 

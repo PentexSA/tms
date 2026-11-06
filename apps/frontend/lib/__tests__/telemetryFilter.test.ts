@@ -14,6 +14,14 @@ const JWT =
 const NOTE = 'o vampiro esconde a carta da Camarilla'
 const UUID = '123e4567-e89b-42d3-a456-426614174000'
 
+// Um código fictício no alfabeto do convite (base32 Crockford, 26 caracteres)
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+const fakeInviteCode = () =>
+  Array.from(
+    { length: 26 },
+    () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
+  ).join('')
+
 describe('redact', () => {
   it('e-mail, JWT, Bearer e credencial de URL', () => {
     const out = redact(
@@ -25,6 +33,34 @@ describe('redact', () => {
 
   it('pacote@1.2.3 não é e-mail', () => {
     expect(redact('node_modules/pacote@1.2.3/x.js')).toContain('pacote@1.2.3')
+  })
+
+  it('o código de convite, cru e formatado, e o fragmento de URL (P12)', () => {
+    const code = fakeInviteCode()
+    const formatted = code.replace(/(.{4})(?=.)/g, '$1 ')
+    for (const text of [
+      `x ${code} y`,
+      `x ${formatted} y`,
+      `x ${code.toLowerCase()} y`,
+    ]) {
+      const out = redact(text)
+      expect(out).toBe('x [convite] y')
+    }
+    expect(redact(`https://app.test/join#${code}`)).toBe(
+      'https://app.test/join#[convite]'
+    )
+    expect(redact(`em /join#${formatted.replace(/ /g, '-')}`)).toBe(
+      'em /join#[convite]'
+    )
+  })
+
+  it('não apaga UUID, hash nem método privado do stack', () => {
+    for (const text of [
+      UUID,
+      'f'.repeat(64),
+      'at Foo.#bar (https://app.test/x.js:1:2)',
+    ])
+      expect(redact(text)).toBe(text)
   })
 })
 
@@ -56,6 +92,21 @@ describe('scrubBreadcrumb', () => {
       category: 'navigation',
       data: { from: '/a/:id', to: '/b' },
     })
+    const code = fakeInviteCode()
+    expect(
+      JSON.stringify(
+        scrubBreadcrumb({
+          category: 'navigation',
+          data: { from: '/', to: `/join#${code}` },
+        })
+      )
+    ).not.toContain(code)
+    expect(
+      scrubBreadcrumb({
+        category: 'navigation',
+        data: { from: '/', to: `/join#${code}` },
+      })
+    ).toMatchObject({ data: { to: '/join' } })
     expect(
       scrubBreadcrumb({
         category: 'fetch',
