@@ -25,9 +25,9 @@ A v0 está pronta quando esta jornada roda inteira no app e no web, e um teste E
 1. Criar conta e entrar.
 2. O narrador cria uma crônica de Vampiro (V20) e gera um código de convite.
 3. O jogador entra na crônica com o código.
-4. O jogador cria a ficha: nome, conceito, clã, geração, senhor, natureza e comportamento. O formulário sai do template, não de uma tela escrita para o Vampiro.
-5. A ficha abre em **Evoluir**: atributos, habilidades, disciplinas, antecedentes, especializações e Força de Vontade. Salvar grava **um** lote.
-6. A ficha abre em **Leitura** e **Jogo**: identidade, 3 abas (Ficha · Vantagens · Sobre) e dock (Vitalidade, Sangue, FdV).
+4. O jogador cria a ficha pelos campos de identidade do template: no Vampiro, nome, natureza e comportamento (com "Escolher da lista"), conceito, clã e senhor. A Geração não é escolhida aqui: ela vem do Antecedente Geração (13 menos os pontos, até a 8ª) e aparece no cabeçalho. O formulário sai do template, não de uma tela escrita para o Vampiro. (D-13)
+5. A ficha abre em **Editar** (ou em **Criação**, quando a crônica usa a criação por pontos da v4): atributos, habilidades, disciplinas, antecedentes, especializações e Força de Vontade. Salvar grava **um** lote. (D-13)
+6. A ficha abre em **Jogo** para o dono e em **Leitura** para quem não é dono: identidade, 3 abas (Ficha · Vantagens · Sobre) e dock (Vitalidade, Sangue, FdV). (D-13)
 7. Em jogo, o jogador gasta Sangue, leva dano letal, cura com Sangue, desperta e desfaz. Tudo funciona offline e sincroniza ao reconectar.
 8. O narrador vê a mesa e edita a ficha do jogador, com a alteração assinada no histórico. Ele escreve as Notas do Narrador, que o aparelho do jogador nunca recebe.
 9. O jogador rola a parada: Atributo + Habilidade, dificuldade, penalidade, especialização e FdV. **Este passo é a linha de corte** (Etapa 21).
@@ -69,6 +69,34 @@ Fora do código, ainda falta:
 
 O checklist de segurança, item por item, está em [`checklist-seguranca-v0.md`](checklist-seguranca-v0.md).
 
+## Depois do teste com personas (ondas 1 a 5)
+
+O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz-achados.md)) comparou a tela com este plano. Pela D-13, o §1 foi alinhado ao que a tela faz, no próprio item e sem renumerar (os specs citam os itens pelo número); cada item revisto leva "(D-13)". As Etapas continuam como registro de como a v0 foi construída: onde uma delas afirma algo que a tela não faz mais, uma linha "Revisto" diz o que mudou e quando.
+
+**O nome do modo.** "Evoluir" é o nome interno do modo (`evolve`), no contrato do template (`editableIn`) e no design system. A tela o chama de "Editar" desde `f514520` (18/10/2026), e de "Criação" na criação por pontos da v4 (`MODE_LABELS` em `apps/frontend/sheet/evolve/ModeBar.tsx`).
+
+**Decisões que mudam esta jornada** (a tabela "Decisões de produto" da matriz tem o texto inteiro de cada uma):
+
+| Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
+|---|---|---|---|
+| D-00 | Decidida em 01/11/2026 como "Android e iOS compilados no CI em todo PR" (P01-C, onda 1). O PR #49 (04/11/2026) tirou do CI os jobs nativos e o `postgres` (Etapa 1): o build nativo e os `*.pg.test` rodam à mão na integração de cada onda, e o job `check` continua conferindo as versões nativas. A revisão da decisão está com o PO | onda 1, P01-C; PR #49 | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16 |
+| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote abre no "Salvar", não mais no "Concluir" (Etapa 18). Na Criação, "Salvar" fica sempre, com "Concluir criação" ou "Enviar para aprovação" ao lado quando a conta fecha. Sair com rascunho oferece "Salvar e sair" | onda 3, P03-D | o rótulo no Editar e ficar no Editar depois de salvar: [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-06 | Na criação por pontos da v4, a Qualidade se compra com bônus, pelo custo do item; a recusa aparece na folha e mantém o nome digitado. Na criação livre desta jornada, nada muda | ondas 2 e 4, P07-C e P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 6 |
+| D-08 | −/+ na própria linha das Disciplinas e dos Antecedentes; a folha do item fica para nome, especialização e notas (item 5) | onda 4, P07-D | — |
+| D-09 | As Disciplinas do clã vêm primeiro, com o selo "do clã"; outra Disciplina avisa "confirme com o narrador", sem bloquear. A Fraqueza mostra o resumo do clã, escrito pelo time, como padrão editável: ele não é gravado sozinho | onda 4, P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 8 |
+| D-11 | "?" com uma frase curta do template ao lado dos campos, das opções e das Disciplinas, na Nova ficha, na Criação e no Editar (itens 4 e 5) | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |
+| D-13 | Este registro e os itens 4, 5 e 6 do §1 | onda 5, P01-D | — |
+| D-14 | `[a preencher: P12]`: o convite por link, com o código no fragmento; os itens 2 e 3 do §1, a decisão 2 do §7 e o "Convite por e-mail ou por link" do §8 | onda 5, P12 | — |
+
+**Correções que mudam o que o §1 descreve:**
+
+- **T-05** (onda 2, P04-C): a ficha em criação da dona abre na montagem por qualquer entrada (lista, link, recarga): em Criação com a conta por pontos, em Editar na criação livre (item 5).
+- **T-33** (onda 3, P09-C): o narrador abre a ficha do jogador em Leitura, sem seletor de modo, e entra na edição pelo "Editar como narrador" (item 8).
+- **T-53** `[a preencher: P13]`: o "De" efetivo no toast de gasto e na reversão do Histórico. O "Estado da v0" o dá como corrigido, e o teste o viu voltar numa ficha nova (item 7).
+- **T-79** `[a preencher: P13]`: a Força de Vontade fora dos Atributos nos Dados (item 9).
+
+**Ainda não conferido:** os resumos da Fraqueza e as frases do "?" são rascunho do time, para revisão; não foram conferidos contra o livro ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
+
 ## 2. Ponto de partida
 
 | Área | Hoje, na `main` | O que falta para a v0 |
@@ -87,7 +115,7 @@ Problemas encontrados na leitura do código, corrigidos no caminho:
 | `packages/db/src/test/pglite.ts` | Engole o erro de migration ("skipped or failed"): um teste pode passar com o schema incompleto | 1 |
 | `pglite.ts` e `migrations.ts` | A lista de migrations é repetida à mão nos dois arquivos | 1 |
 | `todos` | Rotas, tela, hook e tabela de boilerplate ainda são a home do app | 1 |
-| `design/templates/vtm-v20.json` | `generation` não tem `default`: uma ficha nova nasceria na 4ª geração (o `min`) | 6 |
+| `design/templates/vtm-v20.json` | `generation` não tem `default`: uma ficha nova nasceria na 4ª geração (o `min`). **Revisto:** a Geração passou a derivada do Antecedente em `f514520` (vtm-v20 1.1.0) e saiu do formulário | 6 |
 | `packages/ui/package.json` | `peerDependencies` desatualizadas | 8 |
 
 ---
@@ -184,6 +212,7 @@ P · depende de: nada
   - job `check`: `pnpm install --frozen-lockfile`, `lint`, `typecheck`, `test` e `pnpm audit --audit-level high`;
   - job `design`: `node design/scripts/build.mjs` seguido de `git diff --exit-code` (arquivos gerados em dia), mais o `check_tokens.py`;
   - job `postgres`: serviço `postgres:16`, migrations `up → down → up` e os testes que precisam de Postgres real (a partir da Etapa 15).
+    - **Revisto:** o PR #49 (04/11/2026) tirou o job `postgres` e os jobs nativos do CI. Os `*.pg.test` rodam à mão, na integração de cada onda (D-00, no registro "Depois do teste com personas").
 - `packages/db/src/test/pglite.ts` aplica a lista de `migrations.ts`, a fonte única, e **falha** quando uma migration falha.
 - Fim do boilerplate de `todos`:
   - remove as rotas, a tela, o hook e os testes;
@@ -344,6 +373,7 @@ M · depende de: 1, 2
   5. versão já publicada com o mesmo conteúdo (hash do JSON canônico) é no-op. Com conteúdo diferente, o script para com "suba o templateVersion". **Versão publicada é imutável**, e é isso que permite ao app guardar o template em cache para sempre.
 - **O Ajv fica só no servidor e no CI.** Ele entra como `devDependency` de `apps/api`. Como gera código com `new Function`, no bundle do app ele exigiria `unsafe-eval` na CSP. Um teste garante que `sheet-core` e `frontend` não dependem dele, e o check de bundle da Etapa 9 confirma.
 - `vtm-v20.json` ganha `generation.default: 13`, seguido de um novo `build.mjs`.
+  - **Revisto:** a Geração passou a derivada do Antecedente em `f514520` (vtm-v20 1.1.0) e saiu do formulário.
 - O log registra sistema, versão e hash. Nunca o conteúdo.
 
 **Testes** (PGLite):
@@ -605,6 +635,7 @@ M · depende de: 12, 13
 **Testes.**
 
 - o formulário do Vampiro mostra nome, conceito, clã, geração, senhor, natureza e comportamento;
+  - **Revisto:** a Geração passou a derivada do Antecedente em `f514520` (vtm-v20 1.1.0) e saiu do formulário (§1, item 4).
 - **o formulário do fixture de D&D mostra os campos de identidade do D&D.** Isso prova que nenhum campo está fixo no código;
 - erros de validação;
 - o `POST` leva só campos de identidade;
@@ -735,6 +766,7 @@ G · depende de: 16, 17
 
 - `ModeBar` com "Evoluindo · N alterações", sobre o rascunho no store.
   - "Concluir" mostra o resumo (`describeBatch`) com duas saídas: Salvar, que manda um lote (`diffToBatch`), ou Descartar.
+  - **Revisto:** a tela chama o modo de Editar e mostra "Editando · N alterações" (D-13). Desde a D-01 (onda 3, P03-D), o resumo abre no "Salvar" (nome acessível "Salvar alterações"), e não há mais "Concluir" no Editar.
   - Sair da tela com rascunho pede confirmação.
 - Layouts ricos:
   - `grid`: Atributos em 3 grupos, na variante `cell`;
