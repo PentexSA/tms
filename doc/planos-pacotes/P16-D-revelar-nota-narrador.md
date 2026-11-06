@@ -554,7 +554,101 @@ Cada commit diz tudo o que entra nele. Nenhum commit muda template.
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; as Notas do Narrador continuam privadas por padrão, e o servidor continua a autoridade.
 
-(Vazio: preenchido na implementação.)
+Implementação em 05 e 06/11/2026, na `pacote/p16-d-revelar-nota`, a partir de `5da45b2` (com as respostas do usuário na [onda-5.md](onda-5.md) §6), em paralelo com os outros pacotes da onda, cada um no seu worktree.
+
+**Decisões do usuário aplicadas** (onda-5.md §6, pontos 1 e 2):
+
+- o pacote entra nesta onda;
+- a revelação é viva;
+- a nota continua um texto só por ficha;
+- sem selo nem notificação.
+
+Os outros pontos da §9 seguiram a recomendação deste plano, e nada foi decidido aqui:
+
+- o ex-membro não lê a nota revelada e volta a ler se voltar à crônica;
+- a regra sai das `permissions`, sem chave no template;
+- rota própria para o texto;
+- colunas na `characters`;
+- as linhas de edição da nota continuam escondidas do dono;
+- rebusca de 30 s;
+- o app antigo convive com o passo novo do Histórico.
+
+**Desvios de desenho:**
+
+1. **Os commits 4 e 5 viraram um só** (`a34eeb7`). Dois motivos:
+   - o `RevealedProvider` serve ao narrador (rótulo, botão, editor) e ao dono (o texto);
+   - o `TextLayout` muda para os dois. Separar exigiria `git add -p`, que este ambiente não tem.
+
+   A mensagem do commit lista tudo o que entrou nele.
+2. **As frases dos Bastidores (`auditPhrase.ts`) entraram no commit da API** (`d613e2a`), e não no 4. O mapa `PHRASES` é exaustivo pelo tipo que o Eden infere: sem as duas frases, o typecheck do app falharia no pre-commit.
+3. **O nome acessível dos botões começa pelo texto visível** (WCAG 2.5.3, como o "Editar …" da `StorytellerBar`):
+   - "Revelar ao jogador: Notas do Narrador a {jogador}";
+   - "Deixar privadas: Notas do Narrador, de novo só do narrador".
+
+   Na §3.6, eram "Revelar Notas do Narrador a {jogador}" e "Deixar Notas do Narrador privadas de novo", sem o texto do botão. O E2E usa `/^Revelar ao jogador/` e `/^Deixar privadas/`.
+4. **Sem rede, o botão continua tocável, mas não fica `aria-disabled`:** o toque mostra "Sem conexão: revelar e esconder precisam de rede." (`accessibilityRole="alert"`) e não envia. O `Button` do `@tms/ui` ainda não tem o estado "tocável e indisponível": quem o traz é o `blocked` do P13. No rebase sobre o P13, o `RevealControl` passa a usá-lo.
+5. **O `TextBlock` deixou de desenhar o campo que os papéis não leem**, salvo quando está revelado. Antes, quem impedia era só o `SectionView`. Isso é defesa extra no app e não muda nenhum caso de hoje: os testes de `SheetView`, `storyteller` e a11y passam como antes.
+6. **O `lockCharacter` lê também `system_id` e `template_version`.** A rota precisa do modelo da versão da ficha, e o plano só citava as duas colunas novas.
+7. **Corpo fora do formato dá 400, e não 422.** A validação do Elysia neste projeto responde 400. O 422 `REVEAL_UNAVAILABLE` vale para a seção válida que o modelo não deixa revelar.
+8. **A troca de narrador no `reveal.test.ts` é feita direto no banco** (`storyteller_id`), e não pela rota de transferência. O teste é da autoridade lida na transação, e a rota de transferência já tem os testes dela.
+
+**O que ficou fora:**
+
+- **o E2E não rodou no pacote:** as portas são fixas, e ele roda na integração da onda;
+- **o roteiro manual da §11 não rodou:** é da integração, com dois aparelhos por bloco;
+- **o `/code-review` não rodou como skill neste agente.** A revisão do diff foi feita à mão (abaixo), e o `/code-review` (high) fica para o orquestrador.
+
+**`/security-review`** (diff `5da45b2..HEAD`, feito à mão pelo agente do pacote, porque ele não pode abrir sub-tarefas): **nenhuma vulnerabilidade de alta confiança.** Itens conferidos:
+
+- a AuthZ das duas rotas, com o papel do banco, a trava, os 403/404/422 e a chave de comando conferida depois da autorização;
+- a seção do corpo, com padrão, tamanho, conferência contra o modelo e SQL só com parâmetro;
+- nenhuma saída de hoje recebe `revealed`;
+- o `canWrite` não recebe a lista;
+- o registro só com o id da seção;
+- as constraints no banco;
+- o cache do app, sem disco, com o descarte por revisão e a remoção ao esconder.
+
+**Revisão de código à mão (o que mudou por causa dela):**
+
+- **rebusca de resposta velha depois de esconder (corrigido antes do commit).** O efeito que descarta resposta velha rebuscava mesmo sem nota revelada, e uma resposta antiga trazia o texto de volta à memória. Agora o descarte e o avanço só valem enquanto o dono lê, e a consulta é zerada e removida ao esconder. Há teste de tela;
+- **o `RevealControl` usava `useToast` e `useMutation` fora da ficha viva** (o `SheetView` da projeção do viewer e os testes da folha), e quebrava sem `ToastProvider`. Ele virou um invólucro, que só monta o controle com o contexto do narrador;
+- **o `Set` das seções reveladas tem identidade estável** (memo pela lista), para as abas do `SheetView` não serem recalculadas a cada desenho;
+- **uma chave de comando por intenção:** revelar e esconder não dividem a chave, para que uma tentativa de esconder depois de uma revelação com resultado desconhecido não dê `IDEMPOTENCY_CONFLICT`.
+
+**Testes que rodaram no worktree:**
+
+| Pacote | Resultado |
+|---|---|
+| `@tms/sheet-core` | 1150 pass, 0 fail; `permissions.ts` com 100% de linhas e funções |
+| `@tms/db` | 40 pass, 0 fail |
+| `@tms/api` | 2023 pass, 0 fail, com cobertura; `sheets/reveal.ts` com 100%; depois do último ajuste, `reveal.test.ts` e `auditView.test.ts` de novo, 26 pass |
+| `backstage.pg.test.ts`, em `tms_p16d_test` | 9 pass |
+| frontend (Jest, com cobertura e `--forceExit`) | 1615 pass, 104 suítes, metas cumpridas |
+| `@tms/ui` (não mudou) | 226 pass |
+
+Uma rodada isolada do `reveal.test.ts` da API falhou uma vez num gancho sem nome, com 6,5 s, e passou ao repetir: 18 pass. Foi carga da máquina com os outros worktrees, e não falha de teste.
+
+**Bancos:**
+
+- `tms_p16d`, migrado até a `0025_character_reveal` (conferido na `kysely_migration`), só para o `db:codegen`;
+- `tms_p16d_test`, do teste de concorrência.
+
+Os dois podem ser apagados com `dropdb` na integração.
+
+**Para o rebase** (o P16-D entra depois do P15-D):
+
+- **`packages/db/src/migrations.ts` e `migrations.test.ts`:**
+  - a `0024` do P15-D entra antes da `0025`;
+  - o teste "descer a 0023 não apaga versão publicada" passa a esperar `['0025_character_reveal', '0024_templates_onda5', '0023_templates_onda4']`;
+  - o teste da `0025` migra até a `0023` antes de inserir: ele continua valendo, porque a `0024` só grava dados.
+- **`sheet/storyteller/privacy.ts`:** o P15-D põe `readByOwner` e o aviso "O jogador lê este texto.", e o P13 põe `barEdits`. Os textos e o `inRevealed` deste pacote ficam no fim do arquivo. O aviso da folha de edição passa a ter três casos, na ordem da §8.4: revelada, privada, e lida pelo dono.
+- **`sheet/layouts/TextLayout.tsx`:**
+  - o P13 troca o bloco pelo editor no Editar (T-84);
+  - o bloco revelado do dono fica sempre em leitura, e o editor nunca aparece para campo que o dono só lê por revelação (o `canWrite` decide);
+  - o `RevealControl` fica no fim da seção.
+- **`apps/api/src/sheets/events.ts`:** só o mapa `LIFECYCLE_EVENTS` e o `lifecycleRole`. O P13 mexe nas gravações (`:393-413`), em outro trecho.
+- **`apps/api/src/test/authz-matrix.ts` e `matrix-systems.ts`:** duas linhas novas depois da visibilidade do NPC, e o campo `revealSection` no caso do sistema. Os outros pacotes acrescentam linhas em pontos diferentes.
+- **`StorytellerBar.tsx` e `SheetScreen.tsx`:** mudanças pequenas. O `RevealedProvider` fica em volta do `SheetView`, dentro do `CreationContext`.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
