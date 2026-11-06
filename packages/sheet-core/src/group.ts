@@ -3,7 +3,7 @@ import type { FieldId, SheetData } from './contract'
 import { type ActionPlan, planDamage } from './effects'
 import { jsonEqual } from './equal'
 import { parsePath, type SheetEvent } from './events'
-import { describeEvent, withEffectiveFrom } from './labels'
+import { describeEvent, effectiveOf, withEffectiveFrom } from './labels'
 import { resolve } from './resolve'
 import { gain, takeDamage } from './rules/resource'
 
@@ -156,9 +156,19 @@ export function invertBatch(
       kind: 'irreversible',
       paths: blocked.map(e => e.path),
     }
-  const conflicts = events
-    .filter(e => !jsonEqual(raw(sheet, e.path), e.to ?? null))
-    .map(e => e.path)
+  // O histórico guarda o "para" efetivo (T-53): o caminho que o lote deixou
+  // vazio está gravado com o padrão de então. Caminho ainda vazio e o efetivo
+  // de agora igual ao gravado: a pessoa vê o mesmo valor, sem mudança. Fora
+  // disso, o cru decide, como sempre: qualquer escrita depois é conflito, e
+  // a mudança do efetivo (o máximo derivado mudou) também.
+  const effective = effectiveOf(model, sheet)
+  const unchanged = (e: HistoryEvent) => {
+    const now = raw(sheet, e.path)
+    const to = e.to ?? null
+    if (jsonEqual(now, to)) return true
+    return now === null && to !== null && jsonEqual(effective(e.path), to)
+  }
+  const conflicts = events.filter(e => !unchanged(e)).map(e => e.path)
   if (conflicts.length) return { ok: false, kind: 'conflict', paths: conflicts }
   return {
     ok: true,

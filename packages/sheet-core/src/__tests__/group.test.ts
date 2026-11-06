@@ -3,7 +3,8 @@ import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { compileTemplate, type SheetModel } from '../compile'
 import type { SheetData } from '../contract'
-import { applyBatch, diffToBatch, type SheetEvent } from '../events'
+import { jsonEqual } from '../equal'
+import { applyBatch, diffToBatch, parsePath, type SheetEvent } from '../events'
 import {
   damageTargets,
   type HistoryEvent,
@@ -11,7 +12,7 @@ import {
   isReversible,
   planGroupDamage,
 } from '../group'
-import { withEffectiveFrom } from '../labels'
+import { effectiveOf, withEffectiveFrom, withEffectiveTo } from '../labels'
 import { validateSheet } from '../validate'
 import { character, characters, dnd, type Json, templates } from './fixtures'
 
@@ -38,16 +39,22 @@ const applied = (
   return r.sheet
 }
 
-// O que o servidor grava no histórico: o `from` efetivo e se estava vazio
+// O que o servidor grava no histórico: o `from` e o `to` efetivos (T-53) e
+// se o caminho estava vazio
 const history = (
   m: SheetModel,
   before: SheetData,
   events: readonly SheetEvent[]
-): HistoryEvent[] =>
-  withEffectiveFrom(m, before, events).map((e, i) => ({
-    ...e,
-    fromAbsent: (events[i]?.from ?? null) === null,
-  }))
+): HistoryEvent[] => {
+  const r = applyBatch(m, before, { events }, ALL)
+  const after = r.ok ? r.sheet : before
+  return withEffectiveTo(m, after, withEffectiveFrom(m, before, events)).map(
+    (e, i) => ({
+      ...e,
+      fromAbsent: (events[i]?.from ?? null) === null,
+    })
+  )
+}
 
 describe('damageTargets: o alvo vem do tipo', () => {
   it('a Vitalidade no WoD, o PV no D&D; CoC e Fate não têm', () => {
@@ -249,6 +256,132 @@ describe('invertBatch', () => {
   })
 })
 
+// T-53: o histórico guarda o "para" efetivo. O lote que esvaziou o caminho
+// (o desfazer de um gasto a partir do padrão) fica gravado com o padrão de
+// então, e o narrador ainda o desfaz
+// O valor guardado de um caminho (o mesmo que o invertBatch lê)
+const raw = (sheet: SheetData, path: string): unknown => {
+  const p = parsePath(path)
+  if (!p) return null
+  const bucket: Readonly<Record<string, unknown>> =
+    (p.scope === 'values' ? sheet.values : sheet.specialties) ?? {}
+  return Object.hasOwn(bucket, p.fieldId) ? bucket[p.fieldId] : null
+}
+
+describe('invertBatch: o "para" efetivo (T-53)', () => {
+  const m = model('vtm-v20')
+  const empty = (id: string, path: string) => {
+    const s = sheetOf(id)
+    const values = { ...s.values } as Record<string, unknown>
+    delete values[path]
+    return { ...s, values } as SheetData
+  }
+
+  it('caminho ainda vazio, com o efetivo igual ao "para" gravado: sem mudança, e o desfazer devolve o valor de antes', () => {
+    // A ficha nova gastou 1 de Sangue (10 → 9), e o toast desfez (9 → vazio)
+    const spent = sheetOf('helena', { blood: { current: 9 } })
+    const undo: SheetEvent[] = [
+      { path: 'values.blood', from: { current: 9 }, to: null },
+    ]
+    const after = applied(m, spent, undo)
+    const hist = history(m, spent, undo)
+    const shown = effectiveOf(m, after)('values.blood')
+    expect(hist[0]?.to).toEqual(shown)
+    expect(shown).not.toBeNull()
+    const inv = invertBatch(m, after, hist)
+    if (!inv.ok) throw new Error(inv.kind)
+    expect(inv.events).toEqual([
+      { path: 'values.blood', from: null, to: { current: 9 } },
+    ])
+    expect(applied(m, after, inv.events).values.blood).toEqual({
+      current: 9,
+    })
+  })
+
+  it('o efetivo mudou depois (a Coragem mudou o padrão da FdV): conflito', () => {
+    const spent = sheetOf('helena', {
+      willpower: { current: 1, permanent: 2 },
+    })
+    const undo: SheetEvent[] = [
+      {
+        path: 'values.willpower',
+        from: { current: 1, permanent: 2 },
+        to: null,
+      },
+    ]
+    const after = applied(m, spent, undo)
+    const courage = after.values.courage as number
+    const later = applied(m, after, [
+      { path: 'values.courage', from: courage, to: courage + 1 },
+    ])
+    expect(invertBatch(m, later, history(m, spent, undo))).toEqual({
+      ok: false,
+      kind: 'conflict',
+      paths: ['values.willpower'],
+    })
+  })
+
+  it('o caminho vazio continua conflito quando o "para" gravado não é o efetivo de agora', () => {
+    const base = empty('helena', 'blood')
+    const hist: HistoryEvent[] = [
+      {
+        path: 'values.blood',
+        from: { current: 9 },
+        to: { current: 3 },
+        fromAbsent: false,
+      },
+    ]
+    expect(invertBatch(m, base, hist)).toEqual({
+      ok: false,
+      kind: 'conflict',
+      paths: ['values.blood'],
+    })
+  })
+
+  it('esvaziar depois um caminho que já mostrava o padrão não muda o que se vê: o desfazer passa e não muda o valor', () => {
+    // O lote gravou a Vitalidade vazia explicitamente (igual ao padrão)
+    const before = empty('helena', 'health')
+    const zero = effectiveOf(m, before)('values.health')
+    const events: SheetEvent[] = [
+      { path: 'values.health', from: null, to: zero },
+    ]
+    const after = applied(m, before, events)
+    // Depois, alguém esvaziou o caminho: a trilha continua a mesma
+    const later = applied(m, after, [
+      { path: 'values.health', from: zero, to: null },
+    ])
+    const inv = invertBatch(m, later, history(m, before, events))
+    if (!inv.ok) throw new Error(inv.kind)
+    expect(inv.events).toEqual([
+      { path: 'values.health', from: null, to: null },
+    ])
+    expect(
+      effectiveOf(m, applied(m, later, inv.events))('values.health')
+    ).toEqual(zero)
+  })
+
+  it('cru gravado depois e diferente do "para": conflito, como sempre', () => {
+    const spent = sheetOf('helena', { blood: { current: 9 } })
+    const undo: SheetEvent[] = [
+      { path: 'values.blood', from: { current: 9 }, to: null },
+    ]
+    const after = applied(m, spent, undo)
+    const shown = effectiveOf(m, after)('values.blood') as { current: number }
+    const later = applied(m, after, [
+      {
+        path: 'values.blood',
+        from: null,
+        to: { current: shown.current - 1 },
+      },
+    ])
+    expect(invertBatch(m, later, history(m, spent, undo))).toEqual({
+      ok: false,
+      kind: 'conflict',
+      paths: ['values.blood'],
+    })
+  })
+})
+
 // Lotes gerados nas fichas de exemplo: campos de tipo reversível trocados
 // pelo valor de outra ficha do mesmo sistema ou apagados
 const REVERSIBLE = new Set([
@@ -341,6 +474,13 @@ describe('propriedades', () => {
           // ficha pela API; uma tentativa recusada não produz conflito.
           fc.pre(later.ok)
           if (!later.ok) return
+          // T-53: o histórico guarda o "para" efetivo, então a mudança que
+          // conta é a do valor que a pessoa vê. Gravar explicitamente o
+          // padrão, ou esvaziar um caminho que já mostrava o padrão, não
+          // muda o que se vê (o caso tem teste próprio acima)
+          const seen = (s: SheetData) =>
+            effectiveOf(m, s)(target.path) ?? raw(s, target.path)
+          fc.pre(!jsonEqual(seen(later.sheet), seen(after)))
           const inv = invertBatch(m, later.sheet, history(m, before, events))
           expect(inv).toMatchObject({ ok: false, kind: 'conflict' })
           if (!inv.ok) expect(inv.paths).toContain(target.path)

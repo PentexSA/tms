@@ -16,6 +16,7 @@ import {
   type SheetEvent,
   stripRestricted,
   withEffectiveFrom,
+  withEffectiveTo,
   writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -392,9 +393,14 @@ export function eventRoutes(
           await trx
             .insertInto('character_events')
             .values(
-              // O histórico guarda o "de" efetivo (o padrão, quando não havia
-              // valor): "Sangue 10 → 9". O conflito já foi conferido com o cru
-              withEffectiveFrom(model, current, body.events).map((e, seq) => {
+              // O histórico guarda o "de" e o "para" efetivos (o padrão,
+              // quando não havia valor): "Sangue 10 → 9", e o desfazer
+              // "Sangue 9 → 10" (T-53). O conflito já foi conferido com o cru
+              withEffectiveTo(
+                model,
+                result.sheet,
+                withEffectiveFrom(model, current, body.events)
+              ).map((e, seq) => {
                 const p = parsePath(e.path)
                 const type = p
                   ? model.fields.get(p.fieldId)?.def.type

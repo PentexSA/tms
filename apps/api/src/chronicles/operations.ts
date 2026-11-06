@@ -15,6 +15,7 @@ import {
   type SheetEvent,
   type SheetModel,
   withEffectiveFrom,
+  withEffectiveTo,
   writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -223,7 +224,12 @@ export async function writeBatch(
   await trx
     .insertInto('character_events')
     .values(
-      withEffectiveFrom(c.model, c.sheet, args.events).map((e, seq) => {
+      // O "de" e o "para" efetivos, como no endpoint de eventos (T-53)
+      withEffectiveTo(
+        c.model,
+        args.sheet,
+        withEffectiveFrom(c.model, c.sheet, args.events)
+      ).map((e, seq) => {
         const hide = contentFree(c.model, e.path)
         return {
           batch_id: batch.id,

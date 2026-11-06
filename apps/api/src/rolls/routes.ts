@@ -16,6 +16,7 @@ import {
   type SheetModel,
   stripRestricted,
   withEffectiveFrom,
+  withEffectiveTo,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
 import type { Kysely, Transaction } from 'kysely'
@@ -180,9 +181,14 @@ async function recordCost(
   await trx
     .insertInto('character_events')
     .values(
-      // O "de" efetivo, como no endpoint de eventos ("FdV 7 → 6" com a FdV
-      // ainda no padrão)
-      withEffectiveFrom(args.model, args.before, args.events).map((e, seq) => ({
+      // O "de" e o "para" efetivos, como no endpoint de eventos ("FdV 7 → 6"
+      // com a FdV ainda no padrão; o "para" do custo nunca é nulo hoje, e a
+      // regra fica igual nos três lugares)
+      withEffectiveTo(
+        args.model,
+        args.sheet,
+        withEffectiveFrom(args.model, args.before, args.events)
+      ).map((e, seq) => ({
         batch_id: batch.id,
         seq,
         path: e.path,

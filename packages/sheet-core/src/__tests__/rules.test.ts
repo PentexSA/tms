@@ -15,7 +15,7 @@ import {
   planDefaultAction,
 } from '../effects'
 import { applyBatch } from '../events'
-import { withEffectiveFrom } from '../labels'
+import { describeBatch, withEffectiveFrom, withEffectiveTo } from '../labels'
 import { type ResolvedResource, resolve } from '../resolve'
 import { gain, setCurrent, spend, takeDamage } from '../rules/resource'
 import { damage, heal } from '../rules/wod-stacking'
@@ -388,6 +388,40 @@ describe('ação padrão do dock (toque longo)', () => {
       { path: 'values.naoExiste', from: null, to: 1 },
       { path: 'lixo', from: null, to: 1 },
     ])
+  })
+
+  it('withEffectiveTo (T-53): o "para" vazio vira o efetivo da ficha depois do lote; o resto fica', () => {
+    // O desfazer de um gasto a partir do padrão esvazia o caminho
+    const after = {
+      values: { name: 'Nova', strength: 3 },
+      specialties: {},
+    } as SheetData
+    const events = withEffectiveTo(model, after, [
+      { path: 'values.blood', from: { current: 9 }, to: null },
+      { path: 'values.strength', from: 2, to: 3 },
+      { path: 'values.dexterity', from: 2, to: null },
+      // Texto nunca ganha conteúdo; especialização e caminho ruim ficam
+      { path: 'values.notes', from: 'x', to: null },
+      { path: 'specialties.occult', from: 'x', to: null },
+      { path: 'values.naoExiste', from: 1, to: null },
+      { path: 'lixo', from: 1, to: null },
+    ])
+    expect(events).toEqual([
+      { path: 'values.blood', from: { current: 9 }, to: { current: 10 } },
+      { path: 'values.strength', from: 2, to: 3 },
+      { path: 'values.dexterity', from: 2, to: 1 },
+      { path: 'values.notes', from: 'x', to: null },
+      { path: 'specialties.occult', from: 'x', to: null },
+      { path: 'values.naoExiste', from: 1, to: null },
+      { path: 'lixo', from: 1, to: null },
+    ])
+    // O texto do histórico: "Sangue 9 → 10", não "9 → —"
+    expect(describeBatch(model, events.slice(0, 1))).toBe('Sangue 9 → 10')
+    expect(
+      describeBatch(model, [
+        { path: 'values.blood', from: { current: 9 }, to: null },
+      ])
+    ).toBe('Sangue 9 → —')
   })
 
   it('sem ação padrão (Vitalidade abre o sheet)', () => {

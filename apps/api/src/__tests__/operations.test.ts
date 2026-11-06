@@ -1,6 +1,13 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import {
+  compileTemplate,
+  effectiveOf,
+  planDefaultAction,
+  type SheetData,
+  type SheetEvent,
+} from '@tms/sheet-core'
+import {
   addMember,
   as,
   createCharacter,
@@ -9,6 +16,7 @@ import {
   publish,
   setStatus,
   type TestUser,
+  template,
 } from '../test/factories'
 import {
   createTestContext,
@@ -559,4 +567,114 @@ describe('NPC na operação em grupo (v5)', () => {
     )
     expect(JSON.stringify(await listed.json())).not.toContain('Capanga')
   })
+})
+
+// T-53: o histórico guarda o "para" efetivo. O desfazer de um gasto a partir
+// do padrão diz "9 → 10", não "9 → —", e o narrador ainda desfaz esse
+// desfazer. Um recurso com padrão em cada sistema: o Sangue (V20, pela
+// Geração), a Fúria (W20, pelo Augúrio) e a FdV (M20, padrão fixo)
+describe('o "para" efetivo no Histórico (T-53), nos três sistemas', () => {
+  const CASES = [
+    { system: 'vtm-v20', field: 'blood', extra: {} },
+    { system: 'wta-w20', field: 'rage', extra: { auspice: 'ahroun' } },
+    { system: 'mta-m20', field: 'willpower', extra: {} },
+  ] as const
+
+  for (const { system, field, extra } of CASES) {
+    async function fresh() {
+      await publish(ctx, system)
+      const chronicle = await createChronicle(ctx, storyteller, system, system)
+      await addMember(ctx, chronicle, player)
+      const model = compileTemplate(template(system))
+      const values = { [model.template.identity.name]: 'Nova', ...extra }
+      const id = await createCharacter(ctx, player, chronicle, values)
+      await setStatus(ctx, id, 'active')
+      const sheet = { values, specialties: {} } as SheetData
+      const plan = planDefaultAction(model, sheet, field)
+      if (!plan.ok) throw new Error(plan.reason)
+      const effective = effectiveOf(model, sheet)(`values.${field}`) as {
+        current: number
+      }
+      return { chronicle, id, plan, current: effective.current }
+    }
+    const events = (id: string, list: readonly SheetEvent[]) =>
+      as(ctx, player, 'POST', `/characters/${id}/events`, {
+        clientBatchId: crypto.randomUUID(),
+        events: list,
+      })
+    const changes = async (id: string) =>
+      (
+        (await (
+          await as(ctx, storyteller, 'GET', `/characters/${id}/history`)
+        ).json()) as { items: { id: string; changes: { change: string }[] }[] }
+      ).items
+    const revertBatch = (chronicle: string, batch: string) =>
+      as(ctx, storyteller, 'POST', `/chronicles/${chronicle}/operations`, {
+        clientOperationId: crypto.randomUUID(),
+        kind: 'revert',
+        revertsBatchId: batch,
+      })
+    // O "Desfazer" do toast: o inverso do lote, que esvazia o caminho
+    const inverse = (list: readonly SheetEvent[]) =>
+      list.map(e => ({ path: e.path, from: e.to, to: e.from }))
+
+    it(`${system}: o desfazer do app diz o efetivo, e o narrador desfaz esse desfazer sem conflito`, async () => {
+      const { chronicle, id, plan, current } = await fresh()
+      expect(current).toBeGreaterThan(0)
+      expect((await events(id, plan.events)).status).toBe(200)
+      ctx.clock.advance(1000)
+      expect((await events(id, inverse(plan.events))).status).toBe(200)
+      const items = await changes(id)
+      expect(items.map(i => i.changes[0]?.change)).toEqual([
+        `${current - 1} → ${current}`,
+        `${current} → ${current - 1}`,
+      ])
+      const stored = await ctx.db
+        .selectFrom('character_events')
+        .select(['to_value', 'from_absent'])
+        .where('batch_id', '=', items[0]?.id as string)
+        .executeTakeFirstOrThrow()
+      expect(stored.to_value).toMatchObject({ current })
+      expect(stored.from_absent).toBe(false)
+      // O narrador desfaz o desfazer: o caminho vazio mostra o mesmo valor
+      // que o lote deixou, então não há conflito, e o gasto volta
+      ctx.clock.advance(1000)
+      const res = await revertBatch(chronicle, items[0]?.id as string)
+      expect(res.status).toBe(201)
+      const sheet = (await row(id)).sheet_data as {
+        values: Record<string, { current: number }>
+      }
+      expect(sheet.values[field]?.current).toBe(current - 1)
+    })
+
+    it(`${system}: o narrador desfaz o gasto no Histórico, e a linha diz o efetivo`, async () => {
+      const { chronicle, id, plan, current } = await fresh()
+      expect((await events(id, plan.events)).status).toBe(200)
+      const [spent] = await changes(id)
+      ctx.clock.advance(1000)
+      const res = await revertBatch(chronicle, spent?.id as string)
+      expect(res.status).toBe(201)
+      // O caminho volta vazio (o padrão volta a acompanhar a fonte)
+      const sheet = (await row(id)).sheet_data as {
+        values: Record<string, unknown>
+      }
+      expect(sheet.values[field]).toBeUndefined()
+      const [reverted] = await changes(id)
+      expect(reverted?.changes[0]?.change).toBe(`${current - 1} → ${current}`)
+    })
+
+    it(`${system}: uma escrita depois do desfazer continua conflito`, async () => {
+      const { chronicle, id, plan } = await fresh()
+      expect((await events(id, plan.events)).status).toBe(200)
+      ctx.clock.advance(1000)
+      expect((await events(id, inverse(plan.events))).status).toBe(200)
+      const [undone] = await changes(id)
+      // A jogadora gasta de novo: o caminho tem valor e mudou
+      ctx.clock.advance(1000)
+      expect((await events(id, plan.events)).status).toBe(200)
+      const res = await revertBatch(chronicle, undone?.id as string)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'REVERT_CONFLICT' })
+    })
+  }
 })
