@@ -240,6 +240,10 @@ const CAPTION = 13
 const EM_PER_CHAR = 0.6
 const SEP = ' · '
 
+/** Quantos caracteres de `caption` cabem numa linha de `width` dp. */
+export const captionChars = (width: number, fontScale: number): number =>
+  width / (CAPTION * (fontScale > 0 ? fontScale : 1) * EM_PER_CHAR)
+
 /** "Faltam:" com dois ou mais itens, "Falta:" com um. */
 export const guidePrefix = (total: number): string =>
   total === 1 ? 'Falta:' : 'Faltam:'
@@ -262,8 +266,7 @@ export function fitGuide(
   fontScale: number
 ): { readonly shown: readonly GuideItem[]; readonly more: number } {
   if (!items.length) return { shown: [], more: 0 }
-  const capacity =
-    width / (CAPTION * (fontScale > 0 ? fontScale : 1) * EM_PER_CHAR)
+  const capacity = captionChars(width, fontScale)
   const prefix = `${guidePrefix(items.length)} `
   let used = prefix.length
   const shown: GuideItem[] = []
