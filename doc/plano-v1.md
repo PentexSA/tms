@@ -22,9 +22,9 @@ Como usar: o mesmo da v0. Cada etapa é um PR, só termina com os testes verdes 
 A v1 está pronta quando esta jornada roda inteira no app e no web, e um teste E2E a repete no CI:
 
 1. O narrador cria uma crônica e escolhe **Mago (M20)** entre os sistemas publicados.
-2. O jogador entra com o convite e cria a ficha: nome, conceito, tradição, essência, casa, natureza e comportamento. O formulário sai do template.
+2. O jogador entra com o convite e cria a ficha: nome, conceito, tradição, essência, casa ou subgrupo (opcional), natureza e comportamento. O formulário sai do template. (D-12)
 3. A ficha abre em **Editar**: atributos, habilidades, Arete, Esferas, afinidade, antecedentes (Avatar, Nodo), Foco (paradigma, prática e instrumentos) e rotinas. Salvar grava **um** lote.
-4. Uma Esfera acima do Arete é aceita e aparece como **inativa**. Baixar o Arete não apaga ponto nenhum.
+4. No Editar (criação livre, ou o narrador), uma Esfera acima do Arete é aceita e aparece como **inativa**; baixar o Arete não apaga ponto nenhum. Na Criação (por pontos, v4), o `hard-cap` do template não deixa passar (Arete até 3, Esfera até o Arete): a recusa aparece perto do toque, e o servidor recusa o lote. No pedido de XP, a Esfera também não passa do Arete. (D-13)
 5. Em **Jogo**, o dock mostra Vitalidade, a roda de Quintessência e Paradoxo e FdV. O jogador ganha Quintessência, ganha Paradoxo com a roda cheia (consome 1 de Quintessência, com aviso e Desfazer) e leva dano. Tudo funciona offline.
 6. O narrador vê a mesa com a roda de cada mago e lê no histórico "Paradoxo 2 → 3".
 7. O jogador rola **Conjurar efeito**: a parada de Arete, com a dificuldade informada. **Este passo é a linha de corte** (Etapa 6).
@@ -61,6 +61,25 @@ Ainda falta provar fora desta máquina:
 - a publicação no ambiente de verdade, só depois de a versão do app com a roda estar no ar (Etapa 7).
 
 ---
+
+## Depois do teste com personas (ondas 1 a 5)
+
+O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz-achados.md)) comparou a tela com este plano. Pela D-13, o §1 foi alinhado ao que a tela faz, no próprio item e sem renumerar (o `journey-mage.spec.ts` cita os itens pelo número); cada item revisto leva a decisão entre parênteses. As Etapas continuam como registro: onde uma delas afirma algo que a tela não faz mais, uma linha "Revisto" diz o que mudou.
+
+**Decisões que mudam esta jornada** (a tabela "Decisões de produto" da matriz tem o texto inteiro de cada uma):
+
+| Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
+|---|---|---|---|
+| D-01 | No Editar, a barra mostra "Salvar" (nome acessível "Salvar alterações"), e o resumo do lote, com os campos que ficam com pontos inativos, abre no "Salvar" (Etapa 5) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 e 3 |
+| D-08 | −/+ na própria linha dos itens de lista com valor (os Antecedentes, como Avatar e Nodo); a folha do item fica para nome, especialização e notas (item 3) | onda 4, P07-D | — |
+| D-09 | A Esfera de afinidade da Tradição tem o selo "da Tradição"; escolher outra avisa "fora da Tradição: confirme com o narrador", sem bloquear | onda 4, P07-D | — |
+| D-11 | "?" com uma frase curta do template ao lado dos campos, das opções (Tradições, Essências) e das Esferas, na Nova ficha, na Criação e no Editar | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 10, 11 e 13 |
+| D-12 | O campo "Casa ou subgrupo" fica em todas as Tradições, opcional, sem esconder nenhum campo (item 2) | onda 4, P10-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 12 |
+| D-13 | Este registro e os itens 2 e 4 do §1 | onda 5, P01-D | — |
+
+**"Escolher da lista".** A identidade do Mago não tem sugestões de Natureza e Comportamento, como o Vampiro tem; a parte da R-29 que a pediria ficou fora da onda 4 ([onda-4.md](planos-pacotes/onda-4.md) §6, ponto 17, em aberto).
+
+**Ainda não conferido:** as frases do "?" e o mapa Tradição → Esferas recomendadas são rascunho do time, para revisão ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
 
 ## 2. Ponto de partida
 
@@ -235,13 +254,15 @@ M · depende de: 1
 
 **Objetivo.** O jogador entende o `cap` sem ler a regra: vê o teto, pode passar dele e sabe o que acontece.
 
+**Revisto:** vale para o Editar. A criação por pontos da v4 aplica o `hard-cap` do `mta-m20` (Arete até 3, Esfera até o Arete), e a Esfera não passa do Arete na Criação nem no pedido de XP (§1, item 4; D-13).
+
 **Entrega.**
 
 - `NumberEditorRow` de `rating` com `cap`:
   - mostra o teto com o rótulo do template ("máx. pelo Arete 3");
   - o stepper deixa passar do teto até o `max` do campo, e a linha avisa "Forças 4: 1 inativo enquanto o Arete for 3";
   - o leitor de tela ouve o mesmo aviso.
-- Baixar o campo que é teto de outros (o Arete) mostra, no resumo do Concluir, quais campos ficam com pontos inativos. A informação vem do `resolve` da ficha rascunho, não de código do Mago.
+- Baixar o campo que é teto de outros (o Arete) mostra, no resumo do Salvar (D-01; no plano original, "do Concluir"), quais campos ficam com pontos inativos. A informação vem do `resolve` da ficha rascunho, não de código do Mago.
 - `badge` de seção no `GroupsLayout` (contrato §6): a linha cujo id é o valor do `choice` citado ganha o selo ("Afinidade"). Funciona em `groups` e `list`, como o contrato diz.
 - Editor de `list` sem `value` (as rotinas): nome e notas, sem stepper.
 
