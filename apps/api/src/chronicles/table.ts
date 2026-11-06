@@ -12,7 +12,7 @@ import { requireUser } from '../auth/guard'
 import { chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
-import { creationStateOf } from '../sheets/creation-state'
+import { creationInputView, creationStateOf } from '../sheets/creation-state'
 import { modelFor } from '../sheets/models'
 
 // Mesa do narrador (doc/plano-v0.md, Etapa 19): todas as fichas da crônica
@@ -31,6 +31,11 @@ import { modelFor } from '../sheets/models'
 // trava, estado e retrato. O `by` é um enum calculado aqui contra quem pede e
 // contra o dono: a resposta não leva o `created_by` nem o nome de outro
 // narrador ou jogador.
+//
+// P09-D (R-15): o PC em criação por pontos leva a entrada da conta
+// (`creationInput`: escolhas e camada da configuração), para o app fazer no
+// cartão a mesma conta da barra do jogador. A conta fica no app: aqui seria
+// ~45 `resolve` por ficha a cada leitura de uma rota sem limite de taxa.
 
 const notFound = () => new ApiError(404, 'não encontrado')
 
@@ -135,6 +140,9 @@ export function tableRoutes(
           // O estado da criação (P04-D, R-12), como na lista: o modo e os
           // marcadores, sem o motivo
           ...creationStateOf(model, r.status, r.creation),
+          // P09-D (R-15): a entrada da conta, para o progresso no cartão; só
+          // escolhas e camada, nunca o motivo
+          creationInput: creationInputView(model, r),
           activatedAt: r.activated_at,
           lockedAt: r.locked_at,
           updatedAt: r.updated_at,

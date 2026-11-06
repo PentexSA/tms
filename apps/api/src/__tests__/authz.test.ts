@@ -306,6 +306,67 @@ for (const system of MATRIX_SYSTEMS) {
       }
       expect(JSON.stringify(rows)).not.toContain('created_by')
     })
+
+    // P09-D (R-15): a entrada da conta da criação (escolhas e camada) sai só
+    // na Mesa, só para o narrador, e nunca para o NPC oculto
+    it('a Mesa do narrador: creationInput só para ele, nunca no NPC', async () => {
+      const reason = 'motivo-do-ajuste-da-matriz-p09d'
+      const layer = {
+        choices: {
+          priorities: { attributes: ['mental', 'social', 'physical'] },
+        },
+        config: { freebies: 13 },
+      }
+      const points = await createCharacter(
+        shared.ctx,
+        shared.users.owner,
+        shared.chronicleId,
+        { name: 'Por pontos' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({
+          creation: JSON.stringify({
+            ...layer,
+            adjust: { reason, at: '2026-11-05T10:00:00Z' },
+          }),
+        })
+        .where('id', '=', points)
+        .execute()
+      const path = `/chronicles/${shared.chronicleId}/table`
+      const res = await as(shared.ctx, shared.users.storyteller, 'GET', path)
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      // O motivo do ajuste não sai nem para o narrador, pela Mesa
+      expect(text).not.toContain(reason)
+      const rows = JSON.parse(text) as {
+        id: string
+        creationInput: unknown
+      }[]
+      expect(rows.find(r => r.id === points)?.creationInput).toEqual(layer)
+      // O NPC oculto e a ficha da criação livre não têm entrada
+      expect(rows.find(r => r.id === shared.npcId)?.creationInput).toBeNull()
+      expect(
+        rows.find(r => r.id === shared.characterId)?.creationInput
+      ).toBeNull()
+      for (const actor of [
+        'owner',
+        'player',
+        'former',
+        'otherStoryteller',
+        'stranger',
+      ] as const) {
+        const denied = await as(shared.ctx, shared.users[actor], 'GET', path)
+        expect(denied.status).toBe(404)
+        const body = await denied.text()
+        expect(body).not.toContain('creationInput')
+        expect(body).not.toContain('mental')
+      }
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', '=', points)
+        .execute()
+    })
   })
 
   describe(`matriz de AuthZ: ${system}, linhas que mudam o estado`, () => {
