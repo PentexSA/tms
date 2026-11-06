@@ -98,3 +98,50 @@ test('ficha alheia: sem acesso', async ({ page }) => {
     page.getByRole('heading', { name: 'Você não tem acesso a esta ficha' })
   ).toBeVisible()
 })
+
+// T-84 (P13): a Citação fica editável no Editar, a 390
+test.describe('a 390', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('a dona edita a Citação no Sobre e salva', async ({ page }) => {
+    const context = page.context()
+    const user = await signUp(context, 'sobre_p13')
+    const chronicle = await apiAs<{ id: string }>(
+      context,
+      user,
+      'POST',
+      '/chronicles',
+      { name: 'Crônica do Sobre', systemCode: 'vtm-v20' }
+    )
+    await freeCreation(context, user, chronicle.id)
+    const character = await apiAs<{ id: string }>(
+      context,
+      user,
+      'POST',
+      `/chronicles/${chronicle.id}/characters`,
+      { values: { name: 'Helena Varga' } }
+    )
+    await completeCreation(context, user, character.id)
+    await page.goto(`/characters/${character.id}`)
+    await page.getByRole('radio', { name: 'Editar', exact: true }).click()
+    await page.getByRole('tab', { name: 'Sobre' }).click()
+    await page.getByTestId('editor-quote').last().click()
+    await page.getByRole('textbox', { name: 'Citação' }).fill('Uma frase nova.')
+    await page.getByRole('button', { name: 'Aplicar' }).click()
+    const saved = page.waitForResponse(
+      r =>
+        /\/characters\/[0-9a-f-]{36}\/events$/.test(r.url()) &&
+        r.request().method() === 'POST' &&
+        r.status() === 200
+    )
+    await page.getByRole('button', { name: 'Salvar', exact: true }).click()
+    await saved
+    const after = await apiAs<{ sheet: { values: Record<string, unknown> } }>(
+      context,
+      user,
+      'GET',
+      `/characters/${character.id}`
+    )
+    expect(after.sheet.values.quote).toBe('Uma frase nova.')
+  })
+})
