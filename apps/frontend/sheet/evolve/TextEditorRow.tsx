@@ -8,12 +8,13 @@ import {
   tokens,
   useTheme,
 } from '@tms/ui'
-import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useId, useState } from 'react'
+import { Platform, StyleSheet, View } from 'react-native'
 import { submitField } from '../../lib/keyboard'
-import { useSheet } from '../context'
+import { useSheet, useSheetSelector } from '../context'
 import { properNameInput } from '../editors/properName'
 import { SuggestionChips } from '../editors/Suggestions'
+import { editorNotice } from '../storyteller/privacy'
 import type { FieldViewProps } from '../views/types'
 import { fieldA11y } from './a11y'
 import { useCompact } from './compact'
@@ -31,10 +32,16 @@ import { useTextDefault } from './recommend'
 // "Aplicar" sem mudar o texto não grava. O texto do jogador vence; apagar
 // tudo volta ao texto da opção. Com um texto próprio, a folha oferece voltar
 // a ele ("Usar o resumo"), com confirmação.
+//
+// Quando quem edita é o narrador numa ficha de jogador, a folha diz se o
+// jogador lê o texto (U-10: "O jogador lê este texto.") ou se é privado
+// (R-09), e o leitor de tela ouve o aviso com o campo.
 
 export function TextEditorRow({ resolved }: FieldViewProps) {
   const { colors } = useTheme()
-  const { model } = useSheet()
+  const { model, roles } = useSheet()
+  const npc = useSheetSelector(s => s.npc)
+  const noticeId = `${useId()}-notice`
   const set = useSetDraft()
   const issue = useFieldIssue(resolved.id)
   const compact = useCompact()
@@ -75,6 +82,7 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
     if (!err) setOpen(false)
   }
   const own = initial && !resolved.defaulted && value !== initial.text
+  const notice = editorNotice(model, resolved.id, roles, npc)
   return (
     <>
       <HelpRow
@@ -168,6 +176,17 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
             {`Trocar o seu texto pelo resumo de ${initial.option}?`}
           </Text>
         ) : null}
+        {notice ? (
+          <View style={styles.notice}>
+            <Text
+              variant="caption"
+              nativeID={noticeId}
+              testID={`notice-${resolved.id}`}
+            >
+              {notice}
+            </Text>
+          </View>
+        ) : null}
         <Field
           label={required ? `${def.label} (obrigatório)` : def.label}
           value={text}
@@ -182,6 +201,19 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           // aplica, como o "Digitar" (T-25); com erro, o campo fica aberto.
           // No texto longo, Enter continua sendo nova linha.
           {...(long ? {} : submitField('done', apply))}
+          // O aviso com o campo: a dica no app e, no web, o
+          // `aria-describedby` apontando o texto visível
+          // (sem perder o erro nem a dica do template)
+          {...(notice
+            ? {
+                accessibilityHint: [notice, error ?? def.help]
+                  .filter(Boolean)
+                  .join(' '),
+                ...(Platform.OS === 'web'
+                  ? ({ 'aria-describedby': noticeId } as Record<string, string>)
+                  : {}),
+              }
+            : {})}
         />
         {own && !confirming ? (
           <View style={styles.suggestions}>
@@ -222,4 +254,5 @@ const styles = StyleSheet.create({
   compact: { paddingHorizontal: 0, paddingVertical: tokens.space[1] },
   text: { flex: 1, gap: tokens.space['0.5'] },
   suggestions: { paddingTop: tokens.space[3] },
+  notice: { paddingBottom: tokens.space[2] },
 })
