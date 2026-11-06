@@ -50,6 +50,40 @@ describe('Conceder XP: Digitar (U-02)', () => {
     )
   })
 
+  it.each([
+    ['Enter', 'submitEditing', { nativeEvent: { text: '7' } }],
+    ['Esc', 'keyPress', { nativeEvent: { key: 'Escape' } }],
+  ])(
+    'no web, sair com %s devolve o foco ao "Digitar" (T-25)',
+    (_, event, payload) => {
+      setOS('web')
+      const focus = jest.fn()
+      const getElementById = jest.fn(() => ({ focus }))
+      const g = globalThis as { document?: unknown }
+      const previous = g.document
+      g.document = { getElementById }
+      try {
+        render(
+          <GrantForm
+            chronicleId="c1"
+            characterIds={['p1']}
+            commands={commands().value}
+          />
+        )
+        const valueId = screen.getByRole('button', {
+          name: 'Digitar XP a conceder',
+        }).props.nativeID as string
+        expect(valueId).toBeTruthy()
+        const input = typeAmount('XP a conceder', '7')
+        fireEvent(input, event, payload)
+        expect(getElementById).toHaveBeenCalledWith(valueId)
+        expect(focus).toHaveBeenCalled()
+      } finally {
+        g.document = previous
+      }
+    }
+  )
+
   it('1001 mostra a mensagem e, com Enter, o campo fica aberto; sair do campo não aplica', () => {
     setOS('web')
     render(

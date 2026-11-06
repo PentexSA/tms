@@ -19,7 +19,7 @@ import {
   type XpOutcome,
 } from '../../lib/queries/xp'
 import type { XpCommand, XpCommandKind } from '../../lib/xpCommands'
-import { parseTyped } from '../evolve/typing'
+import { useTypedValue } from '../evolve/useTypedValue'
 import { xpMessage } from './messages'
 
 // Formulários dos comandos de XP. A chave nasce ao confirmar e só é trocada
@@ -306,34 +306,18 @@ function TypedAmount({
   const { colors } = theme
   const [typing, setTyping] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const text = useRef('')
-  const done = useRef(true)
-  const finish = (how: 'submit' | 'leave') => {
-    if (done.current) return
-    const n = parseTyped(text.current, min, max)
-    if (n === null) {
-      setError(`Digite um número inteiro de ${min} a ${max}`)
-      if (how === 'submit') return
-    } else setError(null)
-    done.current = true
-    setTyping(false)
-    if (n !== null) onChange(n)
-  }
-  const cancel = () => {
-    done.current = true
-    setError(null)
-    setTyping(false)
-  }
-  const open = () => {
-    text.current = String(value)
-    done.current = false
-    setError(null)
-    setTyping(true)
-  }
-  const textOf = (e: { nativeEvent: unknown }) => {
-    const t = (e.nativeEvent as { text?: unknown } | undefined)?.text
-    if (typeof t === 'string') text.current = t
-  }
+  // O "Digitar" do Editar (T-25), com o estado local: a folha da Mesa também
+  // usa o formulário, e o store do Editar é da ficha
+  const typed = useTypedValue({
+    min,
+    max,
+    value,
+    typing,
+    apply: onChange,
+    setError,
+    open: () => setTyping(true),
+    close: () => setTyping(false),
+  })
   return (
     <View style={styles.form}>
       {typing ? (
@@ -343,27 +327,7 @@ function TypedAmount({
             testID={`${testID}-input`}
             accessibilityLabel={`${label}, de ${min} a ${max}`}
             keyboardType={signedKeyboard(signed)}
-            returnKeyType="done"
-            autoFocus
-            selectTextOnFocus
-            defaultValue={String(value)}
-            maxLength={Math.max(String(min).length, String(max).length) + 1}
-            onChangeText={t => {
-              text.current = t
-            }}
-            submitBehavior="submit"
-            {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
-            onSubmitEditing={e => {
-              textOf(e)
-              finish('submit')
-            }}
-            onBlur={e => {
-              textOf(e)
-              finish('leave')
-            }}
-            onKeyPress={e => {
-              if (e.nativeEvent.key === 'Escape') cancel()
-            }}
+            {...typed.inputProps}
             style={[
               styles.input,
               { minHeight: hitTarget() },
@@ -382,7 +346,8 @@ function TypedAmount({
           size="sheet"
           testID={testID}
           disabled={disabled}
-          onValuePress={disabled ? undefined : open}
+          onValuePress={disabled ? undefined : typed.start}
+          valueNativeID={typed.valueId}
           {...(valueText ? { valueText } : {})}
           onChange={onChange}
         />

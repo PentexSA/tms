@@ -1,15 +1,16 @@
 import { inactiveNote, modifierNote } from '@tms/sheet-core'
 import { hitTarget, Stepper, Text, textStyle, tokens, useTheme } from '@tms/ui'
-import { useEffect, useId, useRef, useState } from 'react'
-import { Platform, StyleSheet, TextInput } from 'react-native'
+import { useEffect, useId, useState } from 'react'
+import { StyleSheet, TextInput } from 'react-native'
 import type { FieldViewProps } from '../views/types'
 import { BlockedNote } from './BlockedNote'
 import { EditorShell } from './EditorShell'
 import { fieldHelp } from './help'
 import { useBlockedNote, useFieldIssue, useSetDraft } from './hooks'
 import { SpecialtyEditor } from './SpecialtyEditor'
-import { parseTyped, typingStore, useTyping } from './typing'
+import { typingStore, useTyping } from './typing'
 import { useRowFeedback } from './useRowFeedback'
+import { useTypedValue } from './useTypedValue'
 
 // rating, number e percent em Evoluir (DS: FieldRow com Stepper inline). O
 // Stepper muda 1 por toque; tocar no valor abre o teclado numérico. O que
@@ -71,71 +72,26 @@ export function NumberEditorRow(props: FieldViewProps) {
   const [error, setError] = useState<string | null>(null)
   const instance = useId()
   const typing = useTyping(instance)
-  // O texto digitado e a trava de execução única (o app dispara o fim da
-  // edição junto do Enter)
-  const text = useRef('')
-  const done = useRef(true)
   // Sumir com o campo aberto (outra aba) não deixa o store apontando para cá
   useEffect(() => () => typingStore.close(instance), [instance])
-  // Enter e Esc desmontam o campo focado: no web, o foco volta ao "Digitar"
-  // (sem isso cairia no body). Ao sair com Tab ou clique, o foco já foi
-  // para onde a pessoa quis.
-  const valueId = `${instance}-digitar`
-  const refocus = useRef(false)
-  useEffect(() => {
-    if (typing || !refocus.current) return
-    refocus.current = false
-    if (Platform.OS !== 'web') return
-    const doc = (
-      globalThis as {
-        document?: { getElementById?: (id: string) => unknown }
-      }
-    ).document
-    const button = doc?.getElementById?.(valueId) as
-      | { focus?: () => void }
-      | null
-      | undefined
-    button?.focus?.()
-  }, [typing, valueId])
   const range = rangeOf(props)
-  if (!range) return null
-  const def = resolved.field.def
   const apply = (n: number) => {
     setError(null)
     set(path, n)
   }
-  // O evento traz o texto quando pode (Enter no app; Enter e blur no web);
-  // senão vale o último onChangeText
-  const textOf = (e: { nativeEvent: unknown }) => {
-    const t = (e.nativeEvent as { text?: unknown } | undefined)?.text
-    if (typeof t === 'string') text.current = t
-  }
-  const finish = (how: 'submit' | 'leave') => {
-    if (done.current) return
-    const n = parseTyped(text.current, range.min, range.max)
-    if (n === null) {
-      setError(`Digite um número inteiro de ${range.min} a ${range.max}`)
-      // Enter: o campo fica aberto para corrigir
-      if (how === 'submit') return
-    }
-    done.current = true
-    refocus.current = how === 'submit'
-    typingStore.close(instance)
-    if (n !== null) apply(n)
-  }
-  // Esc: fecha sem aplicar e sem a mensagem de um valor que não vai valer
-  const cancel = () => {
-    done.current = true
-    refocus.current = true
-    setError(null)
-    typingStore.close(instance)
-  }
-  const open = () => {
-    text.current = String(range.value)
-    done.current = false
-    setError(null)
-    typingStore.open(instance, () => finish('leave'))
-  }
+  // O "Digitar" comum (T-25): o mesmo do XP; aqui, um campo aberto por vez
+  const typed = useTypedValue({
+    min: range?.min ?? 0,
+    max: range?.max ?? 0,
+    value: range?.value ?? 0,
+    typing,
+    apply,
+    setError,
+    open: leave => typingStore.open(instance, leave),
+    close: () => typingStore.close(instance),
+  })
+  if (!range) return null
+  const def = resolved.field.def
   // O teto e, acima dele, o que fica inativo ("1 inativo, máx. pelo Arete 3")
   const capNote =
     resolved.type === 'rating' && resolved.field.def.cap
@@ -205,31 +161,7 @@ export function NumberEditorRow(props: FieldViewProps) {
         <TextInput
           accessibilityLabel={`${def.label}, de ${range.min} a ${range.max}`}
           keyboardType="number-pad"
-          returnKeyType="done"
-          autoFocus
-          selectTextOnFocus
-          defaultValue={String(range.value)}
-          // O sinal de negativo cabe; decimal é recusado com a mensagem
-          maxLength={
-            Math.max(String(range.min).length, String(range.max).length) + 1
-          }
-          onChangeText={t => {
-            text.current = t
-          }}
-          // Enter não tira o foco: com valor inválido, o campo fica aberto
-          submitBehavior="submit"
-          {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
-          onSubmitEditing={e => {
-            textOf(e)
-            finish('submit')
-          }}
-          onBlur={e => {
-            textOf(e)
-            finish('leave')
-          }}
-          onKeyPress={e => {
-            if (e.nativeEvent.key === 'Escape') cancel()
-          }}
+          {...typed.inputProps}
           style={[
             styles.input,
             { minHeight: hitTarget() },
@@ -246,8 +178,8 @@ export function NumberEditorRow(props: FieldViewProps) {
           onChange={apply}
           valueText={range.spoken}
           disabled={blocked !== null}
-          onValuePress={blocked ? undefined : open}
-          valueNativeID={valueId}
+          onValuePress={blocked ? undefined : typed.start}
+          valueNativeID={typed.valueId}
           increase={feedback.increase}
           decrease={feedback.decrease}
         />
