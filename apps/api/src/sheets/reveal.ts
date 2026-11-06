@@ -110,7 +110,9 @@ export function revealRoutes(
           }
           // NPC tem a própria visibilidade; na própria ficha o narrador já lê
           if (row.kind !== 'pc' || row.userId === me) throw unavailable()
-          const model = await modelFor(db, row.systemId, row.templateVersion)
+          // Na transação (`trx`): outra conexão travaria no PGLite e esgotaria
+          // o pool com a linha da ficha presa
+          const model = await modelFor(trx, row.systemId, row.templateVersion)
           if (!revealableSections(model).includes(body.section))
             throw unavailable()
 

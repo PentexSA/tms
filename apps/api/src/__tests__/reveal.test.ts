@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { compileTemplate } from '@tms/sheet-core'
 import { revealedOf, revealedValues } from '../sheets/reveal'
+import { publishTemplate } from '../templates/publish'
 import {
   addMember,
   as,
@@ -494,4 +495,42 @@ describe('revealedOf: só seções reveláveis do modelo', () => {
       )
     ).toEqual([])
   })
+})
+
+// O modelo da ficha é lido na transação da rota (`trx`), não noutra conexão
+// do pool, que ficaria presa enquanto a linha da ficha está travada. Com o
+// cache de modelos frio (versão publicada agora, ficha criada no banco),
+// revelar é a primeira leitura dele. O PGLite deste arquivo não reproduz a
+// espera (o teste passa também com `db`): ele fixa o caminho frio, e a
+// concorrência em Postgres real fica no backstage.pg.test.ts
+describe('revelar com o cache de modelos frio', () => {
+  beforeEach(async () => {
+    await destroyTestDb()
+    ctx = await createTestContext()
+  })
+  afterEach(async () => destroyTestDb())
+
+  it('a primeira leitura do modelo é a da rota de revelar', async () => {
+    const t = template('vtm-v20')
+    t.templateVersion = `9.${Date.now() % 100000}.0`
+    await publishTemplate(ctx.db, t)
+    storyteller = await createUser(ctx, 'narradora-frio')
+    owner = await createUser(ctx, 'dona-frio')
+    chronicleId = await createChronicle(ctx, storyteller)
+    await addMember(ctx, chronicleId, owner)
+    characterId = await createCharacter(ctx, owner, chronicleId)
+    const res = await as(
+      ctx,
+      storyteller,
+      'POST',
+      `/characters/${characterId}/reveal`,
+      {
+        clientCommandId: crypto.randomUUID(),
+        section: 'storyteller',
+        revealed: true,
+        revision: 0,
+      }
+    )
+    expect(res.status).toBe(200)
+  }, 10_000)
 })
