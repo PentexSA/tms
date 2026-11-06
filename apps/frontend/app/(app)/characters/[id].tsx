@@ -7,6 +7,7 @@ import {
 } from 'expo-router'
 import { useEffect, useState } from 'react'
 
+import { useBackTo } from '../../../lib/navigation'
 import { captureError } from '../../../lib/telemetry'
 import { SheetScreen } from '../../../sheet/SheetScreen'
 import { ReloadButton } from '../../../sheet/UnsupportedTemplate'
@@ -33,21 +34,14 @@ export default function CharacterRoute() {
  * ficha foi criada: a rota também abre por link, com qualquer id.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  const router = useRouter()
+  const backToList = useBackTo('/')
   // Este boundary engole o erro antes da raiz: quem avisa o error tracking é ele
   useEffect(() => {
     captureError(error, { source: 'boundary' })
   }, [error])
   return (
     <Screen>
-      <AppBar
-        title="Ficha"
-        back={{
-          label: 'Crônicas',
-          onPress: () =>
-            router.canGoBack?.() ? router.back() : router.replace('/'),
-        }}
-      />
+      <AppBar title="Ficha" back={{ label: 'Crônicas', onPress: backToList }} />
       <EmptyState
         title="Não foi possível mostrar esta ficha"
         message="O que já foi salvo continua na crônica. Tente de novo; se o erro continuar, avise o narrador."
