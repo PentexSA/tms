@@ -100,7 +100,7 @@ export interface HistoryEvent extends SheetEvent {
   // O caminho não tinha valor guardado antes do lote (§7, decisão 3)
   readonly fromAbsent?: boolean
   // O "para" cru era vazio: o lote esvaziou o caminho, e o `to` gravado é o
-  // efetivo de então (T-53, migration 0026)
+  // efetivo de então (T-53, migration 0024)
   readonly toAbsent?: boolean
 }
 

@@ -8,8 +8,9 @@ import type { Kysely } from 'kysely'
 // cru, como antes. As linhas antigas ficam `false`: elas gravaram o "para"
 // cru, e a comparação delas não muda.
 //
-// O número é 0026: a 0024 (P15-D) e a 0025 (P16-D) entram na onda depois
-// deste pacote, e o rebase ordena a lista 0024, 0025, 0026.
+// O número é 0024: o P13 entra na onda antes do P15-D e do P16-D, e o
+// Migrator roda sem `allowUnorderedMigrations` (um banco com um número
+// maior já aplicado recusa os menores que chegam depois).
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .alterTable('character_events')

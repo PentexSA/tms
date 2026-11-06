@@ -636,7 +636,7 @@ describe('o "para" efetivo no Histórico (T-53), nos três sistemas', () => {
         .executeTakeFirstOrThrow()
       expect(stored.to_value).toMatchObject({ current })
       expect(stored.from_absent).toBe(false)
-      // O "para" cru era vazio (0026): só assim o caminho vazio passa
+      // O "para" cru era vazio (0024): só assim o caminho vazio passa
       expect(stored.to_absent).toBe(true)
       // O narrador desfaz o desfazer: o caminho vazio mostra o mesmo valor
       // que o lote deixou, então não há conflito, e o gasto volta

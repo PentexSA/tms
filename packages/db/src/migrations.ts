@@ -22,7 +22,7 @@ import * as m0020 from './migrations/0020_product_templates'
 import * as m0021 from './migrations/0021_timestamptz'
 import * as m0022 from './migrations/0022_user_commands'
 import * as m0023 from './migrations/0023_templates_onda4'
-import * as m0026 from './migrations/0026_character_events_to_absent'
+import * as m0024 from './migrations/0024_character_events_to_absent'
 
 /**
  * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
@@ -53,7 +53,7 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0021_timestamptz': m0021,
   '0022_user_commands': m0022,
   '0023_templates_onda4': m0023,
-  '0026_character_events_to_absent': m0026,
+  '0024_character_events_to_absent': m0024,
 }
 
 export const migrationProvider: MigrationProvider = {
