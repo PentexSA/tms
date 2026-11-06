@@ -654,6 +654,84 @@ A ordem proposta: o P09-D não depende do P12, do P13, do P15-D nem do P16-D. **
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementação em 05 e 06/11/2026, na `pacote/p09-d-mesa-progresso`, em paralelo com o P14-D, o P13, o P12 e o P01-D (cada um no seu worktree). Os pontos para o PO e as perguntas técnicas seguiram a recomendação deste plano; nada foi decidido aqui:
+
+- painel recolhido acima das abas (alternativa A);
+- "Habilidades: faltam N" por orçamento;
+- dois filtros, com "terminei" em "Pendentes";
+- o resumo com os rótulos (o `summaryLine`, 3 linhas a 390).
+
+**Commits:** os 10 da §8.1, na ordem, mais 2 `fix` do `/code-review`:
+
+| Commit | O que entrou |
+|---|---|
+| `74f3965` | 1: `creationInput` na Mesa |
+| `dceece3` | 2: `creatingCount` na lista |
+| `f8293bf` | 3: `progress.ts` |
+| `31557da` | 4: o progresso no cartão |
+| `50a9f32` | 5: o filtro de etapa |
+| `a13ab9d` | 6: a contagem na lista |
+| `99fa2f0` | 7: a aba Pontos em `pending` |
+| `4b930c1` | 8: o painel recolhido |
+| `f027202` | 9: o `table-creation.spec.ts` |
+| `3569158` | 10: o `components.md` |
+| `0e38d1b` | fix do `/code-review`: o bônus e o "A conta fechou" no `fitProgress` |
+| `07962a4` | fix do `/code-review`: o resumo depois de salvar |
+
+**O que ficou fora, e por quê:**
+
+1. **A aba "Pontos" para o dono em `pending`** (ponto 4 do PO). Não entrou, porque o plano a dá como "se o PO quiser", não como padrão.
+2. **"Padrão do sistema" e "Restaurar padrão"** (ponto 7 do PO). Ficam fora da D-10, à espera de uma linha nova na matriz.
+3. **Mandar o `defaults` só quando mudou** (pergunta técnica 5) não entrou. A primeira gravação sem mudança continua escrevendo "orçamento padrão alterado" na auditoria, como já acontecia quando só a aprovação mudava.
+4. **O adiamento do cálculo para depois do primeiro desenho** (pergunta 1) não entrou. A medida no iPhone SE é da integração. O spec só anota o tempo até o décimo cartão, sem limite.
+5. **O E2E não rodou aqui.** O `table-creation.spec.ts` foi escrito e passa no typecheck. Os specs da §4.3 foram lidos, não rodados, e nenhum seletor mudou. O orquestrador roda tudo na integração, em série.
+6. **A invalidação da lista** no "Pedir ajuste" e no "Avisar que terminei" (pergunta 8) já existia: o `useRefresh` de `lib/queries/creation.ts` invalida `chronicleKeys.all` em todos os comandos da criação. O commit 6 não mexeu ali.
+
+**Desvios de desenho:**
+
+7. **`creationProgress(check)` não recebe o `model`.** A assinatura da §3.2 tinha o `model`, mas os rótulos já vêm do `check`.
+8. **`captionChars`** sai do `guide.ts` e é usado pelo `fitGuide` e pelo `fitProgress`. Assim, a conta de largura fica num lugar só.
+9. **A contagem de "N traços para corrigir"** conta caminhos distintos, não problemas: dois problemas no mesmo campo valem um traço. É um achado do `/code-review`.
+10. **"Mostrando N de M"** conta os PCs do escopo. O NPC nunca entra no filtro e também não entra no M.
+11. **A Mesa vazia** mantém "Nenhuma ficha na crônica ainda." e ganha uma segunda linha, "As fichas aparecem aqui com a etapa da criação e o que falta.", em vez de uma frase só. Os testes e specs que procuram o texto de hoje continuam valendo.
+12. **O foco do "Editar" e do "Cancelar".** O `Button` do `@tms/ui` não expõe `ref`, e o pacote não muda o `@tms/ui`.
+    - **No web,** o foco vai ao primeiro elemento focável da vista: o rádio da aprovação ao abrir e o "Editar" ao recolher. O spec confere no DOM.
+    - **No app,** o evento de foco vai à vista que embrulha o botão. Essa vista não é acessível, e o VoiceOver e o TalkBack podem não mover o foco (achado do `/code-review`, aceito aqui).
+    - **No rebase do P12,** que traz a `ref` do `Button`, o foco nativo passa a usá-la. Fica no roteiro do iOS (§11), e no AVD fica não conferido, porque o AVD não tem TalkBack.
+13. **O resumo recolhido depois de salvar** lê um estado local `saved` (achado do `/code-review`). Ele segue a crônica quando a rebusca chega e, antes dela, guarda o que acabou de ser salvo. O `revision` mandado ao servidor continua o da crônica, e o 409 de revisão fica como estava.
+
+**Achados do `/code-review` (high) não corrigidos, com o motivo:**
+
+14. **A Mesa conta o PC do próprio narrador em "Em criação" e a lista não.** É a pergunta técnica 7, e o plano mantém a diferença, que só aparece depois de uma transferência.
+15. **O `creationInputView` refaz o parse que o `creationStateOf` já faz na mesma linha.** Juntar os dois mexeria no `creationStateOf`, que também serve a `GET /chronicles/:id/characters` (a lista do jogador), e a resposta do jogador não pode ganhar o campo. O custo é um parse a mais por PC em criação, sem `resolve`.
+16. **O `cardTextWidth` repete a conta de recuo e borda dos estilos do cartão e da grade.** O `table.test.tsx` fixa os números de hoje (358, 328 e a grade de 1280), e o spec confere no DOM que a linha cabe na célula.
+
+**Segurança.** O `/security-review` cobriu o diff inteiro e não achou nada de confiança alta ou média:
+
+- a Mesa e a contagem continuam só do narrador;
+- a subconsulta é parametrizada;
+- o `creationInput` vai por lista explícita, sem motivo nem marcador;
+- o NPC fica fora;
+- nada é renderizado como HTML.
+
+**Testes, no worktree:**
+
+- **API:** 1972 pass e 0 fail (`test:coverage`). A matriz de AuthZ tem 1129 testes nos três sistemas.
+- **Frontend:** 1638 testes no `test:coverage`. Um caso falhou por timeout de 10 s, sob a carga dos cinco worktrees: `new-sheets.a11y.test.tsx`, o "Sair" no iOS, fora deste pacote. Sozinho, o arquivo passa (6 de 6).
+- **Cobertura:** nenhuma meta quebrou (`progress.ts`: 98,8% de linhas).
+- **Lint e typecheck:** verdes.
+
+**Para o rebase:**
+
+- `authz.test.ts`: dois casos novos no fim do bloco não mutável de cada sistema;
+- `chronicles/routes.ts`: só o `GET /chronicles`;
+- `app/(app)/index.tsx`: só o `chronicleMeta`;
+- `SheetView.tsx`: só o `budget`;
+- `CreationPanel.tsx` e `guide.ts`;
+- `components.md`.
+
+O `chronicles/[id]/index.tsx` não foi tocado.
+
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
 Roteiro para conferir cada item na interface, nas três plataformas, com a API local e o seed do roteiro. Só contas fictícias. Ele detalha o passo 6 da §7. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
