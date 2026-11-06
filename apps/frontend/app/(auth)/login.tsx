@@ -11,6 +11,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { hasPendingInvite } from '../../lib/invite/pending'
+import { usePendingInvite } from '../../lib/invite/usePendingInvite'
 import { nextField } from '../../lib/keyboard'
 import { AuthError } from '../../lib/session'
 import { useSession } from '../../lib/session/SessionProvider'
@@ -20,6 +22,8 @@ export default function LoginScreen() {
   const router = useRouter()
   // Veio da exclusão de conta (app/(app)/account.tsx)
   const { deleted } = useLocalSearchParams<{ deleted?: string }>()
+  // Um convite chegou por link (P12): o aviso, sem o código nem a crônica
+  const invite = usePendingInvite() !== null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +39,7 @@ export default function LoginScreen() {
     setError(null)
     try {
       await session.login(email.trim(), password)
-      router.replace('/')
+      router.replace(hasPendingInvite() ? '/join' : '/')
     } catch (e) {
       setError(e instanceof AuthError ? e.message : 'Não foi possível entrar')
     } finally {
@@ -60,6 +64,12 @@ export default function LoginScreen() {
               tone="success"
               title="Conta excluída"
               message="Seus dados foram apagados, inclusive os deste aparelho."
+            />
+          ) : null}
+          {invite ? (
+            <Banner
+              tone="info"
+              message="Você recebeu um convite para uma crônica. Entre ou crie sua conta para continuar."
             />
           ) : null}
           {error ? <Banner tone="danger" message={error} /> : null}

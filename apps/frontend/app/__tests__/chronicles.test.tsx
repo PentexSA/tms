@@ -4,6 +4,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { FlatList, Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
+import {
+  clearPendingInvite,
+  peekPendingInvite,
+  setPendingInvite,
+} from '../../lib/invite/pending'
 import { createMemoryDraftStore } from '../../sheet/sync/draftStore'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import {
@@ -515,6 +520,52 @@ describe('Entrar com convite', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'convite inválido ou expirado'
     )
+  })
+})
+
+// P12, D-14: o link preenche o campo; o aceite continua no toque
+describe('Entrar com convite pelo link', () => {
+  const CODE = 'ABCD2345EFGH6789JKMN0PQRST'
+  afterEach(() => clearPendingInvite())
+
+  it('campo preenchido, a conta dita, nada enviado até o toque', async () => {
+    setPendingInvite(CODE)
+    calls.acceptPost.mockResolvedValue(
+      ok({ chronicleId: CHRONICLE_ID, role: 'player' })
+    )
+    const session = await signedIn()
+    renderWithSession(<JoinScreen />, session)
+    expect(screen.getByTestId('invite-code').props.value).toBe(CODE)
+    const username = session.getState().user?.username ?? ''
+    expect(
+      screen.getByText(`Convite recebido. Você vai entrar como ${username}.`)
+    ).toBeTruthy()
+    expect(calls.acceptPost).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Entrar na crônica' }))
+    })
+    expect(calls.acceptPost).toHaveBeenCalledWith({ code: CODE })
+    expect(peekPendingInvite()).toBeNull()
+    expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE_ID}`)
+  })
+
+  it('um link novo com a tela aberta troca o código', async () => {
+    renderWithSession(<JoinScreen />, await signedIn())
+    expect(screen.getByTestId('invite-code').props.value).toBe('')
+    act(() => setPendingInvite(CODE))
+    expect(screen.getByTestId('invite-code').props.value).toBe(CODE)
+  })
+
+  it('o "‹" limpa o convite pendente', async () => {
+    setPendingInvite(CODE)
+    renderWithSession(<JoinScreen />, await signedIn())
+    fireEvent.press(screen.getByRole('button', { name: /Crônicas/ }))
+    expect(peekPendingInvite()).toBeNull()
+  })
+
+  it('o campo aceita até 64 caracteres, o teto do aceite', async () => {
+    renderWithSession(<JoinScreen />, await signedIn())
+    expect(screen.getByTestId('invite-code').props.maxLength).toBe(64)
   })
 })
 

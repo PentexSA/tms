@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 
+import { clearPendingInvite, setPendingInvite } from '../../lib/invite/pending'
 import {
   json,
   memoryStore,
@@ -209,5 +210,69 @@ describe('guardas de rota', () => {
     await waitFor(() => expect(session.getState().status).toBe('signedOut'))
     expect(view.toJSON()).toBeTruthy()
     expect(redirectedTo()).toEqual([])
+  })
+})
+
+// P12, D-14: o link chega sem sessão; login ou cadastro, depois o convite
+describe('convite pendente sem sessão', () => {
+  const CODE = 'ABCD2345EFGH6789JKMN0PQRST'
+  const BANNER =
+    'Você recebeu um convite para uma crônica. Entre ou crie sua conta para continuar.'
+  beforeEach(() => setPendingInvite(CODE))
+  afterEach(() => clearPendingInvite())
+
+  it('o login avisa, sem mostrar o código, e leva ao convite', async () => {
+    const { session } = testSession(() => json(200, tokens()))
+    renderWithSession(<LoginScreen />, session)
+    expect(screen.getByText(BANNER)).toBeTruthy()
+    expect(screen.queryByText(CODE, { exact: false })).toBeNull()
+    fireEvent.changeText(screen.getByTestId('login-email'), 'ana@example.test')
+    fireEvent.changeText(
+      screen.getByTestId('login-password'),
+      'senha longa demais'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Entrar' }))
+    })
+    expect(router.replace).toHaveBeenCalledWith('/join')
+  })
+
+  it('o cadastro avisa e leva ao convite', async () => {
+    const { session } = testSession(() => json(201, tokens()))
+    renderWithSession(<RegisterScreen />, session)
+    expect(screen.getByText(BANNER)).toBeTruthy()
+    fireEvent.changeText(
+      screen.getByTestId('register-email'),
+      'ana@example.test'
+    )
+    fireEvent.changeText(screen.getByTestId('register-username'), 'ana')
+    fireEvent.changeText(
+      screen.getByTestId('register-password'),
+      'correct horse battery staple'
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Criar conta' }))
+    })
+    expect(router.replace).toHaveBeenCalledWith('/join')
+  })
+
+  it('com sessão, o layout de autenticação redireciona ao convite', async () => {
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'refresh-0')
+    )
+    await session.restore()
+    renderWithSession(<AuthLayout />, session)
+    const hrefs = jest
+      .mocked(Redirect)
+      .mock.calls.map(c => (c[0] as { href: string }).href)
+    expect(hrefs.at(-1)).toBe('/join')
+  })
+
+  it('sem convite, nenhum aviso', () => {
+    clearPendingInvite()
+    const { session } = testSession(() => json(200, tokens()))
+    renderWithSession(<LoginScreen />, session)
+    expect(screen.queryByText(BANNER)).toBeNull()
   })
 })
