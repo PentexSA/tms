@@ -15,6 +15,7 @@ import { ScrollView, StyleSheet } from 'react-native'
 import { messageOf } from '../../lib/errors'
 import { clearPendingInvite, peekPendingInvite } from '../../lib/invite/pending'
 import { usePendingInvite } from '../../lib/invite/usePendingInvite'
+import { useBackTo } from '../../lib/navigation'
 import { useAcceptInvite } from '../../lib/queries/chronicles'
 import { useSession } from '../../lib/session/SessionProvider'
 
@@ -42,9 +43,10 @@ export default function JoinScreen() {
       },
     })
   }
+  const backToList = useBackTo('/')
   const leave = () => {
     clearPendingInvite()
-    router.back()
+    backToList()
   }
 
   return (

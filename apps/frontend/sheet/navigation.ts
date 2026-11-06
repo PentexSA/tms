@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router'
+import type { Href } from 'expo-router'
+import { useBackTo } from '../lib/navigation'
 
 // O "‹" da ficha (P09-C, T-39; com o T-81 do P11). Volta à tela de baixo,
 // que no nativo continua montada (a crônica com a aba, a rolagem, os filtros
@@ -17,13 +18,9 @@ export interface SheetBack {
 export function useSheetBack(
   chronicle: { readonly id: string; readonly name: string } | null
 ): SheetBack {
-  const router = useRouter()
   const fallback = chronicle ? `/chronicles/${chronicle.id}` : '/'
   return {
     label: chronicle?.name ?? 'Crônicas',
-    onPress: () => {
-      if (router.canGoBack()) router.back()
-      else router.replace(fallback)
-    },
+    onPress: useBackTo(fallback as Href),
   }
 }

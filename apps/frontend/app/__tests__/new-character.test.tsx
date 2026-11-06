@@ -38,12 +38,18 @@ jest.mock('expo-crypto', () => ({
 const calls = (
   apiModule as unknown as { fake: ReturnType<typeof createFakeApi> }
 ).fake.calls
-const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+const router = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  canGoBack: jest.fn(() => true),
+}
 const CHRONICLE = '00000000-0000-4000-8000-0000000000c1'
 const VTM = { code: 'vtm-v20', name: 'Vampiro: A Máscara' }
 
 beforeEach(() => {
   jest.mocked(useRouter).mockReturnValue(router as never)
+  router.canGoBack.mockReturnValue(true)
   jest.mocked(useLocalSearchParams).mockReturnValue({ id: CHRONICLE })
   calls.chronicle.get.mockResolvedValue(
     ok({
@@ -90,6 +96,21 @@ describe('Nova ficha', () => {
       'vtm-v20',
       expect.objectContaining({ query: {} })
     )
+  })
+
+  // T-30 (P12): depois de F5 ou de um link direto não há tela de baixo, e o
+  // router.back() não fazia nada
+  it('o "‹" volta pela pilha; sem tela de baixo, abre a crônica', async () => {
+    renderWithSession(<NewCharacterScreen />, await signedIn())
+    const back = await screen.findByRole('button', {
+      name: 'Voltar para Crônica da Liberdade',
+    })
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).toHaveBeenCalledWith(`/chronicles/${CHRONICLE}`)
   })
 
   it('Natureza e Comportamento saem da lista do livro', async () => {

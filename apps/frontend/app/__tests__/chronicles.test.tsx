@@ -526,6 +526,54 @@ describe('Entrar com convite', () => {
 })
 
 // P12, D-14: o link preenche o campo; o aceite continua no toque
+// T-30 (P12) e o achado 6 da onda 3: o "‹" volta pela pilha; sem tela de
+// baixo (F5, link direto), abre a lista. Nunca replace com tela de baixo
+describe('o "‹" sempre sai', () => {
+  afterEach(() => router.canGoBack.mockReset())
+
+  it.each([
+    ['Entrar com convite', () => <JoinScreen />],
+    ['Nova crônica', () => <NewChronicleScreen />],
+  ])('%s: back com tela de baixo, a lista sem', async (_, screenOf) => {
+    calls.systemsGet.mockResolvedValue(ok([VTM]))
+    renderWithSession(screenOf(), await signedIn())
+    const back = screen.getByRole('button', { name: 'Voltar para Crônicas' })
+    router.canGoBack.mockReturnValue(true)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('a crônica volta pela pilha, sem empilhar outra lista', async () => {
+    jest.mocked(useLocalSearchParams).mockReturnValue({ id: CHRONICLE_ID })
+    calls.chronicle.get.mockResolvedValue(
+      ok({
+        id: CHRONICLE_ID,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role: 'player',
+        storyteller: { username: 'ana' },
+        members: [],
+      })
+    )
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    const back = await screen.findByRole('button', {
+      name: 'Voltar para Crônicas',
+    })
+    router.canGoBack.mockReturnValue(true)
+    fireEvent.press(back)
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalledWith('/')
+    router.canGoBack.mockReturnValue(false)
+    fireEvent.press(back)
+    expect(router.replace).toHaveBeenCalledWith('/')
+  })
+})
+
 describe('Entrar com convite pelo link', () => {
   const CODE = 'ABCD2345EFGH6789JKMN0PQRST'
   afterEach(() => clearPendingInvite())
