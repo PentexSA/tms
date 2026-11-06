@@ -23,6 +23,8 @@ import { useSession } from '../../lib/session/SessionProvider'
 // com o código da memória (lib/invite/pending.ts) e diz com que conta a
 // pessoa vai entrar; o aceite continua no toque, nunca ao abrir a tela.
 // A tela não lê query (?code=): o código só chega pelo fragmento.
+let leaving: ReturnType<typeof setTimeout> | undefined
+
 export default function JoinScreen() {
   const router = useRouter()
   const { user } = useSession()
@@ -33,6 +35,16 @@ export default function JoinScreen() {
   useEffect(() => {
     if (pending) setCode(pending)
   }, [pending])
+  // Sair da tela por qualquer caminho (o voltar do Android, o gesto do iOS,
+  // outra navegação) apaga o código pendente. Num tique depois: o StrictMode
+  // desmonta e monta de novo na hora, e a nova montagem cancela. O aceite
+  // em voo continua: ele já tem o código
+  useEffect(() => {
+    clearTimeout(leaving)
+    return () => {
+      leaving = setTimeout(clearPendingInvite, 0)
+    }
+  }, [])
 
   const submit = () => {
     if (!code.trim()) return

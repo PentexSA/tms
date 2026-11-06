@@ -656,6 +656,19 @@ describe('Entrar com convite pelo link', () => {
     expect(peekPendingInvite()).toBeNull()
   })
 
+  it('sair da tela por qualquer caminho apaga o código pendente', async () => {
+    jest.useFakeTimers()
+    try {
+      setPendingInvite(CODE)
+      const view = renderWithSession(<JoinScreen />, await signedIn())
+      view.unmount()
+      act(() => jest.runOnlyPendingTimers())
+      expect(peekPendingInvite()).toBeNull()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('o campo aceita até 64 caracteres, o teto do aceite', async () => {
     renderWithSession(<JoinScreen />, await signedIn())
     expect(screen.getByTestId('invite-code').props.maxLength).toBe(64)
