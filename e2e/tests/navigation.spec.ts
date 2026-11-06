@@ -50,6 +50,11 @@ test('achado 6 (d): trocar de aba e o voltar do navegador', async ({
   const before = await page.evaluate(() => history.length)
   for (const tab of ['Mesa', 'Fichas', 'Mesa'])
     await page.getByRole('tab', { name: tab }).click()
+  // O setParams troca a URL depois do toque: sem esperar a da última aba, o
+  // voltar sai antes, e a troca atrasada cai na entrada da lista
+  await expect(page).toHaveURL(
+    new RegExp(`/chronicles/${chronicle.id}\\?view=table$`)
+  )
   const after = await page.evaluate(() => history.length)
   // Registra o comportamento de hoje: o setParams substitui a entrada (o
   // voltar sai da crônica). Se empilhar, este teste falha e a correção é a
