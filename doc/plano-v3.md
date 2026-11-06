@@ -125,7 +125,7 @@ As camadas, as ferramentas e as metas de cobertura são as da v0 (§4 do `plano-
 - **A matriz de AuthZ ganha atores e sistemas.** Ela passa a rodar com os três templates do produto (Etapa 3) e ganha o ator `former` (Etapa 7). Toda rota nova da v3 entra nela, como manda o "fail secure" do `authz.test.ts`.
 - **A política tem uma tabela própria**, fora da matriz de rotas: cada estado × cada classe de mudança × dono, narrador e ex-membro, nos três sistemas (`policy.test.ts` na API, Etapa 5). A matriz de rotas diz quem chega à rota; a tabela diz o que passa dentro dela.
 - **O dado alheio não está no corpo.** Para cada rota de ficha, um teste confere que nenhum valor da ficha de outro jogador aparece na resposta ao jogador, nem na contagem (§7 da proposta), não só que a tela não mostra.
-- **Postgres de verdade.** O PGLite tem uma conexão só. Três testes novos no job `postgres` do CI, no molde do `events.pg.test.ts`: concluir a criação contra um lote de Evoluir (Etapa 5), criar ficha e lote contra a remoção (Etapa 7), e operações em grupo concorrentes, inclusive o reenvio simultâneo da mesma chave (Etapa 11).
+- **Postgres de verdade.** O PGLite tem uma conexão só. Três testes novos no job `postgres` do CI, no molde do `events.pg.test.ts`: concluir a criação contra um lote de Evoluir (Etapa 5), criar ficha e lote contra a remoção (Etapa 7), e operações em grupo concorrentes, inclusive o reenvio simultâneo da mesma chave (Etapa 11). **Revisto:** o PR #49 (04/11/2026) tirou o job `postgres` do CI; os `*.pg.test` rodam à mão, na integração de cada onda (a revisão da D-00 está com o PO, [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16).
 - **Property tests** (`fast-check`) para o `classifyChange` (Etapa 4) e para aplicar e reverter (Etapa 10).
 - **Nenhum `if (system === ...)`.** O `scripts/check-system-names.mjs` continua no CI. As regras de alerta, dano em grupo e recuperação passam no fixture de D&D com o mesmo código (princípio 1 da proposta).
 - **Regressão.** As três jornadas de ficha rodam em todo PR, sem edição: as fichas delas ficam em `creating`. O que pode mudar é o que §3.2 muda de propósito (a contagem de fichas na lista de crônicas), e o PR que mexer numa jornada diz por quê.
@@ -301,7 +301,7 @@ G · depende de: 3, 4 · 5.1 da proposta
 - o 403 traz o `code` e o `path` recusado, e nunca o valor;
 - matriz: as quatro rotas novas, com `storyteller` 200 e os demais 403 ou 404;
 - `@tms/db`: a `0014` sobe e desce;
-- **Postgres real** (`apps/api/src/__tests__/policy.pg.test.ts`, no job `postgres`): concluir e um lote de Evoluir ao mesmo tempo. Ou o lote entra antes e a conclusão vê o valor novo, ou é recusado; nunca entra depois.
+- **Postgres real** (`apps/api/src/__tests__/policy.pg.test.ts`, no job `postgres`): concluir e um lote de Evoluir ao mesmo tempo. Ou o lote entra antes e a conclusão vê o valor novo, ou é recusado; nunca entra depois. **Revisto:** o PR #49 (04/11/2026) tirou o job `postgres` do CI; os `*.pg.test` rodam à mão, na integração de cada onda (a revisão da D-00 está com o PO, [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16).
 
 #### Etapa 6. App: estados, recusa com motivo e as ações do narrador
 
