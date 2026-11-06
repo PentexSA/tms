@@ -7,6 +7,7 @@ import {
   canRead,
   canReadSection,
   canWrite,
+  revealableSections,
   stripRestricted,
 } from '../permissions'
 import { character, clone, templates } from './fixtures'
@@ -142,6 +143,130 @@ describe('stripRestricted', () => {
     const before = clone(sheet)
     stripRestricted(model, sheet, ['player'])
     expect(sheet).toEqual(before)
+  })
+})
+
+// U-11 (P16-D): o narrador revela a seção restrita ao dono, só em leitura.
+describe('revelação ao dono (U-11)', () => {
+  type T = Record<string, unknown> & {
+    fields: Record<string, unknown>
+    sections: Record<string, unknown>[]
+  }
+  const withSections = (...extra: Record<string, unknown>[]) => {
+    const t = clone(templates['vtm-v20']) as T
+    t.fields.secretText = { type: 'text', label: 'Segredo', maxLength: 80 }
+    t.fields.secretCount = {
+      type: 'number',
+      label: 'Contagem',
+      min: 0,
+      max: 5,
+    }
+    t.sections.push(...extra)
+    return compileTemplate(t)
+  }
+  const restricted = (id: string, fields: string[]) => ({
+    id,
+    zone: 'lore',
+    title: id,
+    layout: 'text',
+    fields,
+    permissions: { read: ['storyteller'], write: ['storyteller'] },
+  })
+
+  it.each([
+    'vtm-v20',
+    'wta-w20',
+    'mta-m20',
+    'dnd5e-2014',
+    'coc7e',
+    'fate-core',
+  ])('%s: só a seção do narrador é revelável', key => {
+    const m = compileTemplate(templates[key])
+    expect(revealableSections(m)).toEqual(['storyteller'])
+    // a mesma lista, do cache, no segundo pedido
+    expect(revealableSections(m)).toBe(revealableSections(m))
+  })
+
+  it('seção restrita com campo numérico, ou legível pelo dono, não é revelável', () => {
+    const m = withSections(restricted('numeric', ['secretCount']), {
+      ...restricted('shared', ['secretText']),
+      permissions: { read: ['owner', 'storyteller'], write: ['storyteller'] },
+    })
+    expect(revealableSections(m)).toEqual(['storyteller'])
+    expect(canRead(m, 'secretCount', ['owner'], ['numeric'])).toBe(false)
+  })
+
+  it('seção legível pelo viewer, ou vazia, não é revelável', () => {
+    const m = withSections(
+      {
+        ...restricted('npcLore', ['secretText']),
+        permissions: {
+          read: ['storyteller', 'viewer'],
+          write: ['storyteller'],
+        },
+      },
+      restricted('empty', [])
+    )
+    expect(revealableSections(m)).toEqual(['storyteller'])
+  })
+
+  it('campo citado também numa seção restrita não revelável tira a revelação', () => {
+    const m = withSections(
+      restricted('mixed', ['secretText', 'secretCount']),
+      restricted('quiet', ['secretText'])
+    )
+    // `mixed` tem número; `quiet` cita um campo de `mixed`, que não é revelável
+    expect(revealableSections(m)).toEqual(['storyteller'])
+    expect(canRead(m, 'secretText', ['owner'], ['quiet'])).toBe(false)
+  })
+
+  it('duas seções reveláveis com o mesmo campo: o dono lê só com as duas reveladas', () => {
+    const m = withSections(
+      restricted('hooks', ['secretText']),
+      restricted('secrets', ['secretText'])
+    )
+    expect(revealableSections(m)).toEqual(['storyteller', 'hooks', 'secrets'])
+    expect(canRead(m, 'secretText', ['owner'], ['hooks'])).toBe(false)
+    expect(canRead(m, 'secretText', ['owner'], ['hooks', 'secrets'])).toBe(true)
+  })
+
+  it('com a seção revelada, só o dono passa a ler; ninguém passa a escrever', () => {
+    const revealed = ['storyteller']
+    expect(canRead(model, 'storytellerNotes', ['owner'], revealed)).toBe(true)
+    expect(canReadSection(model, 'storyteller', ['owner'], revealed)).toBe(true)
+    expect(canRead(model, 'storytellerNotes', ['viewer'], revealed)).toBe(false)
+    expect(canRead(model, 'storytellerNotes', ['player'], revealed)).toBe(false)
+    expect(canRead(model, 'storytellerNotes', [], revealed)).toBe(false)
+    expect(canWrite(model, 'storytellerNotes', ['owner'])).toBe(false)
+  })
+
+  it('sem lista, lista vazia, id desconhecido ou seção não revelável: como hoje', () => {
+    for (const revealed of [undefined, [], ['naoExiste'], ['about']])
+      expect(canRead(model, 'storytellerNotes', ['owner'], revealed)).toBe(
+        false
+      )
+    // a seção `about` já é do dono: a lista não muda nada
+    expect(canRead(model, 'notes', ['owner'], ['about'])).toBe(true)
+    expect(canReadSection(model, 'naoExiste', ['owner'], ['naoExiste'])).toBe(
+      false
+    )
+  })
+
+  it('stripRestricted com a seção revelada mantém a nota para o dono, e só para ele', () => {
+    const base = helena()
+    const sheet = {
+      ...base,
+      values: { ...base.values, storytellerNotes: 'SENTINELA' },
+    } as SheetData
+    const owner = stripRestricted(model, sheet, ['owner'], ['storyteller'])
+    expect(owner.values.storytellerNotes).toBe('SENTINELA')
+    expect(
+      stripRestricted(model, sheet, ['owner']).values.storytellerNotes
+    ).toBeUndefined()
+    expect(
+      stripRestricted(model, sheet, ['viewer'], ['storyteller']).values
+        .storytellerNotes
+    ).toBeUndefined()
   })
 })
 
