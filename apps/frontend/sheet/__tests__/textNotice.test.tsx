@@ -122,7 +122,7 @@ describe('TextEditorRow: o aviso na folha do editor', () => {
     expect(screen.queryByText(SHARED_NOTE_SHEET)).toBeNull()
     expect(screen.queryByText(PRIVATE_NOTE_SHEET)).toBeNull()
     expect(input().props.accessibilityHint).toBe(
-      'A história do personagem antes da crônica. O jogador e o narrador leem.'
+      'A história do personagem antes da crônica.'
     )
   })
 

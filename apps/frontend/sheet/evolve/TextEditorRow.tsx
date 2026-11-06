@@ -201,9 +201,10 @@ export function TextEditorRow({ resolved }: FieldViewProps) {
           // aplica, como o "Digitar" (T-25); com erro, o campo fica aberto.
           // No texto longo, Enter continua sendo nova linha.
           {...(long ? {} : submitField('done', apply))}
-          // O aviso com o campo: a dica no app e, no web, o
-          // `aria-describedby` apontando o texto visível
-          // (sem perder o erro nem a dica do template)
+          // O aviso com o campo. No app, a dica junta o aviso, o erro e a
+          // ajuda do template. No web, a dica não chega ao DOM: o
+          // `aria-describedby` aponta só o aviso; a ajuda continua como
+          // texto visível abaixo do campo, e o erro, como `alert`
           {...(notice
             ? {
                 accessibilityHint: [notice, error ?? def.help]

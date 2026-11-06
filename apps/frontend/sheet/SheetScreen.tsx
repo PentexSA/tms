@@ -481,7 +481,7 @@ function LiveSheet({
       sync,
       creation,
       editable: forced === null,
-      npc: state.character.kind === 'npc',
+      npc: kind === 'npc',
     })
     if (!forced && isDraftMode(mode)) created.getState().startDraft()
     return created
