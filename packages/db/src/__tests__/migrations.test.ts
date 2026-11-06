@@ -765,10 +765,10 @@ describe('migrations', () => {
         const migrator = new Migrator({ db, provider: migrationProvider })
         const down = await migrator.migrateTo('0022_user_commands')
         expect(down.error).toBeUndefined()
-        expect(down.results?.map(r => r.migrationName)).toEqual([
-          '0024_templates_onda5',
-          '0023_templates_onda4',
-        ])
+        // Desce tudo o que veio depois da 0022, do mais novo ao mais antigo
+        expect(down.results?.map(r => r.migrationName)).toEqual(
+          files.filter(f => f > '0022_user_commands').reverse()
+        )
         expect(await versions(db)).toEqual(before)
         expect((await migrator.migrateToLatest()).error).toBeUndefined()
       } finally {
@@ -777,9 +777,12 @@ describe('migrations', () => {
     })
   })
 
-  // Onda 5 (onda-5.md §4.5; P15-D): a 0024 grava as versões com a História /
-  // Prelúdio num banco que já tem as anteriores, e não toca em ficha
-  describe('0024: as versões da onda 5', () => {
+  // Onda 5 (onda-5.md §4.5; P15-D): a 0025 grava as versões com a História /
+  // Prelúdio num banco que já tem as anteriores, e não toca em ficha. A
+  // migration de antes dela vem da lista (a 0024 do P13 entra antes)
+  describe('0025: as versões da onda 5', () => {
+    const MINE = '0025_templates_onda5'
+    const prior = files[files.indexOf(MINE) - 1] ?? ''
     const current = (system: string) =>
       (productTemplate(system) as { templateVersion: string }).templateVersion
     const previousOf = (v: string) => {
@@ -817,9 +820,7 @@ describe('migrations', () => {
       const { db, destroy } = await createPGliteTestDb()
       try {
         const migrator = new Migrator({ db, provider: migrationProvider })
-        expect(
-          (await migrator.migrateTo('0023_templates_onda4')).error
-        ).toBeUndefined()
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
         // Como em produção antes da onda: só as versões anteriores no banco
         await db.deleteFrom('trait_templates').execute()
         for (const system of PRODUCT_TEMPLATES)
@@ -852,7 +853,7 @@ describe('migrations', () => {
             .returning('id')
             .executeTakeFirstOrThrow()
           const sheet = JSON.stringify({
-            values: { name: 'Antiga', storytellerNotes: 'SEGREDO-0024' },
+            values: { name: 'Antiga', storytellerNotes: 'SEGREDO-0025' },
             specialties: {},
           })
           const row = await db
@@ -894,7 +895,7 @@ describe('migrations', () => {
         expect(after).toEqual(before)
         for (const row of after) {
           expect(row.data).not.toContain('backstory')
-          expect(row.data).toContain('SEGREDO-0024')
+          expect(row.data).toContain('SEGREDO-0025')
         }
         // As anteriores ficam; as novas entram, e a mais nova é a de hoje
         for (const { system } of sheets) {
@@ -918,13 +919,11 @@ describe('migrations', () => {
       }
     })
 
-    it('a 0024 recusa a versão já gravada com outro conteúdo', async () => {
+    it('a 0025 recusa a versão já gravada com outro conteúdo', async () => {
       const { db, destroy } = await createPGliteTestDb()
       try {
         const migrator = new Migrator({ db, provider: migrationProvider })
-        expect(
-          (await migrator.migrateTo('0023_templates_onda4')).error
-        ).toBeUndefined()
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
         await db.deleteFrom('trait_templates').execute()
         const mta = productTemplate('mta-m20') as Record<string, unknown>
         await storeTemplate(db, { ...mta, name: 'Outro conteúdo' })
@@ -937,7 +936,7 @@ describe('migrations', () => {
       }
     })
 
-    it('descer a 0024 não apaga versão publicada', async () => {
+    it('descer a 0025 não apaga versão publicada', async () => {
       const { db, destroy } = await createPGliteTestDb()
       try {
         const count = async () =>
@@ -951,11 +950,9 @@ describe('migrations', () => {
           )
         const before = await count()
         const migrator = new Migrator({ db, provider: migrationProvider })
-        const down = await migrator.migrateTo('0023_templates_onda4')
+        const down = await migrator.migrateTo(prior)
         expect(down.error).toBeUndefined()
-        expect(down.results?.map(r => r.migrationName)).toEqual([
-          '0024_templates_onda5',
-        ])
+        expect(down.results?.map(r => r.migrationName)).toEqual([MINE])
         expect(await count()).toBe(before)
         expect((await migrator.migrateToLatest()).error).toBeUndefined()
       } finally {

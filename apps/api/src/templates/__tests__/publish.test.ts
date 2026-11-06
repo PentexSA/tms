@@ -27,7 +27,7 @@ const beforeProductTemplates = {
         ([name]) =>
           name !== '0020_product_templates' &&
           name !== '0023_templates_onda4' &&
-          name !== '0024_templates_onda5'
+          name !== '0025_templates_onda5'
       )
     ),
 }
