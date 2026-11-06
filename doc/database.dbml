@@ -47,6 +47,8 @@ Table characters {
   visibility_revision integer [not null, default: 0]
   presentation_revision integer [not null, default: 0]
   portrait_url text [note: 'Somente URL HTTPS aceita pela API']
+  revealed_sections "text[]" [not null, default: `'{}'`, note: 'U-11: ids de seção restrita que o narrador revelou ao dono; só PC, até 8; nunca texto']
+  reveal_revision integer [not null, default: 0, note: 'U-11: sobe a cada revelar/esconder; 409 para pedido velho']
   sheet_data jsonb
   template_version text [not null]
   sheet_version integer [not null, default: 0]

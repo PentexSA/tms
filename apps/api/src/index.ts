@@ -17,6 +17,7 @@ import { type AppOptions, resolveOptions } from './options'
 import { rollRoutes } from './rolls/routes'
 import { creationRoutes } from './sheets/creation'
 import { eventRoutes } from './sheets/events'
+import { revealRoutes } from './sheets/reveal'
 import { sheetRoutes } from './sheets/routes'
 import { statusRoutes } from './sheets/status'
 import { ledgerRoutes } from './xp/ledger'
@@ -79,6 +80,7 @@ export const createApp = (
       .use(chronicleRoutes(db, options, guard))
       .use(backstageRoutes(db, options, guard))
       .use(sheetRoutes(db, guard))
+      .use(revealRoutes(db, guard))
       .use(eventRoutes(db, options, guard))
       .use(statusRoutes(db, options, guard))
       .use(creationRoutes(db, options, guard))

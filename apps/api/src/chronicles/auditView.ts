@@ -86,6 +86,11 @@ export function auditDetail(action: string, payload: unknown): AuditDetail {
     case 'character.creation.adjust':
     case 'character.creation.ready':
       return {}
+    // U-11 (P16-D): revelar e esconder as notas não têm detalhe. O id da
+    // seção fica no registro e não sai; o texto nunca entra nele
+    case 'character.section.reveal':
+    case 'character.section.hide':
+      return {}
     case 'invite.create':
       return defined({
         maxUses: integer(p.maxUses),

@@ -375,6 +375,8 @@ Regras checadas por `schema.json`: `fields` e `groups` são mutuamente exclusivo
 
   Dentro da seção `about`, que não declara `permissions`, o `viewer` de um NPC revelado o leria. O id é `backstory`, e não `history`, para não colidir com a perícia "História" do D&D e do CoC.
 
+- **Seção revelável (U-11):** uma seção com `read` só do narrador (sem `owner` e sem `viewer`), com campos e só de texto (`text`, `longText`), pode ser revelada pelo narrador da crônica ao dono da ficha, ficha a ficha, só em leitura, e escondida de novo (`revealableSections` no `@tms/sheet-core`). Não há chave nova: a regra sai das `permissions`. O `viewer` nunca recebe a revelação, o dono nunca escreve, e o NPC não tem revelação de seção (ele tem a própria visibilidade).
+
 **Multi-sistema:** a mesma seção "Narrador" serve a "Mestre" (D&D), "Guardião" (CoC) e "MC" (PbtA), só com outro `title`. Uma seção "Sombra" da Aparição, legível só pelo jogador que faz a Sombra, exigiria um papel novo na lista fechada (§9).
 
 ---
@@ -635,7 +637,8 @@ Sincronização:
 
 ### Notas do narrador
 
-- Seções com `read` restrito (Notas do Narrador, do Mestre, do Guardião) **nunca saem do servidor** para quem não pode ler: o servidor remove os campos da resposta da ficha, da difusão de eventos em tempo real, do histórico, da exportação e da impressão.
+- Seções com `read` restrito (Notas do Narrador, do Mestre, do Guardião) **nunca saem do servidor** para quem não pode ler, **salvo a revelação explícita do narrador da crônica ao dono da ficha**: o servidor remove os campos da resposta da ficha, da difusão de eventos em tempo real, do histórico, da exportação e da impressão.
+- A revelação não muda nenhuma dessas saídas: a ficha, a mesa, o lote de eventos, a rolagem, o histórico e a exportação continuam sem a seção para o dono. O texto revelado só sai pela rota própria de leitura, a quem é dono e membro atual, e o app não o grava no disco do aparelho.
 - Esconder na interface não basta: o cliente do jogador não recebe o dado.
 
 ### Escrita e observabilidade

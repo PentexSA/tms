@@ -89,12 +89,26 @@ export function chronicleRoutes(
         .execute()
       const now = options.now()
       const ids = characters.map(c => c.id)
-      if (ids.length)
+      if (ids.length) {
         await trx
           .updateTable('characters')
           .set({ status: 'archived', locked_at: null, updated_at: now })
           .where('id', 'in', ids)
           .execute()
+        // U-11 (P16-D): a revelação das notas termina com o vínculo. Quem
+        // volta à crônica não lê o que o narrador escreveu depois; o
+        // narrador revela de novo se quiser. A revisão sobe para descartar
+        // pedido feito antes
+        await trx
+          .updateTable('characters')
+          .set({
+            revealed_sections: [],
+            reveal_revision: sql`reveal_revision + 1`,
+          })
+          .where('id', 'in', ids)
+          .where(sql<boolean>`cardinality(revealed_sections) > 0`)
+          .execute()
+      }
       await trx
         .deleteFrom('chronicle_members')
         .where('chronicle_id', '=', chronicleId)

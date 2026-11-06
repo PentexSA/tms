@@ -554,7 +554,138 @@ Cada commit diz tudo o que entra nele. Nenhum commit muda template.
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; as Notas do Narrador continuam privadas por padrão, e o servidor continua a autoridade.
 
-(Vazio: preenchido na implementação.)
+Implementação em 05 e 06/11/2026, na `pacote/p16-d-revelar-nota`, a partir de `5da45b2` (com as respostas do usuário na [onda-5.md](onda-5.md) §6), em paralelo com os outros pacotes da onda, cada um no seu worktree.
+
+**Decisões do usuário aplicadas** (onda-5.md §6, pontos 1 e 2):
+
+- o pacote entra nesta onda;
+- a revelação é viva;
+- a nota continua um texto só por ficha;
+- sem selo nem notificação.
+
+Os outros pontos da §9 seguiram a recomendação deste plano, e nada foi decidido aqui:
+
+- o ex-membro não lê a nota revelada e volta a ler se voltar à crônica;
+- a regra sai das `permissions`, sem chave no template;
+- rota própria para o texto;
+- colunas na `characters`;
+- as linhas de edição da nota continuam escondidas do dono;
+- rebusca de 30 s;
+- o app antigo convive com o passo novo do Histórico.
+
+**Desvios de desenho:**
+
+1. **Os commits 4 e 5 viraram um só** (`a34eeb7`). Dois motivos:
+   - o `RevealedProvider` serve ao narrador (rótulo, botão, editor) e ao dono (o texto);
+   - o `TextLayout` muda para os dois. Separar exigiria `git add -p`, que este ambiente não tem.
+
+   A mensagem do commit lista tudo o que entrou nele.
+2. **As frases dos Bastidores (`auditPhrase.ts`) entraram no commit da API** (`d613e2a`), e não no 4. O mapa `PHRASES` é exaustivo pelo tipo que o Eden infere: sem as duas frases, o typecheck do app falharia no pre-commit.
+3. **O nome acessível dos botões começa pelo texto visível** (WCAG 2.5.3, como o "Editar …" da `StorytellerBar`):
+   - "Revelar ao jogador: Notas do Narrador a {jogador}";
+   - "Deixar privadas: Notas do Narrador, de novo só do narrador".
+
+   Na §3.6, eram "Revelar Notas do Narrador a {jogador}" e "Deixar Notas do Narrador privadas de novo", sem o texto do botão. O E2E usa `/^Revelar ao jogador/` e `/^Deixar privadas/`.
+4. **Sem rede, o botão continua tocável, mas não fica `aria-disabled`:** o toque mostra "Sem conexão: revelar e esconder precisam de rede." (`accessibilityRole="alert"`) e não envia. O `Button` do `@tms/ui` ainda não tem o estado "tocável e indisponível": quem o traz é o `blocked` do P13. No rebase sobre o P13, o `RevealControl` passa a usá-lo.
+5. **O `TextBlock` deixou de desenhar o campo que os papéis não leem**, salvo quando está revelado. Antes, quem impedia era só o `SectionView`. Isso é defesa extra no app e não muda nenhum caso de hoje: os testes de `SheetView`, `storyteller` e a11y passam como antes.
+6. **O `lockCharacter` lê também `system_id` e `template_version`.** A rota precisa do modelo da versão da ficha, e o plano só citava as duas colunas novas.
+7. **Corpo fora do formato dá 400, e não 422.** A validação do Elysia neste projeto responde 400. O 422 `REVEAL_UNAVAILABLE` vale para a seção válida que o modelo não deixa revelar.
+8. **A troca de narrador no `reveal.test.ts` é feita direto no banco** (`storyteller_id`), e não pela rota de transferência. O teste é da autoridade lida na transação, e a rota de transferência já tem os testes dela.
+
+**O que ficou fora:**
+
+- **o E2E não rodou no pacote:** as portas são fixas, e ele roda na integração da onda;
+- **o roteiro manual da §11 não rodou:** é da integração, com dois aparelhos por bloco;
+- **o `/code-review` não rodou como skill neste agente.** A revisão do diff foi feita à mão (abaixo), e o `/code-review` (high) fica para o orquestrador.
+
+**`/security-review`** (diff `5da45b2..HEAD`, feito à mão pelo agente do pacote, porque ele não pode abrir sub-tarefas): **nenhuma vulnerabilidade de alta confiança.** Itens conferidos:
+
+- a AuthZ das duas rotas, com o papel do banco, a trava, os 403/404/422 e a chave de comando conferida depois da autorização;
+- a seção do corpo, com padrão, tamanho, conferência contra o modelo e SQL só com parâmetro;
+- nenhuma saída de hoje recebe `revealed`;
+- o `canWrite` não recebe a lista;
+- o registro só com o id da seção;
+- as constraints no banco;
+- o cache do app, sem disco, com o descarte por revisão e a remoção ao esconder.
+
+**Revisão de código à mão (o que mudou por causa dela):**
+
+- **rebusca de resposta velha depois de esconder (corrigido antes do commit).** O efeito que descarta resposta velha rebuscava mesmo sem nota revelada, e uma resposta antiga trazia o texto de volta à memória. Agora o descarte e o avanço só valem enquanto o dono lê, e a consulta é zerada e removida ao esconder. Há teste de tela;
+- **o `RevealControl` usava `useToast` e `useMutation` fora da ficha viva** (o `SheetView` da projeção do viewer e os testes da folha), e quebrava sem `ToastProvider`. Ele virou um invólucro, que só monta o controle com o contexto do narrador;
+- **o `Set` das seções reveladas tem identidade estável** (memo pela lista), para as abas do `SheetView` não serem recalculadas a cada desenho;
+- **uma chave de comando por intenção:** revelar e esconder não dividem a chave, para que uma tentativa de esconder depois de uma revelação com resultado desconhecido não dê `IDEMPOTENCY_CONFLICT`.
+
+**Depois do `/code-review` (high) do orquestrador, na própria branch** (10 pontos, cada um num commit `fix` com teste de regressão):
+
+| # | Ponto | Commit | O que mudou |
+|---|---|---|---|
+| 1 | O 404 da rota da nota revelada pedia a rota em laço | `1887952` | O 404 desliga a consulta até a ficha mudar de revisão, e a ficha é rebuscada. Teste: um pedido só (sem a correção, 3) |
+| 2 | `modelFor(db)` dentro da transação | `28c8b86` | `modelFor(trx, …)`. O teste do caminho frio passa também sem a correção: o PGLite deste arquivo não reproduz a espera. Fica registrado, e a concorrência em Postgres real continua no `backstage.pg.test.ts` |
+| 3 | Numeração das migrations da onda | `8eb1903` | **A migration virou a `0026_character_reveal`.** A ordem da onda: `0024_character_events_to_absent` (P13), `0025_templates_onda5` (P15-D) e `0026` (P16-D). Onde as §3 a §9 deste plano dizem `0025`, vale `0026` |
+| 4 | **Segurança:** a revelação sobrevivia à saída do dono e à transferência de narração | `739361f` | Na mesma transação, a saída voluntária e a remoção zeram `revealed_sections` das fichas do membro e sobem `reveal_revision`. A transferência aceita faz o mesmo com todas as fichas da crônica. Sem registro novo no Histórico: a saída, a remoção e a transferência já ficam no registro da crônica, e o passo "Notas voltaram a ser privadas" diria um autor que não agiu. Os casos estão no `reveal.test.ts`, nos três sistemas, junto da matriz da revelação: quem sai e volta não lê, nem o que foi escrito depois; o pedido com a revisão velha dá 409; depois da transferência, o dono não lê até o novo narrador revelar |
+| 5 | A lista nova saía do que estava gravado | `e250d49` | Ela sai agora do `revealedOf(model, …)`. Teste: com 8 ids fora do modelo, revelar dá 200, e o CHECK de até 8 nunca chega a dar 500 |
+| 6 | Seção revelável sem o layout `text` | `87b24c2` | O `revealableSections` exige `layout: 'text'`, no core e, pela mesma função, no servidor. Testes no core e na API |
+| 7 | A chave de idempotência não girava com a revisão | `26511ed` | A chave gira quando a `reveal.revision` observada muda. Teste com o `expo-crypto` de verdade |
+| 8 | O estado só chegava na rebusca | `23a8c97` | `setQueryData` da ficha com `sections` e `revision` devolvidos, e depois a invalidação |
+| 9 | `stripRestricted` com `revealed` | `5641de7` | O parâmetro saiu. A nota só sai por `/revealed`, como a §3.1 pedia para as saídas. Onde a §3.1 lista o `stripRestricted` entre as funções com `revealed`, ele não está mais |
+| 10 | Helpers copiados | `0a900b3` | `sheets/commands.ts` (`commandHash`, usado também por `sheets/routes.ts`); o `idempotencyConflict` do `xp/ledger.ts`; `lib/guards.ts` (`isObject`) no app. Sem dependência nova. Teste: o hash continua o mesmo de antes |
+
+**Testes que rodaram no worktree:**
+
+| Pacote | Resultado |
+|---|---|
+| `@tms/sheet-core` | 1150 pass, 0 fail; `permissions.ts` com 100% de linhas e funções |
+| `@tms/db` | 40 pass, 0 fail |
+| `@tms/api` | 2023 pass, 0 fail, com cobertura; `sheets/reveal.ts` com 100%; depois do último ajuste, `reveal.test.ts` e `auditView.test.ts` de novo, 26 pass |
+| `backstage.pg.test.ts`, em `tms_p16d_test` | 9 pass |
+| frontend (Jest, com cobertura e `--forceExit`) | 1615 pass, 104 suítes, metas cumpridas |
+| `@tms/ui` (não mudou) | 226 pass |
+
+Uma rodada isolada do `reveal.test.ts` da API falhou uma vez num gancho sem nome, com 6,5 s, e passou ao repetir: 18 pass. Foi carga da máquina com os outros worktrees, e não falha de teste.
+
+**Depois das 10 correções** (ponta `23a8c97`):
+
+| Verificação | Resultado |
+|---|---|
+| Typecheck (`pnpm typecheck`) | 16 tarefas ok |
+| Lint (`pnpm lint`) | 4 tarefas ok |
+| `@tms/db` | 40 pass |
+| `@tms/sheet-core` | 1151 pass |
+| `@tms/api`, inteiro | 2036 pass, 66 skip (os `*.pg.test` sem `PG_TEST_URL`), 0 fail |
+| `backstage.pg.test.ts`, em `tms_p16d_test` | 9 pass |
+| Jest do frontend, com `--forceExit`, duas rodadas inteiras | 1616 pass e **1 fail** nas duas |
+
+A falha das rodadas inteiras é a mesma: `LiveSheet.test.tsx` › "fechar a oferta mantém o registro; entrar em Editar oferece de novo", que não acha o texto da oferta de rascunho.
+
+- A suíte sozinha passa: 16 de 16, em três rodadas.
+- As rodadas inteiras foram com a carga da máquina entre 180 e 332, com os outros worktrees da onda.
+- O teste não usa a revelação, e a ficha dele não tem `reveal`.
+- Antes das correções, a rodada inteira tinha passado, com 1615.
+
+**Não ficou provado que é só carga.** Conferir na rodada da integração, com a máquina livre.
+
+**Bancos:**
+
+- `tms_p16d`, recriado (só ele, com `dropdb`/`createdb`) depois da troca de número e migrado até a `0026_character_reveal` (conferido na `kysely_migration`), só para o `db:codegen`, que não mudou o `types.ts`;
+- `tms_p16d_test`, do teste de concorrência.
+
+Os dois podem ser apagados com `dropdb` na integração.
+
+**Para o rebase** (o P16-D entra depois do P15-D):
+
+- **`packages/db/src/migrations.ts` e `migrations.test.ts`:**
+  - a `0024` do P13 e a `0025` do P15-D entram antes da `0026`;
+  - o teste "descer a 0023 não apaga versão publicada" passa a esperar `['0026_character_reveal', '0025_templates_onda5', '0024_character_events_to_absent', '0023_templates_onda4']`;
+  - o teste da `0026` migra até a `0023` antes de inserir fichas. No rebase, ele deve migrar até a `0025`, e conferir que a `0024` do P13 não exige coluna nova nas fichas inseridas.
+- **`apps/api/src/chronicles/routes.ts` (`removeMember`) e `chronicles/backstage.ts` (aceitar a transferência):** um `update` a mais em cada transação. O P12 e o P14-D mexem em outros handlers do `chronicles/routes.ts`.
+- **`sheet/storyteller/privacy.ts`:** o P15-D põe `readByOwner` e o aviso "O jogador lê este texto.", e o P13 põe `barEdits`. Os textos e o `inRevealed` deste pacote ficam no fim do arquivo. O aviso da folha de edição passa a ter três casos, na ordem da §8.4: revelada, privada, e lida pelo dono.
+- **`sheet/layouts/TextLayout.tsx`:**
+  - o P13 troca o bloco pelo editor no Editar (T-84);
+  - o bloco revelado do dono fica sempre em leitura, e o editor nunca aparece para campo que o dono só lê por revelação (o `canWrite` decide);
+  - o `RevealControl` fica no fim da seção.
+- **`apps/api/src/sheets/events.ts`:** só o mapa `LIFECYCLE_EVENTS` e o `lifecycleRole`. O P13 mexe nas gravações (`:393-413`), em outro trecho.
+- **`apps/api/src/test/authz-matrix.ts` e `matrix-systems.ts`:** duas linhas novas depois da visibilidade do NPC, e o campo `revealSection` no caso do sistema. Os outros pacotes acrescentam linhas em pontos diferentes.
+- **`StorytellerBar.tsx` e `SheetScreen.tsx`:** mudanças pequenas. O `RevealedProvider` fica em volta do `SheetView`, dentro do `CreationContext`.
 
 ## 11. Testes manuais (web, Android com AVD, iOS com idb)
 
@@ -564,7 +695,7 @@ Roteiro para conferir o item na interface, nas três plataformas, com a API loca
 
 ### 11.a Preparação
 
-1. **Banco e API.** Banco próprio do pacote no Postgres local (`createdb tms_p16d`, `DATABASE_URL=…/tms_p16d` com as credenciais locais do `docker-compose.yml`) e `npx pnpm db:migrate`, que grava os templates e a `0025`. Conferir pela `kysely_migration` (o processo pode travar na saída). **Sem `db:down`.** Depois, `npx pnpm -C packages/sheet-core build` e `npx pnpm -C packages/db build`, a API em `npx pnpm dev:api` (3001) e o Metro em `cd apps/frontend && npx expo start` (8081).
+1. **Banco e API.** Banco próprio do pacote no Postgres local (`createdb tms_p16d`, `DATABASE_URL=…/tms_p16d` com as credenciais locais do `docker-compose.yml`) e `npx pnpm db:migrate`, que grava os templates e a `0026` (era a `0025` antes da ordem final da onda). Conferir pela `kysely_migration` (o processo pode travar na saída). **Sem `db:down`.** Depois, `npx pnpm -C packages/sheet-core build` e `npx pnpm -C packages/db build`, a API em `npx pnpm dev:api` (3001) e o Metro em `cd apps/frontend && npx expo start` (8081).
 2. **Seed:** `npx pnpm seed:roteiro --fichas-criacao > <scratchpad>/p16d/seed-<plataforma>.log 2>&1`. A saída tem a senha e os e-mails: ler só com `grep -v -i senha`.
    - **O que ele já cobre:** as contas N (`roteiro_narrador`), J1 (`roteiro_jogador1`), J2 (`roteiro_jogador2`) e N2 (`roteiro_narrador2`), todas `@roteiro.test`; as crônicas "Vampiro v3/v5", "Mago v3/v5" e "Lobisomem v3/v5" (livre) e as "v4" por pontos, com J1 e J2 dentro; com o `--fichas-criacao`, a "Ficha XP R" de J1 (Vampiro v3/v5, concluída) e a "Ficha Aprovação R" de J1 (Mago v4, em criação). A revelação vale em qualquer estado da ficha, então as duas servem.
    - **A senha é a constante do `scripts/seed-roteiro.ts`** e não é escrita aqui nem nas evidências; os scripts de login a leem em tempo de execução.

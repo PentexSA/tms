@@ -79,6 +79,7 @@ import { blockedBy, useLifecycle } from './policy'
 import { SectionView } from './SectionView'
 import { SheetNav } from './SheetNav'
 import { createSheetStore, type SheetStore } from './store/sheetStore'
+import { useRevealed } from './storyteller/revealed'
 
 // A ficha montada pelo template (doc/arquitetura §6.1): identidade, "Em jogo"
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
@@ -122,12 +123,18 @@ export type SheetViewProps =
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
 const BUDGET_TAB = POINTS_TAB
 
-function readableZones(model: SheetModel, roles: readonly RoleName[]) {
+function readableZones(
+  model: SheetModel,
+  roles: readonly RoleName[],
+  // U-11 (P16-D): a seção revelada ao dono também conta
+  revealed?: ReadonlySet<string>
+) {
   return model.zones.filter(
     z =>
       TAB_ZONES.has(z.id) &&
       z.sections.some(
-        s => s.fieldIds.length > 0 && canReadSection(model, s.id, roles)
+        s =>
+          s.fieldIds.length > 0 && canReadSection(model, s.id, roles, revealed)
       )
   )
 }
@@ -203,7 +210,11 @@ function SheetBody({
 }) {
   const pull = usePullRefresh(() => onRefresh?.())
   const { model, roles } = store.getState()
-  const zones = useMemo(() => readableZones(model, roles), [model, roles])
+  const revealed = useRevealed()?.sections
+  const zones = useMemo(
+    () => readableZones(model, roles, revealed),
+    [model, roles, revealed]
+  )
   const lifecycle = useLifecycle()
   // Travada ou arquivada, o dono não muda de modo: a política tirou o Editar
   const writer = useMemo(

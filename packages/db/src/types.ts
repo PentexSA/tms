@@ -91,6 +91,8 @@ export interface Characters {
   name: string
   portrait_url: string | null
   presentation_revision: Generated<number>
+  reveal_revision: Generated<number>
+  revealed_sections: Generated<string[]>
   sheet_data: Json
   sheet_version: Generated<number>
   status: Generated<string>
