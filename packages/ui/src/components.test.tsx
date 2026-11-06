@@ -5,12 +5,14 @@ import {
   screen,
   within,
 } from '@testing-library/react-native'
+import { type ComponentRef, createRef } from 'react'
 import {
   AccessibilityInfo,
   Modal,
   Platform,
   Text as RNText,
   StyleSheet,
+  View,
   type ViewStyle,
 } from 'react-native'
 import {
@@ -128,6 +130,12 @@ describe('Button e IconButton', () => {
       expect(screen.getByRole('button', { name: 'Ok' })).toBeOnTheScreen()
     }
   )
+
+  it('Button: o ref chega à vista do botão, para o foco por programa (P12)', () => {
+    const ref = createRef<ComponentRef<typeof View>>()
+    render(<Button ref={ref} title="Revogar" onPress={() => undefined} />)
+    expect(ref.current).not.toBeNull()
+  })
 
   it('IconButton: o nome acessível é o rótulo, não o glifo', () => {
     const onPress = jest.fn()
@@ -665,6 +673,68 @@ describe('Toast', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
     expect(undo).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+  })
+
+  // P12, T-43: no web o Modal é um portal depois da raiz, e o aviso da raiz
+  // ficava embaixo da folha. Agora fica dentro do painel também no web
+  it('no web, o aviso também fica dentro da folha e volta à raiz ao fechar', async () => {
+    const os = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      const undo = jest.fn()
+      const content = (visible: boolean) => (
+        <ToastProvider>
+          <BottomSheet
+            visible={visible}
+            title="Recurso"
+            onClose={() => undefined}
+          >
+            <Trigger onUndo={undo} />
+          </BottomSheet>
+        </ToastProvider>
+      )
+      const { rerender } = render(content(true))
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+      expect(
+        within(screen.UNSAFE_getByType(Modal)).getByText('Sangue 10 → 9')
+      ).toBeTruthy()
+      expect(screen.getAllByText('Sangue 10 → 9')).toHaveLength(1)
+      rerender(content(false))
+      expect(screen.getByText('Sangue 10 → 9')).toBeTruthy()
+      act(() => jest.advanceTimersByTime(TOAST_MS))
+      expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
+  })
+
+  it('dentro da folha, o aviso fica acima do rodapé medido', async () => {
+    render(
+      <ToastProvider>
+        <BottomSheet
+          visible
+          title="Remover"
+          onClose={() => undefined}
+          footer={<RNText>Rodapé</RNText>}
+        >
+          <Trigger onUndo={() => undefined} />
+        </BottomSheet>
+      </ToastProvider>
+    )
+    await act(async () => undefined)
+    fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+    const bottom = () =>
+      StyleSheet.flatten(screen.getByTestId('toast-host').props.style).bottom
+    // Sem medida ainda: só a folga de 8 (space[2]) acima do fundo
+    const base = bottom()
+    act(() =>
+      fireEvent(screen.getByTestId('bottom-sheet-footer'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 56 } },
+      })
+    )
+    // Medido: os 56 do rodapé somam à folga
+    expect(bottom()).toBe(base + 56)
   })
 
   it('só o modal superior apresenta o aviso, que acompanha o fechamento da pilha', async () => {

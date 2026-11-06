@@ -1,3 +1,4 @@
+import type { ComponentRef, Ref } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
@@ -19,6 +20,9 @@ export interface ButtonProps {
   // inteiro (WCAG 2.5.3).
   readonly accessibilityLabel?: string
   readonly testID?: string
+  // Com o React 19 o ref é prop: para mover o foco por programa (a
+  // confirmação de "Revogar" devolve o foco ao gatilho, P12)
+  readonly ref?: Ref<ComponentRef<typeof View>>
 }
 
 const palette = (c: Colors, variant: ButtonVariant) =>
@@ -38,11 +42,13 @@ export function Button({
   accessibilityHint,
   accessibilityLabel,
   testID,
+  ref,
 }: ButtonProps) {
   const theme = useTheme()
   const p = palette(theme.colors, variant)
   return (
     <Pressable
+      ref={ref}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}

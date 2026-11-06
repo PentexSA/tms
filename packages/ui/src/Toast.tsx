@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
+import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
@@ -173,26 +173,38 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
   )
 }
 
-/** RN Modal tem uma janela acima da raiz do app. O aviso acompanha o modal
- * superior e volta à raiz quando ele fecha, com o mesmo prazo e a mesma ação. */
-export function ModalToastHost({ visible }: { readonly visible: boolean }) {
+/**
+ * RN Modal tem uma janela acima da raiz do app; no web, o Modal do
+ * react-native-web é um portal depois da raiz, e o aviso da raiz ficaria
+ * embaixo dele (P12, T-43). Nas três plataformas, o aviso acompanha o modal
+ * superior, dentro do painel (e do foco preso do aria-modal), e volta à raiz
+ * quando ele fecha, com o mesmo prazo e a mesma ação. `offset` ergue o aviso
+ * acima do rodapé da folha.
+ */
+export function ModalToastHost({
+  visible,
+  offset = 0,
+}: {
+  readonly visible: boolean
+  readonly offset?: number
+}) {
   const layer = useContext(ToastLayerContext)
   const id = useId()
   const setModal = layer?.setModal
-  const active = visible && Platform.OS !== 'web'
+
   useEffect(() => {
-    if (!active || !setModal) return
+    if (!visible || !setModal) return
     setModal(id, true)
     return () => setModal(id, false)
-  }, [active, id, setModal])
-  if (!active || !layer?.toast || layer.modals.at(-1) !== id) return null
-  // Dentro do modal, a barra fixa da tela fica atrás: sem deslocamento
+  }, [visible, id, setModal])
+  if (!visible || !layer?.toast || layer.modals.at(-1) !== id) return null
+  // Dentro do modal, a barra fixa da tela fica atrás: só o rodapé da folha
   return (
     <ToastView
       toast={layer.toast}
       onDone={layer.hide}
       onHold={layer.hold}
-      offset={0}
+      offset={Math.max(0, offset)}
     />
   )
 }

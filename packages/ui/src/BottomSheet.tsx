@@ -4,10 +4,12 @@ import {
   useEffect,
   useInsertionEffect,
   useRef,
+  useState,
 } from 'react'
 import {
   KeyboardAvoidingView,
   type KeyDownEvent,
+  type LayoutChangeEvent,
   Modal,
   Platform,
   ScrollView,
@@ -147,6 +149,14 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
+  // A altura do rodapé: o aviso dentro da folha fica acima dele, sem cobrir
+  // "Cancelar" e a ação (P12, T-43). No web, o onLayout só dispara quando o
+  // tamanho muda; o rodapé nasce com tamanho, então a primeira medida chega
+  const [footerHeight, setFooterHeight] = useState(0)
+  const measureFooter = useCallback(
+    (e: LayoutChangeEvent) => setFooterHeight(e.nativeEvent.layout.height),
+    []
+  )
   // T-69 (DS: "a partir de 600 vira modal centralizado de até 560"): no
   // compact a folha fica presa embaixo; fora dele, é um diálogo central
   const dialog = useLayout().breakpoint !== 'compact'
@@ -290,8 +300,19 @@ export function BottomSheet({
           <ScrollView keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
-          <ModalToastHost visible={visible} />
+          {footer ? (
+            <View
+              style={styles.footer}
+              onLayout={measureFooter}
+              testID="bottom-sheet-footer"
+            >
+              {footer}
+            </View>
+          ) : null}
+          <ModalToastHost
+            visible={visible}
+            offset={footer ? footerHeight + tokens.space[2] : 0}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
