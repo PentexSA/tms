@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from 'react'
-import { AccessibilityInfo, StyleSheet, View } from 'react-native'
+import {
+  AccessibilityInfo,
+  type LayoutChangeEvent,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { useInsets } from './insets'
 import { Pressable } from './Pressable'
 import { Text } from './Text'
@@ -179,14 +184,18 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
  * embaixo dele (P12, T-43). Nas três plataformas, o aviso acompanha o modal
  * superior, dentro do painel (e do foco preso do aria-modal), e volta à raiz
  * quando ele fecha, com o mesmo prazo e a mesma ação. `offset` ergue o aviso
- * acima do rodapé da folha.
+ * acima do rodapé da folha. `onHeight` recebe a altura medida do aviso
+ * enquanto ele aparece neste modal, e 0 quando ele não aparece: a folha sem
+ * rodapé abre esse espaço no fim do conteúdo (T-43).
  */
 export function ModalToastHost({
   visible,
   offset = 0,
+  onHeight,
 }: {
   readonly visible: boolean
   readonly offset?: number
+  readonly onHeight?: (height: number) => void
 }) {
   const layer = useContext(ToastLayerContext)
   const id = useId()
@@ -197,7 +206,13 @@ export function ModalToastHost({
     setModal(id, true)
     return () => setModal(id, false)
   }, [visible, id, setModal])
-  if (!visible || !layer?.toast || layer.modals.at(-1) !== id) return null
+  const shown = Boolean(visible && layer?.toast && layer.modals.at(-1) === id)
+  // Sumiu daqui (o prazo acabou, outro modal por cima, a folha fechou): o
+  // espaço sai. A altura chega pelo onLayout, porque o texto quebra em linhas
+  useEffect(() => {
+    if (!shown) onHeight?.(0)
+  }, [shown, onHeight])
+  if (!shown || !layer?.toast) return null
   // Dentro do modal, a barra fixa da tela fica atrás: só o rodapé da folha
   return (
     <ToastView
@@ -205,6 +220,7 @@ export function ModalToastHost({
       onDone={layer.hide}
       onHold={layer.hold}
       offset={Math.max(0, offset)}
+      onHeight={onHeight}
     />
   )
 }
@@ -235,11 +251,13 @@ function ToastView({
   onDone,
   onHold,
   offset,
+  onHeight,
 }: {
   readonly toast: ToastMessage
   readonly onDone: () => void
   readonly onHold: (reason: HoldReason, on: boolean) => void
   readonly offset: number
+  readonly onHeight?: (height: number) => void
 }) {
   const { colors } = useTheme()
   const insets = useInsets()
@@ -274,6 +292,11 @@ function ToastView({
         onTouchStart={() => onHold('touch', true)}
         onTouchEnd={() => onHold('touch', false)}
         onTouchCancel={() => onHold('touch', false)}
+        onLayout={
+          onHeight
+            ? (e: LayoutChangeEvent) => onHeight(e.nativeEvent.layout.height)
+            : undefined
+        }
         style={[
           styles.toast,
           {

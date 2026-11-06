@@ -181,9 +181,9 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   ).toBeVisible()
 
   await blood.click()
-  // Desde o P12 (T-43) o aviso do dano acompanha a folha aberta e, sem
-  // rodapé, pode ficar sobre "Curar"; o ponteiro parado em cima segura o
-  // prazo (T-76). Tira o ponteiro: o clique espera o aviso sair
+  // Desde o P12 (T-43) o aviso do dano acompanha a folha aberta. Sem
+  // rodapé, a folha abre o espaço dele no fim, e "Curar" fica acima; o
+  // ponteiro parado em cima do aviso seguraria o prazo (T-76), então ele sai
   await page.mouse.move(0, 0)
   await page
     .getByRole('button', { name: 'Curar 1 nível de dano (1 Sangue)' })
