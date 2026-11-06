@@ -73,6 +73,24 @@ export function tableColumns(width: number, stacked: boolean): number {
 }
 
 /**
+ * A largura do texto de um cartão (P09-D: o progresso cabe sem cortar), pela
+ * janela e pela coluna, sem `onLayout`: na coluna única, a tela menos o
+ * recuo do cartão; na grade, a célula menos o recuo dela, a borda e o recuo
+ * do cartão.
+ */
+export function cardTextWidth(width: number, columns: number): number {
+  const content = Math.min(width, tokens.layout.contentMaxExpanded)
+  if (columns <= 1) return content - 2 * tokens.layout.gutter
+  const grid = content - 2 * (tokens.layout.gutter - tokens.space[3] / 2)
+  return (
+    grid / columns -
+    tokens.space[3] -
+    2 * tokens.borderWidth.hair -
+    2 * tokens.layout.gutter
+  )
+}
+
+/**
  * A grade, na ordem da lista: a leitura e o Tab seguem linha a linha. Um
  * contêiner só, com cada cartão numa célula de 1/colunas da largura e a key
  * da ficha: trocar a ordem ou o filtro move os cartões sem remontá-los.
@@ -194,6 +212,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
   const [onlyAlerts, setOnlyAlerts] = useState(false)
   const { width, stacked } = useLayout()
   const columns = tableColumns(width, stacked)
+  const textWidth = cardTextWidth(width, columns)
   // A seleção vive na crônica (T-49): a barra fica fora da rolagem
   const selection = useTableSelection()
   const { selecting, selected, toggle: select, sync } = selection
@@ -241,6 +260,7 @@ export function TableView({ chronicleId }: { readonly chronicleId: string }) {
       selected={selected.has(item.row.id)}
       onSelect={select}
       framed={framed}
+      width={textWidth}
     />
   )
 

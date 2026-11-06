@@ -8,7 +8,7 @@ import {
 import { describe as fieldDescribe, resolve } from '@tms/sheet-core'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Dimensions, ScrollView, StyleSheet } from 'react-native'
-
+import { cardTextWidth } from '../../components/chronicles/TableView'
 import { changeLabel } from '../../components/chronicles/tableItems'
 import * as apiModule from '../../lib/api'
 import { clearChronicleScroll, scrollOf } from '../../lib/chronicleScroll'
@@ -658,5 +658,87 @@ describe('para o jogador a Mesa não existe', () => {
       await screen.findByText('Você ainda não tem ficha nesta crônica.')
     ).toBeTruthy()
     expect(calls.chronicle.tableGet).not.toHaveBeenCalled()
+  })
+})
+
+// P09-D (D-10, R-15): o progresso da criação por pontos no cartão, pela
+// mesma conta da barra do jogador
+describe('o progresso da criação no cartão', () => {
+  const NEW = '00000000-0000-4000-8000-00000000d001'
+  const NPC = '00000000-0000-4000-8000-00000000d002'
+  const OLD = '00000000-0000-4000-8000-00000000d003'
+  const BROKEN = '00000000-0000-4000-8000-00000000d004'
+  const fresh = (id: string, name: string, extra = {}) => ({
+    ...row(id, 'helena', 'vtm-v20'),
+    name,
+    sheet: { values: { name }, specialties: {} },
+    status: 'creating',
+    creationMode: 'points',
+    creationInput: { choices: {}, config: {} },
+    ...extra,
+  })
+
+  it('a ficha em criação por pontos diz o que falta; o nome acessível também', async () => {
+    const PHONE = { width: 390, height: 844, scale: 3, fontScale: 1 }
+    const before = Dimensions.get('window')
+    Dimensions.set({ window: PHONE, screen: PHONE })
+    try {
+      calls.chronicle.tableGet.mockResolvedValue(
+        ok([
+          fresh(NEW, 'Nova'),
+          // NPC com entrada (resposta adulterada): sem linha
+          fresh(NPC, 'Sentinela', { kind: 'npc', visibility: 'hidden' }),
+          // API antiga, sem o campo: o cartão de antes
+          fresh(OLD, 'Antiga', { creationInput: undefined }),
+          // Escolha fora do formato: vale como ausente, sem quebrar
+          fresh(BROKEN, 'Quebrada', {
+            creationInput: {
+              choices: { priorities: { attributes: ['x'] } },
+              config: { freebies: 'muitos' },
+            },
+          }),
+        ])
+      )
+      await openTable()
+      const line = await screen.findByTestId(`table-progress-${NEW}`)
+      // A 390, as duas linhas não levam tudo: o bônus fica no fim
+      expect(line).toHaveTextContent(/^Atributos \(prioridade\) · /)
+      expect(line).toHaveTextContent(/Bônus: restam 15 de 15$/)
+      const label = String(
+        screen.getByTestId(`table-row-${NEW}`).props.accessibilityLabel
+      )
+      // Depois do estado, antes do resto, com tudo e com palavras
+      expect(label).toContain(
+        'Em criação · por pontos. Atributos: falta escolher a prioridade, Habilidades: falta escolher a prioridade, Disciplinas: faltam 3, Antecedentes: faltam 5, Virtudes: faltam 7, Bônus: restam 15 de 15.'
+      )
+      expect(screen.queryByTestId(`table-progress-${NPC}`)).toBeNull()
+      expect(screen.queryByTestId(`table-progress-${OLD}`)).toBeNull()
+      expect(screen.getByTestId(`table-progress-${BROKEN}`)).toHaveTextContent(
+        /^Atributos \(prioridade\)/
+      )
+    } finally {
+      Dimensions.set({ window: before, screen: before })
+    }
+  })
+
+  it('a ficha em jogo não tem a linha', async () => {
+    calls.chronicle.tableGet.mockResolvedValue(
+      ok([
+        row(HELENA, 'helena', 'vtm-v20', {
+          status: 'active',
+          creationInput: null,
+        }),
+      ])
+    )
+    await openTable()
+    expect(await screen.findByTestId(`table-row-${HELENA}`)).toBeTruthy()
+    expect(screen.queryByTestId(`table-progress-${HELENA}`)).toBeNull()
+  })
+
+  it('a largura do texto do cartão: coluna única e grade', () => {
+    expect(cardTextWidth(390, 1)).toBe(358)
+    expect(cardTextWidth(360, 1)).toBe(328)
+    // A 1280, a grade fica nos 1200 do conteúdo, em 3 colunas
+    expect(cardTextWidth(1280, 3)).toBeCloseTo((1200 - 20) / 3 - 12 - 2 - 32)
   })
 })

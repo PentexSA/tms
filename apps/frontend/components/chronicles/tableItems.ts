@@ -1,11 +1,18 @@
 import {
   type ActiveAlert,
   alertsOf,
+  type CreationInput,
+  creationInputOf,
+  parseCharacterCreation,
   parseSheet,
   type SheetModel,
 } from '@tms/sheet-core'
 
 import { whenLabel } from '../../lib/format'
+import {
+  type CreationProgress,
+  creationProgress,
+} from '../../sheet/creation/progress'
 import { deadLabel } from '../../sheet/policy'
 import { createSheetStore, type SheetStore } from '../../sheet/store/sheetStore'
 import {
@@ -39,6 +46,13 @@ export interface TableRowData {
   readonly returned?: boolean
   readonly adjust?: boolean
   readonly ready?: boolean
+  // A entrada da conta da criação (P09-D, R-15): as escolhas e a camada da
+  // configuração, só no PC em criação por pontos; null no resto. Ausente na
+  // API antiga
+  readonly creationInput?: {
+    readonly choices?: unknown
+    readonly config?: unknown
+  } | null
   readonly activatedAt?: string | Date | null
   readonly lockedAt?: string | Date | null
   readonly updatedAt: string | Date
@@ -62,6 +76,28 @@ export interface TableItem {
   // O selo de visibilidade do NPC ("Oculto", "Identidade revelada", "Ficha
   // revelada"); null no PC (T-52). Não passa pelo characterState
   readonly visibility: string | null
+  // O progresso da criação por pontos (P09-D, D-10): a mesma conta da barra
+  // do jogador; null sem conta (NPC, criação livre, em jogo, API antiga)
+  readonly progress: CreationProgress | null
+}
+
+/**
+ * A entrada da conta a partir do que a Mesa mandou. O que vem da rede é
+ * input hostil: o parse do core roda de novo, e escolha ou camada fora do
+ * formato vale como ausente. Sem `creationInput` (ou no NPC): null, e o
+ * cartão fica sem a linha (fail secure).
+ */
+export function tableCreationInput(
+  row: TableRowData,
+  model: SheetModel
+): CreationInput | null {
+  const raw = row.creationInput
+  if (row.kind === 'npc' || !raw || typeof raw !== 'object') return null
+  const input = creationInputOf(
+    model,
+    parseCharacterCreation(model, { choices: raw.choices, config: raw.config })
+  )
+  return input.config.mode === 'points' ? input : null
 }
 
 /**
@@ -105,6 +141,7 @@ export function buildItem(
         sheet: parsed.value,
         sheetVersion: row.sheetVersion,
         roles: ['storyteller'],
+        creation: tableCreationInput(row, model),
       })
   }
   return {
@@ -121,6 +158,7 @@ export function buildItem(
       { narrating: true, deadLabel: model ? deadLabel(model) : undefined }
     ),
     visibility: row.kind === 'npc' ? npcVisibilityText(row.visibility) : null,
+    progress: store ? creationProgress(store.getState().check) : null,
   }
 }
 
