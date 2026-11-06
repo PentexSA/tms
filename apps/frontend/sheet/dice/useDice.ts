@@ -86,8 +86,12 @@ export function useDice(
   const [hidden, setHidden] = useState(false)
   const pendingKey = useRef<string | null>(null)
   const storyteller = roles.includes('storyteller')
+  // O resultado do topo vale para a parada que o gerou (T-79): mudou a
+  // intenção, ele sai do topo e fica só em "Nesta sessão"
+  const [fresh, setFresh] = useState(false)
   const changedIntent = useCallback(() => {
     pendingKey.current = null
+    setFresh(false)
   }, [])
 
   const options = useMemo(
@@ -124,6 +128,7 @@ export function useDice(
 
   const record = useCallback((entry: SessionRoll) => {
     setRolls(list => [entry, ...list])
+    setFresh(true)
     AccessibilityInfo.announceForAccessibility(entry.announcement)
   }, [])
 
@@ -261,6 +266,8 @@ export function useDice(
 
   return {
     roll,
+    // A última rolagem ainda é da parada na tela
+    fresh,
     options,
     plan,
     slots,

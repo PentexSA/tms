@@ -62,7 +62,10 @@ export function DiceSheet({
     Object.entries(dice.slots).some(([slot, key]) =>
       dice.options[slot]?.some(o => o.key === key && o.specialty)
     )
-  const last = dice.rolls[0]
+  // A rolagem anterior sai do topo quando a parada muda (T-79), e continua
+  // em "Nesta sessão"
+  const last = dice.fresh ? dice.rolls[0] : undefined
+  const earlier = dice.rolls.slice(dice.fresh ? 1 : 0)
 
   return (
     <BottomSheet
@@ -231,10 +234,10 @@ export function DiceSheet({
           {last ? <RollResult roll={last} /> : null}
         </View>
 
-        {dice.rolls.length > 1 ? (
+        {earlier.length ? (
           <View>
             <SectionHeader title="Nesta sessão" level="group" />
-            {dice.rolls.slice(1).map(r => (
+            {earlier.map(r => (
               <ListItem
                 key={r.id}
                 title={r.label}
@@ -293,6 +296,10 @@ function SlotPicker({
   const [query, setQuery] = useState('')
   const chosen = options.find(o => o.key === value)
   const visible = options.filter(o => matches(o.label, query))
+  // Os grupos do template ("Atributos", "Em jogo"), na ordem do poolOptions:
+  // com mais de um, cada um ganha um cabeçalho (T-79)
+  const groups = groupsOf(visible)
+  const headed = groups.length > 1
   const label = slot.label.toLowerCase()
   return (
     <View>
@@ -320,21 +327,30 @@ function SlotPicker({
               }}
             />
           ) : null}
-          {visible.map(o => (
-            <ListItem
-              key={o.key}
-              title={o.label}
-              subtitle={[o.group, o.specialty, ...o.modifiers]
-                .filter(Boolean)
-                .join(' · ')}
-              meta={String(o.value)}
-              accessibilityLabel={`${o.label}, ${o.value}${o.specialty ? `, especialização ${o.specialty}` : ''}${o.modifiers.length ? `, ${o.modifiers.join(', ')}` : ''}`}
-              onPress={() => {
-                onChange(o.key)
-                setOpen(false)
-                setQuery('')
-              }}
-            />
+          {groups.map(g => (
+            <View key={g.title || '-'}>
+              {headed ? <SectionHeader title={g.title} level="group" /> : null}
+              {g.options.map(o => (
+                <ListItem
+                  key={o.key}
+                  title={o.label}
+                  subtitle={[
+                    headed ? null : o.group,
+                    o.specialty,
+                    ...o.modifiers,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  meta={String(o.value)}
+                  accessibilityLabel={`${o.label}, ${o.value}${o.specialty ? `, especialização ${o.specialty}` : ''}${o.modifiers.length ? `, ${o.modifiers.join(', ')}` : ''}`}
+                  onPress={() => {
+                    onChange(o.key)
+                    setOpen(false)
+                    setQuery('')
+                  }}
+                />
+              ))}
+            </View>
           ))}
           {visible.length === 0 ? (
             <Text color="inkMuted">{`Nada encontrado para “${query}”.`}</Text>
@@ -343,6 +359,20 @@ function SlotPicker({
       ) : null}
     </View>
   )
+}
+
+/** As opções em grupos seguidos, na ordem em que chegam. */
+function groupsOf(
+  options: readonly PoolOption[]
+): { readonly title: string; readonly options: PoolOption[] }[] {
+  const out: { title: string; options: PoolOption[] }[] = []
+  for (const o of options) {
+    const title = o.group ?? ''
+    const group = out.find(g => g.title === title)
+    if (group) group.options.push(o)
+    else out.push({ title, options: [o] })
+  }
+  return out
 }
 
 /** O motivo de o boost não valer agora, perto do toque. */

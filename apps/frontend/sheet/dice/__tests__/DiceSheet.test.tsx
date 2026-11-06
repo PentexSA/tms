@@ -505,6 +505,70 @@ describe('o sheet Dados do Lobisomem (v2)', () => {
   })
 })
 
+// T-79: o resultado do topo é o da parada na tela, e a lista do slot separa
+// os grupos do template
+describe('Dados: o resultado e os grupos do slot (T-79)', () => {
+  it('rolar e trocar o Atributo: o resultado sai do topo e fica em "Nesta sessão"; rolar de novo põe o novo no topo', async () => {
+    calls.rollsPost
+      .mockResolvedValueOnce(serverRoll())
+      .mockResolvedValueOnce(
+        serverRoll({ id: 'r2', text: 'Falha', faces: [3], outcome: 'failure' })
+      )
+    await open()
+    pick('Atributo', 'des', /^Destreza, 2/)
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(screen.getByText('Dados: 10 · 6')).toBeTruthy()
+    expect(screen.queryByText('Nesta sessão')).toBeNull()
+
+    pick('Atributo', 'for', /^Força, /)
+    expect(screen.queryByText('Dados: 10 · 6')).toBeNull()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+    expect(screen.getByText('2 sucessos')).toBeTruthy()
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(screen.getByText('Dados: 3')).toBeTruthy()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+  })
+
+  const headers = () =>
+    screen.queryAllByRole('header').map(h => h.props.children as string)
+
+  it('V20: o slot "Atributo" tem um grupo só, sem cabeçalho', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).not.toContain('Atributos')
+  })
+
+  it('W20: "Atributos" e "Em jogo", com a Força de Vontade no segundo', async () => {
+    const { sheet } = sheetFor('iara', ['owner'])
+    await open(storeFor(['owner'], sheet, 'wta-w20').store)
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).toEqual(expect.arrayContaining(['Atributos', 'Em jogo']))
+    const names = screen
+      .getAllByRole('button')
+      .map(b => b.props.accessibilityLabel as string)
+    const playAt = headers().indexOf('Em jogo')
+    expect(playAt).toBeGreaterThan(headers().indexOf('Atributos'))
+    // A FdV vem depois de todos os Atributos
+    const strength = names.findIndex(n => n?.startsWith('Força,'))
+    const willpower = names.findIndex(n => n?.startsWith('Força de Vontade,'))
+    const wits = names.findIndex(n => n?.startsWith('Raciocínio,'))
+    expect(willpower).toBeGreaterThan(wits)
+    expect(willpower).toBeGreaterThan(strength)
+  })
+
+  it('M20: "Atributos" e "Esferas"', async () => {
+    const { sheet } = sheetFor('tomas', ['owner'])
+    await open(storeFor(['owner'], sheet, 'mta-m20').store)
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).toEqual(expect.arrayContaining(['Atributos', 'Esferas']))
+  })
+})
+
 // T-77: o gasto que o servidor recusaria (SHEET_LOCKED) fica bloqueado com
 // o motivo, e a rolagem sem gasto continua
 describe('o boost na ficha travada (T-77)', () => {
