@@ -302,10 +302,22 @@ function SheetBody({
     },
     [groupTabs.store, showTab]
   )
-  // "Ver Pontos" nos avisos da recusa (T-07): só com a aba Pontos
+  const { reduceMotion } = useTheme()
+  // "Ver Pontos" nos avisos da recusa (T-07) e no "Aguardando aprovação":
+  // só com a aba Pontos. Vindo de um aviso acima das abas (a rolagem ainda
+  // não chegou nelas), leva até elas: no celular, a aba trocava fora da tela
   const openBudget = useMemo(
-    () => (budget ? () => showTab(BUDGET_TAB) : null),
-    [budget, showTab]
+    () =>
+      budget
+        ? () => {
+            groupTabs.store.cancelJump()
+            showTab(BUDGET_TAB)
+            const top = groupTabs.store.panelTop()
+            if (groupTabs.store.scrollY() < top)
+              scrollRef.current?.scrollTo({ y: top, animated: !reduceMotion })
+          }
+        : null,
+    [budget, showTab, groupTabs.store, reduceMotion]
   )
   // O "ir ao grupo" do "O que falta" (P05-D, R-18): a aba, a sub-aba e a
   // âncora da seção (ou do grupo); a rolagem e o foco vêm quando a âncora é
@@ -373,7 +385,6 @@ function SheetBody({
       if (play !== null) placePlay(play)
     })
   }, [groupTabs.store, placePlay])
-  const { reduceMotion } = useTheme()
   useEffect(
     () =>
       groupTabs.store.onJump((y, focus) => {
