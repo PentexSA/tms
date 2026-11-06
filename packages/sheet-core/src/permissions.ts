@@ -172,12 +172,12 @@ export function canWrite(
 export function stripRestricted(
   model: SheetModel,
   sheet: SheetData,
-  roles: Roles,
-  revealed?: Iterable<string>
+  roles: Roles
 ): SheetData {
+  // Sem a revelação, de propósito (U-11): a nota revelada só sai pela rota
+  // própria do servidor, nunca pela ficha
   const mine = known(roles)
-  const open = revealedSet(model, revealed)
-  const keep = (id: string) => readsField(model, id, mine, open)
+  const keep = (id: string) => readsField(model, id, mine, null)
   const values = Object.fromEntries(
     Object.entries(sheet.values ?? {}).filter(([id]) => keep(id))
   )

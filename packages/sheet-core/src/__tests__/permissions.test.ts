@@ -252,20 +252,17 @@ describe('revelação ao dono (U-11)', () => {
     )
   })
 
-  it('stripRestricted com a seção revelada mantém a nota para o dono, e só para ele', () => {
+  it('stripRestricted não conhece a revelação: a nota nunca sai pela ficha', () => {
     const base = helena()
     const sheet = {
       ...base,
       values: { ...base.values, storytellerNotes: 'SENTINELA' },
     } as SheetData
-    const owner = stripRestricted(model, sheet, ['owner'], ['storyteller'])
-    expect(owner.values.storytellerNotes).toBe('SENTINELA')
+    // Sem quarto parâmetro: um chamador que tentasse passar a lista não
+    // compila, e o dono continua sem a nota
+    expect(stripRestricted.length).toBe(3)
     expect(
       stripRestricted(model, sheet, ['owner']).values.storytellerNotes
-    ).toBeUndefined()
-    expect(
-      stripRestricted(model, sheet, ['viewer'], ['storyteller']).values
-        .storytellerNotes
     ).toBeUndefined()
   })
 })
