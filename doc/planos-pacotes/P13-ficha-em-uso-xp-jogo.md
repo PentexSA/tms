@@ -530,7 +530,63 @@ Cada commit diz tudo o que entra nele, por sistema e por arquivo (a lição do A
 
 ## 10. Desvios
 
-Fica vazia até a implementação. O que a implementação fizer diferente deste plano, e por quê, entra aqui. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
+O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
+
+Implementação em 05 e 06/11/2026, na `pacote/p13-ficha-em-uso`, num worktree próprio, em paralelo com os outros pacotes da onda. Os pontos para o PO (§2.3) e as perguntas técnicas (§9) seguiram a recomendação deste plano; nada foi decidido aqui. **Os candidatos (a) a (d) da §2.4 não entraram** (pedem a resposta do usuário). Em especial, o desfazer da crônica continua sem o `checkCreationBatch` em `creating`/`pending` (candidato (c)).
+
+**Commits:** `08d4318` (ui), `6d82f18` (core e API, T-53), `a34c938` (app, T-53), `6f39aef` (T-50), `40666cc` (T-77), `732f3ef` (T-79), `bcc60ac` (T-84), `c0e5e67` (U-01), `cb7307c` (U-02), `54c0ca5` (E2E) e `1d44199` (fix da revisão).
+
+**O que ficou diferente:**
+
+1. **O commit 1 não existe.** Os testes que ele pedia já estavam na ponta: `XP_INSUFFICIENT_BALANCE` e `XP_REQUEST_PENDING` em `apps/api/src/__tests__/xp.test.ts:581-643`; a rolagem com boost na ficha travada (403 `SHEET_LOCKED`), a rolagem sem boost (201) e o narrador com boost (201) em `apps/api/src/__tests__/policy.test.ts:286-299`, nos três sistemas.
+2. **T-50, a ordem das seções.** Os blocos seguem a ordem das abas da ficha (`model.zones`) e, dentro de cada uma, a do template. Por isso "Em jogo" vem primeiro, e não por último como na tabela da §3.1.
+3. **T-53, onde ficaram os testes.**
+   - O toast foi testado no `sheet/play/__tests__/play.test.tsx` (a folha do Sangue já era testada ali). O `ResourceSheet.test.tsx` não foi criado (pergunta 7).
+   - O Histórico foi testado no `apps/api/src/__tests__/operations.test.ts`, nos três sistemas: Sangue no V20, Fúria no W20 pelo Augúrio e FdV no M20 (padrão fixo). O M20 não usa a Quintessência, porque a roda é um `clock`, e o gasto padrão do M20 é a FdV.
+   - O core ganhou um export a mais, `effectiveOf(model, sheet)`. É o valor efetivo de um caminho, usado pelo `withEffectiveFrom`, pelo `withEffectiveTo` e pelo `invertBatch`.
+4. **T-53, a comparação do desfazer** (revisão de segurança, abaixo). Com o "para" efetivo gravado, o `invertBatch` passa a comparar o valor que a pessoa vê, e não o cru:
+   - o caminho vazio cujo efetivo é igual ao "para" gravado conta como "sem mudança" (o caso pedido);
+   - também conta como "sem mudança" gravar depois, explicitamente, o mesmo valor que o lote deixou;
+   - e também esvaziar um caminho que já mostrava o padrão.
+   
+   Nos dois últimos casos, o valor visto não mudou, e o inverso devolve o valor de antes do lote. A propriedade do `group.test.ts` ("qualquer mudança posterior recusa") passou a valer para a mudança do valor visto, e esse caso tem um teste próprio. Mudar o efetivo continua sendo conflito: o teste muda o padrão da FdV pela Coragem.
+5. **T-77, o boost.** A primeira versão bloqueava o boost em toda recusa do Jogo. A revisão corrigiu em `1d44199`: só `SHEET_LOCKED` bloqueia com "a rolagem sai sem gastar". Nas fichas arquivada, fora de jogo ou sem vínculo, o servidor recusa a rolagem inteira, e vale a recusa de hoje. Sem escolha, "Enviar pedido" também fica bloqueado, com "Escolha um traço para ver o custo.".
+6. **U-01.**
+   - O atalho fica de fora também quando o papel inclui `storyteller`, mesmo que seja dono.
+   - Na lista, o atalho abre a busca pelo rótulo dela (ponto 2 da §2.3), sem marcar item.
+   - O `XpShortcutContext` fica em volta da ficha só no ramo sem a `SwipeArea`, que é do narrador.
+7. **U-02.** O `TypedAmount` é local no `forms.tsx` (pergunta 4). O erro do valor fora da faixa fica embaixo do controle, também depois de sair do campo.
+8. **E2E: escritos e não rodados**, como o brief pede. Os specs são `xp.spec.ts` (novo), `dice.spec.ts`, `play.spec.ts` e `sheet.spec.ts`; só o typecheck do `e2e` foi rodado.
+   - No `dice.spec.ts`, a conta é a mesma para dona e narradora. Por isso o spec da trava confere só que o narrador liga o boost; o caso da dona barrada, sem `disabled` no web, ficou no `DiceSheet.test.tsx`.
+   - Os seletores (nomes acessíveis dos rádios, "Mais opções" a 390, `bottom-sheet-root`) ficam para o orquestrador conferir na primeira rodada.
+   - O passo 4 do `journey-storyteller.spec.ts` não mudou.
+
+**Os pontos de encaixe para os pacotes que vêm depois:**
+
+- **P15-D (História / Prelúdio, D-16).** A regra do T-84 é `drawsEditor(model, roles, id, mode) && !barEdits(model, id)`, no `TextBlock` (`sheet/layouts/TextLayout.tsx`). O `barEdits` (`sheet/storyteller/privacy.ts`) diz qual texto só o narrador escreve, pelas `permissions` da seção.
+  - **Opção A, os dois escrevem:** um campo `text` ou `longText` numa seção de layout `text` ganha o editor no Editar e na Criação, sem código novo. O `testID` é `editor-<campo>` no Sobre, como o `editor-quote` e o `editor-notes` (por exemplo, `editor-backstory`). O teste de encaixe fica no `layouts.test.tsx`, bloco "text: o Sobre no Editar (T-84)".
+  - **Opção B, só o narrador escreve:** o campo cai no `barEdits`, fica só leitura no layout e ganha o botão da barra do narrador (`storytellerOnlyText` usa o mesmo `barEdits`).
+- **P16-D (revelar a nota, D-17).** O `TextBlock` tem o ramo do editor no topo (devolve o `FieldSlot`); o bloco de leitura vem embaixo. O rótulo pelo estado, o bloco revelado do dono e o `RevealControl` entram no bloco de leitura. As Notas do Narrador nunca caem no ramo do editor (o `barEdits` é verdadeiro para elas), e o dono não as escreve, então o bloco revelado continua em leitura também no Editar.
+- **P12 (`Button.tsx`).** O `blocked` usa um `ref` interno (`markSoftDisabled`). O P12, que entra depois, junta esse `ref` com o `ref` externo do foco por programa (onda-5.md §3).
+
+**Revisões:**
+
+- **Revisão de segurança do commit 3 (`6d82f18`, o caso novo do `invertBatch`): sem achado.** Foi feita à mão neste worktree: o agente do pacote não dispara subagentes, e a skill `/security-review` não foi chamada. **Recomendação: rodar o `/security-review` de verdade na integração, sobre o `6d82f18`.** O que foi conferido:
+  - **AuthZ:** o desfazer continua só do narrador (`operations.ts:549-550`). O inverso devolve o valor de antes do lote, que o narrador já podia gravar à mão, e o lote fica assinado no Histórico.
+  - **Vazamento:** o "para" efetivo é o do próprio campo do evento. Texto e especialização ficam fora (`NO_EFFECTIVE`, `contentFree`). O filtro `canRead` da leitura e o da rolagem oculta não mudaram.
+  - **Custo:** um `resolve` a mais por lote, num lote que já tem limite de tamanho.
+- **Revisão de código do diff `52dbe0f..HEAD`:** também à mão, pela mesma razão. Achou o motivo errado do boost fora da trava, corrigido em `1d44199` com teste.
+
+**Testes do "PR local" (06/11):**
+
+| Suíte | Resultado |
+|---|---|
+| `@tms/sheet-core` (Bun, com cobertura) | 1142 pass; `labels.ts` e `group.ts` acima de 99% |
+| `@tms/api` (Bun, PGLite, com cobertura) | 1971 pass, com os 9 casos novos do T-53 |
+| frontend (Jest, com cobertura e `--forceExit`) | 105 suítes, 1633 pass |
+| `@tms/ui` (Jest) | 232 pass |
+| typecheck dos 11 pacotes e `pnpm lint` | ok (4 avisos do lint, de antes do pacote) |
+| `check-system-names.mjs` | ok |
 
 ---
 
