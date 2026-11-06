@@ -9,11 +9,14 @@ import {
   checkCreation,
   compileTemplate,
   effectiveCreationConfig,
+  isSafeText,
 } from '@tms/sheet-core'
 import {
   checkSeedDatabase,
   type Handle,
   type Key,
+  PRESENTATION_MARKUP,
+  presentationTexts,
   runSeed,
 } from '../../../../scripts/seed-roteiro'
 import { template } from '../test/factories'
@@ -215,6 +218,56 @@ describe('seed-roteiro (S-04)', () => {
     expect(requests).toEqual([{ status: 'pending', target_field: 'strength' }])
     // Uma rodada inteira do seed e mais ~30 chamadas à API em processo:
     // passa dos 5 s padrão do Bun numa máquina mais lenta
+  }, 30_000)
+
+  // Onda 5 (P14-D §11.a): a Descrição de três crônicas, pelo PATCH
+  async function descriptions() {
+    const rows = await ctx.db
+      .selectFrom('chronicles as c')
+      .innerJoin('users as u', 'u.id', 'c.storyteller_id')
+      .where('u.email', '=', 'roteiro_narrador@roteiro.test')
+      .select(['c.name', 'c.description'])
+      .execute()
+    return new Map(rows.map(r => [r.name.split(' · ')[0], r.description]))
+  }
+
+  it('sem --apresentacao, nenhuma crônica tem Descrição', async () => {
+    const result = await runSeed({ api: inProcess(), base: 'http://localhost' })
+    expect(result.presentations).toEqual([])
+    for (const description of (await descriptions()).values())
+      expect(description).toBe('')
+  })
+
+  it('--apresentacao: curta, longa com seis parágrafos e 4000, só nas três', async () => {
+    const result = await runSeed({
+      api: inProcess(),
+      base: 'http://localhost',
+      presentation: true,
+    })
+    expect(result.chronicles).toHaveLength(7)
+    expect(
+      result.presentations.map(p => [p.chronicle.split(' · ')[0], p.length])
+    ).toEqual([
+      ['Vampiro v3/v5', 119],
+      ['Mago v4', 3625],
+      ['Lobisomem v4', 4000],
+    ])
+    const saved = await descriptions()
+    const texts = presentationTexts()
+    for (const [name, text] of texts) {
+      expect(saved.get(name)).toBe(text)
+      expect(isSafeText(text)).toBe(true)
+      // O servidor apara: o texto já vem sem espaço nas pontas
+      expect(text).toBe(text.trim())
+    }
+    expect(saved.get('Vampiro v3/v5')).not.toContain('\n')
+    const mage = saved.get('Mago v4') ?? ''
+    expect(mage.split('\n\n')).toHaveLength(6)
+    expect(mage).toContain(PRESENTATION_MARKUP)
+    expect(saved.get('Lobisomem v4')).toHaveLength(4000)
+    for (const empty of ['Mago v3/v5', 'Lobisomem v3/v5', 'Vampiro v4'])
+      expect(saved.get(empty)).toBe('')
+    expect(saved.get('Vampiro limite 20')).toBe('')
   }, 30_000)
 })
 

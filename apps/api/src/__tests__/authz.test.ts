@@ -52,6 +52,10 @@ const SECRET = 'marca-secreta-do-narrador-7f3a'
 // O nome do NPC oculto do cenário: nenhuma resposta a quem não narra o traz
 // (lista, Mesa, auditoria, identidade)
 const HIDDEN_NPC = 'NPC oculto'
+// A Descrição da crônica do cenário (P14-D, D-15): chega ao narrador e aos
+// membros no GET /chronicles/:id e a nenhuma resposta de quem não é membro,
+// inclusive o ex-membro
+const DESCRIPTION = 'marca-descricao-da-cronica-5c1e'
 
 interface Scenario {
   readonly ctx: TestContext
@@ -91,6 +95,11 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   await addMember(ctx, chronicleId, users.owner)
   await addMember(ctx, chronicleId, users.player)
   await createChronicle(ctx, users.otherStoryteller, s.system, 'Outra')
+  await ctx.db
+    .updateTable('chronicles')
+    .set({ description: `Apresentação da mesa. ${DESCRIPTION}` })
+    .where('id', '=', chronicleId)
+    .execute()
   const characterId = await createCharacter(ctx, users.owner, chronicleId)
   // A matriz é de AuthZ, não da conta da criação
   await freeCreation(ctx, characterId)
@@ -233,6 +242,13 @@ async function check(
     expect(text).not.toContain(SECRET)
     expect(text).not.toContain(HIDDEN_NPC)
   }
+  // A Descrição: o narrador e os membros a leem no detalhe da crônica; quem
+  // não é membro (o ex-membro também, D-15) não a recebe em rota nenhuma
+  const member =
+    actor === 'storyteller' || actor === 'owner' || actor === 'player'
+  const detail = row.method === 'GET' && row.route === '/chronicles/:id'
+  if (member && detail) expect(text).toContain(DESCRIPTION)
+  if (!member) expect(text).not.toContain(DESCRIPTION)
   // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
   if (actor === 'former')
     for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])

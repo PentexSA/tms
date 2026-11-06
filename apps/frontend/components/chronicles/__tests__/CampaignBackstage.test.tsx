@@ -265,6 +265,18 @@ describe('narrador', () => {
     })
   })
 
+  // P14-D (U-09, D-15): quem escreve sabe que os jogadores leem
+  it('o campo "Descrição" avisa que os jogadores da crônica leem o texto', async () => {
+    renderWithQueryClient(<CampaignBackstage chronicle={info()} narrating />)
+    await screen.findByText('Apresentação')
+    const hint =
+      'Os jogadores da crônica leem este texto. Segredos ficam nas notas privadas.'
+    expect(screen.getByText(hint)).toBeTruthy()
+    expect(screen.getByLabelText('Descrição').props.accessibilityHint).toBe(
+      hint
+    )
+  })
+
   it('sem catálogo não desenha regras da casa; erro mantém a chave', async () => {
     chronicle.patch.mockResolvedValue(
       fail(422, 'Escolha um valor permitido pelo template.')

@@ -247,7 +247,11 @@ describe('o ex-membro (former)', () => {
   it('lê a crônica sem os membros, e só as fichas dele', async () => {
     await createCharacter(ctx, other, chronicleId, { name: 'Do outro' })
     const detail = await as(ctx, player, 'GET', `/chronicles/${chronicleId}`)
-    expect(await detail.json()).toMatchObject({ role: 'former', members: [] })
+    const read = await detail.json()
+    expect(read).toMatchObject({ role: 'former', members: [] })
+    // D-15 (P14-D): a Apresentação só chega a quem é membro
+    expect(read).not.toHaveProperty('description')
+    expect(read).not.toHaveProperty('imageUrl')
     const list = await as(
       ctx,
       player,
@@ -288,6 +292,13 @@ describe('o ex-membro (former)', () => {
       await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
     ).json()) as { uses: number }[]
     expect(listed?.uses).toBe(1)
+    // Membro de novo, lê a Apresentação de novo (D-15)
+    const back = await as(ctx, player, 'GET', `/chronicles/${chronicleId}`)
+    expect(await back.json()).toMatchObject({
+      role: 'player',
+      description: '',
+      imageUrl: null,
+    })
     expect((await characterRow()).status).toBe('archived')
     // Membro de novo, mas a ficha arquivada continua só leitura para ele
     const write = await as(

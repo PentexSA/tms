@@ -17,7 +17,7 @@ import {
   type TestContext,
   useTestDb,
 } from '../test/helpers'
-import { systemCase } from '../test/matrix-systems'
+import { MATRIX_SYSTEMS, systemCase } from '../test/matrix-systems'
 
 // Um PGLite para o arquivo, restaurado a cada createTestContext
 useTestDb()
@@ -853,6 +853,89 @@ describe('sessões e configurações: revisão, idempotência e validação', ()
     expect(((await stale.json()) as { code: string }).code).toBe(
       'REVISION_CONFLICT'
     )
+  })
+})
+
+// P14-D (U-09, D-15): a Descrição é da crônica e chega a todo membro, também
+// ao que é `viewer` de um NPC revelado; a ficha do NPC não a carrega, e o NPC
+// oculto continua fora de tudo o que o jogador recebe
+describe('a Descrição da crônica e os NPCs', () => {
+  for (const system of MATRIX_SYSTEMS)
+    it(`${system}: o viewer lê a Descrição; a ficha do NPC não a traz; o oculto não aparece`, async () => {
+      if (system !== 'vtm-v20') await publish(ctx, system)
+      const marker = `marca-descricao-${system}`
+      const chronicle = await createChronicle(ctx, storyteller, system, 'Mesa')
+      await addMember(ctx, chronicle, player)
+      await ctx.db
+        .updateTable('chronicles')
+        .set({ description: `Abertura da mesa. ${marker}` })
+        .where('id', '=', chronicle)
+        .execute()
+      const hiddenName = `Velado ${system}`
+      const npc = await createCharacter(ctx, storyteller, chronicle, {
+        name: hiddenName,
+      })
+      await ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility: 'hidden' })
+        .where('id', '=', npc)
+        .execute()
+      const get = async (path: string) => {
+        const res = await as(ctx, player, 'GET', path)
+        return [res.status, await res.text()] as const
+      }
+      const read = async () =>
+        [
+          await get(`/chronicles/${chronicle}`),
+          await get(`/chronicles/${chronicle}/characters`),
+          await get(`/characters/${npc}`),
+        ] as const
+
+      // Oculto: o jogador lê a Descrição e não recebe o NPC em lugar nenhum
+      const [detail, list, sheet] = await read()
+      expect(detail[0]).toBe(200)
+      expect(detail[1]).toContain(marker)
+      expect(sheet[0]).toBe(404)
+      for (const [, text] of [detail, list, sheet])
+        expect(text).not.toContain(hiddenName)
+
+      for (const visibility of ['identity', 'full'] as const) {
+        await ctx.db
+          .updateTable('characters')
+          .set({ visibility })
+          .where('id', '=', npc)
+          .execute()
+        const [chronicleRead, , npcRead] = await read()
+        expect(chronicleRead[0]).toBe(200)
+        expect(chronicleRead[1]).toContain(marker)
+        expect(npcRead[0]).toBe(200)
+        expect(npcRead[1]).toContain(hiddenName)
+        expect(npcRead[1]).not.toContain(marker)
+      }
+    })
+
+  it('o PATCH aceita a Descrição com 4000 caracteres e recusa 4001 sem gravar', async () => {
+    const patch = (description: string, revision: number) =>
+      as(ctx, storyteller, 'PATCH', `/chronicles/${chronicleId}`, {
+        clientCommandId: crypto.randomUUID(),
+        revision,
+        description,
+      })
+    const full = 'a'.repeat(4000)
+    expect((await patch(full, 0)).status).toBe(200)
+    // 4001 para no schema da rota (400), antes do safeText
+    const over = await patch('b'.repeat(4001), 1)
+    expect(over.status).toBe(400)
+    expect(await over.text()).not.toContain('b'.repeat(100))
+    const markup = await patch('texto com <b>marca</b>', 1)
+    expect(markup.status).toBe(422)
+    expect(await markup.text()).not.toContain('<b>marca</b>')
+    const row = await ctx.db
+      .selectFrom('chronicles')
+      .select('description')
+      .where('id', '=', chronicleId)
+      .executeTakeFirstOrThrow()
+    expect(row.description).toBe(full)
   })
 })
 

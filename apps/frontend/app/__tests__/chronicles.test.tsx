@@ -724,6 +724,87 @@ describe('Crônica (detalhe)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
   })
 
+  // P14-D (U-09, D-15): o bloco "Apresentação" com o trecho e "Ler tudo"
+  describe('a Apresentação no topo', () => {
+    const long = 'Parágrafo de teste do roteiro, número 1. '.repeat(15).trim()
+    const withDescription = (
+      role: 'storyteller' | 'player' | 'former',
+      description: string
+    ) =>
+      ok({
+        id: CHRONICLE_ID,
+        name: 'Crônica da Liberdade',
+        system: VTM,
+        role,
+        storyteller: { id: 'u1', username: 'ana' },
+        description,
+        imageUrl: null,
+        members: [],
+      })
+
+    it.each(['player', 'storyteller'] as const)(
+      '%s vê o trecho e "Ler tudo", que abre a leitura',
+      async role => {
+        calls.chronicle.get.mockResolvedValue(withDescription(role, long))
+        renderWithSession(<ChronicleScreen />, await signedIn())
+        const read = await screen.findByRole('button', {
+          name: 'Ler tudo: apresentação da crônica',
+        })
+        expect(screen.getByText('Apresentação')).toBeTruthy()
+        const excerpt = screen.getByTestId('chronicle-about-excerpt')
+        const shown = excerpt.props.children as string
+        // Sem um segundo corte no desenho: a tela mostra o que o leitor lê
+        expect(excerpt.props.numberOfLines).toBeUndefined()
+        // O trecho é o começo, cortado no código: o leitor de tela não recebe
+        // os 600 caracteres
+        expect(Array.from(shown).length).toBeLessThanOrEqual(81)
+        expect(shown.endsWith('…')).toBe(true)
+        expect(long.startsWith(shown.slice(0, -1))).toBe(true)
+        fireEvent.press(read)
+        expect(router.push).toHaveBeenCalledWith(
+          `/chronicles/${CHRONICLE_ID}/about`
+        )
+      }
+    )
+
+    it('texto curto aparece inteiro, sem "…", e com "Ler tudo"', async () => {
+      calls.chronicle.get.mockResolvedValue(
+        withDescription('player', 'Uma mesa curta.')
+      )
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      expect(await screen.findByText('Uma mesa curta.')).toBeTruthy()
+      expect(
+        screen.getByRole('button', {
+          name: 'Ler tudo: apresentação da crônica',
+        })
+      ).toBeTruthy()
+    })
+
+    it.each([
+      ['sem Descrição', ''],
+      ['só espaços', '  \n  '],
+    ])('%s: nenhum bloco', async (_, description) => {
+      calls.chronicle.get.mockResolvedValue(
+        withDescription('player', description)
+      )
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      await screen.findByText('Narrador: ana')
+      expect(screen.queryByTestId('chronicle-about')).toBeNull()
+      expect(
+        screen.queryByRole('button', {
+          name: 'Ler tudo: apresentação da crônica',
+        })
+      ).toBeNull()
+    })
+
+    it('o ex-membro não vê o bloco, mesmo com a Descrição na resposta', async () => {
+      calls.chronicle.get.mockResolvedValue(withDescription('former', long))
+      renderWithSession(<ChronicleScreen />, await signedIn())
+      expect(await screen.findByTestId('former-banner')).toBeTruthy()
+      expect(screen.queryByTestId('chronicle-about')).toBeNull()
+    })
+  })
+
   it('crônica alheia: não encontrada', async () => {
     calls.chronicle.get.mockResolvedValue(fail(404, 'não encontrado'))
     renderWithSession(<ChronicleScreen />, await signedIn())
