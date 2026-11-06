@@ -116,7 +116,9 @@ describe('Conta', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Abrir Crônica da Liberdade' })
     )
-    expect(router.push).toHaveBeenCalledWith('/chronicles/c1')
+    // A crônica abre no lugar da Conta: o "‹ Crônicas" dela volta à lista
+    expect(router.replace).toHaveBeenCalledWith('/chronicles/c1')
+    expect(router.push).not.toHaveBeenCalledWith('/chronicles/c1')
     expect(session.getState().status).toBe('signedIn')
   })
 
