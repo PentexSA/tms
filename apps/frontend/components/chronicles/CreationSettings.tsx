@@ -43,6 +43,13 @@ export interface ChronicleCreationInfo {
   readonly revision: number
 }
 
+/** O salvo da crônica: as regras e se já houve uma gravação. */
+const savedOf = (creation: ChronicleCreationInfo) => ({
+  approval: creation.approval,
+  defaults: layerOf(creation.defaults),
+  stored: creation.revision > 0,
+})
+
 /**
  * O foco programático num controle de dentro de uma vista (o botão "Editar",
  * o primeiro rádio): no web, o primeiro elemento focável dela; no app, o
@@ -85,6 +92,10 @@ export function CreationSettings({
   const toast = useToast()
   const { colors } = useTheme()
   const { breakpoint, stacked } = useLayout()
+  // O que está salvo, até onde a tela sabe: o da crônica e, logo depois de
+  // salvar (antes da rebusca chegar), o que acabou de ser salvo. O resumo, o
+  // "mudou" e o "Cancelar" partem daqui, não da prop ainda velha
+  const [saved, setSaved] = useState(() => savedOf(creation))
   const [approval, setApproval] = useState(creation.approval)
   const [defaults, setDefaults] = useState<CreationConfigLayer>(() =>
     layerOf(creation.defaults)
@@ -101,6 +112,7 @@ export function CreationSettings({
   }, [focus])
 
   useEffect(() => {
+    setSaved(savedOf(creation))
     setApproval(creation.approval)
     setDefaults(layerOf(creation.defaults))
   }, [creation])
@@ -110,8 +122,8 @@ export function CreationSettings({
     [model, defaults]
   )
   const changed =
-    approval !== creation.approval ||
-    JSON.stringify(defaults) !== JSON.stringify(layerOf(creation.defaults))
+    approval !== saved.approval ||
+    JSON.stringify(defaults) !== JSON.stringify(saved.defaults)
   // L-01: "não carregou" e "não suportado" não são "criação livre". Sem as
   // regras do sistema, o narrador não salva (nem a aprovação): decidiria sem
   // ver as regras, e os padrões voltariam sem ele ter visto. O servidor
@@ -120,8 +132,8 @@ export function CreationSettings({
   const rulesKnown = Boolean(model)
   // T-56: "Descartar e sair" volta ao que está salvo
   const reset = () => {
-    setApproval(creation.approval)
-    setDefaults(layerOf(creation.defaults))
+    setApproval(saved.approval)
+    setDefaults(saved.defaults)
   }
   const collapse = () => {
     setOpen(false)
@@ -188,7 +200,7 @@ export function CreationSettings({
               ? 'Carregando as regras do sistema…'
               : model === null
                 ? unsupportedShort('regras')
-                : summaryLine(chronicleCreationSummary(model, creation))}
+                : summaryLine(chronicleCreationSummary(model, saved))}
           </Text>
         )}
       </View>
@@ -340,7 +352,7 @@ export function CreationSettings({
       ) : null}
       <View style={styles.actions}>
         {/* Só quem já salvou recolhe sem salvar: "Cancelar" descarta */}
-        {creation.revision > 0 ? (
+        {saved.stored ? (
           <Button
             title="Cancelar"
             variant="ghost"
@@ -359,9 +371,7 @@ export function CreationSettings({
           // A primeira gravação vale sem mudança: salvar o padrão do sistema
           // é a primeira configuração, e o painel recolhe
           disabled={
-            (!changed && creation.revision > 0) ||
-            mutation.isPending ||
-            !rulesKnown
+            (!changed && saved.stored) || mutation.isPending || !rulesKnown
           }
           accessibilityHint={
             rulesKnown
@@ -377,6 +387,7 @@ export function CreationSettings({
               },
               {
                 onSuccess: () => {
+                  setSaved({ approval, defaults, stored: true })
                   toast.show({ message: 'Regras da criação salvas.' })
                   collapse()
                 },

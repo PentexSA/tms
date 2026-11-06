@@ -305,6 +305,28 @@ describe('o painel recolhido', () => {
     expect(screen.getByText('Regras da criação salvas.')).toBeTruthy()
   })
 
+  // /code-review (P09-D): antes da rebusca, o resumo, o "mudou" e o
+  // "Cancelar" partem do que acabou de ser salvo, não da prop velha
+  it('depois de salvar, o resumo diz o novo antes da rebusca', async () => {
+    calls.chronicle.creationSettingsPatch.mockResolvedValue(ok({}))
+    await render()
+    turnApprovalOn()
+    await act(async () => {
+      fireEvent.press(save())
+    })
+    expect(
+      await screen.findByTestId('creation-settings-summary')
+    ).toHaveTextContent(/aprovação ligada$/)
+    // Reaberto, nada mudou em relação ao que acabou de ser salvo
+    await openPanel()
+    expect(jest.mocked(usePreventRemove).mock.calls.at(-1)?.[0]).toBe(false)
+    expect(screen.getByRole('radio', { name: /^Ligada, / })).toBeChecked()
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByTestId('creation-settings-summary')).toHaveTextContent(
+      /aprovação ligada$/
+    )
+  })
+
   it('erro ao salvar: continua aberto, com o erro', async () => {
     calls.chronicle.creationSettingsPatch.mockResolvedValue(
       fail(409, 'as regras mudaram')
