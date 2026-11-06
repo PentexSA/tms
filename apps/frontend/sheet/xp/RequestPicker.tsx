@@ -23,6 +23,7 @@ import {
   optionLabel,
   optionMeta,
   type RequestContext,
+  refusalMayBeStale,
   requestRefusal,
   type XpCandidate,
   xpCandidates,
@@ -250,7 +251,7 @@ export function RequestFooter({
           if (refusal) {
             setAlertedFor(candidate?.key ?? null)
             AccessibilityInfo.announceForAccessibility(refusal)
-            onRefresh()
+            if (refusalMayBeStale(candidate, context)) onRefresh()
             return
           }
           if (cost?.ok) onSend(cost.cost, cost.to)

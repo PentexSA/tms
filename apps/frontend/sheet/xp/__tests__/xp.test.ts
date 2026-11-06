@@ -16,6 +16,7 @@ import {
   groupCandidates,
   optionLabel,
   optionMeta,
+  refusalMayBeStale,
   requestRefusal,
   xpCandidates,
 } from '../candidates'
@@ -172,6 +173,19 @@ describe('requestRefusal e optionMeta', () => {
       'Conecte-se para enviar. Nada foi enviado.'
     )
     expect(requestRefusal(strength, ctx)).toBeNull()
+  })
+
+  it('só a recusa de saldo ou de pedido pendente pode estar velha (refaz as consultas)', () => {
+    expect(refusalMayBeStale(strength, { ...ctx, available: 4 })).toBe(true)
+    expect(
+      refusalMayBeStale(strength, {
+        ...ctx,
+        pendingKeys: new Set([strength.key]),
+      })
+    ).toBe(true)
+    expect(refusalMayBeStale(maxed, ctx)).toBe(false)
+    expect(refusalMayBeStale(null, ctx)).toBe(false)
+    expect(refusalMayBeStale(strength, ctx)).toBe(false)
   })
 
   it('a opção diz o motivo curto e fica bloqueada', () => {

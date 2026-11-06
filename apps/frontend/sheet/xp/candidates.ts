@@ -143,6 +143,20 @@ export function requestRefusal(
 }
 
 /**
+ * A recusa pode estar velha no aparelho: o saldo (o narrador concedeu XP) ou
+ * o pedido pendente (decidido em outra tela). Só nesses casos o toque no
+ * bloqueado pede o extrato e os pedidos de novo; sem custo, sem escolha ou
+ * sem rede, refazer as consultas não muda nada.
+ */
+export function refusalMayBeStale(
+  c: XpCandidate | null,
+  { available, pendingKeys }: Omit<RequestContext, 'online'>
+): boolean {
+  if (!c?.cost.ok) return false
+  return available < c.cost.cost || pendingKeys.has(c.key)
+}
+
+/**
  * O texto curto da opção na lista: o custo e, se o servidor recusaria, o
  * motivo em poucas palavras ("2 → 3 · 10 XP · faltam 4").
  */

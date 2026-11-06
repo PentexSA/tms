@@ -313,6 +313,21 @@ describe('"Enviar pedido" bloqueado com o motivo (T-77)', () => {
     expect(screen.queryByTestId('xp-request-refusal')).toBeNull()
   })
 
+  it('sem escolha, o toque no bloqueado diz o motivo e não refaz o extrato', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
+    const fetched = calls.xpGet.mock.calls.length
+    fireEvent.press(screen.getByRole('button', { name: 'Enviar pedido' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Escolha um traço para ver o custo.'
+    )
+    // Deixa sair qualquer rebusca pendente antes de contar
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(calls.xpGet.mock.calls.length).toBe(fetched)
+  })
+
   it('pedido pendente do mesmo traço: bloqueado com o motivo', async () => {
     calls.xpRequestsGet.mockImplementation((async () =>
       ok({
