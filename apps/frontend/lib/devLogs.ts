@@ -17,6 +17,10 @@ export const IGNORED_DEV_LOGS: readonly string[] = [
   // (onda-5.md §11), não resolvido por esconder a frase.
   'Looks like you have configured linking in multiple places.',
   'Looks like you have multiple navigation containers consuming the shared imperative routing queue.',
+  // iOS: o React Native (RCTEventEmitter) avisa quando uma animação nativa
+  // de terceiros manda o valor depois que o listener do JS já saiu (a troca
+  // de tela depois do login). O app não usa Animated.
+  'Sending `onAnimatedValueUpdate` with no listeners registered.',
 ]
 
 /**
