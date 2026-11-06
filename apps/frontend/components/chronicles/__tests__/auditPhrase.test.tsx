@@ -97,6 +97,12 @@ describe('auditPhrase', () => {
     ],
     ['character.creation.ready', {}, 'O dono de Helena avisou que terminou'],
     [
+      'character.section.reveal',
+      {},
+      'Notas privadas de Helena reveladas ao jogador',
+    ],
+    ['character.section.hide', {}, 'Notas de Helena voltaram a ser privadas'],
+    [
       'member.remove',
       { detail: { characters: 2 } },
       'beto removido da crônica (2 fichas arquivadas)',

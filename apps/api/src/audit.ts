@@ -34,6 +34,10 @@ export type AuditAction =
   | 'xp.request.stale'
   | 'character.create-npc'
   | 'character.visibility'
+  // U-11 (P16-D): o narrador revela ao dono, ou volta a esconder, uma seção
+  // restrita da ficha. O payload guarda só o id da seção, nunca o texto
+  | 'character.section.reveal'
+  | 'character.section.hide'
   | 'chronicle.settings'
   | 'chronicle.session.create'
   | 'chronicle.session.update'

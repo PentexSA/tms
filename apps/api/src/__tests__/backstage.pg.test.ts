@@ -159,6 +159,44 @@ describe.skipIf(!URL_)('bastidores concorrentes num Postgres real', () => {
     expect(row.visibility_revision).toBe(1)
   })
 
+  // U-11 (P16-D): dois pedidos de revelar na mesma revisão, com chaves
+  // diferentes: um grava, o outro recebe 409; uma revisão e um registro
+  it('duas revelações das notas na mesma revisão têm uma vencedora', async () => {
+    const chronicleId = await campaign('revelar')
+    const id = await createCharacter(ctx, owner, chronicleId, {
+      name: 'Ficha revelada',
+    })
+    const responses = await Promise.all(
+      [0, 1].map(() =>
+        as(ctx, storyteller, 'POST', `/characters/${id}/reveal`, {
+          clientCommandId: crypto.randomUUID(),
+          section: 'storyteller',
+          revealed: true,
+          revision: 0,
+        })
+      )
+    )
+    expect(responses.map(response => response.status).sort()).toEqual([
+      200, 409,
+    ])
+    const row = await ctx.db
+      .selectFrom('characters')
+      .select(['revealed_sections', 'reveal_revision'])
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow()
+    expect(row).toEqual({
+      revealed_sections: ['storyteller'],
+      reveal_revision: 1,
+    })
+    const audits = await ctx.db
+      .selectFrom('chronicle_audit')
+      .select('id')
+      .where('target_character_id', '=', id)
+      .where('action', '=', 'character.section.reveal')
+      .execute()
+    expect(audits).toHaveLength(1)
+  })
+
   it('a mesma chave em fichas distintas grava um resultado e um conflito', async () => {
     const chronicleId = await campaign('rolagens')
     const first = await createCharacter(ctx, owner, chronicleId, {

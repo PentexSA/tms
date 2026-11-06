@@ -3,6 +3,7 @@ import {
   poolOptions,
   poolRollOf,
   resolve,
+  revealableSections,
   type SheetData,
 } from '@tms/sheet-core'
 import { template } from './factories'
@@ -23,6 +24,8 @@ export interface SystemCase {
   readonly notesField: string
   /** Um traço (`rating`) da zona de construção: o alvo de um pedido de XP. */
   readonly ratingField: string
+  /** A seção restrita que o narrador pode revelar ao dono (U-11). */
+  readonly revealSection: string
 }
 
 export function systemCase(system: string): SystemCase {
@@ -48,7 +51,17 @@ export function systemCase(system: string): SystemCase {
   const ratingField = [...model.fields.values()].find(
     f => f.type === 'rating' && f.zone === 'build'
   )?.id
-  if (!textField || !slot || !option || !notesField || !ratingField)
+  const revealSection = revealableSections(model).find(id =>
+    model.sections.get(id)?.fieldIds.includes(notesField ?? '')
+  )
+  if (
+    !textField ||
+    !slot ||
+    !option ||
+    !notesField ||
+    !ratingField ||
+    !revealSection
+  )
     throw new Error(`${system}: o template não tem o que a matriz precisa`)
   return {
     system,
@@ -56,5 +69,6 @@ export function systemCase(system: string): SystemCase {
     slots: { [slot.id]: option.key },
     notesField,
     ratingField,
+    revealSection,
   }
 }

@@ -44,6 +44,12 @@ export interface LockedCharacter {
   readonly visibility: 'hidden' | 'identity' | 'full'
   readonly visibilityRevision: number
   readonly presentationRevision: number
+  // U-11 (P16-D): a versão do template da ficha (o modelo da revelação) e
+  // as seções restritas reveladas ao dono, com a revisão delas
+  readonly systemId: string
+  readonly templateVersion: string
+  readonly revealedSections: readonly string[]
+  readonly revealRevision: number
 }
 
 const notFound = () => new ApiError(404, 'não encontrado')
@@ -91,6 +97,10 @@ export async function lockCharacter(
       'visibility',
       'visibility_revision',
       'presentation_revision',
+      'system_id',
+      'template_version',
+      'revealed_sections',
+      'reveal_revision',
     ])
     .where('id', '=', id)
     .where('chronicle_id', '=', located.chronicle_id)
@@ -112,6 +122,10 @@ export async function lockCharacter(
     visibility: row.visibility as 'hidden' | 'identity' | 'full',
     visibilityRevision: row.visibility_revision,
     presentationRevision: row.presentation_revision,
+    systemId: row.system_id,
+    templateVersion: row.template_version,
+    revealedSections: row.revealed_sections,
+    revealRevision: row.reveal_revision,
   }
 }
 

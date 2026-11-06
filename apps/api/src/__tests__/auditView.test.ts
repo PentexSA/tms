@@ -92,6 +92,13 @@ describe('auditDetail', () => {
     ).toEqual({})
   })
 
+  it('revelar e esconder as notas: sem detalhe, nem o id da seção (U-11)', () => {
+    for (const action of ['character.section.reveal', 'character.section.hide'])
+      expect(
+        auditDetail(action, { section: 'storyteller', text: 'NOTA' })
+      ).toEqual({})
+  })
+
   it('as outras ações e payloads estranhos: vazio', () => {
     expect(auditDetail('chronicle.create', {})).toEqual({})
     expect(
