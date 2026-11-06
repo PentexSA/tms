@@ -405,7 +405,7 @@ G · depende de: 1
 - **Refresh token** opaco, com 32 bytes aleatórios:
   - guardado só como SHA-256;
   - trocado a cada uso (rotação);
-  - o reuso de um token já trocado revoga a família inteira, porque é sinal de roubo.
+  - o reuso de um token já trocado revoga a família inteira, porque é sinal de roubo. Desde a onda 5, com uma tolerância de 30 s para o token anterior cujo sucessor não foi usado, uma vez (o app encerrado com um refresh em voo); ver `doc/checklist-seguranca-v0.md`, "Sessão e tokens".
 - **Transporte:**
   - nativo: o refresh vai no corpo da resposta, e o app o guarda no `expo-secure-store`;
   - web: cookie `HttpOnly; Secure; SameSite=Strict; Path=/auth`;
