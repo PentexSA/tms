@@ -1,7 +1,17 @@
-import { Button, Chip, Stepper, Text, TextField, tokens } from '@tms/ui'
+import {
+  Button,
+  Chip,
+  hitTarget,
+  Stepper,
+  Text,
+  TextField,
+  textStyle,
+  tokens,
+  useTheme,
+} from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
 import { useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, TextInput, View } from 'react-native'
 import { useOnline } from '../../lib/network'
 import {
   type useXpCommands,
@@ -9,6 +19,7 @@ import {
   type XpOutcome,
 } from '../../lib/queries/xp'
 import type { XpCommand, XpCommandKind } from '../../lib/xpCommands'
+import { parseTyped } from '../evolve/typing'
 import { xpMessage } from './messages'
 
 // Formulários dos comandos de XP. A chave nasce ao confirmar e só é trocada
@@ -90,13 +101,11 @@ export function GrantForm({
   const valid = reason.trim().length > 0 && characterIds.length > 0
   return (
     <View style={styles.form}>
-      <Stepper
+      <TypedAmount
         label="XP a conceder"
-        showLabel
         value={amount}
         min={1}
         max={1000}
-        size="sheet"
         testID="xp-grant-amount"
         disabled={run.busy}
         onChange={v => {
@@ -179,16 +188,15 @@ export function AdjustForm({
     (reverses === null || (delta < 0 && -delta <= (limit ?? 0)))
   return (
     <View style={styles.form}>
-      <Stepper
+      <TypedAmount
         label="Ajuste no total"
-        showLabel
         value={delta}
         min={-1000}
         max={1000}
-        size="sheet"
         testID="xp-adjust-delta"
         valueText={n => (n > 0 ? `+${n}` : String(n))}
         disabled={run.busy}
+        signed
         onChange={v => {
           setDelta(v)
           run.reset()
@@ -255,7 +263,138 @@ export function AdjustForm({
   )
 }
 
+/**
+ * U-02: o valor do XP com o "Digitar" do Stepper, como no Editar (T-25):
+ * Enter aplica; sair do campo aplica; Esc cancela; fora da faixa, a
+ * mensagem, e com Enter o campo fica aberto. Estado local: a folha da Mesa
+ * também usa o formulário, e o `typingStore` é do editor da ficha.
+ */
+function TypedAmount({
+  label,
+  value,
+  min,
+  max,
+  testID,
+  disabled,
+  valueText,
+  signed = false,
+  onChange,
+}: {
+  readonly label: string
+  readonly value: number
+  readonly min: number
+  readonly max: number
+  readonly testID: string
+  readonly disabled: boolean
+  readonly valueText?: (n: number) => string
+  // Aceita negativo: no iOS, o `number-pad` não tem o sinal de menos
+  readonly signed?: boolean
+  readonly onChange: (n: number) => void
+}) {
+  const theme = useTheme()
+  const { colors } = theme
+  const [typing, setTyping] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const text = useRef('')
+  const done = useRef(true)
+  const finish = (how: 'submit' | 'leave') => {
+    if (done.current) return
+    const n = parseTyped(text.current, min, max)
+    if (n === null) {
+      setError(`Digite um número inteiro de ${min} a ${max}`)
+      if (how === 'submit') return
+    } else setError(null)
+    done.current = true
+    setTyping(false)
+    if (n !== null) onChange(n)
+  }
+  const cancel = () => {
+    done.current = true
+    setError(null)
+    setTyping(false)
+  }
+  const open = () => {
+    text.current = String(value)
+    done.current = false
+    setError(null)
+    setTyping(true)
+  }
+  const textOf = (e: { nativeEvent: unknown }) => {
+    const t = (e.nativeEvent as { text?: unknown } | undefined)?.text
+    if (typeof t === 'string') text.current = t
+  }
+  return (
+    <View style={styles.form}>
+      {typing ? (
+        <>
+          <Text variant="fieldLabel">{label}</Text>
+          <TextInput
+            testID={`${testID}-input`}
+            accessibilityLabel={`${label}, de ${min} a ${max}`}
+            keyboardType={
+              signed && Platform.OS === 'ios'
+                ? 'numbers-and-punctuation'
+                : 'number-pad'
+            }
+            returnKeyType="done"
+            autoFocus
+            selectTextOnFocus
+            defaultValue={String(value)}
+            maxLength={Math.max(String(min).length, String(max).length) + 1}
+            onChangeText={t => {
+              text.current = t
+            }}
+            submitBehavior="submit"
+            {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
+            onSubmitEditing={e => {
+              textOf(e)
+              finish('submit')
+            }}
+            onBlur={e => {
+              textOf(e)
+              finish('leave')
+            }}
+            onKeyPress={e => {
+              if (e.nativeEvent.key === 'Escape') cancel()
+            }}
+            style={[
+              styles.input,
+              { minHeight: hitTarget() },
+              textStyle(theme, 'number'),
+              { borderColor: colors.borderControl, color: colors.ink },
+            ]}
+          />
+        </>
+      ) : (
+        <Stepper
+          label={label}
+          showLabel
+          value={value}
+          min={min}
+          max={max}
+          size="sheet"
+          testID={testID}
+          disabled={disabled}
+          onValuePress={disabled ? undefined : open}
+          {...(valueText ? { valueText } : {})}
+          onChange={onChange}
+        />
+      )}
+      {error ? (
+        <Text variant="caption" color="danger" accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   form: { gap: tokens.space[2] },
+  input: {
+    borderWidth: tokens.borderWidth.control,
+    borderRadius: tokens.radius.md,
+    paddingHorizontal: tokens.space[3],
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
 })
