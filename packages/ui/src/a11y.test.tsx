@@ -32,6 +32,7 @@ import {
   tokens,
   useRovingFocus,
 } from './index'
+import * as StepperModule from './Stepper'
 import { joinHints, markSoftDisabled } from './Stepper'
 
 const realOS = Platform.OS
@@ -1158,6 +1159,151 @@ describe('Button: nome acessível próprio (T-61)', () => {
     expect(screen.getByRole('button').props.accessibilityLabel).toBe(
       'Escolher da lista: Natureza'
     )
+  })
+})
+
+// T-77 e T-50 (P13): o que o servidor recusaria aparece bloqueado, com o
+// motivo, e o toque continua chegando (o mesmo contrato do "+" do Stepper)
+describe('Button e ChoiceOption: bloqueado e tocável (T-77, T-50)', () => {
+  // O teste não tem DOM: confere que o markSoftDisabled (testado acima com
+  // um elemento falso) é chamado com a trava, e sem ela quando sai
+  const soft = () => jest.spyOn(StepperModule, 'markSoftDisabled')
+  afterEach(() => jest.restoreAllMocks())
+  const flat = (el: { props: { style?: unknown } }): ViewStyle =>
+    StyleSheet.flatten(
+      typeof el.props.style === 'function'
+        ? (el.props.style as (s: { pressed: boolean }) => ViewStyle)({
+            pressed: false,
+          })
+        : (el.props.style as ViewStyle)
+    ) ?? {}
+
+  it('no web, o Button bloqueado põe aria-disabled no elemento, sem `disabled`, aponta o motivo e continua tocável', () => {
+    setOS('web')
+    const mark = soft()
+    const onPress = jest.fn()
+    const { rerender } = render(
+      <Button
+        title="Enviar pedido"
+        onPress={onPress}
+        blocked
+        hintID="xp-refusal"
+      />
+    )
+    const button = screen.getByRole('button', { name: 'Enviar pedido' })
+    expect(button.props.accessibilityDisabled).toBeUndefined()
+    expect(button.props.accessibilityState).toMatchObject({ disabled: false })
+    expect(button.props['aria-describedby']).toBe('xp-refusal')
+    expect(flat(button).opacity).toBe(0.5)
+    expect(mark).toHaveBeenLastCalledWith(expect.anything(), true)
+    fireEvent.press(button)
+    expect(onPress).toHaveBeenCalledTimes(1)
+    // A trava sai: o atributo também
+    rerender(
+      <Button title="Enviar pedido" onPress={onPress} hintID="xp-refusal" />
+    )
+    expect(mark).toHaveBeenLastCalledWith(expect.anything(), false)
+    expect(
+      flat(screen.getByRole('button', { name: 'Enviar pedido' })).opacity
+    ).toBeUndefined()
+  })
+
+  it('no app, o Button bloqueado é anunciado indisponível, e o toque chega', () => {
+    setOS('ios')
+    const onPress = jest.fn()
+    render(
+      <Button
+        title="Enviar pedido"
+        onPress={onPress}
+        blocked
+        hintID="xp-refusal"
+      />
+    )
+    const button = screen.getByRole('button', { name: 'Enviar pedido' })
+    expect(button.props.accessibilityState).toMatchObject({ disabled: true })
+    expect(button.props['aria-describedby']).toBeUndefined()
+    fireEvent.press(button)
+    expect(onPress).toHaveBeenCalledTimes(1)
+  })
+
+  it('desabilitado ou ocupado vence o bloqueado: sem toque', () => {
+    setOS('web')
+    const onPress = jest.fn()
+    render(<Button title="Enviar pedido" onPress={onPress} blocked busy />)
+    fireEvent.press(screen.getByRole('button', { name: 'Enviar pedido' }))
+    expect(onPress).not.toHaveBeenCalled()
+  })
+
+  const options = [
+    { id: 'brawl', label: 'Briga', meta: '0 → 1 · 3 XP' },
+    {
+      id: 'occult',
+      label: 'Ocultismo',
+      meta: '2 → 3 · 10 XP · faltam 4',
+      blocked: true,
+    },
+  ]
+
+  it('no web, a opção bloqueada fica apagada com aria-disabled no elemento, no foco itinerante, e o toque escolhe', () => {
+    setOS('web')
+    const mark = soft()
+    const onChange = jest.fn()
+    render(
+      <Choice
+        label="Conhecimentos"
+        options={options}
+        value={null}
+        onChange={onChange}
+      />
+    )
+    const blocked = screen.getByRole('radio', { name: /^Ocultismo/ })
+    expect(blocked.props.accessibilityDisabled).toBeUndefined()
+    expect(flat(blocked).opacity).toBe(0.5)
+    // O foco itinerante continua valendo para ela (tabIndex do grupo)
+    expect(blocked.props.tabIndex).toBe(-1)
+    expect(flat(screen.getByRole('radio', { name: /^Briga/ })).opacity).toBe(
+      undefined
+    )
+    // Uma chamada por opção: só a bloqueada com a trava
+    expect(mark.mock.calls.map(c => c[1])).toEqual([false, true])
+    fireEvent.press(blocked)
+    expect(onChange).toHaveBeenCalledWith('occult')
+  })
+
+  it('no app, a opção bloqueada é anunciada indisponível, e o toque escolhe', () => {
+    setOS('android')
+    const onChange = jest.fn()
+    render(
+      <Choice
+        label="Conhecimentos"
+        options={options}
+        value={null}
+        onChange={onChange}
+      />
+    )
+    const blocked = screen.getByRole('radio', { name: /^Ocultismo/ })
+    expect(blocked.props.accessibilityState).toMatchObject({ disabled: true })
+    expect(
+      screen.getByRole('radio', { name: /^Briga/ }).props.accessibilityState
+    ).toMatchObject({ disabled: false })
+    fireEvent.press(blocked)
+    expect(onChange).toHaveBeenCalledWith('occult')
+  })
+
+  it('o Choice inteiro desabilitado vence a opção bloqueada', () => {
+    setOS('web')
+    const onChange = jest.fn()
+    render(
+      <Choice
+        label="Conhecimentos"
+        options={options}
+        value={null}
+        onChange={onChange}
+        disabled
+      />
+    )
+    fireEvent.press(screen.getByRole('radio', { name: /^Ocultismo/ }))
+    expect(onChange).not.toHaveBeenCalled()
   })
 })
 

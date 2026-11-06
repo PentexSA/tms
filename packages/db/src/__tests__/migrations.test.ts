@@ -13,6 +13,16 @@ const files = readdirSync(join(import.meta.dir, '../migrations'))
   .sort()
 
 describe('migrations', () => {
+  // O Migrator roda sem `allowUnorderedMigrations`: um número pulado vira
+  // um buraco que a migration de outro pacote não pode ocupar depois de
+  // aplicada a seguinte (P13, a 0024)
+  it('os números seguem sem buraco, de 0001 em diante', () => {
+    const numbers = Object.keys(migrations).map(name =>
+      Number(name.slice(0, 4))
+    )
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1))
+  })
+
   it('a lista registra todo arquivo de migrations/, em ordem', () => {
     expect(Object.keys(migrations)).toEqual(files)
   })
@@ -766,6 +776,7 @@ describe('migrations', () => {
         const down = await migrator.migrateTo('0022_user_commands')
         expect(down.error).toBeUndefined()
         expect(down.results?.map(r => r.migrationName)).toEqual([
+          '0024_character_events_to_absent',
           '0023_templates_onda4',
         ])
         expect(await versions(db)).toEqual(before)
@@ -946,6 +957,39 @@ describe('migrations', () => {
         .select('user_id')
         .execute()
       expect(left).toEqual([{ user_id: b.id }])
+    } finally {
+      await destroy()
+    }
+  })
+
+  // T-53 (P13): o "para" cru vazio fica marcado; as linhas antigas, não
+  it('0024: to_absent nasce false nas linhas antigas e desce sem perder o resto', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const { rows } = await sql<{
+        column: string
+        nullable: string
+        def: string
+      }>`
+        select column_name as column, is_nullable as nullable,
+          column_default as def
+        from information_schema.columns
+        where table_name = 'character_events' and column_name = 'to_absent'`.execute(
+        db
+      )
+      expect(rows).toEqual([
+        { column: 'to_absent', nullable: 'NO', def: 'false' },
+      ])
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      const down = await migrator.migrateTo('0023_templates_onda4')
+      expect(down.error).toBeUndefined()
+      const gone = await sql<{ n: number }>`
+        select count(*)::int as n from information_schema.columns
+        where table_name = 'character_events'
+          and column_name in ('to_absent', 'from_absent')`.execute(db)
+      // Só a do "de" fica
+      expect(gone.rows[0]?.n).toBe(1)
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
     } finally {
       await destroy()
     }

@@ -152,10 +152,45 @@ export function withEffectiveFrom(
   before: SheetData,
   events: readonly SheetEvent[]
 ): SheetEvent[] {
-  let resolved: ReturnType<typeof resolve> | undefined
+  const effective = effectiveOf(model, before)
   return events.map(e => {
     if (e.from !== null && e.from !== undefined) return e
-    const p = parsePath(e.path)
+    const from = effective(e.path)
+    return from === undefined ? e : { ...e, from }
+  })
+}
+
+/**
+ * O mesmo para o "para" (T-53): o evento que esvazia o caminho (o desfazer de
+ * um gasto a partir do padrão) diz o valor efetivo da ficha **depois** do
+ * lote. Assim o histórico do desfazer diz "Sangue 9 → 10", não "9 → —". Só
+ * para mostrar: quem desfaz de novo compara o cru (`invertBatch`).
+ */
+export function withEffectiveTo(
+  model: SheetModel,
+  after: SheetData,
+  events: readonly SheetEvent[]
+): SheetEvent[] {
+  const effective = effectiveOf(model, after)
+  return events.map(e => {
+    if (e.to !== null && e.to !== undefined) return e
+    const to = effective(e.path)
+    return to === undefined ? e : { ...e, to }
+  })
+}
+
+/**
+ * O valor efetivo, na forma guardada, de um caminho da ficha (o padrão ou o
+ * derivado quando nada foi gravado). `undefined` fora do escopo `values`,
+ * para texto (o histórico não repete conteúdo) e para campo desconhecido.
+ */
+export function effectiveOf(
+  model: SheetModel,
+  sheet: SheetData
+): (path: string) => unknown {
+  let resolved: ReturnType<typeof resolve> | undefined
+  return path => {
+    const p = parsePath(path)
     const field = p ? model.fields.get(p.fieldId) : undefined
     if (
       !p ||
@@ -163,11 +198,11 @@ export function withEffectiveFrom(
       !field ||
       NO_EFFECTIVE.has(field.def.type)
     )
-      return e
-    resolved ??= resolve(model, before)
+      return undefined
+    resolved ??= resolve(model, sheet)
     const r = resolved.get(p.fieldId)
-    return r ? { ...e, from: stored(r, resolved) } : e
-  })
+    return r ? stored(r, resolved) : undefined
+  }
 }
 
 /** Uma linha para o toast e o histórico: o evento único ou "N alterações". */

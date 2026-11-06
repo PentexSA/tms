@@ -1,15 +1,14 @@
 import {
-  costOf,
   type RoleName,
   type SheetData,
   type SheetModel,
+  type XpTarget,
   xpBalance,
   xpTargetKey,
 } from '@tms/sheet-core'
 import {
   BottomSheet,
   Button,
-  Chip,
   Skeleton,
   Text,
   TextField,
@@ -29,13 +28,10 @@ import {
   type XpRequestData,
 } from '../../lib/queries/xp'
 import type { SheetLifecycle } from '../policy'
-import {
-  costLabel,
-  freeItemLists,
-  type XpCandidate,
-  xpCandidates,
-} from './candidates'
+import { candidateFor, type XpCandidate, xpCandidates } from './candidates'
 import { AdjustForm, GrantForm, useCommand, xpCommand } from './forms'
+import { RequestFooter, RequestPicker } from './RequestPicker'
+import type { XpShortcutTarget } from './XpShortcut'
 
 // "Experiência" (doc/plano-v4.md, Etapa 8): saldo, pedidos e extrato da
 // ficha. O jogador pede um nível por vez, vendo o custo antes de enviar; o
@@ -81,6 +77,7 @@ export function ExperienceSheet({
   lifecycle,
   visible,
   onClose,
+  initial,
 }: {
   readonly characterId: string
   readonly chronicleId: string
@@ -91,6 +88,8 @@ export function ExperienceSheet({
   readonly lifecycle: SheetLifecycle
   readonly visible: boolean
   readonly onClose: () => void
+  // U-01: abre já em "Solicitar evolução", com o traço marcado ou a busca
+  readonly initial?: XpShortcutTarget
 }) {
   const { colors } = useTheme()
   const online = useOnline()
@@ -100,7 +99,7 @@ export function ExperienceSheet({
   const requests = useXpRequests(characterId, visible)
   const commands = useXpCommands()
   const [panel, setPanel] = useState<'request' | 'grant' | 'adjust' | null>(
-    null
+    initial ? 'request' : null
   )
   const balance =
     ledger.data?.pages[0]?.balance ?? xpBalance(model, sheet) ?? null
@@ -111,6 +110,66 @@ export function ExperienceSheet({
   const mine = commands.unconfirmed.filter(c => c.characterId === characterId)
   const block = requestBlock(lifecycle)
   const hasRules = Boolean(model.template.costs?.xp?.rules?.length)
+  // O pedido escolhido mora aqui: o resumo e o envio vão no rodapé da folha.
+  // Guarda só o alvo; o custo e o "para" saem da ficha confirmada de agora
+  const [target, setTarget] = useState<XpTarget | null>(
+    initial && 'target' in initial ? initial.target : null
+  )
+  const candidates = useMemo(() => xpCandidates(model, sheet), [model, sheet])
+  const picked = useMemo(
+    () => candidateFor(model, sheet, candidates, target),
+    [model, sheet, candidates, target]
+  )
+  const [query, setQuery] = useState(
+    initial && 'query' in initial ? initial.query : ''
+  )
+  const request = useCommand(commands, false)
+  const picking = owner && !block && panel === 'request'
+  // O que o servidor recusaria: o saldo do extrato e os pedidos pendentes
+  const available = balance?.available ?? 0
+  const pendingKeys = useMemo(
+    () =>
+      new Set(
+        (requests.data ?? [])
+          .filter(r => r.status === 'pending')
+          .map(r =>
+            xpTargetKey({
+              field: r.field,
+              ...(r.item !== null && { item: r.item }),
+              ...(r.item === null && r.name !== null && { name: r.name }),
+            })
+          )
+      ),
+    [requests.data]
+  )
+  const choose = (c: XpCandidate | null) => {
+    setTarget(c?.target ?? null)
+    request.reset()
+  }
+  const send = (target: XpCandidate, cost: number, to: number) =>
+    void request
+      .send(
+        key =>
+          xpCommand('request', key, {
+            chronicleId,
+            characterId,
+            body: {
+              field: target.target.field,
+              ...(target.target.item && { item: target.target.item }),
+              ...(target.target.name && { name: target.target.name }),
+              to,
+              expectedCost: cost,
+            },
+            label: `Pedir ${target.label}`,
+          }),
+        'O pedido não foi enviado.'
+      )
+      .then(outcome => {
+        if (outcome?.status !== 'done') return
+        setPanel(null)
+        setTarget(null)
+        setQuery('')
+      })
 
   return (
     <BottomSheet
@@ -118,6 +177,23 @@ export function ExperienceSheet({
       title="Experiência"
       onClose={onClose}
       testID="xp-sheet"
+      footer={
+        picking ? (
+          <RequestFooter
+            candidate={picked}
+            context={{ available, pendingKeys, online }}
+            busy={request.busy}
+            error={request.error}
+            onSend={(cost, to) => {
+              if (picked) send(picked, cost, to)
+            }}
+            onRefresh={() => {
+              void ledger.refetch()
+              void requests.refetch()
+            }}
+          />
+        ) : undefined
+      }
     >
       <View style={styles.content}>
         {balance ? (
@@ -167,15 +243,15 @@ export function ExperienceSheet({
             </Text>
           )
         ) : null}
-        {owner && !block && panel === 'request' ? (
+        {picking ? (
           <RequestPicker
-            chronicleId={chronicleId}
-            characterId={characterId}
             model={model}
             sheet={sheet}
-            available={balance?.available ?? 0}
-            commands={commands}
-            onDone={() => setPanel(null)}
+            chosen={picked}
+            onChoose={choose}
+            query={query}
+            onQuery={setQuery}
+            context={{ available, pendingKeys }}
           />
         ) : null}
 
@@ -285,179 +361,6 @@ function UnconfirmedRow({
         Este comando fica guardado até o servidor confirmar o resultado.
       </Text>
       <Button title="Reenviar" disabled={disabled} onPress={onRetry} />
-    </View>
-  )
-}
-
-function RequestPicker({
-  chronicleId,
-  characterId,
-  model,
-  sheet,
-  available,
-  commands,
-  onDone,
-}: {
-  readonly chronicleId: string
-  readonly characterId: string
-  readonly model: SheetModel
-  readonly sheet: SheetData
-  readonly available: number
-  readonly commands: ReturnType<typeof useXpCommands>
-  readonly onDone: () => void
-}) {
-  const online = useOnline()
-  const candidates = useMemo(() => xpCandidates(model, sheet), [model, sheet])
-  const lists = useMemo(() => freeItemLists(model), [model])
-  const [chosen, setChosen] = useState<XpCandidate | null>(null)
-  const [list, setList] = useState(lists[0]?.id ?? null)
-  const [custom, setCustom] = useState('')
-  const run = useCommand(commands, false)
-  // Item de nome livre: o mesmo core calcula o preço (sem desconto de
-  // catálogo para um nome digitado)
-  const typed = useMemo<XpCandidate | null>(() => {
-    const def = lists.find(l => l.id === list)
-    const name = custom.trim()
-    if (!def || !name) return null
-    const target = { field: def.id, name }
-    return {
-      key: xpTargetKey(target),
-      target,
-      label: `${def.label}: ${name} (novo)`,
-      cost: costOf(model, sheet, target),
-    }
-  }, [custom, list, lists, model, sheet])
-  const target = chosen ?? typed
-  return (
-    <View style={styles.form} testID="xp-request-picker">
-      <Text color="inkMuted">
-        Um nível por pedido. O custo é conferido de novo na aprovação.
-      </Text>
-      <View style={styles.chips}>
-        {candidates.map(c => (
-          <Chip
-            key={c.key}
-            label={`${c.label} · ${costLabel(c)}`}
-            selected={chosen?.key === c.key}
-            onPress={
-              c.cost.ok
-                ? () => {
-                    setChosen(c)
-                    setCustom('')
-                    run.reset()
-                  }
-                : undefined
-            }
-          />
-        ))}
-      </View>
-      {lists.length > 1 ? (
-        <View style={styles.chips}>
-          {lists.map(l => (
-            <Chip
-              key={l.id}
-              label={l.label}
-              selected={list === l.id}
-              onPress={() => setList(l.id)}
-            />
-          ))}
-        </View>
-      ) : null}
-      {lists.length ? (
-        <TextField
-          label={`Novo item em ${lists.find(l => l.id === list)?.label ?? ''} (nome)`}
-          value={custom}
-          maxLength={80}
-          testID="xp-request-custom"
-          onChangeText={t => {
-            setCustom(t)
-            setChosen(null)
-            run.reset()
-          }}
-        />
-      ) : null}
-      {target ? (
-        <PickedRequest
-          key={target.key}
-          candidate={target}
-          available={available}
-          online={online}
-          busy={run.busy}
-          error={run.error}
-          onSend={(cost, to) =>
-            void run
-              .send(
-                key =>
-                  xpCommand('request', key, {
-                    chronicleId,
-                    characterId,
-                    body: {
-                      field: target.target.field,
-                      ...(target.target.item && { item: target.target.item }),
-                      ...(target.target.name && { name: target.target.name }),
-                      to,
-                      expectedCost: cost,
-                    },
-                    label: `Pedir ${target.label}`,
-                  }),
-                'O pedido não foi enviado.'
-              )
-              .then(outcome => {
-                if (outcome?.status === 'done') onDone()
-              })
-          }
-        />
-      ) : null}
-    </View>
-  )
-}
-
-function PickedRequest({
-  candidate,
-  available,
-  online,
-  busy,
-  error,
-  onSend,
-}: {
-  readonly candidate: XpCandidate
-  readonly available: number
-  readonly online: boolean
-  readonly busy: boolean
-  readonly error: string | null
-  readonly onSend: (cost: number, to: number) => void
-}) {
-  const cost = candidate.cost
-  if (!cost.ok)
-    return (
-      <Text color="danger" accessibilityRole="alert">
-        {costLabel(candidate)}: este traço não pode ser pedido agora.
-      </Text>
-    )
-  const short = available < cost.cost
-  return (
-    <View style={styles.form}>
-      <Text testID="xp-request-summary">
-        {candidate.label}: {cost.from} → {cost.to}. Custo {cost.cost} XP
-        (disponível {available}).
-      </Text>
-      {short ? (
-        <Text color="inkMuted">
-          Saldo insuficiente para esta evolução: o servidor vai recusar.
-        </Text>
-      ) : null}
-      {error ? (
-        <Text color="danger" accessibilityRole="alert">
-          {error}
-        </Text>
-      ) : null}
-      <Button
-        title="Enviar pedido"
-        testID="xp-request-send"
-        busy={busy}
-        disabled={!online}
-        onPress={() => onSend(cost.cost, cost.to)}
-      />
     </View>
   )
 }
@@ -580,7 +483,6 @@ const styles = StyleSheet.create({
   content: { gap: tokens.space[3] },
   form: { gap: tokens.space[2] },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space[2] },
   entry: {
     gap: tokens.space[1],
     paddingVertical: tokens.space[2],

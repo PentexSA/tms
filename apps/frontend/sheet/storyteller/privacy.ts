@@ -1,4 +1,9 @@
-import { canRead, type FieldId, type SheetModel } from '@tms/sheet-core'
+import {
+  canRead,
+  canWrite,
+  type FieldId,
+  type SheetModel,
+} from '@tms/sheet-core'
 
 // R-09 (P09-C): o campo que o narrador lê e o dono não (as Notas do Narrador
 // no Vampiro, as do Mestre no D&D) diz que é privado. Vem das permissões do
@@ -8,6 +13,25 @@ import { canRead, type FieldId, type SheetModel } from '@tms/sheet-core'
 
 export function hiddenFromOwner(model: SheetModel, id: FieldId): boolean {
   return canRead(model, id, ['storyteller']) && !canRead(model, id, ['owner'])
+}
+
+/**
+ * T-84: o texto que só o narrador escreve (as Notas do Narrador) é editado
+ * pela barra do narrador, que grava direto, fora do rascunho. O layout de
+ * texto não desenha um segundo editor para ele: só leitura, com a legenda de
+ * privado. Os outros textos do Sobre (Citação, Notas, e os de outros
+ * sistemas) ganham o editor no Editar e na Criação para quem os escreve.
+ * Vem só das permissões do template, nada aqui cita sistema. Um campo novo
+ * de texto (a "História" do P15-D) segue a mesma regra: se o dono o
+ * escreve, editor no Editar; se só o narrador, a barra.
+ */
+export function barEdits(model: SheetModel, id: FieldId): boolean {
+  const type = model.fields.get(id)?.type
+  return (
+    (type === 'text' || type === 'longText') &&
+    canWrite(model, id, ['storyteller']) &&
+    !canWrite(model, id, ['owner'])
+  )
 }
 
 // O rótulo diz que o jogador não lê; nunca repete o conteúdo da nota

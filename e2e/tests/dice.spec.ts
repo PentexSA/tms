@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { apiAs, completeCreation, freeCreation, signUp } from '../support/users'
 
 // Etapa 21: montar Destreza + Esportes no sheet "Dados" e rolar. Quem rola é
@@ -64,4 +64,74 @@ test('montar Destreza + Esportes e rolar', async ({ page }) => {
   expect(rolls.items).toEqual([
     expect.objectContaining({ label: 'Destreza + Esportes', manual: false }),
   ])
+})
+
+/** Uma ficha concluída do sistema, aberta em Jogo pela dona. */
+async function playing(page: Page, systemCode: string, name: string) {
+  const context = page.context()
+  const user = await signUp(context, 'dados_p13')
+  const chronicle = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    '/chronicles',
+    { name: 'Crônica dos Dados', systemCode }
+  )
+  await freeCreation(context, user, chronicle.id)
+  const character = await apiAs<{ id: string }>(
+    context,
+    user,
+    'POST',
+    `/chronicles/${chronicle.id}/characters`,
+    { values: { name } }
+  )
+  await completeCreation(context, user, character.id)
+  return { context, user, id: character.id }
+}
+
+test.describe('P13 a 390', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  // T-79: o resultado sai do topo quando a parada muda; o W20 separa "Em jogo"
+  test('trocar o Atributo tira o resultado do topo; no W20, "Atributos" e "Em jogo"', async ({
+    page,
+  }) => {
+    const { id } = await playing(page, 'wta-w20', 'Iara')
+    await page.goto(`/characters/${id}`)
+    await page.getByRole('button', { name: 'Dados', exact: true }).click()
+    await page.getByRole('button', { name: /^Atributo:/ }).click()
+    await expect(
+      page.getByRole('heading', { name: 'Em jogo', exact: true })
+    ).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Atributos', exact: true })
+    ).toBeVisible()
+    await page.getByLabel('Buscar atributo').fill('destreza')
+    await page.getByRole('button', { name: /^Destreza, / }).click()
+    await page.getByRole('button', { name: 'Rolar no app' }).click()
+    const faces = page.getByText(/^Dados: /)
+    await expect(faces).toBeVisible()
+    await page.getByRole('button', { name: /^Atributo:/ }).click()
+    await page.getByLabel('Buscar atributo').fill('força')
+    await page
+      .getByRole('button', { name: /^Força, / })
+      .first()
+      .click()
+    await expect(faces).toHaveCount(0)
+    await expect(page.getByText('Nesta sessão')).toBeVisible()
+  })
+
+  // T-77: o narrador nunca é barrado pela trava. Aqui a mesma conta é dona e
+  // narradora; o caso da dona barrada, com o aria-disabled sem `disabled`,
+  // está no DiceSheet.test.tsx (o web pelo Platform.OS)
+  test('ficha travada: o narrador continua ligando "Gastar 1 Força de Vontade"', async ({
+    page,
+  }) => {
+    const { context, user, id } = await playing(page, 'vtm-v20', 'Helena')
+    await apiAs(context, user, 'POST', `/characters/${id}/lock`)
+    await page.goto(`/characters/${id}`)
+    await page.getByRole('button', { name: 'Dados', exact: true }).click()
+    const boost = page.getByRole('checkbox', { name: /^Gastar 1 Força/ })
+    await expect(boost).not.toHaveAttribute('aria-disabled', 'true')
+  })
 })

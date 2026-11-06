@@ -107,6 +107,7 @@ Table character_events {
   from_value jsonb
   to_value jsonb
   from_absent boolean [not null, default: false]
+  to_absent boolean [not null, default: false, note: 'o "para" cru era vazio; to_value guarda o efetivo (0024, T-53)']
 }
 
 Table chronicle_audit {
