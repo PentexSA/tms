@@ -25,6 +25,7 @@ import {
 } from 'react-native'
 import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
+import { ChronicleAbout } from '../../../../components/chronicles/ChronicleAbout'
 import {
   type ChronicleCreationInfo,
   CreationSettings,
@@ -223,6 +224,15 @@ export default function ChronicleScreen() {
                 ? 'Você narra esta crônica.'
                 : `Narrador: ${c.storyteller.username}`}
             </Text>
+            {/* D-15: a Apresentação, depois de sistema e narrador e antes do
+                painel da criação e das abas (onda-5.md §4.1). O ex-membro
+                não a vê (defesa em profundidade; quem decide é a API) */}
+            {!former ? (
+              <ChronicleAbout
+                chronicleId={c.id}
+                description={c.description ?? ''}
+              />
+            ) : null}
           </View>
 
           {c.role === 'player' && transfer.data?.available ? (
@@ -341,6 +351,8 @@ interface ChronicleData {
   readonly id: string
   readonly system: { readonly code: string }
   readonly storyteller: { readonly username: string }
+  // A Apresentação (D-15): o narrador e os membros leem
+  readonly description?: string
   // As regras da criação (o ex-membro não recebe)
   readonly creation?: ChronicleCreationInfo
   readonly members: readonly {
