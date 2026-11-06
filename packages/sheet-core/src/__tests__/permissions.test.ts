@@ -92,6 +92,64 @@ describe('matriz papel × seção', () => {
   })
 })
 
+// U-10 (D-16): a História / Prelúdio, numa seção própria que o dono e o
+// narrador leem e escrevem, e o `viewer` de um NPC revelado não lê. As Notas
+// do Narrador continuam só do narrador.
+describe('U-10: a História do personagem nos três sistemas', () => {
+  const product: string[] = ['vtm-v20', 'mta-m20', 'wta-w20']
+
+  it.each(product)('%s: o campo, a seção e quem lê e escreve', system => {
+    const m = compileTemplate(templates[system])
+    const field = m.fields.get('backstory')
+    expect(field?.def.type).toBe('longText')
+    expect((field?.def as { maxLength?: number } | undefined)?.maxLength).toBe(
+      8000
+    )
+    expect(field?.sectionIds).toEqual(['backstory'])
+    const section = m.sections.get('backstory')
+    expect(section?.zone).toBe('lore')
+    expect(section?.restricted).toBe(true)
+
+    expect(canRead(m, 'backstory', ['owner'])).toBe(true)
+    expect(canRead(m, 'backstory', ['storyteller'])).toBe(true)
+    expect(canRead(m, 'backstory', ['viewer'])).toBe(false)
+    expect(canRead(m, 'backstory', ['player'])).toBe(false)
+    expect(canRead(m, 'backstory', [])).toBe(false)
+    expect(canWrite(m, 'backstory', ['owner'])).toBe(true)
+    expect(canWrite(m, 'backstory', ['storyteller'])).toBe(true)
+    expect(canWrite(m, 'backstory', ['viewer'])).toBe(false)
+
+    expect(canRead(m, 'storytellerNotes', ['owner'])).toBe(false)
+    expect(canWrite(m, 'storytellerNotes', ['owner'])).toBe(false)
+  })
+
+  it.each(product)('%s: o stripRestricted por papel', system => {
+    const m = compileTemplate(templates[system])
+    const sheet = {
+      values: {
+        notes: 'NOTAS-DO-JOGADOR',
+        backstory: 'HISTORIA-COMPARTILHADA',
+        storytellerNotes: 'SEGREDO',
+      },
+    } as unknown as SheetData
+
+    const viewer = stripRestricted(m, sheet, ['viewer'])
+    expect(viewer.values.notes).toBe('NOTAS-DO-JOGADOR')
+    expect(Object.hasOwn(viewer.values, 'backstory')).toBe(false)
+    expect(Object.hasOwn(viewer.values, 'storytellerNotes')).toBe(false)
+
+    const owner = stripRestricted(m, sheet, ['owner'])
+    expect(owner.values.backstory).toBe('HISTORIA-COMPARTILHADA')
+    expect(Object.hasOwn(owner.values, 'storytellerNotes')).toBe(false)
+
+    const st = stripRestricted(m, sheet, ['storyteller'])
+    expect(st.values.backstory).toBe('HISTORIA-COMPARTILHADA')
+    expect(st.values.storytellerNotes).toBe('SEGREDO')
+
+    expect(stripRestricted(m, sheet, ['player']).values).toEqual({})
+  })
+})
+
 describe('stripRestricted', () => {
   it('remove valores e especializações que o papel não lê', () => {
     const sheet = helena()

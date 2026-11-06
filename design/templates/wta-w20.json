@@ -1005,6 +1005,12 @@
     },
 
     "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "backstory": {
+      "type": "longText",
+      "label": "História / Prelúdio",
+      "maxLength": 8000,
+      "help": "A história do personagem antes da crônica. O jogador e o narrador leem."
+    },
     "storytellerNotes": {
       "type": "longText",
       "label": "Notas do Narrador",
@@ -1200,6 +1206,14 @@
       "title": "Sobre",
       "layout": "text",
       "fields": ["quote", "metisDeformity", "notes"]
+    },
+    {
+      "id": "backstory",
+      "zone": "lore",
+      "title": "História",
+      "layout": "text",
+      "fields": ["backstory"],
+      "permissions": { "read": ["owner", "storyteller"] }
     },
     {
       "id": "battle-scars",

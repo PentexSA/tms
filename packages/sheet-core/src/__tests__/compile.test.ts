@@ -54,7 +54,7 @@ describe('compileTemplate: o modelo do Vampiro', () => {
       play: ['play'],
       build: ['attributes', 'abilities'],
       powers: ['advantages', 'merits-flaws', 'experience'],
-      lore: ['about', 'storyteller'],
+      lore: ['about', 'backstory', 'storyteller'],
     })
   })
 
@@ -115,6 +115,8 @@ describe('compileTemplate: o modelo do Vampiro', () => {
   it('marca a seção do narrador como restrita', () => {
     expect(model.sections.get('storyteller')?.restricted).toBe(true)
     expect(model.sections.get('about')?.restricted).toBe(false)
+    // A História declara `read` (dono e narrador, sem `viewer`)
+    expect(model.sections.get('backstory')?.restricted).toBe(true)
   })
 
   it('identityFields são os campos da criação de ficha', () => {
@@ -257,6 +259,7 @@ describe('os campos da ficha de papel nos três sistemas', () => {
     const lore = model.zones.find(z => z.id === 'lore')?.sections ?? []
     expect(lore.map(s => s.id)).toEqual([
       'about',
+      'backstory',
       'battle-scars',
       'storyteller',
     ])
