@@ -54,5 +54,5 @@ test('excluir a conta: senha errada não exclui; com a senha, não entra mais', 
   await page.getByLabel('E-mail').fill(`${user.username}@example.test`)
   await page.getByLabel('Senha', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByRole('alert')).toContainText('e-mail ou senha')
+  await expect(page.getByRole('alert')).toContainText('E-mail ou senha')
 })

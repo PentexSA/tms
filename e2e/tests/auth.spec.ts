@@ -76,6 +76,6 @@ test('senha errada mostra o erro genérico', async ({ page }) => {
   await page.getByLabel('Senha').fill('qualquer senha errada')
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('alert')).toContainText(
-    'e-mail ou senha incorretos'
+    'E-mail ou senha incorretos'
   )
 })
