@@ -29,6 +29,7 @@ module.exports = {
     '<rootDir>/sheet/**/*.test.tsx',
     '<rootDir>/test/**/*.test.ts',
     '<rootDir>/test/**/*.test.tsx',
+    '<rootDir>/plugins/**/*.test.ts',
   ],
 
   collectCoverageFrom: [
