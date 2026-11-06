@@ -37,6 +37,40 @@ export const shortDate = (value: string | Date) => {
 export const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
+/**
+ * O começo de um texto longo, para um bloco que leva a ele (P14-D, a
+ * Apresentação da crônica). Conta pontos de código (`Array.from`), então não
+ * parte um emoji nem um par substituto. Corta no último espaço antes de
+ * `max`; sem espaço, em `max`. O "…" entra só quando corta. O corte é no
+ * código, e não só no desenho (`numberOfLines`): o leitor de tela recebe o
+ * trecho, nunca o texto inteiro.
+ */
+export const excerpt = (text: string, max: number): string => {
+  const trimmed = text.trim()
+  const points = Array.from(trimmed)
+  if (points.length <= max) return trimmed
+  const head = points.slice(0, max)
+  // O último espaço antes do limite, se ele não deixar o trecho vazio
+  let cut = head.length
+  for (let i = head.length - 1; i > 0; i--)
+    if (/\s/.test(head[i] ?? '')) {
+      cut = i
+      break
+    }
+  return `${head.slice(0, cut).join('').trimEnd()}…`
+}
+
+/**
+ * Os parágrafos de um texto puro: separados por linha em branco (também
+ * `\r\n` e linha só com espaços). A quebra simples fica dentro do parágrafo.
+ * Nenhum parser: `*`, `#` e `[]()` voltam como foram escritos.
+ */
+export const paragraphs = (text: string): string[] =>
+  text
+    .split(/\r?\n[ \t]*\r?\n/)
+    .map(p => p.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd())
+    .filter(p => p.trim() !== '')
+
 /** "às 14:05" hoje; "em 12/10 às 14:05" em outro dia (última alteração). */
 export const whenLabel = (value: string | Date, now = new Date()) => {
   const d = new Date(value)
