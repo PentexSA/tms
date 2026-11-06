@@ -168,38 +168,44 @@ test.describe('a 390', () => {
         field: 'brawl',
       }
     )
-    const requests: string[] = []
-    playerPage.on('request', r => {
-      if (r.url().endsWith('/xp-requests') && r.method() === 'POST')
-        requests.push(r.url())
-    })
-    await playerPage.goto(`/characters/${id}`)
-    await openExperience(playerPage)
-    await playerPage
-      .getByRole('button', { name: 'Solicitar evolução', exact: true })
-      .click()
-    await playerPage.getByLabel('Buscar traço').fill('brig')
-    const brawl = playerPage.getByRole('radio', {
-      name: /^Briga, .*pedido pendente$/,
-    })
-    await expect(brawl).toHaveAttribute('aria-disabled', 'true')
-    await expect(brawl).not.toHaveAttribute('disabled', /.*/)
-    // Tocável (force: o Playwright não clica em aria-disabled sem ele, lição
-    // da onda 4): a opção é marcada, e o rodapé diz o motivo
-    await brawl.click({ force: true })
-    await expect(brawl).toHaveAttribute('aria-checked', 'true')
-    const reason = 'Já existe um pedido pendente para este traço.'
-    await expect(playerPage.getByTestId('xp-request-refusal')).toHaveText(
-      reason
-    )
-    const send = panel(playerPage).getByRole('button', {
-      name: 'Enviar pedido',
-      exact: true,
-    })
-    await expect(send).toHaveAttribute('aria-disabled', 'true')
-    await send.click({ force: true })
-    await expect(playerPage.getByRole('alert')).toContainText(reason)
-    expect(requests).toEqual([])
+    // Fecha a página do jogador no fim: aberta, com a folha e as rebuscas,
+    // ela deixava o WebKit instável no caso seguinte (U-02 a 1280)
+    try {
+      const requests: string[] = []
+      playerPage.on('request', r => {
+        if (r.url().endsWith('/xp-requests') && r.method() === 'POST')
+          requests.push(r.url())
+      })
+      await playerPage.goto(`/characters/${id}`)
+      await openExperience(playerPage)
+      await playerPage
+        .getByRole('button', { name: 'Solicitar evolução', exact: true })
+        .click()
+      await playerPage.getByLabel('Buscar traço').fill('brig')
+      const brawl = playerPage.getByRole('radio', {
+        name: /^Briga, .*pedido pendente$/,
+      })
+      await expect(brawl).toHaveAttribute('aria-disabled', 'true')
+      await expect(brawl).not.toHaveAttribute('disabled', /.*/)
+      // Tocável (force: o Playwright não clica em aria-disabled sem ele, lição
+      // da onda 4): a opção é marcada, e o rodapé diz o motivo
+      await brawl.click({ force: true })
+      await expect(brawl).toHaveAttribute('aria-checked', 'true')
+      const reason = 'Já existe um pedido pendente para este traço.'
+      await expect(playerPage.getByTestId('xp-request-refusal')).toHaveText(
+        reason
+      )
+      const send = panel(playerPage).getByRole('button', {
+        name: 'Enviar pedido',
+        exact: true,
+      })
+      await expect(send).toHaveAttribute('aria-disabled', 'true')
+      await send.click({ force: true })
+      await expect(playerPage.getByRole('alert')).toContainText(reason)
+      expect(requests).toEqual([])
+    } finally {
+      await playerContext.close()
+    }
   })
 
   test('"Peça ao narrador." abre a Experiência com o traço marcado (U-01)', async ({

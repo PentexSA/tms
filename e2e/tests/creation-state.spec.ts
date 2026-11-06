@@ -350,8 +350,19 @@ test('R-13 e R-14: avisar que terminei, pedir ajuste, privacidade e Histórico',
       .first()
     await expect(history.getByText('Ajuste pedido')).toBeVisible()
     await expect(history.getByText('Avisou que terminou')).toHaveCount(2)
-    await expect(history.getByText('Criação concluída')).toBeVisible()
+    // Exato: o aviso "Criação concluída. Subir um traço…" acompanha a folha
+    // de cima (P12) e, com o espaço da folha sem rodapé (T-43), pode ficar
+    // sob o ponteiro parado, que segura o prazo (T-76)
+    await expect(
+      history.getByText('Criação concluída', { exact: true })
+    ).toBeVisible()
     await expect(history.getByText(reason)).toHaveCount(0)
+    // O ponteiro sai de cima, e o aviso some no prazo (nada fica preso)
+    await st.mouse.move(0, 0)
+    await expect(history.getByText(/^Criação concluída\. Subir/)).toHaveCount(
+      0,
+      { timeout: 10_000 }
+    )
   } finally {
     await desk.close()
     await third.close()
