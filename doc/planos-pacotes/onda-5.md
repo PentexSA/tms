@@ -204,16 +204,27 @@ O uso limitado, a validade, o limite de tentativas e as mensagens genéricas do 
 
 ### 4.6 As migrations
 
+**Ordem final, depois da integração** (a tabela do plano, abaixo, ficou como registro):
+
+| Número | Pacote | Tipo | O que faz |
+|---|---|---|---|
+| `0024_character_events_to_absent` | P13 | **Schema** | `to_absent boolean not null default false` em `character_events`: marca que o "para" cru do evento era vazio. As linhas antigas ficam `false` e comparam o cru, como antes. É a alternativa que o plano do P13 já trazia (§3.3, pergunta 1): gravar o "para" efetivo no Histórico, sem saber se o cru era vazio, deixava de recusar dois desfazeres do desfazer (gravar o mesmo valor de novo; esvaziar um caminho que já mostrava o padrão), e isso afrouxava o conflito. Com a coluna, o `invertBatch` só aceita "sem mudança" no caso do plano: `to_absent`, o cru de agora vazio e o efetivo igual ao "para" gravado |
+| `0025_templates_onda5` | P15-D | Só dados | Publica vtm-v20 1.10.0, wta-w20 1.8.0 e mta-m20 1.8.0 |
+| `0026_character_reveal` | P16-D | **Schema** | `revealed_sections text[]` e `reveal_revision` em `characters`, com as constraints "só PC" e "até 8" |
+
+- **A numeração seguiu a ordem de merge** (P13 → P15-D → P16-D). O `Migrator` roda sem `allowUnorderedMigrations`: um banco que já tivesse aplicado um número maior recusaria um menor que chegasse depois ("corrupted migrations"). O `/code-review` do P13 e o do P16-D apontaram isso, e os pacotes renumeraram antes do merge. O teste das migrations desce pela lista de arquivos, e não por nomes fixos.
+- **Onde este documento diz "a `0024`" dos templates** (seções 1 a 4.5, 8 e 10), leia `0025_templates_onda5`; onde diz "a `0025`" da revelação, leia `0026_character_reveal`. As seções 4.12, 9 e 10.1 já foram corrigidas.
+- **O P12 não tem migration:** o rótulo do convite ficou só com o número automático (seção 6, ponto 7).
+- **O `db:migrate` pode travar na saída** ([onda-4.md](onda-4.md) §11): confira pela tabela `kysely_migration`.
+- **Bancos dos pacotes:** `tms_p13`, `tms_p16d` e `tms_p16d_test` ficaram criados e podem ser apagados com `dropdb` na integração. O `tms_p15d` não chegou a existir. Nunca `db:down`: o Postgres do Docker é compartilhado.
+
+**O plano, antes da integração (registro):**
+
 | Número | Pacote | Tipo | O que faz |
 |---|---|---|---|
 | `0024_templates_onda5` | P15-D | Só dados | Publica as três versões novas |
 | `0025_character_reveal` | P16-D, se entrar | **Schema** | `revealed_sections text[]` e `reveal_revision` em `characters`, com constraints "só PC" e "até 8". Pede `db:codegen`, o `types.ts` e o `doc/database.dbml` |
 | `0026_…` | P12, só se o PO escolher o rótulo livre do convite | Schema | A coluna do rótulo. O padrão do plano (o número automático, por `row_number`) não tem migration |
-
-- **A numeração segue a ordem de merge** da seção 2. Um pacote que ganhe migration fora dessa lista pega o próximo número no rebase.
-- **O P13 não tem migration.** A alternativa de uma coluna `to_absent` para o T-53 foi descartada em favor de um caso novo no `invertBatch` (P13 §9).
-- **O `db:migrate` pode travar na saída** ([onda-4.md](onda-4.md) §11): confira pela tabela `kysely_migration`.
-- **Bancos dos pacotes:** cada um migra o seu (`tms_p15d`, `tms_p16d` e os outros), e todos podem ser apagados com `dropdb` na integração. Nunca `db:down`: o Postgres do Docker é compartilhado.
 
 ### 4.7 AuthZ: quem lê o quê
 
@@ -293,7 +304,7 @@ Os papéis:
   - as fichas em cada estado para a Mesa (em criação, aguardando aprovação, aguardando ajuste, devolvida e concluída, com e sem "terminei") e um NPC oculto (P09-D);
   - o "Lobo R" (W20) para o T-79 e o saldo insuficiente para o T-77 (P13);
   - Notas do Narrador com texto (P15-D, P16-D);
-  - a ficha na versão anterior, criada antes da `0024` (P15-D; seção 10.1);
+  - a ficha na versão anterior, criada antes da `0025_templates_onda5` (P15-D; seção 10.1);
   - por plataforma, a "Cronica P12 <plataforma>" e uma conta nova `p12_<plataforma>@roteiro.test` pelo link sem sessão (P12).
 - **A saída do seed tem a senha, os e-mails e o código do convite do N2** (`seed-roteiro.ts:602`). Vai só para um log no scratchpad, com permissão `600`, lido com `grep -v -i -E 'senha|convite N2'`. A senha é a constante do seed e nunca é escrita num plano, num script versionado ou numa captura.
 
@@ -352,6 +363,8 @@ Os planos não foram editados na consolidação. O que muda em relação a eles:
    Recomendação do P15-D: a 1, com a 2 oferecida ao narrador quando o P13 estiver em produção, e a 4 registrada como item futuro no `proximas-features.md` (pelo P01-D).
 4. **A ordem do release** (onda-4 §6, ponto 3, em aberto). **É pergunta para o usuário:** como a onda 4 foi à produção (a loja antes ou depois da `0023`, e se há app nativo na loja) não está no repositório. O P15-D não põe chave nova, então o app da onda 4 abre a 1.10.0, e a janela de "Atualize o app" desta onda é só a de quem ainda tem um app anterior à onda 4. Se a alternativa com chave do P16-D for escolhida, a janela volta a valer para todos os apps nativos.
 5. **Uma regra só para o ex-membro.** Hoje ele recebe a Descrição e a Imagem no `GET /chronicles/:id` (`routes.ts:457-466`). No desenho dos planos, ele lê a própria ficha com a História (P15-D) e não lê a nota revelada (P16-D). Recomendação dos planos: o ex-membro deixa de receber a Descrição e a Imagem (P14-D, commit 1) e a nota revelada (P16-D), e continua lendo a própria ficha, que é dele.
+
+   **Na integração:** a D-15 da matriz já dizia que a Descrição "só chega a quem é membro da crônica (AuthZ no servidor)", e o `/code-review` do P14-D apontou o vazamento (o app só escondia o bloco, e a matriz de AuthZ exigia que o ex-membro a recebesse). O P14-D aplicou a D-15 (`38fee1d`): o ex-membro não recebe a Descrição nem a Imagem no `GET /chronicles/:id`, e a matriz recusa nos três sistemas. O resto vale como desenhado: o ex-membro lê a própria ficha com a História e não lê a nota revelada. O P16-D também zera a revelação na saída, na remoção e na transferência da narração, na mesma transação: quem volta à crônica não lê o que o narrador escreveu nesse meio tempo, e o novo narrador revela de novo.
 6. **P14-D, a Imagem da crônica.** A CSP do web (`img-src 'self'`) a bloqueia, e no nativo o aparelho do jogador buscaria uma URL de terceiro, que vira rastreador. Recomendação: deixar para um upload hospedado e não afrouxar a CSP. Também: o `viewer` lê a Descrição, porque é membro.
 7. **P12, o rótulo do convite (T-45):**
    - o número automático ("Convite 2 · 14:05"), o padrão do plano, sem migration;
@@ -432,7 +445,7 @@ Cada plano tem as suas na §9. As que cruzam pacotes:
 
 - **O P12 é o caminho crítico** (~13 dias) e entra em sexto. O rebase dele passa pelo topo da crônica, pelo `Button.tsx` e por dois specs. Mitigação: o P12 rebaseia a cada merge da onda, não só no fim.
 - **O limite de convite e de cadastro é por IP** na máquina local: as três plataformas saem do mesmo IP (o AVD pelo `adb reverse`, o simulador e o navegador pelo localhost). O roteiro do P12 conta no máximo 3 aceites e 1 a 2 cadastros por plataforma, com o 409 do T-73 só no web, uma plataforma por vez e 15 min entre os seeds (seção 10.1).
-- **A `0025` é a primeira mudança de schema desde a `0022`.** Ela roda no deploy da API, antes de subir. Se o P16-D entrar, o `/security-review` e o teste das constraints vêm antes do merge.
+- **A `0024` (P13) e a `0026` (P16-D) são as primeiras mudanças de schema desde a `0022`.** Elas rodam no deploy da API, antes de subir. O `/security-review` da onda e o teste das constraints vêm antes do PR.
 - **O texto longo** (a Descrição de 4000, a História de 8000) num nó acessível só: o leitor de tela lê tudo de uma vez. O P14-D corta o trecho no código; a tela "Ler tudo" e a História dividem em parágrafos (`paragraphs`).
 - **A ficha antiga do U-10 continua sem a História.** Se o PO não escolher uma saída (seção 6, ponto 3), o narrador que pediu não vê a mudança na ficha dele.
 - **O `@tms/ui` muda em dois pacotes, e o CI não compila o nativo.** O build local da integração é o único que prova o app.
@@ -456,7 +469,7 @@ Só contas e dados fictícios. A senha é a constante do seed, e o código de co
 - `npx pnpm bootstrap`, se o `scripts/check-dev-env.mjs` pedir. Com o core mudado pelo P13 e pelo P16-D, o `dist` precisa estar novo.
 - **O banco da integração:**
   - `npx pnpm db:up` e `npx pnpm db:migrate`, conferido pela tabela `kysely_migration` (o comando pode travar na saída);
-  - **antes da `0024`:** a ficha na versão anterior, "Antiga R" em "Mago v4", criada pela tela com o `mta-m20` 1.7.0. Se o banco já migrou, ela vai num banco à parte (`tms_onda5_antes`), migrado até a `0023`;
+  - **antes da `0025_templates_onda5`:** a ficha na versão anterior, "Antiga R" em "Mago v4", criada pela tela com o `mta-m20` 1.7.0. Se o banco já migrou, ela vai num banco à parte (`tms_onda5_antes`), migrado até a `0023`;
   - `npx pnpm templates:publish --published`, que deve dizer "sem mudança", e a conferência de que vtm-v20 1.10.0, mta-m20 1.8.0 e wta-w20 1.8.0 estão publicados;
   - os bancos dos pacotes (`tms_p09d`, `tms_p12`, `tms_p13`, `tms_p14d`, `tms_p15d` e `tms_p16d`) podem ser apagados com `dropdb`. Nunca `db:down`.
 - API em `npx pnpm dev:api` (porta 3001) e Metro em `cd apps/frontend && EXPO_PUBLIC_WEB_URL=http://localhost:8081 npx expo start` (porta 8081), com as saídas em logs do scratchpad.
@@ -642,3 +655,57 @@ Nunca "ok" sem a evidência.
 - os achados da integração;
 - o resultado das suítes;
 - a conferência manual por plataforma.
+
+## 11. Integração
+
+Integração em 06/11/2026, na `onda/5-narrador-entrada-uso`, a partir de `5da45b2` (as respostas da D-16, da D-17 e da ordem do release, seção 6). Os sete pacotes foram implementados em paralelo, cada um no seu worktree, e entraram em série, com merge `--no-ff`. O E2E rodou só aqui, em série, no Chromium e no WebKit. Sem push.
+
+### 11.1 Merges, na ordem real
+
+| # | Merge | Pacote | Conflitos e como foram resolvidos |
+|---|---|---|---|
+| 1 | `15f1498` | P09-D | Nenhum |
+| 2 | `9f614ea` | P14-D | Nenhum |
+| 3 | `9faaff1` | P13 | Nenhum |
+| 4 | `0a2de26` | P15-D | Cinco, todos de dois lados acrescentando, com os dois mantidos: `migrations.ts` (a `0024` do P13 e a `0025`); `migrations.test.ts` (a descida pela lista de arquivos, do P15-D); `privacy.ts` e `StorytellerBar.tsx` (o `barEdits` do P13 e o `editorNotice` do P15-D); `authz.test.ts` (a Descrição do P14-D e a História) |
+| 5 | `2f2df33` | P16-D | Seis: `migrations.ts` e `migrations.test.ts` (0024, 0025 e 0026 em ordem; o teste da descida da 0025 passa a esperar também a 0026); `matrix-systems.ts` (o `sharedTextField` do P15-D e o `revealSection`); `TextLayout.tsx` (o `mode` do T-84 e o `useRevealed`); `StorytellerBar.tsx` (o aviso do editor com três casos: revelada, privada e "O jogador lê este texto."); `design/templates/README.md` (as duas regras) |
+| 6 | `2104934` | P12 | Um: `packages/ui/src/Button.tsx`, com um *callback ref* que entrega a vista ao `ref` interno do `blocked` (P13) e à prop `ref` (P12), como o §10, item 9, do P12 previa |
+| 7 | `289faed` | P01-D | Nenhum. Os marcadores `[a preencher: Pxx]` foram preenchidos depois, em `e529272` |
+
+Depois de cada merge: `pnpm build`, `typecheck`, `lint` e `pnpm test` completos, e o E2E dos specs que o pacote tocou.
+
+### 11.2 Correções da integração
+
+Todas nos specs; nenhuma asserção de regra ou de segurança foi afrouxada, e nenhum código de produto mudou nelas.
+
+| Commit | Spec | Causa |
+|---|---|---|
+| `ec63397` | `dice`, `sheet`, `xp` e `play` (13 falhas na primeira rodada dos specs do P13, que nunca tinham rodado) | Seletores que batiam também na ficha por baixo da folha (agora dentro de `bottom-sheet-root`); o "Salvar alterações" com a confirmação (D-01); o `isVisible()` que não espera o "Mais opções" a 390; o `force` no rádio com `aria-disabled`; "Força" que casava com "Força de Vontade". No `play.spec`, o aviso de "Desfazer" ficava por baixo da folha aberta no web, porque o `ModalToastHost` ainda era só do nativo: o spec passou a fechar a folha antes de desfazer. O `journey-storyteller` no WebKit falhou só sob carga (load até 330) e passou isolado |
+| `21d69f5` | `backstory` | O `waitForResponse` de `GET /characters/:id` pegava o HTML da página do web, que tem o mesmo caminho; agora exige `resourceType` `fetch` |
+| `ed5b27e` | `reveal-notes` | Passo sem rede: a rota abortada não muda o `navigator.onLine`, e o app mostra "Não foi possível carregar as notas reveladas." em vez de "Conecte-se…". No WebKit, a ficha do cache pode ser de antes da revelação (o IndexedDB grava com atraso), e o bloco nem aparece. A asserção de segurança fica: o texto revelado nunca aparece sem rede |
+| `2a5133b` | `navigation` (intermitente no Chromium) | O `setParams` troca a URL depois do toque, e o spec voltava antes: a troca atrasada caía na entrada da lista. Agora espera a URL da última aba; 20 de 20 com `--repeat-each=5` |
+
+### 11.3 Revisões
+
+O `/code-review` (high) dos pacotes cujo agente não pôde chamar a skill rodou pelo orquestrador, na branch do pacote, antes do merge. Todos os achados foram corrigidos em commits `fix` com teste de regressão na branch do pacote, salvo os registrados no §10 de cada plano.
+
+| Pacote | Achados | Os principais |
+|---|---|---|
+| P14-D | 7 | **AuthZ:** o ex-membro recebia a Descrição e a Imagem da API (`38fee1d`; seção 6, ponto 5). O trecho da Apresentação (quebras, palavra perdida, tela diferente do leitor de tela), o "‹" enquanto carrega e os parágrafos com espaço Unicode. O 7.º (o estado comum de carregamento) ficou registrado no §10 |
+| P12 | 10 | **Segurança:** o convite pendente sobrevivia à saída da conta e a sair de "Entrar com convite" pelo voltar do sistema (`50780e2`, `000dd58`); a redação do fragmento era quadrática e redigia antes de cortar (`567360f`). Também: o login recusava o que a API aceita, o cadastro perdia campo no preenchimento automático, o "‹ Crônicas" vindo da Conta |
+| P13 | 10 | **Regra:** o "para" efetivo no Histórico afrouxava o conflito do desfazer do desfazer; a saída foi a coluna `to_absent` (seção 4.6). A numeração da migration (`5b354dd`). No app: o boost na ficha travada, o "-" do Android no Ajustar XP, o resultado atrasado dos Dados, o custo velho no pedido, o atalho do U-01 |
+| P16-D | 10 | **Segurança:** a revelação sobrevivia à saída, à remoção e à transferência (`739361f`); o parâmetro `revealed` do `stripRestricted`, sem uso, abria caminho para a nota ir na ficha persistida (`5641de7`). Também: o laço de GET no 404, o modelo lido fora da transação, ids não reveláveis gravados, a chave de idempotência e a numeração da migration |
+| P09-D, P15-D, P01-D | 9, 9 e 9 | Rodados pelos próprios agentes; ver o §10 de cada plano |
+
+O `/security-review` da onda inteira (`05c5d7d..HEAD`) roda uma vez, depois deste documento, como na onda 4 (seção 2). Os agentes do P13 e do P16-D fizeram a revisão de segurança à mão; o P13 pede a conferência do `6d82f18`, do `dcc44dd` e do `2a53ee4` (o desfazer).
+
+### 11.4 Suítes
+
+`[a preencher na rodada final]`: os totais de `pnpm test` (core, config, db, API, `@tms/ui` e frontend) e o resultado do E2E completo no Chromium e no WebKit.
+
+### 11.5 O que fica para o roteiro manual (seção 10)
+
+- **O topo da crônica do narrador com a Apresentação e o painel juntos.** O `table-creation.spec.ts` (abas abaixo de 340 a 390) roda numa crônica sem Descrição, e o `chronicle-about.spec.ts` mede só a tela do jogador, sem o painel. Nenhum spec mede os dois juntos (a estimativa da seção 4.1 era ~374 px). Conferir no X-cronica, no web a 390 e no AVD a 393; se passar do limite, a saída é encurtar o trecho (seção 4.1).
+- **O `play.spec.ts` fecha a folha antes de desfazer** (`ec63397`). Com o P12, o `ModalToastHost` também vale no web: dá para voltar a desfazer pelo aviso com a folha aberta, e o roteiro confere isso na tela.
+- **O build nativo** de Android e iOS: o `@tms/ui` mudou (`Button.blocked` e o `ref`, `ChoiceOption.blocked`, o `Toast` e a `BottomSheet`), e o CI não compila o nativo.
+- **As plataformas:** a seção 10 inteira, com os itens obrigatórios da 10.9 e a acessibilidade da 10.10. A migration dos templates agora é a `0025_templates_onda5`: a ficha da versão anterior é criada antes dela (seção 10.1).
