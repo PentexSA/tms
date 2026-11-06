@@ -411,7 +411,9 @@ function SheetsPanel({
       {c.members.length === 0 ? (
         <Text color="inkMuted" style={styles.empty}>
           {narrating
-            ? 'Ninguém entrou ainda. Convide os jogadores com um código.'
+            ? // Vale para "nunca entrou" e para "saiu" ou "foi removido": a
+              // lista não distingue os dois (T-82, P12)
+              'Nenhum jogador agora. Convide os jogadores com um link.'
             : 'Você é o primeiro jogador.'}
         </Text>
       ) : (
