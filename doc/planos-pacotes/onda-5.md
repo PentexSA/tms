@@ -561,20 +561,20 @@ As fichas que o narrador acompanha são as do roteiro, em cada estado (seção 4
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| SAIDA-acompanhar | Web 390 e 1280 (N-W, F2-1; NW-11); iOS SE (N-A, Tarefa 1 da fase 2); Android 393 | N | Lista de crônicas → "Vampiro v4" → Mesa → filtro "Em criação" → "Pendentes" → ler os cartões sem abrir nenhuma ficha | A lista diz "N fichas em criação" (P09-D); o painel "Criação de fichas" é uma linha, e as abas estão no topo (T-36); cada cartão diz o progresso em texto ("Atributos ✓ · Habilidades: faltam 4 · Bônus: restam 2 de 15"), o mesmo do "Faltam" do jogador; o filtro diz qual está ativo; o NPC oculto não aparece no filtro nem na contagem | `onda5-<plat>-<w>-SAIDA-acompanhar-01..05.png` | |
-| SAIDA-ajudar | Web 390 (N-W, F2-2); iOS SE (N-A, Tarefa 2); Android 393 (U-10) | N, depois J1 | Abrir a ficha do Iniciante pela Mesa → aba "Pontos" em Leitura → Sobre → História (conforme a D-16) ou Notas do Narrador → salvar → (se o P16-D entrar) revelar a nota → J1 abre a ficha | O narrador lê a mesma conta do jogador sem entrar no Editar; o editor diz quem lê ("O jogador lê este texto." na História, o aviso de privado nas Notas); o J1 lê a História e, se revelada, a nota; o Histórico registra a revelação | `onda5-<plat>-<w>-SAIDA-ajudar-01..06.png` | |
-| SAIDA-devolver | Web 390 (N-W, F2-3); iOS SE (N-A, Tarefa 3) | N, depois J2 | Ficha em `pending` → "Pedir ajuste" com o motivo → Mesa → "Pendentes" → J2 corrige e avisa → Mesa | O cartão passa a "Aguardando ajuste" com o progresso, e a aba "Pontos" segue em leitura para o N em `pending`; depois do "terminei", o cartão vai a "Pendentes" | `onda5-<plat>-<w>-SAIDA-devolver-01..05.png` | |
-| SAIDA-concluir | Web 1280 (N-W, F2-4); iOS SE (N-A, Tarefa 4); Android 393 | N, depois J1 | Aprovar ou concluir as fichas prontas → lista de crônicas → a ficha concluída → Conceder XP com "Digitar" → J1: "Solicitar evolução" pela lista agrupada | O cartão sai de "Em criação", e a contagem cai; o "Conceder XP" aceita o valor digitado (U-02); a lista de evolução agrupada mostra a opção marcada e o resumo fixo no rodapé (T-50), e o bloqueado diz o motivo (T-77) | `onda5-<plat>-<w>-SAIDA-concluir-01..06.png` | |
+| SAIDA-acompanhar | Web 390 e 1280 (N-W, F2-1; NW-11); iOS SE (N-A, Tarefa 1 da fase 2); Android 393 | N | Lista de crônicas → "Vampiro v4" → Mesa → filtro "Em criação" → "Pendentes" → ler os cartões sem abrir nenhuma ficha | A lista diz "N fichas em criação" (P09-D); o painel "Criação de fichas" é uma linha, e as abas estão no topo (T-36); cada cartão diz o progresso em texto ("Atributos ✓ · Habilidades: faltam 4 · Bônus: restam 2 de 15"), o mesmo do "Faltam" do jogador; o filtro diz qual está ativo; o NPC oculto não aparece no filtro nem na contagem | `onda5-<plat>-<w>-SAIDA-acompanhar-01..05.png` || ok no web (390 e 1280), no Android 393 e no iOS SE: a contagem sem o NPC oculto, o filtro com o estado, o progresso em texto no cartão |
+| SAIDA-ajudar | Web 390 (N-W, F2-2); iOS SE (N-A, Tarefa 2); Android 393 (U-10) | N, depois J1 | Abrir a ficha do Iniciante pela Mesa → aba "Pontos" em Leitura → Sobre → História (conforme a D-16) ou Notas do Narrador → salvar → (se o P16-D entrar) revelar a nota → J1 abre a ficha | O narrador lê a mesma conta do jogador sem entrar no Editar; o editor diz quem lê ("O jogador lê este texto." na História, o aviso de privado nas Notas); o J1 lê a História e, se revelada, a nota; o Histórico registra a revelação | `onda5-<plat>-<w>-SAIDA-ajudar-01..06.png` || ok no web 390 (o IndexedDB do J1 sem a nota) e no iOS SE. Android: a revelação pela tela ok, com a nota gravada por API (o N editando pela barra não foi refeito no AVD) |
+| SAIDA-devolver | Web 390 (N-W, F2-3); iOS SE (N-A, Tarefa 3) | N, depois J2 | Ficha em `pending` → "Pedir ajuste" com o motivo → Mesa → "Pendentes" → J2 corrige e avisa → Mesa | O cartão passa a "Aguardando ajuste" com o progresso, e a aba "Pontos" segue em leitura para o N em `pending`; depois do "terminei", o cartão vai a "Pendentes" | `onda5-<plat>-<w>-SAIDA-devolver-01..05.png` || ok no web 390 e no iOS SE (o cartão "Devolvida", que é o `returned` da aprovação) |
+| SAIDA-concluir | Web 1280 (N-W, F2-4); iOS SE (N-A, Tarefa 4); Android 393 | N, depois J1 | Aprovar ou concluir as fichas prontas → lista de crônicas → a ficha concluída → Conceder XP com "Digitar" → J1: "Solicitar evolução" pela lista agrupada | O cartão sai de "Em criação", e a contagem cai; o "Conceder XP" aceita o valor digitado (U-02); a lista de evolução agrupada mostra a opção marcada e o resumo fixo no rodapé (T-50), e o bloqueado diz o motivo (T-77) | `onda5-<plat>-<w>-SAIDA-concluir-01..06.png` || ok no web (U-02, T-50, T-77) e no iOS SE; no Android 393, ok em parte (aprovar e digitar o XP; a concessão não foi enviada). "Ver Pontos" em `pending` não levava à aba no celular: corrigido em `e9c48ff` (seção 11.6) |
 
 ### 10.7 Itens que dependem de mais de um pacote
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| X-cronica | Web 390 e 1280; Android 360, 393 e 411; iOS SE e 17 | N, depois J1 | "Mago v4" (Descrição de 3.600) → medir o topo → "Ler tudo" → "‹" → "Alterar" no resumo do painel → salvar | O bloco "Apresentação" acima do resumo de uma linha, e as abas no limite do `table-creation.spec.ts` (seção 4.1); "Ler tudo" abre a tela de leitura, com texto puro, e o "‹" volta à crônica; salvar as regras recolhe o painel e mostra "Regras da criação salvas." acima do rodapé (P09-D com o toast do P12); o J1 lê a mesma Descrição, sem o "Alterar" | `onda5-<plat>-<w>-X-cronica-01..06.png` | |
-| X-convite | Web 390 (link `https`, sem sessão); Android 393 (`tms://` pelo `am start`); iOS SE (`tms://` pelo `idb open`) | N, depois a conta nova `p12_<plataforma>` | N gera o convite e copia o link → abrir o link sem sessão → cadastro → "Entrar com convite" preenchido → Entrar → ficha nova no "Lobisomem v4" → N: lista de crônicas e Mesa | "Copiado ✓" anunciado; o convite com número e hora; a URL e o histórico sem o fragmento depois de lido (web); a tela abre preenchida e não aceita sozinha; a ficha nova aparece na Mesa em criação, com o progresso, e a lista conta 1 a mais; nenhum log, nenhuma captura e nenhum breadcrumb com o código (`grep -c` dá 0) | `onda5-<plat>-<w>-X-convite-01..08.png` | |
-| X-historia | Web 390; Android 393 (obrigatório: U-10); iOS SE | J1, depois N | A ficha nova (1.10.0) e a "Antiga R" (1.7.0) lado a lado → Sobre → (se o P16-D entrar) N revela a nota da "Antiga R" → J1 relê → N esconde → J1 reabre o app sem rede (a API parada) | A nova tem "História / Prelúdio"; a antiga abre sem "Atualize o app" e sem o campo (seção 4.5); com o P16-D, o J1 lê a nota revelada e, depois de escondida, não a lê de novo nem sem rede | `onda5-<plat>-<w>-X-historia-01..07.png` | |
-| X-sobre | Android 393 (obrigatório: T-84); web 390; iOS SE | J1, depois N | Ficha concluída → Editar → Sobre → mudar a Citação e as Notas → (D-16 A) a História → Salvar → N abre a mesma ficha | O editor aparece no Editar para o que o J1 escreve (T-84); as Notas do Narrador não aparecem para o J1; o N vê o que o J1 salvou e edita a História pela barra, com o aviso certo (seção 4.4) | `onda5-<plat>-<w>-X-sobre-01..05.png` | |
-| X-authz | Web 390 | J2 (outro jogador), N2 (convidado que não entrou), J2 depois de sair (ex-membro) | Abrir pela URL a ficha do J1, a Mesa, a crônica e a tela "Ler tudo" de uma crônica de que não é membro | 404 onde a seção 4.7 diz 404; o ex-membro conforme o ponto 5 da seção 6; nenhuma tela mostra dado de outro e depois some | `onda5-web-390-X-authz-01..06.png` | |
+| X-cronica | Web 390 e 1280; Android 360, 393 e 411; iOS SE e 17 | N, depois J1 | "Mago v4" (Descrição de 3.600) → medir o topo → "Ler tudo" → "‹" → "Alterar" no resumo do painel → salvar | O bloco "Apresentação" acima do resumo de uma linha, e as abas no limite do `table-creation.spec.ts` (seção 4.1); "Ler tudo" abre a tela de leitura, com texto puro, e o "‹" volta à crônica; salvar as regras recolhe o painel e mostra "Regras da criação salvas." acima do rodapé (P09-D com o toast do P12); o J1 lê a mesma Descrição, sem o "Alterar" | `onda5-<plat>-<w>-X-cronica-01..06.png` || **Acima do limite (A1, seção 11.6):** as abas do N ficam a 378 px no web 390 e a 320 px no 1280; no Android, de 370 a 387 dp abaixo da barra (360, 393 e 411); no iOS, a 400 pt no SE e a 423 pt no iPhone 17. O jogador fica abaixo (228 e 206 px; 257 dp). "Ler tudo", o "‹" e o texto puro ok nas três |
+| X-convite | Web 390 (link `https`, sem sessão); Android 393 (`tms://` pelo `am start`); iOS SE (`tms://` pelo `idb open`) | N, depois a conta nova `p12_<plataforma>` | N gera o convite e copia o link → abrir o link sem sessão → cadastro → "Entrar com convite" preenchido → Entrar → ficha nova no "Lobisomem v4" → N: lista de crônicas e Mesa | "Copiado ✓" anunciado; o convite com número e hora; a URL e o histórico sem o fragmento depois de lido (web); a tela abre preenchida e não aceita sozinha; a ficha nova aparece na Mesa em criação, com o progresso, e a lista conta 1 a mais; nenhum log, nenhuma captura e nenhum breadcrumb com o código (`grep -c` dá 0) | `onda5-<plat>-<w>-X-convite-01..08.png` || ok nas três: a tela abre preenchida e não aceita sozinha; a URL fica sem o fragmento (Chromium e WebKit); `grep -c` dá 0 na API, no Metro e no logcat. "Copiado ✓" ok no web e no iOS, não conferido no Android |
+| X-historia | Web 390; Android 393 (obrigatório: U-10); iOS SE | J1, depois N | A ficha nova (1.10.0) e a "Antiga R" (1.7.0) lado a lado → Sobre → (se o P16-D entrar) N revela a nota da "Antiga R" → J1 relê → N esconde → J1 reabre o app sem rede (a API parada) | A nova tem "História / Prelúdio"; a antiga abre sem "Atualize o app" e sem o campo (seção 4.5); com o P16-D, o J1 lê a nota revelada e, depois de escondida, não a lê de novo nem sem rede | `onda5-<plat>-<w>-X-historia-01..07.png` || ok no web, com o ponto da nota até a rebusca (seção 11.6). Android: a "Antiga R" sem o campo e sem "Atualize o app"; a revelação não foi refeita. iOS: esconder e reabrir sem rede ok numa ficha nova; a "Antiga R" não foi conferida |
+| X-sobre | Android 393 (obrigatório: T-84); web 390; iOS SE | J1, depois N | Ficha concluída → Editar → Sobre → mudar a Citação e as Notas → (D-16 A) a História → Salvar → N abre a mesma ficha | O editor aparece no Editar para o que o J1 escreve (T-84); as Notas do Narrador não aparecem para o J1; o N vê o que o J1 salvou e edita a História pela barra, com o aviso certo (seção 4.4) | `onda5-<plat>-<w>-X-sobre-01..05.png` || ok no web 390, no Android (393 e 360) e no iOS SE |
+| X-authz | Web 390 | J2 (outro jogador), N2 (convidado que não entrou), J2 depois de sair (ex-membro) | Abrir pela URL a ficha do J1, a Mesa, a crônica e a tela "Ler tudo" de uma crônica de que não é membro | 404 onde a seção 4.7 diz 404; o ex-membro conforme o ponto 5 da seção 6; nenhuma tela mostra dado de outro e depois some | `onda5-web-390-X-authz-01..06.png` || ok: 404 nos lugares da seção 4.7; o ex-membro recebe `description` e `imageUrl` nulos, e o ex-membro sem ficha recebe 404 |
 
 ### 10.8 O que ficou não conferido na onda 4 ([onda-4.md](onda-4.md) §11)
 
@@ -582,9 +582,9 @@ Roda de graça no roteiro, quando o J1 cria as fichas novas:
 
 | ID | Plataforma e tamanho | Conta | Passos | Esperado | Evidência | Resultado |
 |---|---|---|---|---|---|---|
-| O4-catalogo | Web 390; Android 393; iOS SE | J1 | A ficha nova do X-convite (W20) → "Adicionar Dom" → os blocos → uma recomendada; uma ficha V20 → a Fraqueza com o resumo | T-24a, T-24f, R-26c e os blocos do T-24e como no P07-D §11.e | `onda5-<plat>-<w>-O4-catalogo-01..04.png` | |
-| O4-A4 | iOS SE | J1 | "Verbena R" → uma Esfera fora da Tradição → `describe-all` | "fora da Tradição: confirme com o narrador" é um elemento de texto à parte do botão. O que o VoiceOver diz segue para ouvir no aparelho | `onda5-ios-se-O4-A4-01..02.png` | |
-| O4-android | Android 393 e 360 | J1 | A Quintessência do M20 no "Em jogo"; o T-24d a 360; a Humanidade no T-85; "Nenhuma Cicatriz"; o "?" pelo teclado | Como no P10-C e no P07-D §11.e | `onda5-android-<w>-O4-android-01..05.png` | |
+| O4-catalogo | Web 390; Android 393; iOS SE | J1 | A ficha nova do X-convite (W20) → "Adicionar Dom" → os blocos → uma recomendada; uma ficha V20 → a Fraqueza com o resumo | T-24a, T-24f, R-26c e os blocos do T-24e como no P07-D §11.e | `onda5-<plat>-<w>-O4-catalogo-01..04.png` || ok no Android 393 e no iOS SE; não conferido no web (a ficha nova não tinha Raça, Augúrio nem Tribo) |
+| O4-A4 | iOS SE | J1 | "Verbena R" → uma Esfera fora da Tradição → `describe-all` | "fora da Tradição: confirme com o narrador" é um elemento de texto à parte do botão. O que o VoiceOver diz segue para ouvir no aparelho | `onda5-ios-se-O4-A4-01..02.png` || ok: "fora da Tradição: confirme com o narrador" é um texto à parte do botão. O que o VoiceOver diz segue para ouvir no aparelho |
+| O4-android | Android 393 e 360 | J1 | A Quintessência do M20 no "Em jogo"; o T-24d a 360; a Humanidade no T-85; "Nenhuma Cicatriz"; o "?" pelo teclado | Como no P10-C e no P07-D §11.e | `onda5-android-<w>-O4-android-01..05.png` || não conferido: o AVD instável consumiu a rodada |
 
 **Segue "não conferido",** pelos limites das ferramentas: os anúncios do VoiceOver e do TalkBack, o foco depois de "ir ao grupo", o O3-T-26 (o teclado de software some no idb) e o O3-T-04-gesto (o idb não faz o gesto de borda).
 
@@ -707,6 +707,8 @@ O E2E completo passou **246 de 246** no Chromium e no WebKit (16,4 min), depois 
 
 - **`d16f44f`, a jornada da v0** (falhava nos dois navegadores, determinística). Com o aviso acima do dock (`26ed892`, T-43), o toque longo no Sangue saía antes de a folha "Salvar 7 alterações?" terminar de sair; com o Modal montado, o toque longo virava toque e abria a folha do recurso. No WebKit, o aviso do dano, agora dentro da folha (`ccc1788`), ficava sobre "Curar" com o ponteiro parado em cima, e o prazo pausava (T-76). O spec espera a folha sair e tira o ponteiro; nenhuma asserção mudou.
 
+Depois do roteiro manual (seção 11.6), com os quatro commits de app em `c2f4982`, o frontend passou **1856 testes** (sete a mais: três do `UnsavedChangesGuard`, três do `devLogs` e um do "Ver Pontos"). O E2E completo passou de novo **246 de 246** no Chromium e no WebKit (16,0 min).
+
 ### 11.5 O que fica para o roteiro manual (seção 10)
 
 - **O topo da crônica do narrador com a Apresentação e o painel juntos.** O `table-creation.spec.ts` (abas abaixo de 340 a 390) roda numa crônica sem Descrição, e o `chronicle-about.spec.ts` mede só a tela do jogador, sem o painel. Nenhum spec mede os dois juntos (a estimativa da seção 4.1 era ~374 px). Conferir no X-cronica, no web a 390 e no AVD a 393; se passar do limite, a saída é encurtar o trecho (seção 4.1).
@@ -714,3 +716,61 @@ O E2E completo passou **246 de 246** no Chromium e no WebKit (16,4 min), depois 
 - **O `play.spec.ts` fecha a folha antes de desfazer** (`ec63397`). Com o P12, o `ModalToastHost` também vale no web: dá para voltar a desfazer pelo aviso com a folha aberta, e o roteiro confere isso na tela.
 - **O build nativo** de Android e iOS: o `@tms/ui` mudou (`Button.blocked` e o `ref`, `ChoiceOption.blocked`, o `Toast` e a `BottomSheet`), e o CI não compila o nativo.
 - **As plataformas:** a seção 10 inteira, com os itens obrigatórios da 10.9 e a acessibilidade da 10.10. A migration dos templates agora é a `0025_templates_onda5`: a ficha da versão anterior é criada antes dela (seção 10.1).
+
+### 11.6 O roteiro manual
+
+O roteiro manual rodou em 06/11, na ordem da seção 10.5: web (Playwright, Chromium e WebKit), Android (AVD a 360, 393 e 411 dp) e iOS (idb, iPhone SE com iOS 18.0 e iPhone 17 com iOS 26.5). Cada plataforma teve o seu seed. Os builds nativos foram os da integração; o JS veio do Metro. A ficha da versão anterior, "Antiga R" (`mta-m20` 1.7.0, "Mago antigo"), foi criada pela API da onda 4 antes da `0025`. A coluna "Resultado" das seções 10.6 a 10.8 traz o resumo por plataforma.
+
+**Commits do roteiro.** Os quatro são de app, cada um com teste:
+
+| Commit | O quê |
+|---|---|
+| `f96cd5a` | O `UnsavedChangesGuard` desliga a prevenção no mesmo handler do `repeat`. Antes, ao criar a ficha e no "Salvar e sair", o `when` do pai continuava verdadeiro, e o `usePreventRemove` mostrava um aviso na tela do app (Android). Três testes falham sem a correção |
+| `e365b5f` e `c2f4982` | `lib/devLogs.ts`, carregado no `index.ts` antes do roteador, tira da tela do app (LogBox) quatro avisos de dev de terceiros pela frase exata. São eles: o `ImageBackground` obsoleto, que o NativeWind lê ao carregar; os dois do Expo Router quando o Android recria a Activity; e o `onAnimatedValueUpdate` do React Native no iOS. Os avisos seguem no console. O app não usa nem `ImageBackground` nem `Animated` |
+| `e9c48ff` | "Ver Pontos" do aviso "Aguardando aprovação" troca a aba e rola até ela. No celular, a aba trocava fora da tela, e o toque parecia não fazer nada (iOS SE e Android 393). É o item obrigatório do P09-D no iOS |
+
+**Pontos para o PO** (nenhum decidido aqui):
+
+1. **A1, o topo da crônica do narrador.** Com o bloco "Apresentação" (de 92 a 96) e o painel "Criação de fichas" recolhido, as abas passam do limite do `table-creation.spec.ts` nas três plataformas (ver X-cronica). O bloco sozinho cabe no limite dele. A saída da seção 4.1, encurtar o trecho, não basta: mesmo com uma linha a menos, o topo fica acima de 340 a 390. As outras saídas são o resumo das regras sem rótulos (P09-D) ou a Apresentação recolhida para o narrador, que já conhece o texto. Código não mudado.
+2. **T-43, o aviso dentro de uma folha sem rodapé.** O aviso cobre a última ação até sumir, e o ponteiro em cima segura o prazo (T-76). Foi visto na Vitalidade no web e no Android, e no Sangue no iOS. É o desenho do T-43 (`offset` 0 sem rodapé).
+3. **P16-D, a nota depois de "Deixar privadas".** A tela do dono que já estava aberta mostra a nota até a próxima busca da ficha: trocar de aba não busca de novo, mas recarregar ou voltar ao app, sim. Sem rede, a nota não aparece. É o desenho (consulta, sem push), e o aviso do narrador diz "Quem já leu continua sabendo."
+4. **P13, "pedido pendente".** Na lista de evolução, essa opção é `disabled` de verdade (não tocável e com o motivo no nome acessível). Já a opção acima do saldo é tocável e diz o motivo. Falta decidir se as duas devem se comportar igual.
+
+**Achados técnicos em aberto** (nenhum é regressão da onda):
+
+- **A navegação depois de o Android recriar a Activity.** Mudar o tamanho da tela ou da fonte do sistema recria a Activity. O Expo adia o `onDestroy` da antiga, e por um instante há duas raízes montadas: os dois erros de dev do Expo Router vêm daí. Nesse estado, "Nova ficha" (`router.push`) chegou a não navegar com dois toques, enquanto a troca de aba funcionava. Com o app aberto do zero, o mesmo fluxo funciona. Causa não isolada (Expo/React Native). Esconder a frase do LogBox não resolve isto.
+- **A sessão derrubada por um refresh interrompido.** No iOS, o app foi encerrado com um `POST /auth/refresh` em voo (a API suspensa no teste do P16-D). A API girou o token, e o app reaberto usou o antigo; a detecção de reuso revogou a família, e o jogador caiu para o login. É fail secure e é o desenho. Em rede lenta, porém, encerrar o app no meio de um refresh desloga a pessoa. Uma janela curta de tolerância para o token anterior é uma opção a avaliar com segurança, sem afrouxar a detecção.
+
+**Higiene.** Dois incidentes nos drivers do roteiro, nenhum no produto:
+
+- **Android:** a folha do convite mostra o código com espaços entre os caracteres, e o filtro do driver não reconheceu esse formato. O código saiu na saída de um script local (scratchpad), não em captura nem em log. O convite foi revogado em seguida, sem uso.
+- **iOS:** uma captura saiu com o campo do código preenchido antes do recorte. Ela foi apagada na hora, o driver passou a recortar acima de qualquer campo secreto preenchido, e o convite foi revogado depois do aceite.
+
+Nos três, `grep -c` pelo código deu 0 na API, no Metro e no logcat. O log do simulador iOS registra a URL aberta pelo `idb open` (`CoreSimulatorBridge`), que é a ferramenta e não o app. A partir de agora, a máscara dos drivers também cobre sequências do alfabeto do convite separadas por espaço.
+
+**Ambiente.** Nenhum destes é achado do produto:
+
+- No Android, outro projeto da máquina escutava em `127.0.0.1:3001`, e o `adb reverse` caía nele; o contorno foi um repasse local para a API do TMS em IPv6.
+- O AVD caiu pelo watchdog com a máquina muito carregada, e o bundle de dev levava de 2 a 5 min para baixar.
+- No iOS 26, o sistema oferece "Salvar Senha?" depois do login; a resposta foi "Agora Não", e nada foi salvo.
+
+**Não conferido**, pela ferramenta ou pelo tempo (seção 10.12):
+
+- os anúncios do VoiceOver e do TalkBack, e o foco da confirmação de "Revogar" no app;
+- "Copiado ✓" no Android;
+- U-09h, o pedido de evolução do jogador e o O4-android no AVD;
+- "Desfeito: …" e o "Faltam N XP" no iOS;
+- X-historia com a "Antiga R" e o U-10 longo com o colar texto no iOS;
+- no iPhone 17, o topo do jogador, o cartão da Mesa e a Experiência;
+- O4-catalogo no web;
+- o toque longo durante a saída de uma folha;
+- o achado 6 com a seleção da Mesa.
+
+**Convites e limpeza.**
+
+- **Convites:** o web gerou 2 (além do convite do seed), o Android 2 e o iOS 2. Todos foram revogados pelo N, ou ficaram inativos ao remover a `p12_ios` no T-82. Houve 3 cadastros novos (`p12_web`, `p12_android` e `p12_ios`) e uma tentativa 409, todos dentro dos limites.
+- **Arquivos:** os links, os códigos e os logs dos seeds foram apagados do scratchpad.
+- **Aparelhos:**
+  - AVD: densidade e teclado restaurados, `adb reverse` removido e AVD desligado;
+  - iOS: simuladores desligados e `idb_companion` encerrado, sem nada escutando;
+  - o `pip-audit` do venv do idb não achou vulnerabilidades.
