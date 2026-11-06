@@ -144,6 +144,7 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
       ok([
         {
           id: 'i1',
+          number: 1,
           createdAt: '2026-10-18T12:00:00Z',
           expiresAt: '2026-10-25T12:00:00Z',
           maxUses: 10,
@@ -166,10 +167,12 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
       />,
       session
     )
-    const revoke = await screen.findByRole('button', { name: 'Revogar' })
+    const revoke = await screen.findByRole('button', {
+      name: 'Revogar convite 1',
+    })
     expect(insideAccessible(revoke)).toBe(false)
     expect(
-      screen.getByLabelText(/^Criado em .*, 8 usos restantes/)
+      screen.getByLabelText(/^Convite 1 · criado em .*, 8 usos restantes/)
     ).toBeTruthy()
   })
 })

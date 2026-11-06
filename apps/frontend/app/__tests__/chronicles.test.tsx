@@ -5,6 +5,7 @@ import { FlatList, Platform, Share } from 'react-native'
 
 import * as apiModule from '../../lib/api'
 import { WEB_URL } from '../../lib/env'
+import * as focusModule from '../../lib/focus'
 import {
   clearPendingInvite,
   peekPendingInvite,
@@ -772,7 +773,7 @@ describe('Crônica (detalhe)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Convidar' }))
 
     expect(
-      await screen.findByText('8 usos restantes · vale até 25/10')
+      await screen.findByText(/^8 usos restantes · vale até 25\/10 às /)
     ).toBeTruthy()
     // Só os ativos aparecem
     expect(screen.queryByText(/vale até 08\/10/)).toBeNull()
@@ -824,8 +825,11 @@ describe('Crônica (detalhe)', () => {
       message: `Você foi convidado para a crônica "Crônica da Liberdade" no TMS. Abra o link para entrar: ${LINK} — No app TMS, toque em "Entrar com convite" e use o código ABCD EFGH JKMN PQRS TVWX YZ01 23. Vale até 25/10 e para até 10 pessoas.`,
     })
 
+    // T-45: o convite 2 pela confirmação na linha
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    expect(calls.chronicle.invitesDelete).not.toHaveBeenCalled()
     await act(async () => {
-      fireEvent.press(screen.getAllByRole('button', { name: 'Revogar' })[1]!)
+      fireEvent.press(screen.getByRole('button', { name: 'Revogar convite' }))
     })
     await waitFor(() =>
       expect(calls.chronicle.invitesDelete).toHaveBeenCalledWith('i1')
@@ -836,6 +840,66 @@ describe('Crônica (detalhe)', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Convidar' }))
     expect(screen.queryByText('ABCD EFGH JKMN PQRS TVWX YZ01 23')).toBeNull()
     expect(screen.queryByTestId('invite-link-value')).toBeNull()
+  })
+
+  it('T-45: revogar pede confirmação, com o foco em Cancelar e de volta', async () => {
+    const focus = jest.spyOn(focusModule, 'focusView')
+    calls.chronicle.get.mockResolvedValue(detail('storyteller', []))
+    calls.chronicle.invitesGet.mockResolvedValue(inviteList())
+    calls.chronicle.invitesDelete.mockResolvedValue(ok(null))
+    renderWithSession(<ChronicleScreen />, await signedIn())
+    fireEvent.press(await screen.findByRole('button', { name: 'Convidar' }))
+    // Dois do mesmo dia, distinguíveis pelo número e pela hora
+    const t = (iso: string) => {
+      const d = new Date(iso)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    expect(
+      await screen.findByText(
+        `Convite 3 · criado em 18/10 às ${t('2026-10-18T13:07:00Z')}`
+      )
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        `Convite 2 · criado em 18/10 às ${t('2026-10-18T12:00:00Z')}`
+      )
+    ).toBeTruthy()
+
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    expect(
+      screen.getByText(
+        'Revogar o convite 2? Quem ainda não entrou não vai conseguir usar o link nem o código.'
+      )
+    ).toBeTruthy()
+    // O alvo do foco, sem imprimir a árvore se falhar
+    const focused = () => {
+      const view = focus.mock.lastCall?.[0] as
+        | { props?: { accessibilityLabel?: string; children?: unknown } }
+        | null
+        | undefined
+      return String(view?.props?.accessibilityLabel ?? view?.props?.children)
+    }
+    expect(focused()).toBe('Cancelar')
+    fireEvent.press(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(calls.chronicle.invitesDelete).not.toHaveBeenCalled()
+    // O foco volta ao gatilho da mesma linha
+    expect(focused()).toBe('Revogar convite 2')
+
+    // Uma confirmação por vez
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 2' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Revogar convite 3' }))
+    expect(screen.getAllByRole('button', { name: 'Cancelar' })).toHaveLength(1)
+    expect(
+      screen.getByRole('button', { name: 'Revogar convite 2' })
+    ).toBeTruthy()
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Revogar convite' }))
+    })
+    expect(calls.chronicle.invitesDelete).toHaveBeenCalledTimes(1)
+    expect(calls.chronicle.invitesDelete).toHaveBeenCalledWith('i2')
+    // Revogado: o foco vai para "Convites ativos"
+    await waitFor(() => expect(focused()).toBe('Convites ativos'))
+    focus.mockRestore()
   })
 
   it('a cópia que falha diz como copiar à mão, sem erro solto', async () => {
