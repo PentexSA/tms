@@ -679,11 +679,13 @@ describe('Crônica (detalhe)', () => {
           name: 'Ler tudo: apresentação da crônica',
         })
         expect(screen.getByText('Apresentação')).toBeTruthy()
-        const shown = screen.getByTestId('chronicle-about-excerpt').props
-          .children as string
+        const excerpt = screen.getByTestId('chronicle-about-excerpt')
+        const shown = excerpt.props.children as string
+        // Sem um segundo corte no desenho: a tela mostra o que o leitor lê
+        expect(excerpt.props.numberOfLines).toBeUndefined()
         // O trecho é o começo, cortado no código: o leitor de tela não recebe
         // os 600 caracteres
-        expect(Array.from(shown).length).toBeLessThanOrEqual(141)
+        expect(Array.from(shown).length).toBeLessThanOrEqual(81)
         expect(shown.endsWith('…')).toBe(true)
         expect(long.startsWith(shown.slice(0, -1))).toBe(true)
         fireEvent.press(read)

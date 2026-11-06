@@ -7,8 +7,13 @@ import { excerpt } from '../../lib/format'
 // Descrição e "Ler tudo", que abre a tela de leitura. Para o narrador e para
 // o jogador; sem Descrição, nada (o bloco não ocupa espaço).
 
-/** O trecho tem até 140 pontos de código (mais o "…"), cortado no código. */
-export const ABOUT_EXCERPT = 140
+/**
+ * O trecho tem até 80 pontos de código (mais o "…"), cortado no código: cabe
+ * em duas linhas de `body` a 360–411 com a fonte a 100%, então o que a tela
+ * mostra é o que o leitor de tela anuncia, sem um segundo corte no desenho.
+ * O bloco fica em até 104 px a 390 (onda-5.md §4.1).
+ */
+export const ABOUT_EXCERPT = 80
 
 export function ChronicleAbout({
   chronicleId,
@@ -33,9 +38,9 @@ export function ChronicleAbout({
           onPress={() => router.push(`/chronicles/${chronicleId}/about`)}
         />
       </View>
-      {/* O corte é no código: o leitor de tela recebe o trecho, nunca os
-          4000 caracteres; o numberOfLines só limita o desenho */}
-      <Text numberOfLines={2} testID="chronicle-about-excerpt">
+      {/* O corte é só no código, sem numberOfLines: a tela e o leitor de
+          tela recebem o mesmo trecho, nunca os 4000 caracteres */}
+      <Text testID="chronicle-about-excerpt">
         {excerpt(description, ABOUT_EXCERPT)}
       </Text>
     </View>

@@ -115,8 +115,12 @@ test('a Apresentação da crônica: trecho, leitura, ex-membro e convidado', asy
     const block = playerPage.getByTestId('chronicle-about')
     const excerpt = playerPage.getByTestId('chronicle-about-excerpt')
     const shown = (await excerpt.textContent()) ?? ''
-    // O leitor de tela recebe o trecho, nunca os 4000
-    expect(Array.from(shown).length).toBeLessThanOrEqual(141)
+    // O leitor de tela recebe o trecho, nunca os 4000, e a tela mostra o
+    // mesmo trecho inteiro, sem line-clamp
+    expect(Array.from(shown).length).toBeLessThanOrEqual(81)
+    expect(
+      await excerpt.evaluate(el => getComputedStyle(el).webkitLineClamp)
+    ).not.toBe('2')
     expect(shown.endsWith('…')).toBe(true)
     expect(shown).not.toContain(MARKER)
     const box = await block.boundingBox()
