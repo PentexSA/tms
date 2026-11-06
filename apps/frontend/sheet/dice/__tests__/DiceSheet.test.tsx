@@ -608,6 +608,19 @@ describe('o boost na ficha travada (T-77)', () => {
     )
   })
 
+  it('arquivada: o boost não diz "sai sem gastar" (o servidor recusa a rolagem inteira)', async () => {
+    await open(storeFor().store, faces(10, 6), {
+      status: 'archived',
+      locked: false,
+      member: true,
+    })
+    expect(screen.queryByText(/a rolagem sai sem gastar/)).toBeNull()
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ disabled: false })
+  })
+
   it('narrador na mesma ficha travada: o boost liga', async () => {
     const { store } = storeFor(
       ['storyteller'],

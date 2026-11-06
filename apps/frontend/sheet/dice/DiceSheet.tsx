@@ -1,4 +1,4 @@
-import type { PoolOption, RefusalCode, RollSlot } from '@tms/sheet-core'
+import type { PoolOption, RollSlot } from '@tms/sheet-core'
 import {
   Banner,
   BottomSheet,
@@ -15,7 +15,7 @@ import {
 } from '@tms/ui'
 import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
-import { blockedBy, blockedNote, useLifecycle } from '../policy'
+import { blockedBy, useLifecycle } from '../policy'
 import type { SheetStore } from '../store/sheetStore'
 import { matches } from './fold'
 import { type DiceDeps, type SessionRoll, useDice } from './useDice'
@@ -49,7 +49,10 @@ export function DiceSheet({
     lifecycle,
     'play'
   )
-  const boostNote = costBlocked ? boostRefusal(costBlocked) : null
+  // Só a trava separa o gasto da rolagem: arquivada, fora de jogo ou sem
+  // vínculo, o servidor recusa a rolagem inteira (`rollPolicy`), e o motivo
+  // "sai sem gastar" seria falso; ali vale a recusa de hoje
+  const boostNote = costBlocked === 'SHEET_LOCKED' ? BOOST_LOCKED : null
   const [manual, setManual] = useState<{
     successes: number
     botch: boolean
@@ -375,11 +378,8 @@ function groupsOf(
   return out
 }
 
-/** O motivo de o boost não valer agora, perto do toque. */
-const boostRefusal = (code: RefusalCode): string =>
-  code === 'SHEET_LOCKED'
-    ? 'O narrador travou a ficha: a rolagem sai sem gastar.'
-    : `${blockedNote(code)} A rolagem sai sem gastar.`
+/** O motivo de o boost não valer na ficha travada, perto do toque. */
+const BOOST_LOCKED = 'O narrador travou a ficha: a rolagem sai sem gastar.'
 
 function Toggle({
   label,
