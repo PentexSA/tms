@@ -1,11 +1,13 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { sleep } from 'bun'
 import {
   hashInviteCode,
   newInviteCode,
   normalizeInviteCode,
 } from '../chronicles/invite-code'
 import { createRateLimiter } from '../http/rate-limit'
+import { logger } from '../logger'
 import { defaultLimits } from '../options'
 import {
   addMember,
@@ -513,6 +515,42 @@ describe('convites', () => {
       code: newInviteCode(),
     })
     expect(res.status).toBe(429)
+  })
+})
+
+describe('o aceite não deixa o código no log', () => {
+  // O código vai no corpo do POST (o link o leva no fragmento, que o navegador
+  // não manda). O log de acesso não tem corpo; este teste prende isso para o
+  // código e para o hash dele, com o aceite que entra e com o que falha.
+  const LEVELS = ['error', 'warn', 'info', 'debug'] as const
+
+  it('nem o código nem o hash aparecem em nenhuma linha, em nenhum nível', async () => {
+    const invite = await newInvite()
+    const wrong = newInviteCode()
+    const spies = LEVELS.map(level => spyOn(logger, level))
+    try {
+      const ok = await as(ctx, stranger, 'POST', '/invites/accept', {
+        code: invite.code,
+      })
+      expect(ok.status).toBe(200)
+      const bad = await as(ctx, player, 'POST', '/invites/accept', {
+        code: wrong,
+      })
+      expect(bad.status).toBe(404)
+      // O log de acesso sai no onAfterResponse, depois da resposta
+      await sleep(10)
+      const logged = JSON.stringify(spies.map(spy => spy.mock.calls))
+      expect(logged).toContain('/invites/accept')
+      for (const secret of [
+        invite.code,
+        wrong,
+        hashInviteCode(invite.code),
+        hashInviteCode(wrong),
+      ])
+        expect(logged).not.toContain(secret)
+    } finally {
+      for (const spy of spies) spy.mockRestore()
+    }
   })
 })
 
