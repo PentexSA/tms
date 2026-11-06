@@ -61,10 +61,16 @@ export interface ManualEntry {
 
 const deviceRandom = cryptoRandom(array => getRandomValues(array))
 
+// Sem boost: o mesmo array, para a parada memorizada não mudar à toa
+const NO_BOOSTS: readonly string[] = []
+
 export function useDice(
   characterId: string,
   store: SheetStore,
-  deps: DiceDeps = {}
+  deps: DiceDeps = {},
+  // T-77: a ficha travada recusa o custo; a rolagem sai sem gastar, e o
+  // boost ligado antes da trava não vai no pedido
+  { noCost = false }: { readonly noCost?: boolean } = {}
 ) {
   const random = deps.random ?? deviceRandom
   const uuid = deps.uuid ?? randomUUID
@@ -79,7 +85,8 @@ export function useDice(
   const [preset, setPreset] = useState<string | null>(null)
   const [difficulty, setDifficulty] = useState(roll?.difficulty.default ?? 6)
   const [specialty, setSpecialty] = useState(false)
-  const [boosts, setBoosts] = useState<readonly string[]>([])
+  const [chosenBoosts, setBoosts] = useState<readonly string[]>([])
+  const boosts = noCost ? NO_BOOSTS : chosenBoosts
   const [rolls, setRolls] = useState<readonly SessionRoll[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

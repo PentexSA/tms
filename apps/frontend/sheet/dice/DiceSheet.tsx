@@ -39,10 +39,10 @@ export function DiceSheet({
   onClose,
   ...deps
 }: DiceSheetProps) {
-  const dice = useDice(characterId, store, deps)
   // O gasto da rolagem segue a política do Jogo (T-77): na ficha travada, o
   // servidor recusa o custo (SHEET_LOCKED), e a rolagem sem gasto passa. O
-  // boost fica bloqueado e tocável, com o motivo; o narrador nunca é barrado
+  // boost fica desmarcado, bloqueado e tocável, com o motivo, e não vai no
+  // pedido; o narrador nunca é barrado
   const lifecycle = useLifecycle()
   const costBlocked = blockedBy(
     new Set(store.getState().roles),
@@ -52,7 +52,9 @@ export function DiceSheet({
   // Só a trava separa o gasto da rolagem: arquivada, fora de jogo ou sem
   // vínculo, o servidor recusa a rolagem inteira (`rollPolicy`), e o motivo
   // "sai sem gastar" seria falso; ali vale a recusa de hoje
-  const boostNote = costBlocked === 'SHEET_LOCKED' ? BOOST_LOCKED : null
+  const locked = costBlocked === 'SHEET_LOCKED'
+  const boostNote = locked ? BOOST_LOCKED : null
+  const dice = useDice(characterId, store, deps, { noCost: locked })
   const [manual, setManual] = useState<{
     successes: number
     botch: boolean

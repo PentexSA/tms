@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { RandomSource, RoleName, SheetData } from '@tms/sheet-core'
+import { useState } from 'react'
 import { AccessibilityInfo, Platform } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
@@ -599,6 +600,52 @@ describe('o boost na ficha travada (T-77)', () => {
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
       reason
     )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(calls.rollsPost).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ boosts: [] })
+    )
+  })
+
+  it('o boost ligado antes da trava: a caixa fica desmarcada, e o pedido sai sem ele', async () => {
+    calls.rollsPost.mockResolvedValue(serverRoll())
+    let lock: (next: SheetLifecycle) => void = () => undefined
+    function Harness() {
+      const [value, setValue] = useState<SheetLifecycle>({
+        status: 'active',
+        locked: false,
+        member: true,
+      })
+      lock = setValue
+      let n = 0
+      return (
+        <LifecycleContext.Provider value={value}>
+          <DiceButton
+            characterId={ID}
+            store={storeFor().store}
+            random={faces(10, 6)}
+            uuid={() =>
+              `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
+            }
+          />
+        </LifecycleContext.Provider>
+      )
+    }
+    renderWithSession(<Harness />, await signedIn())
+    fireEvent.press(screen.getByRole('button', { name: 'Dados' }))
+    pick('Atributo', 'des', /^Destreza, 2/)
+    fireEvent.press(screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: true })
+    act(() => lock({ status: 'active', locked: true, member: true }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: false, disabled: true })
     await act(async () => {
       fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
     })
