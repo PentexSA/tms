@@ -55,6 +55,16 @@ describe('paragraphs', () => {
     ])
   })
 
+  it('should treat a line with only Unicode spaces (NBSP and others) as blank', () => {
+    expect(paragraphs('um\n \ndois\r\n 　\r\ntrês')).toEqual([
+      'um',
+      'dois',
+      'três',
+    ])
+    // Sem linha em branco, a quebra simples continua no parágrafo
+    expect(paragraphs('um\n dois')).toEqual(['um\n dois'])
+  })
+
   it('should drop extra blank lines and empty paragraphs', () => {
     expect(paragraphs('\n\num\n\n\n\ndois\n\n')).toEqual(['um', 'dois'])
     expect(paragraphs('   ')).toEqual([])

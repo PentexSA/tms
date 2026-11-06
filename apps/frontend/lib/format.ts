@@ -66,13 +66,17 @@ export const excerpt = (text: string, max: number): string => {
 
 /**
  * Os parágrafos de um texto puro: separados por linha em branco (também
- * `\r\n` e linha só com espaços). A quebra simples fica dentro do parágrafo.
- * Nenhum parser: `*`, `#` e `[]()` voltam como foram escritos.
+ * `\r\n` e linha só com espaços, inclusive os do Unicode, como o NBSP). A
+ * quebra simples fica dentro do parágrafo. Nenhum parser: `*`, `#` e `[]()`
+ * voltam como foram escritos.
  */
+// Espaço em branco que não é quebra: a linha em branco não atravessa linhas
+const BLANK_LINE = /\r?\n[^\S\r\n]*\r?\n/
+const LEADING_BLANK = /^(?:[^\S\r\n]*\r?\n)+/
 export const paragraphs = (text: string): string[] =>
   text
-    .split(/\r?\n[ \t]*\r?\n/)
-    .map(p => p.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd())
+    .split(BLANK_LINE)
+    .map(p => p.replace(LEADING_BLANK, '').trimEnd())
     .filter(p => p.trim() !== '')
 
 /** "às 14:05" hoje; "em 12/10 às 14:05" em outro dia (última alteração). */
