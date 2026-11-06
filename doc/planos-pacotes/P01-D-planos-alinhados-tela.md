@@ -480,6 +480,42 @@ A ordem proposta: **o P01-D entra por último**, como a matriz pede ("Conversa c
 
 O que a implementação fez diferente deste plano, e por quê. Nenhum desvio muda regra do jogo, remove campo ou afrouxa limite; o servidor continua a autoridade.
 
+Implementação em 05/11/2026, na `pacote/p01-d-planos-tela` a partir de `52dbe0f`, em paralelo com os outros pacotes da onda (cada um no seu worktree). Nada foi decidido aqui. Os pontos 1 e 2 do PO (§9) seguiram a instrução do orquestrador, que é o texto da D-13 e da matriz, e não a recomendação deste plano. Os demais pontos e as perguntas técnicas seguiram a recomendação.
+
+**O que ficou fora, e por quê:**
+
+1. **O registro vai até a D-14**, como a D-13 diz (ponto 1 do PO). As linhas da D-15, D-16 e D-17 não entraram nos registros do v0, v1, v2 e v5. O v0 §1, item 8 (as Notas do Narrador que o aparelho do jogador nunca recebe), continua como estava. Se o PO estender a D-13, as três linhas entram no commit 9, com o texto do §10 do P14-D, do P15-D e do P16-D.
+2. **O commit 5 (plano-v3 e plano-v5) não foi feito** (ponto 2 do PO; ponto 4 também segue aberto). Entraram no plano-v3 só as duas linhas "Revisto" do job `postgres` (l.128 e l.304), que são o fato do PR #49 (§3.10, item 2). Elas foram para o commit da observabilidade, que agora se chama `docs(observabilidade, plano-v3): …`. O "Evoluir" do v3 §1, item 1, e as correções T-32, T-80, T-52 e T-15 ficam para quando o PO responder.
+3. **A linha sobre o estado da v4** (§3.14; ponto 3 do PO) não entrou.
+4. **O Posto 0 e a frase "Começa em 1"** (ponto 5 do PO) não foram escritos em plano nenhum: são conteúdo de template.
+5. **Os commits 9 e 10 são do orquestrador.** O 9 preenche os 14 marcadores `[a preencher: Pxx]`: P09-D no v4 (itens 7, D-10, T-36); P12 no v0 (D-14) e no v4 (item 1); P13 no v0 (T-53, T-79), no v2 (T-79) e no v4 (itens 9 a 11, T-50, U-01); P16-D no `proximas-features.md` §5.3. O 10 traz as contagens do `CLAUDE.md`, que não mudaram neste pacote.
+
+**Desvios de texto:**
+
+6. **"Resumo do Concluir" (§3.7).** O texto antigo não foi trocado: ganhou "resumo do Salvar (D-01; no plano original, 'do Concluir')" no v1 e no v2, e uma linha "Revisto" na Etapa 18 do v0. Assim a regra da §3.0 vale ("o texto antigo não é apagado").
+7. **A ordem do formulário do Vampiro (v0, item 4):** "conceito, clã e senhor", como sai do `identityFields` (`packages/sheet-core/src/compile.ts`, colunas do `vtm-v20`). O plano dizia "senhor e clã". A ordem do W20 (v2, item 2) também foi tirada do `identityFields` e do `wta-w20.json`: as colunas na ordem e o Posto do resumo no fim. A D2 da §11 confere na tela.
+8. **O "Revisto" da l.90 do v0** ficou dentro da célula da tabela "Problemas encontrados", porque uma linha abaixo quebraria a tabela.
+9. **O `proximas-features.md` §5.3** ("Revelar uma Nota do Narrador", D-17) entrou só com o marcador do P16-D. Se o pacote entrar, o orquestrador tira a subseção; se ficar para depois, ele a preenche.
+10. **A coluna "Em aberto" da D-08 no v0 e no v1 é "—".** O ponto 7 do onda-4 §6 trata dos Dons, então fica só no v2.
+
+**Conferências do PR local** (§4.1, com um script no scratchpad): os links relativos e as âncoras dos 8 arquivos tocados resolvem; nenhum "Evoluir" no §1 do v0; o `generation.default` tem a linha "Revisto"; nenhum e-mail, senha ou conta do seed. O typecheck do pre-commit passou em cada commit.
+
+**Revisão.** Cada frase nova foi lida contra o código ou o template que ela descreve (§7, passo 4). Foram conferidos:
+
+- `MODE_LABELS`, `OWNER_MODES` e `openingMode`;
+- o `identityFields` e as colunas dos três templates;
+- a Geração `readOnly` derivada;
+- os `hard-cap` do `mta-m20`, o `CREATION_HARD_CAP` e o `XP_PREREQUISITE`/`cap`;
+- o `completionRefusal` da API;
+- as frases do `nextStep.ts` e da fase;
+- a folha de bônus;
+- os selos `recommend` do `vtm-v20` e do `mta-m20`, com o `CONFIRM`;
+- o catálogo de 48 Dons;
+- a "Casa ou subgrupo" com o `placeholder` "Opcional";
+- o rótulo e o nome acessível do "Salvar".
+
+O `/code-review` (high) foi disparado em segundo plano no diff `52dbe0f..HEAD`. Se ele achar algo, o orquestrador recebe os achados no resumo do pacote.
+
 ## 11. Conferência das divergências na tela (web, Android com AVD, iOS com idb)
 
 O P01-D só muda documentação: em vez do roteiro de um item de código, a conferência põe cada divergência ao lado da tela, com captura, nas três plataformas, depois de todos os pacotes da onda mergeados. Ela detalha o passo 6 da §7 e confere que o texto novo dos planos descreve a tela da ponta. Só contas fictícias. A coluna "Resultado" fica em branco e é preenchida na integração. Nenhum resultado é "ok" sem a evidência; quando uma plataforma não puder ser conferida, o resultado diz "não conferido" e por quê.
