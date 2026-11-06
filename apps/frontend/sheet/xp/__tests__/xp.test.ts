@@ -163,7 +163,7 @@ describe('requestRefusal e optionMeta', () => {
     )
     const pending = { ...ctx, pendingKeys: new Set([strength.key]) }
     expect(requestRefusal(strength, pending)).toBe(
-      'Já há um pedido pendente para este traço.'
+      'Já existe um pedido pendente para este traço.'
     )
     // A ordem do servidor: o saldo antes do pendente
     expect(requestRefusal(strength, { ...pending, available: 0 })).toContain(

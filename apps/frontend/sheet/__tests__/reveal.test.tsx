@@ -1,11 +1,15 @@
-import { onlineManager } from '@tanstack/react-query'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { RoleName } from '@tms/sheet-core'
 import { useRouter } from 'expo-router'
 import { AccessibilityInfo } from 'react-native'
 
 import * as apiModule from '../../lib/api'
-import { parseRevealed, revealKeys } from '../../lib/queries/reveal'
+import {
+  parseRevealed,
+  REVEALED_REFETCH_MS,
+  revealKeys,
+} from '../../lib/queries/reveal'
 import { type createFakeApi, fail, ok } from '../../test/fake-api'
 import { modelOf, sheetFor, templateJson } from '../../test/fixtures'
 import { sheetsDismissed } from '../../test/queries'
@@ -367,6 +371,86 @@ describe('o dono lê as notas reveladas', () => {
     )
     await waitFor(() => expect(screen.queryByText(SENTINEL)).toBeNull())
     expect(queryClient.getQueryData(revealKeys.revealed(ID))).toBeUndefined()
+  })
+
+  // §11.6, ponto 3: "Deixar privadas" com a tela do dono aberta. Sem push,
+  // a rebusca de 30 s da rota tira o bloco sem recarregar
+  it('com a tela aberta, a nota escondida some na rebusca de 30 s', async () => {
+    jest.useFakeTimers()
+    try {
+      calls.revealedGet.mockResolvedValue(revealedBody(2))
+      await open(
+        ['owner'],
+        character(['owner'], { sections: ['storyteller'], revision: 2 })
+      )
+      expect(await screen.findByText(SENTINEL)).toBeTruthy()
+      // O narrador deixa privadas: a rota e a ficha dizem a revisão nova
+      calls.revealedGet.mockResolvedValue(ok({ revision: 3, sections: [] }))
+      calls.characterGet.mockResolvedValue(
+        character(['owner'], { sections: [], revision: 3 })
+      )
+      const before = calls.revealedGet.mock.calls.length
+      // Antes do intervalo, nada muda na tela
+      await act(async () => {
+        jest.advanceTimersByTime(REVEALED_REFETCH_MS - 1_000)
+      })
+      expect(screen.getByText(SENTINEL)).toBeTruthy()
+      expect(calls.revealedGet.mock.calls.length).toBe(before)
+      await act(async () => {
+        jest.advanceTimersByTime(1_000)
+      })
+      await waitFor(() => expect(screen.queryByText(SENTINEL)).toBeNull())
+      expect(calls.revealedGet.mock.calls.length).toBe(before + 1)
+      expect(screen.queryByText(/reveladas pelo narrador/)).toBeNull()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  // A consulta fica acima das abas: trocar de aba não a rebuscava, e a nota
+  // escondida continuava no "Sobre" até a rebusca de 30 s
+  it('ao voltar para a aba "Sobre", a nota escondida some na hora', async () => {
+    calls.revealedGet.mockResolvedValue(revealedBody(2))
+    await open(
+      ['owner'],
+      character(['owner'], { sections: ['storyteller'], revision: 2 })
+    )
+    expect(await screen.findByText(SENTINEL)).toBeTruthy()
+    fireEvent.press(screen.getByRole('tab', { name: 'Ficha' }))
+    expect(screen.queryByText(SENTINEL)).toBeNull()
+    const before = calls.revealedGet.mock.calls.length
+    calls.revealedGet.mockResolvedValue(ok({ revision: 3, sections: [] }))
+    calls.characterGet.mockResolvedValue(
+      character(['owner'], { sections: [], revision: 3 })
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    await waitFor(() =>
+      expect(screen.queryByText(/reveladas pelo narrador/)).toBeNull()
+    )
+    expect(screen.queryByText(SENTINEL)).toBeNull()
+    // Um pedido só ao aparecer, sem esperar o intervalo
+    expect(calls.revealedGet.mock.calls.length).toBe(before + 1)
+  })
+
+  it('ao voltar ao primeiro plano, a nota escondida some na hora', async () => {
+    calls.revealedGet.mockResolvedValue(revealedBody(2))
+    await open(
+      ['owner'],
+      character(['owner'], { sections: ['storyteller'], revision: 2 })
+    )
+    expect(await screen.findByText(SENTINEL)).toBeTruthy()
+    act(() => focusManager.setFocused(false))
+    calls.revealedGet.mockResolvedValue(ok({ revision: 3, sections: [] }))
+    calls.characterGet.mockResolvedValue(
+      character(['owner'], { sections: [], revision: 3 })
+    )
+    try {
+      // O AppState "active" do _layout.tsx (no web, o visibilitychange)
+      act(() => focusManager.setFocused(true))
+      await waitFor(() => expect(screen.queryByText(SENTINEL)).toBeNull())
+    } finally {
+      focusManager.setFocused(undefined)
+    }
   })
 
   it('resposta mais velha que a ficha é descartada', async () => {

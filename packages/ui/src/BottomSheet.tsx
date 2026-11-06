@@ -13,6 +13,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   View,
 } from 'react-native'
@@ -157,6 +158,25 @@ export function BottomSheet({
     (e: LayoutChangeEvent) => setFooterHeight(e.nativeEvent.layout.height),
     []
   )
+  // Sem rodapé (T-43, decisão do PO): enquanto o aviso aparece aqui, o fim
+  // do conteúdo ganha um espaço da altura dele, e a última ação fica acima.
+  // A folha cresce; já na altura máxima, ela rola. A altura é a medida (o
+  // texto quebra em linhas), e o espaço sai quando o aviso some
+  const [toastHeight, setToastHeight] = useState(0)
+  const scroll = useRef<ScrollViewInstance>(null)
+  // Onde a rolagem estava antes do espaço entrar: no fim (a ação que gerou
+  // o aviso costuma ser a última), ela acompanha o espaço até o fim
+  const scrollState = useRef({ offset: 0, content: 0, viewport: 0 })
+  const followEnd = useRef(false)
+  const shownHeight = useRef(0)
+  const measureToast = useCallback((height: number) => {
+    if (shownHeight.current === 0 && height > 0) {
+      const { offset, content, viewport } = scrollState.current
+      followEnd.current = offset + viewport >= content - 1
+    }
+    shownHeight.current = height
+    setToastHeight(height)
+  }, [])
   // T-69 (DS: "a partir de 600 vira modal centralizado de até 560"): no
   // compact a folha fica presa embaixo; fora dele, é um diálogo central
   const dialog = useLayout().breakpoint !== 'compact'
@@ -221,6 +241,15 @@ export function BottomSheet({
     if (closing && Platform.OS === 'android') closed.current?.()
   }, [visible])
   const web = Platform.OS === 'web'
+  const sheetPaddingBottom = tokens.space[5] + (dialog ? 0 : insets.bottom)
+  // O aviso fica a space[4] + inset do fundo da folha (ToastView), e o
+  // conteúdo termina no padding dela: o espaço cobre o aviso e a folga
+  const toastSpace =
+    !footer && toastHeight > 0
+      ? toastHeight +
+        tokens.space[2] +
+        Math.max(0, tokens.space[4] + insets.bottom - sheetPaddingBottom)
+      : 0
   const scrimStyle = [
     StyleSheet.absoluteFill,
     { backgroundColor: colors.scrim },
@@ -277,7 +306,7 @@ export function BottomSheet({
               backgroundColor: colors.surfaceRaised,
               borderColor: colors.borderSubtle,
               // O inset de baixo só vale para a folha presa embaixo
-              paddingBottom: tokens.space[5] + (dialog ? 0 : insets.bottom),
+              paddingBottom: sheetPaddingBottom,
             },
           ]}
         >
@@ -297,8 +326,38 @@ export function BottomSheet({
               testID="bottom-sheet-close"
             />
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView
+            ref={scroll}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={64}
+            onScroll={e => {
+              const { contentOffset, contentSize, layoutMeasurement } =
+                e.nativeEvent
+              scrollState.current = {
+                offset: contentOffset.y,
+                content: contentSize.height,
+                viewport: layoutMeasurement.height,
+              }
+            }}
+            onLayout={e => {
+              scrollState.current.viewport = e.nativeEvent.layout.height
+            }}
+            onContentSizeChange={(_, height) => {
+              scrollState.current.content = height
+              if (!followEnd.current) return
+              followEnd.current = false
+              if (toastSpace > 0)
+                scroll.current?.scrollToEnd({ animated: !reduceMotion })
+            }}
+          >
             {children}
+            {toastSpace > 0 ? (
+              <View
+                aria-hidden
+                testID="bottom-sheet-toast-space"
+                style={{ height: toastSpace }}
+              />
+            ) : null}
           </ScrollView>
           {footer ? (
             <View
@@ -312,6 +371,7 @@ export function BottomSheet({
           <ModalToastHost
             visible={visible}
             offset={footer ? footerHeight + tokens.space[2] : 0}
+            onHeight={measureToast}
           />
         </View>
       </KeyboardAvoidingView>

@@ -8,6 +8,7 @@ import {
   xpTargetKey,
 } from '@tms/sheet-core'
 import { matches } from '../dice/fold'
+import { XP_PENDING_MESSAGE } from './messages'
 
 // O que o jogador pode pedir, com o custo que o core calcula sobre a ficha
 // confirmada (a do servidor, não o rascunho): cada campo de uma regra de XP,
@@ -137,7 +138,7 @@ export function requestRefusal(
     return `${costLabel(c)}: este traço não pode ser pedido agora.`
   if (available < c.cost.cost)
     return `Faltam ${c.cost.cost - available} XP (custa ${c.cost.cost}, disponível ${available}).`
-  if (pendingKeys.has(c.key)) return 'Já há um pedido pendente para este traço.'
+  if (pendingKeys.has(c.key)) return XP_PENDING_MESSAGE
   if (!online) return 'Conecte-se para enviar. Nada foi enviado.'
   return null
 }

@@ -8,6 +8,7 @@ import {
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -57,6 +58,11 @@ export interface RevealedValue {
   // O texto revelado, só para o dono (e só o carregado e atual)
   readonly values: ReadonlyMap<FieldId, string>
   readonly status: RevealedStatus
+  /**
+   * Rebusca a rota agora, enquanto o dono lê (o bloco revelado chama ao
+   * aparecer). Junta-se a um pedido em voo; sem leitura, não faz nada.
+   */
+  readonly refresh: () => void
 }
 
 const RevealedContext = createContext<RevealedValue | null>(null)
@@ -98,7 +104,8 @@ export function RevealedProvider({
   // novo, em laço. A ficha é rebuscada para trazer o estado atual
   const [goneAt, setGoneAt] = useState<number | null>(null)
   const lost = goneAt !== null && goneAt === state.revision
-  const query = useRevealedNotes(characterId, reads && !lost)
+  const enabled = reads && !lost
+  const query = useRevealedNotes(characterId, enabled)
   const notFound = statusOf(query.error) === 404
   const revision = state.revision
   useEffect(() => {
@@ -129,6 +136,13 @@ export function RevealedProvider({
   useEffect(() => {
     if (stale) void refetch()
   }, [stale, refetch])
+  // §11.6, ponto 3: a consulta vive acima das abas, e trocar de aba não
+  // monta outro observador. Sem isto, a nota escondida pelo narrador só saía
+  // da tela aberta na rebusca de 30 s (ou ao voltar ao app). O bloco pede a
+  // rota ao aparecer; a resposta com a revisão nova (`ahead`) o tira na hora
+  const refresh = useCallback(() => {
+    if (enabled) void refetch({ cancelRefetch: false })
+  }, [enabled, refetch])
   // A rota mais nova que a ficha: a ficha rebusca o estado
   const ahead = reads && data !== undefined && data.revision > state.revision
   useEffect(() => {
@@ -182,8 +196,18 @@ export function RevealedProvider({
       revision,
       values,
       status,
+      refresh,
     }),
-    [characterId, ownerName, narrator, sections, revision, values, status]
+    [
+      characterId,
+      ownerName,
+      narrator,
+      sections,
+      revision,
+      values,
+      status,
+      refresh,
+    ]
   )
   return (
     <RevealedContext.Provider value={value}>

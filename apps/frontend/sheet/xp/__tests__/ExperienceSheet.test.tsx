@@ -328,7 +328,10 @@ describe('"Enviar pedido" bloqueado com o motivo (T-77)', () => {
     expect(calls.xpGet.mock.calls.length).toBe(fetched)
   })
 
-  it('pedido pendente do mesmo traço: bloqueado com o motivo', async () => {
+  // P13 (§11.6, ponto 4; decisão do PO): o pendente é igual ao acima do
+  // saldo. Bloqueado (aria-disabled, sem `disabled`), tocável, e o toque diz
+  // o motivo com a frase da recusa do servidor; "Enviar pedido" não envia
+  it('pedido pendente do mesmo traço: bloqueado e tocável, com o motivo', async () => {
     calls.xpRequestsGet.mockImplementation((async () =>
       ok({
         items: [
@@ -350,12 +353,24 @@ describe('"Enviar pedido" bloqueado com o motivo (T-77)', () => {
     await open()
     fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
     fireEvent.changeText(screen.getByLabelText('Buscar traço'), 'brig')
-    fireEvent.press(screen.getByRole('radio', { name: /pedido pendente$/ }))
-    expect(screen.getByTestId('xp-request-refusal')).toHaveTextContent(
-      'Já há um pedido pendente para este traço.'
+    const radio = screen.getByRole('radio', { name: /pedido pendente$/ })
+    expect(radio.props.accessibilityState).toMatchObject({ disabled: true })
+    expect(radio.props.disabled).toBeUndefined()
+    fireEvent.press(radio)
+    expect(
+      screen.getByRole('radio', { name: /pedido pendente$/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: true })
+    const footer = screen.getByTestId('xp-request-footer')
+    const reason = 'Já existe um pedido pendente para este traço.'
+    expect(within(footer).getByTestId('xp-request-refusal')).toHaveTextContent(
+      reason
     )
-    fireEvent.press(screen.getByRole('button', { name: 'Enviar pedido' }))
+    fireEvent.press(
+      within(footer).getByRole('button', { name: 'Enviar pedido' })
+    )
     expect(calls.xpRequestPost).not.toHaveBeenCalled()
+    expect(within(footer).getByRole('alert')).toHaveTextContent(reason)
     calls.xpRequestsGet.mockImplementation((async () =>
       ok({ items: [] })) as never)
   })
