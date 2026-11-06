@@ -1,6 +1,5 @@
 import {
   type CompiledField,
-  canWrite,
   type FieldId,
   jsonEqual,
   type SheetMode,
@@ -17,6 +16,7 @@ import { useModeBarActions } from '../evolve/ModeBar'
 import { useCommit } from '../useCommit'
 import {
   ADJUST_HINT,
+  barEdits,
   hiddenFromOwner,
   PRIVATE_NOTE_A11Y,
   PRIVATE_NOTE_SHEET,
@@ -32,12 +32,7 @@ import {
  * permissões das seções do template: nada aqui conhece sistema.
  */
 export function storytellerOnlyText(model: SheetModel): CompiledField[] {
-  return [...model.fields.values()].filter(
-    f =>
-      (f.type === 'text' || f.type === 'longText') &&
-      canWrite(model, f.id, ['storyteller']) &&
-      !canWrite(model, f.id, ['owner'])
-  )
+  return [...model.fields.values()].filter(f => barEdits(model, f.id))
 }
 
 export const NARRATING_NOTICE = 'As alterações ficam assinadas no histórico.'
