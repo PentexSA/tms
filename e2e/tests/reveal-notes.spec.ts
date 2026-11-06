@@ -154,9 +154,21 @@ test('o narrador revela e esconde as notas; a dona lê só em leitura, sem cache
   await ownerContext.setOffline(false)
   await sheet.reload()
   await sheet.getByRole('tab', { name: 'Sobre' }).click()
+  // A rota abortada não muda o navigator.onLine: o app vê uma falha de rede,
+  // e não "sem conexão". A ficha vem do cache, que pode ser de antes da
+  // revelação (o WebKit grava o IndexedDB com atraso): aí o bloco nem aparece.
+  // Com o bloco na tela, uma das duas frases; em todo caso, nunca o texto
   await expect(
-    sheet.getByText('Conecte-se para ler as notas reveladas.')
+    sheet.getByRole('heading', { name: 'Sobre', level: 2 })
   ).toBeVisible()
+  if (
+    await sheet.getByText('Notas do Narrador · reveladas pelo narrador').count()
+  )
+    await expect(
+      sheet.getByText(
+        /^(Conecte-se para ler as notas reveladas\.|Não foi possível carregar as notas reveladas\.)$/
+      )
+    ).toBeVisible()
   await expect(sheet.getByText(SENTINEL)).toHaveCount(0)
   await ownerContext.unroute(`${API_URL}/**`)
 
