@@ -264,6 +264,17 @@ export function AdjustForm({
 }
 
 /**
+ * O teclado do valor: com sinal, um que tenha o "-" (o `number-pad` não tem
+ * no iOS nem no Android); sem sinal, o numérico simples.
+ */
+export const signedKeyboard = (signed: boolean) =>
+  !signed
+    ? ('number-pad' as const)
+    : Platform.OS === 'ios'
+      ? ('numbers-and-punctuation' as const)
+      : ('numeric' as const)
+
+/**
  * U-02: o valor do XP com o "Digitar" do Stepper, como no Editar (T-25):
  * Enter aplica; sair do campo aplica; Esc cancela; fora da faixa, a
  * mensagem, e com Enter o campo fica aberto. Estado local: a folha da Mesa
@@ -331,11 +342,7 @@ function TypedAmount({
           <TextInput
             testID={`${testID}-input`}
             accessibilityLabel={`${label}, de ${min} a ${max}`}
-            keyboardType={
-              signed && Platform.OS === 'ios'
-                ? 'numbers-and-punctuation'
-                : 'number-pad'
-            }
+            keyboardType={signedKeyboard(signed)}
             returnKeyType="done"
             autoFocus
             selectTextOnFocus

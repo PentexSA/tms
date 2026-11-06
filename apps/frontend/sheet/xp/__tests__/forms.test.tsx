@@ -131,6 +131,27 @@ describe('Ajustar XP: Digitar (U-02)', () => {
     )
   })
 
+  it('no Android, o teclado do ajuste também tem o sinal de menos', () => {
+    setOS('android')
+    render(
+      <AdjustForm
+        chronicleId="c1"
+        characterId="p1"
+        grants={[]}
+        commands={commands().value}
+      />
+    )
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Ajuste no total' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } }
+    )
+    expect(
+      screen.getByLabelText('Ajuste no total, de -1000 a 1000').props
+        .keyboardType
+    ).toBe('numeric')
+  })
+
   it('no iOS, o teclado tem o sinal de menos', () => {
     setOS('ios')
     render(
