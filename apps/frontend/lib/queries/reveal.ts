@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, unwrap } from '../api'
 import { statusOf } from '../errors'
+import { isObject } from '../guards'
 
 // U-11 (P16-D): o narrador revela ao dono as Notas do Narrador de uma ficha,
 // só em leitura, e esconde de novo. O texto revelado vem de uma rota própria,
@@ -23,9 +24,6 @@ export interface RevealedNotes {
     readonly values: Readonly<Record<string, string>>
   }[]
 }
-
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /**
  * A resposta da rota, conferida: o que vem da rede é input hostil. Forma

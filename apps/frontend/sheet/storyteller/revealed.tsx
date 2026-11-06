@@ -14,6 +14,7 @@ import {
 } from 'react'
 
 import { statusOf } from '../../lib/errors'
+import { isObject } from '../../lib/guards'
 import { useOnline } from '../../lib/network'
 import { revealKeys, useRevealedNotes } from '../../lib/queries/reveal'
 
@@ -27,9 +28,6 @@ export interface Reveal {
   readonly sections: readonly string[]
   readonly revision: number
 }
-
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /** O `reveal` da ficha, conferido (fail secure: forma errada é nada). */
 export function revealOf(model: SheetModel, value: unknown): Reveal {

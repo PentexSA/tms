@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   canRead,
@@ -14,6 +13,8 @@ import { requireUser } from '../auth/guard'
 import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
+import { idempotencyConflict } from '../xp/ledger'
+import { commandHash } from './commands'
 import { modelFor } from './models'
 import { lockCharacter } from './policy'
 
@@ -39,16 +40,6 @@ const unavailable = () =>
   new ApiError(422, 'Esta ficha não tem notas para revelar ao jogador.', {
     code: 'REVEAL_UNAVAILABLE',
   })
-
-const idempotencyConflict = () =>
-  new ApiError(
-    409,
-    'Esta ação já foi enviada com outros dados. Atualize antes de tentar novamente.',
-    { code: 'IDEMPOTENCY_CONFLICT' }
-  )
-
-const commandHash = (kind: string, request: unknown) =>
-  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
 
 const COMMAND = 'character.reveal'
 

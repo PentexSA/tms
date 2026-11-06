@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   canWrite,
@@ -22,6 +21,7 @@ import { requireUser } from '../auth/guard'
 import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
+import { commandHash } from './commands'
 import { creationView } from './creation'
 import { creationStateOf } from './creation-state'
 import { latestTemplate, modelFor } from './models'
@@ -49,9 +49,6 @@ const fieldsOf = (issues: readonly Issue[]) =>
 
 const invalid = (issues: readonly Issue[]) =>
   new ApiError(422, 'ficha inválida', { issues: fieldsOf(issues) })
-
-const commandHash = (kind: string, request: unknown) =>
-  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
 
 const validHttpsUrl = (value: string | null | undefined) => {
   if (!value) return null
