@@ -1,10 +1,11 @@
-import type { PoolOption, RollSlot } from '@tms/sheet-core'
+import type { PoolOption, RefusalCode, RollSlot } from '@tms/sheet-core'
 import {
   Banner,
   BottomSheet,
   Button,
   Chip,
   ListItem,
+  markSoftDisabled,
   Pressable,
   SectionHeader,
   Stepper,
@@ -12,8 +13,9 @@ import {
   TextField,
   tokens,
 } from '@tms/ui'
-import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native'
+import { blockedBy, blockedNote, useLifecycle } from '../policy'
 import type { SheetStore } from '../store/sheetStore'
 import { matches } from './fold'
 import { type DiceDeps, type SessionRoll, useDice } from './useDice'
@@ -38,6 +40,16 @@ export function DiceSheet({
   ...deps
 }: DiceSheetProps) {
   const dice = useDice(characterId, store, deps)
+  // O gasto da rolagem segue a política do Jogo (T-77): na ficha travada, o
+  // servidor recusa o custo (SHEET_LOCKED), e a rolagem sem gasto passa. O
+  // boost fica bloqueado e tocável, com o motivo; o narrador nunca é barrado
+  const lifecycle = useLifecycle()
+  const costBlocked = blockedBy(
+    new Set(store.getState().roles),
+    lifecycle,
+    'play'
+  )
+  const boostNote = costBlocked ? boostRefusal(costBlocked) : null
   const [manual, setManual] = useState<{
     successes: number
     botch: boolean
@@ -166,6 +178,7 @@ export function DiceSheet({
             label={b.label}
             checked={dice.boosts.includes(b.id)}
             onChange={() => dice.toggleBoost(b.id)}
+            blocked={boostNote}
           />
         ))}
 
@@ -332,26 +345,69 @@ function SlotPicker({
   )
 }
 
+/** O motivo de o boost não valer agora, perto do toque. */
+const boostRefusal = (code: RefusalCode): string =>
+  code === 'SHEET_LOCKED'
+    ? 'O narrador travou a ficha: a rolagem sai sem gastar.'
+    : `${blockedNote(code)} A rolagem sai sem gastar.`
+
 function Toggle({
   label,
   checked,
   onChange,
+  blocked = null,
 }: {
   readonly label: string
   readonly checked: boolean
   readonly onChange: (next: boolean) => void
+  /**
+   * O motivo de não ligar agora (a política recusaria o gasto). A caixa fica
+   * com a cara de bloqueada e tocável: o toque não liga e repete o motivo.
+   * Desligar continua valendo (o boost ligado antes da trava).
+   */
+  readonly blocked?: string | null
 }) {
+  const web = Platform.OS === 'web'
+  const soft = blocked !== null
+  const [alerted, setAlerted] = useState(false)
+  const ref = useRef<ComponentRef<typeof View>>(null)
+  // No web, o aria-disabled vai direto no elemento (markSoftDisabled): o
+  // react-native-web tiraria o toque e o foco
+  useEffect(() => {
+    if (web) markSoftDisabled(ref.current, soft)
+  }, [web, soft])
   return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityLabel={label}
-      aria-checked={checked}
-      onPress={() => onChange(!checked)}
-      style={styles.toggle}
-    >
-      <Text>{checked ? '☑' : '☐'}</Text>
-      <Text style={styles.toggleLabel}>{label}</Text>
-    </Pressable>
+    <View style={styles.toggleBox}>
+      <Pressable
+        ref={ref}
+        accessibilityRole="checkbox"
+        accessibilityLabel={label}
+        aria-checked={checked}
+        {...(soft && !web ? { 'aria-disabled': true } : {})}
+        {...(soft ? { accessibilityHint: blocked } : {})}
+        onPress={() => {
+          if (blocked !== null && !checked) {
+            setAlerted(true)
+            AccessibilityInfo.announceForAccessibility(blocked)
+            return
+          }
+          onChange(!checked)
+        }}
+        style={[styles.toggle, soft && styles.blocked]}
+      >
+        <Text>{checked ? '☑' : '☐'}</Text>
+        <Text style={styles.toggleLabel}>{label}</Text>
+      </Pressable>
+      {soft ? (
+        <Text
+          variant="caption"
+          color="inkMuted"
+          {...(alerted ? { accessibilityRole: 'alert' as const } : {})}
+        >
+          {blocked}
+        </Text>
+      ) : null}
+    </View>
   )
 }
 
@@ -370,4 +426,6 @@ const styles = StyleSheet.create({
     gap: tokens.space[2],
   },
   toggleLabel: { flex: 1 },
+  toggleBox: { gap: tokens.space[1] },
+  blocked: { opacity: 0.5 },
 })

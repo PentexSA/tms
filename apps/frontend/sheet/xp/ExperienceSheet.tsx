@@ -3,6 +3,7 @@ import {
   type SheetData,
   type SheetModel,
   xpBalance,
+  xpTargetKey,
 } from '@tms/sheet-core'
 import {
   BottomSheet,
@@ -109,6 +110,23 @@ export function ExperienceSheet({
   const [query, setQuery] = useState('')
   const request = useCommand(commands, false)
   const picking = owner && !block && panel === 'request'
+  // O que o servidor recusaria: o saldo do extrato e os pedidos pendentes
+  const available = balance?.available ?? 0
+  const pendingKeys = useMemo(
+    () =>
+      new Set(
+        (requests.data ?? [])
+          .filter(r => r.status === 'pending')
+          .map(r =>
+            xpTargetKey({
+              field: r.field,
+              ...(r.item !== null && { item: r.item }),
+              ...(r.item === null && r.name !== null && { name: r.name }),
+            })
+          )
+      ),
+    [requests.data]
+  )
   const choose = (c: XpCandidate | null) => {
     setPicked(c)
     request.reset()
@@ -148,12 +166,15 @@ export function ExperienceSheet({
         picking ? (
           <RequestFooter
             candidate={picked}
-            available={balance?.available ?? 0}
-            online={online}
+            context={{ available, pendingKeys, online }}
             busy={request.busy}
             error={request.error}
             onSend={(cost, to) => {
               if (picked) send(picked, cost, to)
+            }}
+            onRefresh={() => {
+              void ledger.refetch()
+              void requests.refetch()
             }}
           />
         ) : undefined
@@ -215,6 +236,7 @@ export function ExperienceSheet({
             onChoose={choose}
             query={query}
             onQuery={setQuery}
+            context={{ available, pendingKeys }}
           />
         ) : null}
 

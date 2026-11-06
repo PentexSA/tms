@@ -162,3 +162,88 @@ describe('Solicitar evolução (T-50)', () => {
     expect(screen.getByText('Nada encontrado para “zzzz”.')).toBeTruthy()
   })
 })
+
+// T-77: o que o servidor recusaria fica bloqueado com o motivo, tocável
+describe('"Enviar pedido" bloqueado com o motivo (T-77)', () => {
+  const brawlOf = () => {
+    const { model, sheet } = sheetFor('helena', ['owner'])
+    const brawl = xpCandidates(model, sheet).find(
+      c => c.target.field === 'brawl'
+    )
+    if (!brawl?.cost.ok) throw new Error('Briga sem custo')
+    return brawl as typeof brawl & { cost: { ok: true; cost: number } }
+  }
+
+  it('acima do saldo: a opção e o botão bloqueados; o toque mostra o motivo, pede o saldo de novo e não chama a API; com o saldo novo, o botão se libera', async () => {
+    const brawl = brawlOf()
+    const short = brawl.cost.cost - 1
+    await open({ available: short })
+    fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar traço'), 'brig')
+    const radio = screen.getByRole('radio', { name: /^Briga, / })
+    expect(radio.props.accessibilityLabel).toContain('faltam 1')
+    expect(radio.props.accessibilityState).toMatchObject({ disabled: true })
+    // Tocável: a opção é marcada
+    fireEvent.press(radio)
+    expect(
+      screen.getByRole('radio', { name: /^Briga, / }).props.accessibilityState
+    ).toMatchObject({ checked: true })
+
+    const footer = screen.getByTestId('xp-request-footer')
+    const reason = `Faltam 1 XP (custa ${brawl.cost.cost}, disponível ${short}).`
+    expect(within(footer).getByTestId('xp-request-refusal')).toHaveTextContent(
+      reason
+    )
+    const send = within(footer).getByRole('button', { name: 'Enviar pedido' })
+    expect(send.props.accessibilityState).toMatchObject({ disabled: true })
+    const fetched = calls.xpGet.mock.calls.length
+    // O narrador concedeu XP enquanto a folha estava aberta
+    calls.xpGet.mockImplementation((async () =>
+      balance(brawl.cost.cost)) as never)
+    fireEvent.press(send)
+    expect(calls.xpRequestPost).not.toHaveBeenCalled()
+    expect(within(footer).getByRole('alert')).toHaveTextContent(reason)
+    await waitFor(() =>
+      expect(calls.xpGet.mock.calls.length).toBeGreaterThan(fetched)
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Enviar pedido' }).props
+          .accessibilityState
+      ).toMatchObject({ disabled: false })
+    )
+    expect(screen.queryByTestId('xp-request-refusal')).toBeNull()
+  })
+
+  it('pedido pendente do mesmo traço: bloqueado com o motivo', async () => {
+    calls.xpRequestsGet.mockImplementation((async () =>
+      ok({
+        items: [
+          {
+            id: 'r1',
+            characterId: CHARACTER,
+            field: 'brawl',
+            item: null,
+            name: null,
+            label: 'Briga',
+            from: 0,
+            to: 1,
+            cost: 3,
+            status: 'pending',
+            reason: null,
+          },
+        ],
+      })) as never)
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Solicitar evolução' }))
+    fireEvent.changeText(screen.getByLabelText('Buscar traço'), 'brig')
+    fireEvent.press(screen.getByRole('radio', { name: /pedido pendente$/ }))
+    expect(screen.getByTestId('xp-request-refusal')).toHaveTextContent(
+      'Já há um pedido pendente para este traço.'
+    )
+    fireEvent.press(screen.getByRole('button', { name: 'Enviar pedido' }))
+    expect(calls.xpRequestPost).not.toHaveBeenCalled()
+    calls.xpRequestsGet.mockImplementation((async () =>
+      ok({ items: [] })) as never)
+  })
+})

@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { RandomSource, RoleName, SheetData } from '@tms/sheet-core'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
@@ -12,6 +12,7 @@ import {
   testSession,
   tokens,
 } from '../../../test/session'
+import { LifecycleContext, type SheetLifecycle } from '../../policy'
 import { createSheetStore } from '../../store/sheetStore'
 import { DiceButton } from '../DiceButton'
 import { fold, matches } from '../fold'
@@ -63,16 +64,26 @@ function storeFor(
 
 async function open(
   store = storeFor().store,
-  random: RandomSource = faces(10, 6)
+  random: RandomSource = faces(10, 6),
+  lifecycle?: SheetLifecycle
 ) {
   let n = 0
-  renderWithSession(
+  const button = (
     <DiceButton
       characterId={ID}
       store={store}
       random={random}
       uuid={() => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`}
-    />,
+    />
+  )
+  renderWithSession(
+    lifecycle ? (
+      <LifecycleContext.Provider value={lifecycle}>
+        {button}
+      </LifecycleContext.Provider>
+    ) : (
+      button
+    ),
     await signedIn()
   )
   fireEvent.press(screen.getByRole('button', { name: 'Dados' }))
@@ -491,6 +502,76 @@ describe('o sheet Dados do Lobisomem (v2)', () => {
     expect(screen.getByTestId('preset-help')).toHaveTextContent(
       'Parada de Fúria permanente.'
     )
+  })
+})
+
+// T-77: o gasto que o servidor recusaria (SHEET_LOCKED) fica bloqueado com
+// o motivo, e a rolagem sem gasto continua
+describe('o boost na ficha travada (T-77)', () => {
+  const locked: SheetLifecycle = {
+    status: 'active',
+    locked: true,
+    member: true,
+  }
+
+  it('dona: "Gastar 1 Força de Vontade" com aria-disabled e o motivo; tocar não liga; "Rolar no app" manda boosts vazios', async () => {
+    calls.rollsPost.mockResolvedValue(serverRoll())
+    await open(storeFor().store, faces(10, 6), locked)
+    pick('Atributo', 'des', /^Destreza, 2/)
+    pick('Habilidade ou Disciplina', 'esport', /^Esportes, 1/)
+    const boost = screen.getByRole('checkbox', { name: /^Gastar 1 Força/ })
+    expect(boost.props.accessibilityState).toMatchObject({
+      disabled: true,
+      checked: false,
+    })
+    const reason = 'O narrador travou a ficha: a rolagem sai sem gastar.'
+    expect(screen.getByText(reason)).toBeTruthy()
+    fireEvent.press(boost)
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: false })
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+      reason
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(calls.rollsPost).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ boosts: [] })
+    )
+  })
+
+  it('narrador na mesma ficha travada: o boost liga', async () => {
+    const { store } = storeFor(
+      ['storyteller'],
+      sheetFor('helena', ['storyteller']).sheet
+    )
+    await open(store, faces(10, 6), locked)
+    fireEvent.press(screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: true })
+    expect(
+      screen.queryByText('O narrador travou a ficha: a rolagem sai sem gastar.')
+    ).toBeNull()
+  })
+
+  it('no web, o boost bloqueado não vira `disabled` e continua tocável', async () => {
+    const real = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      await open(storeFor().store, faces(10, 6), locked)
+      const boost = screen.getByRole('checkbox', { name: /^Gastar 1 Força/ })
+      expect(boost.props.accessibilityDisabled).toBeUndefined()
+      fireEvent.press(boost)
+      expect(screen.getByRole('alert')).toBeTruthy()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: real, configurable: true })
+    }
   })
 })
 

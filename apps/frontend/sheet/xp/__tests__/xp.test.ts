@@ -15,6 +15,8 @@ import {
   filterCandidates,
   groupCandidates,
   optionLabel,
+  optionMeta,
+  requestRefusal,
   xpCandidates,
 } from '../candidates'
 import { requestBlock } from '../ExperienceSheet'
@@ -137,6 +139,57 @@ describe('resultado desconhecido', () => {
 
     expect(run.mock.calls[1]?.[0].key).toBe(run.mock.calls[0]?.[0].key)
     expect(run.mock.calls[1]?.[0].body).toEqual(run.mock.calls[0]?.[0].body)
+  })
+})
+
+// T-77: o que o servidor recusaria, na ordem em que ele confere
+describe('requestRefusal e optionMeta', () => {
+  const [strength] = xpCandidates(model, sheet)
+  if (!strength?.cost.ok) throw new Error('fixture sem custo')
+  const ctx = { available: 10, pendingKeys: new Set<string>(), online: true }
+  const maxed = {
+    ...strength,
+    cost: { ok: false as const, code: 'XP_MAX_REACHED' as const },
+  } as unknown as typeof strength
+
+  it('sem escolha, sem custo, sem saldo, pedido pendente, sem rede; tudo certo é null', () => {
+    expect(requestRefusal(null, ctx)).toBe('Escolha um traço para ver o custo.')
+    expect(requestRefusal(maxed, ctx)).toBe(
+      'No máximo: este traço não pode ser pedido agora.'
+    )
+    expect(requestRefusal(strength, { ...ctx, available: 4 })).toBe(
+      'Faltam 4 XP (custa 8, disponível 4).'
+    )
+    const pending = { ...ctx, pendingKeys: new Set([strength.key]) }
+    expect(requestRefusal(strength, pending)).toBe(
+      'Já há um pedido pendente para este traço.'
+    )
+    // A ordem do servidor: o saldo antes do pendente
+    expect(requestRefusal(strength, { ...pending, available: 0 })).toContain(
+      'Faltam 8 XP'
+    )
+    expect(requestRefusal(strength, { ...ctx, online: false })).toBe(
+      'Conecte-se para enviar. Nada foi enviado.'
+    )
+    expect(requestRefusal(strength, ctx)).toBeNull()
+  })
+
+  it('a opção diz o motivo curto e fica bloqueada', () => {
+    expect(optionMeta(strength, ctx)).toEqual({
+      meta: '2 → 3 · 8 XP',
+      blocked: false,
+    })
+    expect(optionMeta(strength, { ...ctx, available: 4 })).toEqual({
+      meta: '2 → 3 · 8 XP · faltam 4',
+      blocked: true,
+    })
+    expect(
+      optionMeta(strength, { ...ctx, pendingKeys: new Set([strength.key]) })
+    ).toEqual({ meta: '2 → 3 · 8 XP · pedido pendente', blocked: true })
+    expect(optionMeta(maxed, ctx)).toEqual({
+      meta: 'No máximo',
+      blocked: true,
+    })
   })
 })
 

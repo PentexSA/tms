@@ -13,15 +13,17 @@ import {
   TextField,
   tokens,
 } from '@tms/ui'
-import { useMemo, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useId, useMemo, useState } from 'react'
+import { AccessibilityInfo, StyleSheet, View } from 'react-native'
 import {
   type CandidateSection,
-  costLabel,
   filterCandidates,
   freeItemLists,
   groupCandidates,
   optionLabel,
+  optionMeta,
+  type RequestContext,
+  requestRefusal,
   type XpCandidate,
   xpCandidates,
 } from './candidates'
@@ -38,6 +40,7 @@ export function RequestPicker({
   onChoose,
   query,
   onQuery,
+  context,
 }: {
   readonly model: SheetModel
   // A ficha confirmada pelo servidor: o custo é o dela, nunca o do rascunho
@@ -46,6 +49,8 @@ export function RequestPicker({
   readonly onChoose: (candidate: XpCandidate | null) => void
   readonly query: string
   readonly onQuery: (query: string) => void
+  // O saldo e os pedidos pendentes: o que o servidor recusaria fica marcado
+  readonly context: Omit<RequestContext, 'online'>
 }) {
   const candidates = useMemo(() => xpCandidates(model, sheet), [model, sheet])
   const sections = useMemo(
@@ -95,6 +100,7 @@ export function RequestPicker({
             key={s.id}
             model={model}
             section={s}
+            context={context}
             chosen={chosen}
             onChoose={key => {
               setCustom('')
@@ -139,11 +145,13 @@ export function RequestPicker({
 function PickerSection({
   model,
   section,
+  context,
   chosen,
   onChoose,
 }: {
   readonly model: SheetModel
   readonly section: CandidateSection
+  readonly context: Omit<RequestContext, 'online'>
   readonly chosen: XpCandidate | null
   readonly onChoose: (key: string) => void
 }) {
@@ -160,10 +168,12 @@ function PickerSection({
           label={b.title}
           columns={1}
           testID={`xp-block-${b.id}`}
+          // Acima do saldo ou com pedido pendente: tocável, com a cara de
+          // bloqueada; o toque a marca, e o rodapé diz o motivo inteiro
           options={b.candidates.map(c => ({
             id: c.key,
             label: optionLabel(model, c),
-            meta: costLabel(c),
+            ...optionMeta(c, context),
           }))}
           value={
             chosen && b.candidates.some(c => c.key === chosen.key)
@@ -178,42 +188,50 @@ function PickerSection({
 }
 
 /**
- * O rodapé da folha com o pedido escolhido: o resumo, o erro do servidor e
- * "Enviar pedido", sempre à vista, sem rolar a lista.
+ * O rodapé da folha com o pedido escolhido: o resumo, o motivo de o servidor
+ * recusar (T-77), o erro dele e "Enviar pedido", sempre à vista. Com motivo,
+ * o botão fica bloqueado e tocável: o toque não envia, repete o motivo como
+ * alerta e pede o saldo de novo (`onRefresh`), porque o do aparelho pode
+ * estar velho.
  */
 export function RequestFooter({
   candidate,
-  available,
-  online,
+  context,
   busy,
   error,
   onSend,
+  onRefresh,
 }: {
   readonly candidate: XpCandidate | null
-  readonly available: number
-  readonly online: boolean
+  readonly context: RequestContext
   readonly busy: boolean
   readonly error: string | null
   readonly onSend: (cost: number, to: number) => void
+  readonly onRefresh: () => void
 }) {
+  const reasonId = `${useId()}-xp-refusal`
   const cost = candidate?.cost
+  const refusal = requestRefusal(candidate, context)
+  // O toque no bloqueado vira alerta só para a escolha de agora
+  const [alertedFor, setAlertedFor] = useState<string | null | undefined>()
+  const alerting =
+    alertedFor !== undefined && alertedFor === (candidate?.key ?? null)
   return (
     <View style={styles.footer} testID="xp-request-footer">
-      {!candidate ? (
-        <Text color="inkMuted">Escolha um traço para ver o custo.</Text>
-      ) : cost?.ok ? (
+      {candidate && cost?.ok ? (
         <Text testID="xp-request-summary">
           {candidate.label}: {cost.from} → {cost.to}. Custo {cost.cost} XP
-          (disponível {available}).
+          (disponível {context.available}).
         </Text>
-      ) : (
-        <Text color="danger" accessibilityRole="alert">
-          {costLabel(candidate)}: este traço não pode ser pedido agora.
-        </Text>
-      )}
-      {candidate && cost?.ok && available < cost.cost ? (
-        <Text color="inkMuted">
-          Saldo insuficiente para esta evolução: o servidor vai recusar.
+      ) : null}
+      {refusal ? (
+        <Text
+          nativeID={reasonId}
+          testID="xp-request-refusal"
+          color={candidate ? 'danger' : 'inkMuted'}
+          {...(alerting ? { accessibilityRole: 'alert' as const } : {})}
+        >
+          {refusal}
         </Text>
       ) : null}
       {error ? (
@@ -225,8 +243,16 @@ export function RequestFooter({
         title="Enviar pedido"
         testID="xp-request-send"
         busy={busy}
-        disabled={!online || !cost?.ok}
+        blocked={refusal !== null}
+        hintID={refusal ? reasonId : undefined}
+        accessibilityHint={refusal ?? undefined}
         onPress={() => {
+          if (refusal) {
+            setAlertedFor(candidate?.key ?? null)
+            AccessibilityInfo.announceForAccessibility(refusal)
+            onRefresh()
+            return
+          }
           if (cost?.ok) onSend(cost.cost, cost.to)
         }}
       />

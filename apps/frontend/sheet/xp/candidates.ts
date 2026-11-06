@@ -85,6 +85,54 @@ export function costLabel(c: XpCandidate): string {
   }
 }
 
+export interface RequestContext {
+  readonly available: number
+  // `xpTargetKey` dos pedidos pendentes desta ficha
+  readonly pendingKeys: ReadonlySet<string>
+  readonly online: boolean
+}
+
+/**
+ * Por que o servidor recusaria este pedido agora (T-77), na ordem em que ele
+ * confere (`xp/requests.ts`): sem custo (máximo, pré-requisito), sem saldo,
+ * pedido pendente do mesmo traço. Sem rede, nada sai. Null quando dá para
+ * enviar. A previsão só erra para o lado bloqueado (o saldo do aparelho pode
+ * estar velho), e o servidor continua a última palavra.
+ */
+export function requestRefusal(
+  c: XpCandidate | null,
+  { available, pendingKeys, online }: RequestContext
+): string | null {
+  if (!c) return 'Escolha um traço para ver o custo.'
+  if (!c.cost.ok)
+    return `${costLabel(c)}: este traço não pode ser pedido agora.`
+  if (available < c.cost.cost)
+    return `Faltam ${c.cost.cost - available} XP (custa ${c.cost.cost}, disponível ${available}).`
+  if (pendingKeys.has(c.key)) return 'Já há um pedido pendente para este traço.'
+  if (!online) return 'Conecte-se para enviar. Nada foi enviado.'
+  return null
+}
+
+/**
+ * O texto curto da opção na lista: o custo e, se o servidor recusaria, o
+ * motivo em poucas palavras ("2 → 3 · 10 XP · faltam 4").
+ */
+export function optionMeta(
+  c: XpCandidate,
+  { available, pendingKeys }: Omit<RequestContext, 'online'>
+): { readonly meta: string; readonly blocked: boolean } {
+  const base = costLabel(c)
+  if (!c.cost.ok) return { meta: base, blocked: true }
+  if (available < c.cost.cost)
+    return {
+      meta: `${base} · faltam ${c.cost.cost - available}`,
+      blocked: true,
+    }
+  if (pendingKeys.has(c.key))
+    return { meta: `${base} · pedido pendente`, blocked: true }
+  return { meta: base, blocked: false }
+}
+
 /** Um bloco da lista de evolução: um grupo do template, uma seção ou uma lista. */
 export interface CandidateBlock {
   readonly id: string
