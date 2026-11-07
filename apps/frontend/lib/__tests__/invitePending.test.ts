@@ -11,7 +11,11 @@ import {
 const CODE = 'ABCD2345EFGH6789JKMN0PQRST'
 
 beforeEach(() => clearPendingInvite())
-afterEach(() => jest.useRealTimers())
+// O timer de validade é real (30 min): sem limpar, o Jest espera por ele para sair
+afterEach(() => {
+  clearPendingInvite()
+  jest.useRealTimers()
+})
 
 describe('convite pendente', () => {
   it('peek não consome: duas leituras, o mesmo código', () => {

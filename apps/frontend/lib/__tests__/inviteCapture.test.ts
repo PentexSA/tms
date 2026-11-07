@@ -32,6 +32,8 @@ function fakePage(href: string) {
 }
 
 beforeEach(() => clearPendingInvite())
+// O timer de validade é real (30 min): sem limpar, o Jest espera por ele para sair
+afterEach(() => clearPendingInvite())
 
 describe('captureInvite', () => {
   it('guarda o código e tira o fragmento da URL, com o mesmo estado', () => {
