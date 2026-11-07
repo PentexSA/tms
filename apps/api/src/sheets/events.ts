@@ -16,6 +16,7 @@ import {
   type SheetEvent,
   stripRestricted,
   withEffectiveFrom,
+  withEffectiveTo,
   writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -112,13 +113,16 @@ export type LifecycleEvent =
   | 'creation.returned'
   | 'creation.adjust'
   | 'creation.ready'
+  | 'section.revealed'
+  | 'section.hidden'
 
 /**
  * As ações do registro da crônica que viram passos no Histórico da ficha:
  * "Criação concluída" (T-80: o dono ou o narrador conclui, ou o narrador
  * aprova) e, desde o P04-D (R-12), enviar, devolver, pedir ajuste e avisar
- * que terminou. Só estas; o resto do registro continua só para o narrador,
- * em Bastidores.
+ * que terminou; desde o P16-D (U-11), o narrador revelar ou esconder as
+ * notas. Só estas; o resto do registro continua só para o narrador, em
+ * Bastidores. Os passos não levam conteúdo nem "Desfazer".
  */
 export const LIFECYCLE_EVENTS = {
   'character.creation.complete': 'creation.completed',
@@ -127,6 +131,8 @@ export const LIFECYCLE_EVENTS = {
   'character.creation.return': 'creation.returned',
   'character.creation.adjust': 'creation.adjust',
   'character.creation.ready': 'creation.ready',
+  'character.section.reveal': 'section.revealed',
+  'character.section.hide': 'section.hidden',
 } as const satisfies Partial<Record<AuditAction, LifecycleEvent>>
 
 const LIFECYCLE_ACTIONS = Object.keys(
@@ -188,6 +194,8 @@ export function lifecycleRole(row: {
       return 'owner'
     case 'creation.returned':
     case 'creation.adjust':
+    case 'section.revealed':
+    case 'section.hidden':
       return 'storyteller'
   }
 }
@@ -392,9 +400,14 @@ export function eventRoutes(
           await trx
             .insertInto('character_events')
             .values(
-              // O histórico guarda o "de" efetivo (o padrão, quando não havia
-              // valor): "Sangue 10 → 9". O conflito já foi conferido com o cru
-              withEffectiveFrom(model, current, body.events).map((e, seq) => {
+              // O histórico guarda o "de" e o "para" efetivos (o padrão,
+              // quando não havia valor): "Sangue 10 → 9", e o desfazer
+              // "Sangue 9 → 10" (T-53). O conflito já foi conferido com o cru
+              withEffectiveTo(
+                model,
+                result.sheet,
+                withEffectiveFrom(model, current, body.events)
+              ).map((e, seq) => {
                 const p = parsePath(e.path)
                 const type = p
                   ? model.fields.get(p.fieldId)?.def.type
@@ -409,6 +422,8 @@ export function eventRoutes(
                   // O `from` cru é o valor atual (o conflito já conferiu):
                   // null é caminho vazio, que a reversão devolve vazio
                   from_absent: (body.events[seq]?.from ?? null) === null,
+                  // O "para" cru era vazio: o to_value guarda o efetivo (T-53)
+                  to_absent: (body.events[seq]?.to ?? null) === null,
                 }
               })
             )

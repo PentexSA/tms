@@ -53,6 +53,7 @@ export interface CharacterEvents {
   id: Generated<string>
   path: string
   seq: number
+  to_absent: Generated<boolean>
   to_value: Json | null
 }
 
@@ -90,6 +91,8 @@ export interface Characters {
   name: string
   portrait_url: string | null
   presentation_revision: Generated<number>
+  reveal_revision: Generated<number>
+  revealed_sections: Generated<string[]>
   sheet_data: Json
   sheet_version: Generated<number>
   status: Generated<string>

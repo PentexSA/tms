@@ -1,7 +1,7 @@
 import { Button, EmptyState } from '@tms/ui'
 import Constants from 'expo-constants'
-import { useRouter } from 'expo-router'
 import { Linking, Platform } from 'react-native'
+import { useBackTo } from '../lib/navigation'
 
 // L-02: o template é mais novo que este app (compileSafe devolveu null). O
 // motor recusa o que não conhece (falha segura); esta tela só dá a saída. No
@@ -49,10 +49,10 @@ export function unsupportedShort(what: 'ficha' | 'regras'): string {
 export function UnsupportedTemplate({
   onBack,
 }: {
-  // No app, a saída da tela (padrão: router.back())
+  // No app, a saída da tela (padrão: voltar, ou a lista sem tela de baixo)
   readonly onBack?: () => void
 }) {
-  const router = useRouter()
+  const backToList = useBackTo('/')
   if (Platform.OS === 'web')
     return (
       <EmptyState
@@ -71,7 +71,7 @@ export function UnsupportedTemplate({
           <Button
             title="Voltar"
             variant={store ? 'secondary' : 'primary'}
-            onPress={onBack ?? (() => router.back())}
+            onPress={onBack ?? backToList}
           />
           {store ? (
             <Button

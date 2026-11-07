@@ -27,7 +27,7 @@ import { AnchorHeader } from '../layouts/AnchorHeader'
 import { useAnchor } from '../layouts/anchor'
 import { bonusSeenNow, markBonusSeen, readBonusSeen } from './bonusSeen'
 import { CompletionMessage } from './CompletionMessage'
-import { useCreation, useGuideNav } from './CreationContext'
+import { useCreation, useGuideNav, useOpenBudget } from './CreationContext'
 import {
   completionBy,
   completionCopy,
@@ -65,6 +65,17 @@ export function useCreating(): boolean {
   const creation = useCreation()
   return Boolean(
     creation?.active && creation.status === 'creating' && creation.info
+  )
+}
+
+/**
+ * A criação por pontos em `pending` (P09-D, D-10): a aba Pontos em Leitura
+ * para o narrador conferir a conta antes de aprovar ou devolver. Nada edita.
+ */
+export function useCreationReview(): boolean {
+  const creation = useCreation()
+  return Boolean(
+    creation?.active && creation.status === 'pending' && creation.info
   )
 }
 
@@ -194,15 +205,23 @@ export function CreationPanel() {
   const notices = useCreationNotices()
   // O "ir ao grupo" (P05-D): o painel e os blocos dele são âncoras
   const panel = useAnchor('creation-panel', { focusable: false })
+  const storyteller = roles.has('storyteller')
+  // Em `pending`, só o narrador em Leitura (P09-D): conferir antes de aprovar
+  const reviewing =
+    creation?.status === 'pending' && storyteller && mode === 'read'
   if (
     !creation?.active ||
-    creation.status !== 'creating' ||
+    (creation.status !== 'creating' && !reviewing) ||
     !creation.info ||
     !check
   )
     return null
-  const storyteller = roles.has('storyteller')
   const { freebies } = check
+  // O próximo passo: concluir pela barra (creating) ou o aviso do topo
+  // (pending)
+  const next = reviewing
+    ? 'Confira a ficha e aprove ou devolva pelo aviso no topo.'
+    : null
 
   return (
     <View
@@ -237,8 +256,10 @@ export function CreationPanel() {
       ) : (
         <Text variant="caption" color="inkMuted" testID="creation-ready">
           {freebies && freebies.remaining > 0
-            ? `Pontos básicos completos; ${restam(freebies.remaining)} de bônus. Gaste-os nos grupos ou conclua pela barra de cima.`
-            : 'A conta fechou: conclua a criação pela barra de cima.'}
+            ? `Pontos básicos completos; ${restam(freebies.remaining)} de bônus. ${next ?? 'Gaste-os nos grupos ou conclua pela barra de cima.'}`
+            : next
+              ? `A conta fechou. ${next}`
+              : 'A conta fechou: conclua a criação pela barra de cima.'}
         </Text>
       )}
       {notices.length ? (
@@ -537,6 +558,9 @@ export function CreationStatusPanel() {
   // bônus (T-18)
   const [approving, setApproving] = useState(false)
   const approveNotes = useFreebiesNotes()
+  // "Ver Pontos" (P09-D, POA-20): só quando a aba existe (o narrador em
+  // Leitura, com a conta)
+  const openBudget = useOpenBudget()
   // O painel continua montado fora de `pending`: sem zerar, o formulário de
   // devolução reaparecia preenchido na próxima revisão (nota do QA app)
   const pending = creation?.status === 'pending'
@@ -598,6 +622,14 @@ export function CreationStatusPanel() {
                 setError(null)
               }}
             />
+            {openBudget ? (
+              <Button
+                title="Ver Pontos"
+                variant="secondary"
+                testID="creation-pending-points"
+                onPress={openBudget}
+              />
+            ) : null}
           </View>
           {returning ? (
             <View style={styles.block}>

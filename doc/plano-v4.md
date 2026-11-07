@@ -23,22 +23,48 @@ Cada etapa deve produzir uma alteração revisável, com seus testes e documenta
 
 A jornada principal será `e2e/tests/journey-creation.spec.ts`, com sessões separadas de narrador e jogadores:
 
-1. O narrador cria a crônica, liga a aprovação de ficha e convida dois jogadores.
+1. O narrador cria a crônica, liga a aprovação de ficha e convida dois jogadores. O convite é um link com uma mensagem pronta, que abre "Entrar com convite" já preenchido (D-14, onda 5, P12).
 2. O jogador cria a ficha pela identidade e entra no modo de criação por pontos.
 3. Escolhe as prioridades e distribui pontos básicos, acompanhando os contadores por grupo.
-4. Tenta concluir com um grupo incompleto; a operação é recusada e o problema aparece naquele grupo.
-5. Distribui os pontos restantes e bônus, salva as escolhas e espera a sincronização.
+4. Com um grupo incompleto, a barra mostra "Faltam: …" no lugar de "Concluir criação"; cada item leva ao grupo, e a aba Pontos lista o que falta. O servidor recusa a conclusão com a conta aberta (`completionRefusal`). (D-13; o botão escondido até a conta fechar é ponto para o PO em aberto: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 2.)
+5. Distribui os pontos restantes e bônus, salva as escolhas e espera a sincronização. Ao fechar os pontos básicos, a folha "Começaram os pontos de bônus" aparece uma vez por ficha neste aparelho (a marca fica no aparelho: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 4, em aberto), e a aba Pontos mostra a fase em texto ("Fase: pontos básicos" ou "Fase: pontos de bônus"). Quando a conta fecha, a barra diz "A conta fechou: você conclui." (ou "envie ao narrador", com a aprovação ligada), e o botão aparece. (D-13, D-05)
 6. Conclui a criação; a ficha passa a `pending` e o jogador não consegue alterá-la.
-7. O narrador aprova; a ficha passa a `active`.
+7. O narrador aprova; a ficha passa a `active`. Antes, ele acompanha a criação pela Mesa: o cartão mostra o progresso ("Atributos ✓ · Habilidades: faltam 4 · Bônus: restam 2 de 15", ou "A conta fechou"), o filtro separa "Em criação" e "Pendentes", e a ficha pendente abre com a aba Pontos em leitura (D-10, onda 5, P09-D).
 8. O narrador concede XP ao grupo, com motivo. Cada ficha recebe seu crédito e extrato, uma única vez.
-9. O jogador consulta o saldo e solicita “Destreza 2 → 3”, vendo o custo calculado antes de enviar.
-10. O narrador aprova; o traço sobe, o XP gasto aumenta, o pedido fica aprovado e o extrato aponta para o lote correspondente.
-11. Um segundo pedido sem saldo é recusado no envio, sem criar um pendente. Um cenário complementar prova que um pedido aceito pode ficar sem saldo antes da aprovação: a aprovação é recusada sem débito e o pedido continua pendente. Recusa e cancelamento são exercitados em cenários complementares.
+9. O jogador consulta o saldo e solicita “Destreza 2 → 3”, vendo o custo calculado antes de enviar. A lista de "Solicitar evolução" vem agrupada pelo template, com busca; a opção tocada fica marcada, e o resumo com "Enviar pedido" fica fixo no rodapé (T-50, onda 5, P13).
+10. O narrador aprova; o traço sobe, o XP gasto aumenta, o pedido fica aprovado e o extrato aponta para o lote correspondente. "Conceder XP" e "Ajustar XP" aceitam também o valor digitado (U-02, onda 5, P13).
+11. Um segundo pedido sem saldo é recusado no envio, sem criar um pendente. Um cenário complementar prova que um pedido aceito pode ficar sem saldo antes da aprovação: a aprovação é recusada sem débito e o pedido continua pendente. Recusa e cancelamento são exercitados em cenários complementares. Na tela, "Enviar pedido" sem saldo aparece bloqueado com o motivo ("Faltam 4 XP"), continua tocável e explica no toque, sem mandar o pedido (T-77, onda 5, P13).
 12. O outro jogador continua sem receber os dados dessa ficha, inclusive nas listas, contagens e rotas novas.
 
 Também precisam funcionar: aprovação desligada por padrão, ajuste de orçamento por crônica e ficha, criação livre autorizada pelo narrador, devolução da ficha pendente para correção e ajuste/estorno de concessão de XP. As definições acrescentadas nesta revisão estão identificadas no §2.3; não são atribuídas às decisões originais do painel.
 
 A jornada roda em Chromium e WebKit. O fluxo nativo novo cobre criação, aprovação e XP em Android. A execução nativa de iOS tem resultado próprio, conforme a infraestrutura disponível; WebKit não a substitui.
+
+## Depois do teste com personas (ondas 1 a 5)
+
+O teste com personas de 01/11/2026 ([matriz de achados](testes/2026-11-01/matriz-achados.md)) comparou a tela com este plano. Pela D-13, o §1 foi alinhado ao que a tela faz, no próprio item e sem renumerar; cada item revisto leva a decisão entre parênteses. O §3.4 já registra a D-03 e a D-04 na tabela de operações (onda 3, P04-D).
+
+**Decisões que mudam esta jornada** (a tabela "Decisões de produto" da matriz tem o texto inteiro de cada uma):
+
+| Decisão | O que muda nesta jornada | Onda e pacote | Em aberto |
+|---|---|---|---|
+| D-01 | Na Criação, "Salvar" fica sempre na barra, com "Concluir criação" ou "Enviar para aprovação" ao lado quando a conta fecha; sair com rascunho oferece "Salvar e sair" (itens 5 e 6) | onda 3, P03-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 1 a 4 |
+| D-02 | O estado aparece sob o nome da ficha, na lista da crônica, na aba Fichas e na Mesa ("Em criação · livre" ou "· por pontos", "Aguardando aprovação", "Aguardando ajuste", "Devolvida", "Concluída em dd/mm"); o Histórico registra "Criação concluída" (itens 6 e 7) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 6, 7 e 10 |
+| D-03 | Na criação livre, "Avisar que terminei" põe um selo na Mesa do narrador; push fica para depois. Em todo modo, a barra diz o próximo passo e quem conclui (§3.4) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, ponto 11 |
+| D-04 | "Pedir ajuste", com motivo, só do narrador, com a aprovação ligada ou não (§3.4). "Reabrir criação" fica fora deste ciclo, em [proximas-features.md](proximas-features.md) | onda 3, P04-D | [onda-3.md](planos-pacotes/onda-3.md) §6, pontos 8 e 9 |
+| D-05 | "Faltam: …" na barra, com itens que levam ao grupo; a aba "Orçamento" passou a "Pontos", com o "O que falta"; a folha "Começaram os pontos de bônus" uma vez por ficha neste aparelho; a fase em texto, com a troca manual como opção secundária (itens 3 a 5) | onda 4, P05-D | [onda-4.md](planos-pacotes/onda-4.md) §6, pontos 2, 4 e 15 |
+| D-06 | A Qualidade se compra com bônus, pelo custo do item; a recusa aparece na folha e mantém o nome digitado (item 5) | ondas 2 e 4, P07-C e P07-D | [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 6 |
+| D-10 | O progresso no cartão da Mesa, com as mesmas frases que o jogador lê; o filtro "Em criação / Pendentes", com a contagem de cada um; "N fichas em criação" na lista de crônicas, só para o narrador; a aba Pontos em leitura para o narrador também em `pending`, aberta pelo "Ver Pontos"; o painel "Criação de fichas" recolhido num resumo com "Editar" depois de salvo, e as abas logo abaixo do topo. O NPC fica fora da contagem e do filtro (itens 1 e 7) | onda 5, P09-D | o nome "Orçamento" nas regras da crônica: [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 15 |
+| D-13 | Este registro e os itens 4 e 5 do §1 | onda 5, P01-D | — |
+
+**Correções que mudam o que o §1 descreve:**
+
+- **R-12** (onda 3, P04-D, D-02): a ficha diz em que estado está, sob o nome e nas listas (itens 6 e 7).
+- **T-36** (onda 5, P09-D): a ficha pendente na Mesa e o painel "Criação de fichas" acima das abas. O painel vira um resumo de uma linha com "Editar", e as abas sobem (item 7).
+- **T-50** (onda 5, P13): a lista de "Solicitar evolução" agrupada pelas seções do template, com busca, a opção marcada e o resumo fixo no rodapé (item 9).
+- **U-01** (onda 5, P13): o "Peça ao narrador." numa ficha concluída ganha o botão "Solicitar evolução", que abre a Experiência com o traço já escolhido; numa lista (Disciplinas, Antecedentes), abre a busca pelo nome dela (item 9).
+
+**Ainda não conferido:** as frases do "Faltam" e da folha de bônus são rascunho do time, para revisão ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
 
 ## 2. Ponto de partida
 
@@ -615,7 +641,7 @@ Privacidade é comprovada no corpo e nas contagens, não só na interface. Lista
 
 ### 6.3 Concorrência em Postgres real
 
-Acrescentar testes ao job `postgres` de `.github/workflows/ci.yml`, usando pool com conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos arquivos existentes. PGLite não prova essas travas.
+Acrescentar testes ao job `postgres` de `.github/workflows/ci.yml` (**Revisto:** o job saiu do CI no PR #49; os `*.pg.test` rodam à mão, ver a D-00 no registro do [plano-v0.md](plano-v0.md)), usando pool com conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos arquivos existentes. PGLite não prova essas travas.
 
 | Cenário | Resultado obrigatório |
 |---|---|

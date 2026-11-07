@@ -20,8 +20,10 @@ import {
   templateJson,
 } from '../../../test/fixtures'
 import { fakeServer, renderLive } from '../../../test/live'
+import { textInput } from '../../../test/queries'
 import { fold } from '../../evolve/text'
 import { SheetView } from '../../SheetView'
+import { barEdits } from '../../storyteller/privacy'
 import { GROUP_COL_MIN } from '../GroupsLayout'
 
 // Etapa 18: os layouts ricos. `groups` com filtro e busca; `grid` em colunas
@@ -512,5 +514,90 @@ describe('T-58: um título e um contador por bloco', () => {
     const advantages = within(screen.getByTestId('groups-advantages'))
     expect(advantages.getAllByText('Disciplinas')).toHaveLength(2)
     expect(screen.queryByTestId('items-disciplines')).toBeNull()
+  })
+})
+
+// T-84: Citação, Notas e os textos do Sobre editáveis no Editar, pela regra
+// dos outros layouts. As Notas do Narrador continuam com a barra do narrador
+describe('text: o Sobre no Editar (T-84)', () => {
+  const lifecycle = { status: 'active', locked: false, member: true }
+  const about = async (
+    id: string,
+    roles: RoleName[] = ['owner'],
+    mode: 'evolve' | 'play' = 'evolve'
+  ) => {
+    const c = example(id)
+    const model = modelOf(c.system)
+    const live = await renderLive(
+      { model, sheet: c.sheet, mode, roles, lifecycle },
+      fakeServer(model, c.sheet).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    return { model, live }
+  }
+
+  it('V20, a dona na ficha ativa: a Citação abre o editor, e "Aplicar" grava no rascunho; as Notas também', async () => {
+    const { live } = await about('helena')
+    expect(screen.getByTestId('editor-notes')).toBeTruthy()
+    fireEvent.press(screen.getByTestId('editor-quote'))
+    fireEvent.changeText(textInput('Citação'), 'Uma frase nova.')
+    fireEvent.press(screen.getByRole('button', { name: 'Aplicar' }))
+    // No rascunho: a linha mostra o texto novo, e o "Salvar" fica com ele
+    expect(screen.getByTestId('editor-quote')).toHaveAccessibilityValue({
+      text: 'Uma frase nova.',
+    })
+    expect(live.store().getState().draft).not.toBeNull()
+  })
+
+  it('W20: a Deformidade também ganha o editor', async () => {
+    await about('iara')
+    expect(screen.getByTestId('editor-quote')).toBeTruthy()
+    expect(screen.getByTestId('editor-metisDeformity')).toBeTruthy()
+    expect(screen.getByTestId('editor-notes')).toBeTruthy()
+  })
+
+  it('M20: Citação e Notas', async () => {
+    await about('tomas')
+    expect(screen.getByTestId('editor-quote')).toBeTruthy()
+    expect(screen.getByTestId('editor-notes')).toBeTruthy()
+  })
+
+  it('o narrador no Editar: Citação e Notas com editor; as Notas do Narrador só leitura, com a legenda de privadas', async () => {
+    await about('helena', ['storyteller'])
+    expect(screen.getByTestId('editor-quote')).toBeTruthy()
+    expect(screen.queryByTestId('editor-storytellerNotes')).toBeNull()
+    expect(
+      screen.getByText('Notas do Narrador · privadas: o jogador não vê')
+    ).toBeTruthy()
+  })
+
+  it('em Jogo, nada muda: o texto em leitura, a Citação entre aspas', async () => {
+    const { model } = await about('helena', ['owner'], 'play')
+    expect(screen.queryByTestId('editor-quote')).toBeNull()
+    const { sheet } = example('helena')
+    expect(model.template.identity.voice).toBe('quote')
+    expect(screen.getByText(`“${sheet.values.quote as string}”`)).toBeTruthy()
+  })
+
+  it('a regra é do template: um campo de texto que só o narrador escreve fica com a barra', () => {
+    const model = modelOf('vtm-v20')
+    expect(barEdits(model, 'storytellerNotes')).toBe(true)
+    expect(barEdits(model, 'quote')).toBe(false)
+    expect(barEdits(model, 'notes')).toBe(false)
+    // Um traço não é texto: nunca é da barra
+    expect(barEdits(model, 'strength')).toBe(false)
+    expect(barEdits(model, 'naoExiste')).toBe(false)
+    // A mesma seção, com o dono também escrevendo, sai da barra: a regra
+    // segue as permissões (o caso "os dois escrevem" da D-16, P15-D)
+    const json = templateJson('vtm-v20') as {
+      sections: { id: string; permissions?: unknown }[]
+    }
+    const section = json.sections.find(x => x.id === 'storyteller')
+    if (section)
+      section.permissions = {
+        read: ['owner', 'storyteller'],
+        write: ['owner', 'storyteller'],
+      }
+    expect(barEdits(compileTemplate(json), 'storytellerNotes')).toBe(false)
   })
 })

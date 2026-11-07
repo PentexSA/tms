@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from 'bun:test'
-import { safeError } from '../http/safe-error'
+import { ALPHABET, newInviteCode } from '../chronicles/invite-code'
+import { INVITE_CHAR, redact, safeError } from '../http/safe-error'
 
 const EMAIL = 'pessoa.canario@empresa.com.br'
 const JWT =
@@ -251,5 +252,76 @@ describe('safeError: nunca lança', () => {
     const { proxy, revoke } = Proxy.revocable({}, {})
     revoke()
     expect(safeError(proxy)).toEqual({ name: 'Error' })
+  })
+})
+
+describe('redact: código de convite (P12)', () => {
+  // Código fictício, gerado aqui: nenhum convite real em teste
+  const code = newInviteCode()
+  const formatted = code.replace(/(.{4})(?=.)/g, '$1 ')
+
+  it('cru, formatado, com hífens e em minúsculas', () => {
+    for (const text of [
+      `aceite ${code} falhou`,
+      `aceite ${formatted} falhou`,
+      `aceite ${formatted.replace(/ /g, '-')} falhou`,
+      `"${code.toLowerCase()}"`,
+    ]) {
+      const out = redact(text)
+      expect(out).toContain('[convite]')
+      expect(out).not.toContain(code)
+      expect(out).not.toContain(code.slice(0, 8))
+    }
+  })
+
+  it('o fragmento de URL e de caminho', () => {
+    expect(redact('GET https://app.test/join#qualquer-coisa ok')).toBe(
+      'GET https://app.test/join#[convite] ok'
+    )
+    expect(redact(`abriu /join#${code}`)).toBe('abriu /join#[convite]')
+  })
+
+  it('não apaga UUID, hash, método privado nem texto comum', () => {
+    const uuid = '123e4567-e89b-42d3-a456-426614174000'
+    const hash = 'a'.repeat(64)
+    for (const text of [
+      uuid,
+      hash,
+      'at Foo.#bar (file:///x.js:1:2)',
+      'Cannot read properties of undefined (reading x)',
+      // 26 letras, mas com U, que o alfabeto não tem
+      'at ChronicleInviteSheetUnused (x.js:1:2)',
+    ])
+      expect(redact(text)).toBe(text)
+  })
+
+  it('a mensagem do erro sai sem o código', () => {
+    const safe = safeError(new Error(`convite ${formatted} recusado`))
+    expect(safe.message).toBe('convite [convite] recusado')
+  })
+})
+
+describe('redact: alfabeto e tempo (P12, revisão)', () => {
+  it('a classe do código é o alfabeto do invite-code.ts, mais O, I e L, sem U', () => {
+    const one = new RegExp(`^${INVITE_CHAR}$`)
+    for (const c of ALPHABET) {
+      expect(one.test(c)).toBe(true)
+      expect(one.test(c.toLowerCase())).toBe(true)
+    }
+    for (const c of 'OILoil') expect(one.test(c)).toBe(true)
+    for (const c of 'Uu-_ ') expect(one.test(c)).toBe(false)
+  })
+
+  it('linear num token longo de "/" e num base64 de 64 KB', () => {
+    const slashes = '/'.repeat(64 * 1024)
+    const base64 = Buffer.from(
+      Array.from({ length: 48 * 1024 }, (_, i) => i % 256)
+    ).toString('base64')
+    for (const text of [slashes, `${slashes}#x`, base64, `/${base64}#y`]) {
+      const start = performance.now()
+      redact(text)
+      expect(performance.now() - start).toBeLessThan(200)
+    }
+    expect(redact(`${slashes}#x`).endsWith('#[convite]')).toBe(true)
   })
 })

@@ -314,6 +314,53 @@ describe('a tela da ficha com o estado', () => {
     }
   )
 
+  // U-01: "Peça ao narrador." leva a "Solicitar evolução" com o traço
+  describe('o atalho para o pedido de evolução (U-01)', () => {
+    const editar = async () => {
+      fireEvent.press(await screen.findByRole('radio', { name: 'Editar' }))
+    }
+
+    it('ficha ativa, dona, Editar: "Solicitar evolução de Força" abre a Experiência com Força marcada e o resumo no rodapé', async () => {
+      await open(['owner'], 'active')
+      await editar()
+      expect(screen.getAllByText('Peça ao narrador.').length).toBeGreaterThan(0)
+      fireEvent.press(
+        screen.getByRole('button', { name: 'Solicitar evolução de Força' })
+      )
+      const footer = await screen.findByTestId('xp-request-footer')
+      expect(
+        within(footer).getByTestId('xp-request-summary')
+      ).toHaveTextContent(/^Força: \d → \d\. Custo \d+ XP/)
+      const radio = screen.getByRole('radio', { name: /^Força, / })
+      expect(radio.props.accessibilityState).toMatchObject({ checked: true })
+    })
+
+    it('a lista (Disciplinas) abre a busca pelo nome dela, sem traço marcado', async () => {
+      await open(['owner'], 'active')
+      await editar()
+      fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+      fireEvent.press(
+        screen.getByRole('button', {
+          name: 'Solicitar evolução de Disciplinas',
+        })
+      )
+      expect(await screen.findByLabelText('Buscar traço')).toHaveProp(
+        'value',
+        'Disciplinas'
+      )
+      expect(
+        within(screen.getByTestId('xp-request-footer')).getByText(
+          'Escolha um traço para ver o custo.'
+        )
+      ).toBeTruthy()
+    })
+
+    it('o narrador na ficha: sem atalho (o pedido é da dona)', async () => {
+      await open(['storyteller'], 'active')
+      expect(screen.queryByTestId('xp-shortcut')).toBeNull()
+    })
+  })
+
   it('o dono não tem o menu do narrador', async () => {
     await open(['owner'], 'active')
     fireEvent.press(screen.getByRole('button', { name: 'Mais opções' }))

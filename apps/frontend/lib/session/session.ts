@@ -1,4 +1,5 @@
-import { withErrorCode } from '../errors'
+import { requestIdOf, withErrorCode } from '../errors'
+import { clearPendingInvite } from '../invite/pending'
 import { NO_STORE_HEADERS } from '../noStore'
 import type {
   SessionChannel,
@@ -33,11 +34,14 @@ export interface SessionState {
 
 export class AuthError extends Error {
   readonly status: number
+  // O id do 5xx, para a tela montar a própria frase com o código (P12)
+  readonly requestId?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, requestId?: string) {
     super(message)
     this.name = 'AuthError'
     this.status = status
+    if (requestId) this.requestId = requestId
   }
 }
 
@@ -235,6 +239,9 @@ export class Session {
    * avisa o servidor. Sem rede, a revogação fica pendente e vai depois.
    */
   async logout(): Promise<void> {
+    // O convite pendente (P12) sai só no "Sair" explícito: a abertura sem
+    // sessão também passa por signedOut e apagaria o link que acabou de chegar
+    clearPendingInvite()
     const { store } = this.#deps
     const userId = this.#state.user?.id
     if (store.refreshInBody) {
@@ -286,6 +293,10 @@ export class Session {
     this.#accessToken = null
     // Com sessão aberta, o OfflineProvider apaga o storage deste usuário
     const open = this.#state.user?.id
+    // Saída de uma sessão aberta (conta excluída, refresh recusado, logout
+    // noutra aba): o convite pendente sai junto (P12). Na abertura sem
+    // sessão (status ainda "loading"), não: o link acabou de chegar
+    if (this.#state.status === 'signedIn') clearPendingInvite()
     await this.#deps.store.clear()
     const last = await this.#deps.lastUser?.read().catch(() => null)
     await this.#deps.lastUser?.clear().catch(() => undefined)
@@ -449,7 +460,8 @@ export class Session {
         res.status,
         typeof data.error === 'string'
           ? withErrorCode(data.error, res.status, data)
-          : OFFLINE
+          : OFFLINE,
+        requestIdOf(data)
       )
     }
     const data = (await res.json()) as TokenResponse

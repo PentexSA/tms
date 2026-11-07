@@ -716,6 +716,70 @@ describe('T-27 (parte 2): abas, sub-abas e contador fixos no celular', () => {
     expect(scrollToSpy).not.toHaveBeenCalled()
   })
 
+  // iOS e Android (onda 5): no aviso "Aguardando aprovação", acima das
+  // abas, "Ver Pontos" trocava a aba fora da tela, sem rolar: parecia não
+  // fazer nada
+  it('a 390, "Ver Pontos" do aviso no topo troca a aba e rola até ela', async () => {
+    resize(PHONE)
+    calls.characterGet.mockResolvedValue(
+      ok({
+        id: ID,
+        name: 'Pendente',
+        chronicle: { id: 'c1', name: 'Crônica da Liberdade' },
+        owner: { id: 'u1', username: 'dona' },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 1,
+        roles: ['storyteller'],
+        status: 'pending',
+        lockedAt: null,
+        member: true,
+        updatedAt: '2026-10-18T12:00:00Z',
+        sheet: {
+          values: { name: 'Pendente', clan: 'tremere' },
+          specialties: {},
+        },
+        creation: {
+          revision: 1,
+          mode: 'points',
+          accounting: true,
+          choices: {
+            priorities: {
+              attributes: ['physical', 'social', 'mental'],
+              abilities: ['talents', 'skills', 'knowledges'],
+            },
+          },
+          config: {},
+          effective: effectiveCreationConfig(vtm),
+          returned: null,
+          approval: true,
+        },
+      })
+    )
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    const points = await screen.findByTestId('creation-pending-points')
+    layout('sheet-panel', 600)
+    layout('sheet-nav', 500, 120)
+    scrollTo(0)
+    const scrollView = screen
+      .UNSAFE_getByType(KeyboardArea)
+      .findAllByType(ScrollView)[0]!.instance as {
+      scrollTo: (o: object) => void
+    }
+    const scrollToSpy = jest.spyOn(scrollView, 'scrollTo')
+    fireEvent.press(points)
+    expect(nav().getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    // A faixa no topo da tela, e o painel de Pontos logo abaixo (600 − 120)
+    expect(scrollToSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ y: 480 })
+    )
+  })
+
   it('a 750: as abas da zona continuam fixas; sub-abas não há', async () => {
     resize(TABLET)
     await openCreation()

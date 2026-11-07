@@ -166,3 +166,19 @@ describe('captura', () => {
     expect(envelope).not.toContain(INVITE)
   })
 })
+
+describe('código de convite (P12)', () => {
+  it('nem cru nem formatado chega ao envelope, na mensagem ou no frame', async () => {
+    const code = '7K2M9QX4TR8V1BNC6DWZ3HJP5A'
+    const formatted = code.replace(/(.{4})(?=.)/g, '$1 ')
+    const error = new Error(`aceite ${formatted} recusado`)
+    error.stack = `Error: x\n    at f (https://app.test/join#${code}:10:5)`
+    captureError(error, { source: 'boundary' })
+    await settle()
+    expect(sent).toHaveLength(1)
+    const envelope = sent[0] as string
+    expect(envelope).not.toContain(code)
+    expect(envelope).not.toContain(formatted)
+    expect(envelope).not.toContain(code.slice(0, 8))
+  })
+})

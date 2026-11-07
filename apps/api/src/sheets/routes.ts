@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import type { DB } from '@tms/db'
 import {
   canWrite,
@@ -22,10 +21,12 @@ import { requireUser } from '../auth/guard'
 import { characterAccess, chronicleAccess } from '../authz'
 import { ApiError } from '../http/errors'
 import { idParams } from '../http/params'
+import { commandHash } from './commands'
 import { creationView } from './creation'
 import { creationStateOf } from './creation-state'
 import { latestTemplate, modelFor } from './models'
 import { lockCharacter, refusal, writeAccess } from './policy'
+import { revealedOf } from './reveal'
 
 // Fichas: leitura e criação (doc/plano-v0.md, Etapa 12). Toda saída passa por
 // stripRestricted com os papéis resolvidos no banco: o aparelho de quem não
@@ -48,9 +49,6 @@ const fieldsOf = (issues: readonly Issue[]) =>
 
 const invalid = (issues: readonly Issue[]) =>
   new ApiError(422, 'ficha inválida', { issues: fieldsOf(issues) })
-
-const commandHash = (kind: string, request: unknown) =>
-  createHash('sha256').update(JSON.stringify({ kind, request })).digest('hex')
 
 const validHttpsUrl = (value: string | null | undefined) => {
   if (!value) return null
@@ -470,6 +468,8 @@ export function sheetRoutes(
             'ch.visibility_revision',
             'ch.presentation_revision',
             'ch.portrait_url',
+            'ch.revealed_sections',
+            'ch.reveal_revision',
             'c.character_approval',
             'c.id as chronicleId',
             'c.name as chronicleName',
@@ -558,6 +558,14 @@ export function sheetRoutes(
             activatedAt: row.activated_at,
           },
           member,
+          // U-11 (P16-D): só os ids das seções reveladas ao dono e a revisão,
+          // nunca o texto (ele sai só por GET /characters/:id/revealed). O
+          // ex-membro não lê a revelação. O `sheet` abaixo continua sem a
+          // seção para o dono
+          reveal: {
+            sections: member ? revealedOf(model, row.revealed_sections) : [],
+            revision: row.reveal_revision,
+          },
           updatedAt: row.updated_at,
           sheet: stripRestricted(
             model,

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import {
+  canReadSection,
   compileTemplate,
   describe as fieldDescribe,
   REGISTRY,
@@ -53,7 +54,9 @@ function expectEveryField(
     const zone = model.zones.find(z => z.id === zoneId)
     for (const s of zone?.sections ?? [])
       for (const id of s.fieldIds) {
-        if (s.restricted && !roles.includes('storyteller')) continue
+        // A seção que o papel não lê (as Notas do Narrador para o dono) não
+        // aparece; a História (U-10), que o dono lê, aparece
+        if (!canReadSection(model, s.id, roles)) continue
         const r = resolved.get(id)
         if (!r) continue
         // R-09: o campo que o dono não lê diz, para o narrador, que é privado
@@ -158,7 +161,9 @@ describe('as fichas de Vampiro em Leitura', () => {
 
   it('aba sem seção legível some', () => {
     const t = templateJson('vtm-v20')
-    t.sections = (t.sections as { id: string }[]).filter(s => s.id !== 'about')
+    t.sections = (t.sections as { id: string }[]).filter(
+      s => s.id !== 'about' && s.id !== 'backstory'
+    )
     const model = compileTemplate(t)
     const sheet = {
       values: { name: 'Sem Sobre' },

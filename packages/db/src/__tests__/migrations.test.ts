@@ -13,6 +13,16 @@ const files = readdirSync(join(import.meta.dir, '../migrations'))
   .sort()
 
 describe('migrations', () => {
+  // O Migrator roda sem `allowUnorderedMigrations`: um número pulado vira
+  // um buraco que a migration de outro pacote não pode ocupar depois de
+  // aplicada a seguinte (P13, a 0024)
+  it('os números seguem sem buraco, de 0001 em diante', () => {
+    const numbers = Object.keys(migrations).map(name =>
+      Number(name.slice(0, 4))
+    )
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1))
+  })
+
   it('a lista registra todo arquivo de migrations/, em ordem', () => {
     expect(Object.keys(migrations)).toEqual(files)
   })
@@ -765,10 +775,198 @@ describe('migrations', () => {
         const migrator = new Migrator({ db, provider: migrationProvider })
         const down = await migrator.migrateTo('0022_user_commands')
         expect(down.error).toBeUndefined()
-        expect(down.results?.map(r => r.migrationName)).toEqual([
-          '0023_templates_onda4',
-        ])
+        // Desce tudo o que veio depois da 0022, do mais novo ao mais antigo
+        expect(down.results?.map(r => r.migrationName)).toEqual(
+          files.filter(f => f > '0022_user_commands').reverse()
+        )
         expect(await versions(db)).toEqual(before)
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+      } finally {
+        await destroy()
+      }
+    })
+  })
+
+  // Onda 5 (onda-5.md §4.5; P15-D): a 0025 grava as versões com a História /
+  // Prelúdio num banco que já tem as anteriores, e não toca em ficha. A
+  // migration de antes dela vem da lista (a 0024 do P13 entra antes)
+  describe('0025: as versões da onda 5', () => {
+    const MINE = '0025_templates_onda5'
+    const prior = files[files.indexOf(MINE) - 1] ?? ''
+    const current = (system: string) =>
+      (productTemplate(system) as { templateVersion: string }).templateVersion
+    const previousOf = (v: string) => {
+      const [major, minor, patch] = v.split('.').map(Number)
+      return `${major}.${(minor ?? 1) - 1}.${patch}`
+    }
+    // O banco "de antes": cada template na minor anterior, sem a História
+    // (o conteúdo de hoje menos o campo e a seção). Prova a convivência e
+    // que a ficha antiga não ganha o campo, não o conteúdo da main
+    const withoutBackstory = (system: string) => {
+      const t = structuredClone(productTemplate(system)) as {
+        templateVersion: string
+        fields: Record<string, unknown>
+        sections: { id: string }[]
+      }
+      delete t.fields.backstory
+      t.sections = t.sections.filter(s => s.id !== 'backstory')
+      t.templateVersion = previousOf(current(system))
+      return t as unknown as Record<string, unknown>
+    }
+
+    it('os arquivos de hoje têm a História; a minor de antes, não', () => {
+      for (const system of PRODUCT_TEMPLATES) {
+        const t = productTemplate(system) as {
+          fields: Record<string, unknown>
+        }
+        expect(Object.hasOwn(t.fields, 'backstory')).toBe(true)
+        expect(
+          Object.hasOwn(withoutBackstory(system).fields as object, 'backstory')
+        ).toBe(false)
+      }
+    })
+
+    it('a ficha da versão anterior fica como estava: nada passa das Notas para a História', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
+        // Como em produção antes da onda: só as versões anteriores no banco
+        await db.deleteFrom('trait_templates').execute()
+        for (const system of PRODUCT_TEMPLATES)
+          expect(
+            (await storeTemplate(db, withoutBackstory(system))).status
+          ).toBe('published')
+        const user = await db
+          .insertInto('users')
+          .values({
+            username: 'u24',
+            email: 'u24@x.test',
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+        const sheets = []
+        for (const system of PRODUCT_TEMPLATES) {
+          const { id: systemId } = await db
+            .selectFrom('game_systems')
+            .select('id')
+            .where('code', '=', system)
+            .executeTakeFirstOrThrow()
+          const chronicle = await db
+            .insertInto('chronicles')
+            .values({
+              name: system,
+              storyteller_id: user.id,
+              system_id: systemId,
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+          const sheet = JSON.stringify({
+            values: { name: 'Antiga', storytellerNotes: 'SEGREDO-0025' },
+            specialties: {},
+          })
+          const row = await db
+            .insertInto('characters')
+            .values({
+              name: 'Antiga',
+              chronicle_id: chronicle.id,
+              system_id: systemId,
+              user_id: user.id,
+              template_version: previousOf(current(system)),
+              sheet_data: sheet,
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+          sheets.push({ id: row.id, system, sheet })
+        }
+        const before = await db
+          .selectFrom('characters')
+          .select([
+            'id',
+            'template_version',
+            sql<string>`sheet_data::text`.as('data'),
+          ])
+          .orderBy('id')
+          .execute()
+
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+
+        // A ficha: a mesma versão e o mesmo jsonb, sem a História
+        const after = await db
+          .selectFrom('characters')
+          .select([
+            'id',
+            'template_version',
+            sql<string>`sheet_data::text`.as('data'),
+          ])
+          .orderBy('id')
+          .execute()
+        expect(after).toEqual(before)
+        for (const row of after) {
+          expect(row.data).not.toContain('backstory')
+          expect(row.data).toContain('SEGREDO-0025')
+        }
+        // As anteriores ficam; as novas entram, e a mais nova é a de hoje
+        for (const { system } of sheets) {
+          const versions = await db
+            .selectFrom('trait_templates as t')
+            .innerJoin('game_systems as g', 'g.id', 't.system_id')
+            .select(['t.version'])
+            .where('g.code', '=', system)
+            .orderBy('t.published_at', 'desc')
+            .execute()
+          expect(versions.map(v => v.version)).toEqual([
+            current(system),
+            previousOf(current(system)),
+          ])
+          expect(
+            (await storeTemplate(db, productTemplate(system))).status
+          ).toBe('unchanged')
+        }
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('a 0025 recusa a versão já gravada com outro conteúdo', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
+        await db.deleteFrom('trait_templates').execute()
+        const mta = productTemplate('mta-m20') as Record<string, unknown>
+        await storeTemplate(db, { ...mta, name: 'Outro conteúdo' })
+        const result = await migrator.migrateToLatest()
+        expect(String(result.error)).toContain(
+          'já está no banco com outro conteúdo'
+        )
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('descer a 0025 não apaga versão publicada', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const count = async () =>
+          Number(
+            (
+              await db
+                .selectFrom('trait_templates')
+                .select(db.fn.countAll().as('n'))
+                .executeTakeFirstOrThrow()
+            ).n
+          )
+        const before = await count()
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        const down = await migrator.migrateTo(prior)
+        expect(down.error).toBeUndefined()
+        // Desce a 0025 e o que veio depois dela na onda (a 0026 do P16-D)
+        const names = down.results?.map(r => r.migrationName)
+        expect(names).toEqual(files.filter(f => f > prior).reverse())
+        expect(names).toContain(MINE)
+        expect(await count()).toBe(before)
         expect((await migrator.migrateToLatest()).error).toBeUndefined()
       } finally {
         await destroy()
@@ -946,6 +1144,120 @@ describe('migrations', () => {
         .select('user_id')
         .execute()
       expect(left).toEqual([{ user_id: b.id }])
+    } finally {
+      await destroy()
+    }
+  })
+
+  // T-53 (P13): o "para" cru vazio fica marcado; as linhas antigas, não
+  it('0024: to_absent nasce false nas linhas antigas e desce sem perder o resto', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const { rows } = await sql<{
+        column: string
+        nullable: string
+        def: string
+      }>`
+        select column_name as column, is_nullable as nullable,
+          column_default as def
+        from information_schema.columns
+        where table_name = 'character_events' and column_name = 'to_absent'`.execute(
+        db
+      )
+      expect(rows).toEqual([
+        { column: 'to_absent', nullable: 'NO', def: 'false' },
+      ])
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      const down = await migrator.migrateTo('0023_templates_onda4')
+      expect(down.error).toBeUndefined()
+      const gone = await sql<{ n: number }>`
+        select count(*)::int as n from information_schema.columns
+        where table_name = 'character_events'
+          and column_name in ('to_absent', 'from_absent')`.execute(db)
+      // Só a do "de" fica
+      expect(gone.rows[0]?.n).toBe(1)
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
+    } finally {
+      await destroy()
+    }
+  })
+
+  it('0026: a ficha nasce privada; NPC e mais de 8 seções são recusados; desce e sobe', async () => {
+    const { db, destroy } = await createPGliteTestDb()
+    try {
+      const migrator = new Migrator({ db, provider: migrationProvider })
+      expect(
+        (await migrator.migrateTo('0023_templates_onda4')).error
+      ).toBeUndefined()
+      const user = await db
+        .insertInto('users')
+        .values({ username: 'u', email: 'u@x.test', hashed_password: 'h' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const system = await db
+        .insertInto('game_systems')
+        .values({ code: 'sistema-teste', name: 'Teste' })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const chronicle = await db
+        .insertInto('chronicles')
+        .values({ name: 'c', storyteller_id: user.id, system_id: system.id })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+      const insert = (name: string, kind: 'pc' | 'npc') =>
+        db
+          .insertInto('characters')
+          .values({
+            name,
+            kind,
+            chronicle_id: chronicle.id,
+            system_id: system.id,
+            user_id: user.id,
+            template_version: '1.0.0',
+            sheet_data: JSON.stringify({ values: { name } }),
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+      // Uma ficha de antes da 0026
+      const old = await insert('antiga', 'pc')
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
+      const npc = await insert('npc', 'npc')
+      const pc = await insert('nova', 'pc')
+      const rows = await db
+        .selectFrom('characters')
+        .select(['id', 'revealed_sections', 'reveal_revision'])
+        .orderBy('name')
+        .execute()
+      for (const row of rows) {
+        expect(row.revealed_sections).toEqual([])
+        expect(row.reveal_revision).toBe(0)
+      }
+      expect(rows.map(r => r.id).sort()).toEqual([old.id, npc.id, pc.id].sort())
+      const reveal = (id: string, sections: string[]) =>
+        db
+          .updateTable('characters')
+          .set({ revealed_sections: sections })
+          .where('id', '=', id)
+          .execute()
+      await reveal(pc.id, ['storyteller'])
+      await expect(reveal(npc.id, ['storyteller'])).rejects.toThrow()
+      await expect(
+        reveal(
+          pc.id,
+          Array.from({ length: 9 }, (_, i) => `s${i}`)
+        )
+      ).rejects.toThrow()
+
+      const down = await migrator.migrateTo('0023_templates_onda4')
+      expect(down.error).toBeUndefined()
+      const { rows: columns } = await sql<{ column_name: string }>`
+        select column_name from information_schema.columns
+        where table_name = 'characters'
+          and column_name in ('revealed_sections', 'reveal_revision')`.execute(
+        db
+      )
+      expect(columns).toEqual([])
+      expect((await migrator.migrateToLatest()).error).toBeUndefined()
     } finally {
       await destroy()
     }

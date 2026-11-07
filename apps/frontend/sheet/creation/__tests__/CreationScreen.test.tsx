@@ -527,6 +527,42 @@ describe('bônus que sobram', () => {
   })
 })
 
+// P09-D (D-10, POA-20): em `pending`, o narrador confere a conta em
+// Leitura; a frase da conta fechada aponta o aviso do topo, não a barra
+describe('a aba Pontos do narrador em pending', () => {
+  const review = async (values: Record<string, unknown>) => {
+    const sent = character(PRIORITIES, values) as {
+      data: Record<string, unknown>
+    }
+    calls.characterGet.mockResolvedValue(
+      ok({ ...sent.data, roles: ['storyteller'], status: 'pending' })
+    )
+    calls.templateGet.mockResolvedValue(ok(templateJson('vtm-v20')))
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(<SheetScreen id={ID} />, session)
+    fireEvent.press(await screen.findByRole('button', { name: 'Ver Pontos' }))
+  }
+
+  it('conta fechada sem sobra: "A conta fechou. Confira a ficha…"', async () => {
+    await review({ ...ALMOST, stamina: 3, strength: 5, dexterity: 5 })
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    expect(screen.getByTestId('creation-ready')).toHaveTextContent(
+      'A conta fechou. Confira a ficha e aprove ou devolva pelo aviso no topo.'
+    )
+  })
+
+  it('com bônus sobrando: o que resta, e o mesmo próximo passo', async () => {
+    await review({ ...ALMOST, stamina: 3 })
+    expect(screen.getByTestId('creation-ready')).toHaveTextContent(
+      'Pontos básicos completos; restam 15 de bônus. Confira a ficha e aprove ou devolva pelo aviso no topo.'
+    )
+  })
+})
+
 describe('extrato do bônus (R-17)', () => {
   it('a aba Pontos mostra onde foram os bônus, com o teto e a partida da FdV', async () => {
     await open(PRIORITIES, {

@@ -762,6 +762,18 @@ export function backstageRoutes(
             .where('chronicle_id', '=', params.id)
             .where('kind', '=', 'npc')
             .execute()
+          // U-11 (P16-D): as revelações eram do narrador antigo. O novo não
+          // herda o que não fez: as notas voltam a ser privadas, e a revisão
+          // sobe para descartar pedido feito antes
+          await trx
+            .updateTable('characters')
+            .set({
+              revealed_sections: [],
+              reveal_revision: sql`reveal_revision + 1`,
+            })
+            .where('chronicle_id', '=', params.id)
+            .where(sql<boolean>`cardinality(revealed_sections) > 0`)
+            .execute()
           await trx
             .updateTable('chronicle_transfers')
             .set({

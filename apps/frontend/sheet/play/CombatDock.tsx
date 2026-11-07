@@ -6,8 +6,15 @@ import {
   type Roles,
   type SheetModel,
 } from '@tms/sheet-core'
-import { Pressable, Text, tokens, useTheme, useToast } from '@tms/ui'
-import { memo } from 'react'
+import {
+  Pressable,
+  Text,
+  tokens,
+  useTheme,
+  useToast,
+  useToastOffset,
+} from '@tms/ui'
+import { memo, useState } from 'react'
 import {
   type AccessibilityActionEvent,
   AccessibilityInfo,
@@ -44,11 +51,17 @@ export function CombatDock() {
   const { colors } = useTheme()
   const sheets = useFieldSheet()
   const ids = dockFields(model, roles)
+  // O aviso ("Salvo: 33 alterações", "Forma: Crinos", o de conclusão) sobe
+  // acima do dock, sem cobrir os recursos (o --dock-offset do DS; P12, T-43)
+  const [height, setHeight] = useState(0)
+  useToastOffset(ids.length ? height : 0)
   if (!ids.length) return null
   return (
     <View
       role="region"
       aria-label="Em jogo"
+      testID="combat-dock"
+      onLayout={e => setHeight(e.nativeEvent.layout.height)}
       style={[
         styles.dock,
         {

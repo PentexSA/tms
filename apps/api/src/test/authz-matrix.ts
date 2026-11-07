@@ -55,7 +55,9 @@ const denied = {
 
 export const MATRIX: readonly MatrixRow[] = [
   {
-    // O ex-membro lê o nome, o sistema e o narrador, sem os membros
+    // O ex-membro lê o nome, o sistema e o narrador, sem os membros nem a
+    // Descrição e a Imagem (D-15, P14-D); a matriz confere a Descrição pela
+    // sentinela
     method: 'GET',
     route: '/chronicles/:id',
     expect: {
@@ -401,6 +403,25 @@ export const MATRIX: readonly MatrixRow[] = [
     }),
     mutates: true,
     expect: { storyteller: 200, owner: 404, player: 404, ...denied },
+  },
+  {
+    // U-11 (P16-D): só o narrador revela; o dono recebe 403, os outros 404
+    method: 'POST',
+    route: '/characters/:id/reveal',
+    body: s => ({
+      clientCommandId: crypto.randomUUID(),
+      section: s.revealSection,
+      revealed: true,
+      revision: 0,
+    }),
+    mutates: true,
+    expect: { storyteller: 200, owner: 403, player: 404, ...denied },
+  },
+  {
+    // U-11: o dono membro e o narrador leem as seções reveladas (vazias aqui)
+    method: 'GET',
+    route: '/characters/:id/revealed',
+    expect: { storyteller: 200, owner: 200, player: 404, ...denied },
   },
   {
     method: 'PATCH',

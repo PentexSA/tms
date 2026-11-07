@@ -71,7 +71,7 @@ test('código inválido não entra em crônica nenhuma', async ({ page }) => {
     .fill('0000 0000 0000 0000 0000 0000 00')
   await page.getByRole('button', { name: 'Entrar na crônica' }).click()
   await expect(page.getByRole('alert')).toContainText(
-    'convite inválido ou expirado'
+    'Este convite não vale mais ou o código está errado'
   )
 })
 

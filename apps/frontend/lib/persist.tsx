@@ -59,7 +59,12 @@ type Persistable =
     }
   | { readonly kind: 'character'; readonly id: string }
 
-/** As queries que vão para o disco: o template de uma versão e a ficha. */
+/**
+ * As queries que vão para o disco: o template de uma versão e a ficha. Só
+ * chaves de dois elementos para a ficha: as filhas dela (o Histórico e as
+ * Notas do Narrador reveladas ao dono, U-11) nunca vão ao disco. A nota
+ * revelada depende disso para não ficar no aparelho depois de escondida.
+ */
 export function persistable(key: QueryKey): Persistable | null {
   if (key.length === 3 && key[0] === 'templates') {
     const [, code, version] = key

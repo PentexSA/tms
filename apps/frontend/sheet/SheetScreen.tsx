@@ -21,7 +21,7 @@ import {
   useToast,
 } from '@tms/ui'
 import { randomUUID } from 'expo-crypto'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { characterState } from '../components/chronicles/characterState'
@@ -68,6 +68,7 @@ import {
   RevealNpcSheet,
   revealsMore,
 } from './storyteller/RevealNpcSheet'
+import { RevealedProvider } from './storyteller/revealed'
 import {
   StatusMenuButton,
   type StatusMenuDraft,
@@ -78,7 +79,12 @@ import { SwipeArea, TableNav } from './storyteller/TableNav'
 import { OfflineBanner, SyncIndicator } from './sync/SyncIndicator'
 import { useSync } from './sync/SyncProvider'
 import { UnsupportedTemplate } from './UnsupportedTemplate'
-import { ExperienceSheet } from './xp/ExperienceSheet'
+import { ExperienceSheet, requestBlock } from './xp/ExperienceSheet'
+import {
+  useXpShortcutValue,
+  XpShortcutContext,
+  type XpShortcutTarget,
+} from './xp/XpShortcut'
 
 export function SheetScreen({
   id,
@@ -93,7 +99,33 @@ export function SheetScreen({
   const sync = useSync()
   const state = useSheetData(id)
   const [history, setHistory] = useState(false)
-  const [xp, setXp] = useState(false)
+  // A Experiência aberta; com alvo, vinda do atalho do "Peça ao narrador."
+  // (U-01), já em "Solicitar evolução"
+  const [xp, setXpState] = useState<{ initial?: XpShortcutTarget } | null>(null)
+  const setXp = (open: boolean) => setXpState(open ? {} : null)
+  const openRequest = useCallback(
+    (to: XpShortcutTarget) => setXpState({ initial: to }),
+    []
+  )
+  const ready = state.status === 'ready' ? state : null
+  // O atalho só para a dona, na ficha ativa e sem trava, num template com
+  // extrato; o servidor confere tudo de novo no pedido
+  const shortcut = useXpShortcutValue(
+    Boolean(
+      ready &&
+        ready.roles.includes('owner') &&
+        !ready.roles.includes('storyteller') &&
+        xpLedgerFields(ready.model).length &&
+        !requestBlock({
+          status: ready.character.status,
+          locked: ready.character.lockedAt !== null,
+          member: ready.character.member,
+        })
+    ),
+    ready?.model ?? null,
+    ready?.sheet ?? null,
+    openRequest
+  )
   // T-11: abaixo de 900, as ações do cabeçalho não cabem lado a lado e
   // ficam no "Mais opções"; a partir de 900, como antes
   const wide = useLayout().breakpoint === 'expanded'
@@ -282,7 +314,9 @@ export function SheetScreen({
           {body}
         </SwipeArea>
       ) : (
-        body
+        <XpShortcutContext.Provider value={shortcut}>
+          {body}
+        </XpShortcutContext.Provider>
       )}
       {state.status === 'ready' && xp ? (
         <ExperienceSheet
@@ -296,8 +330,9 @@ export function SheetScreen({
             locked: state.character.lockedAt !== null,
             member: state.character.member,
           }}
-          visible={xp}
+          visible
           onClose={() => setXp(false)}
+          {...(xp.initial ? { initial: xp.initial } : {})}
         />
       ) : null}
       {state.status === 'ready' ? (
@@ -481,6 +516,7 @@ function LiveSheet({
       sync,
       creation,
       editable: forced === null,
+      npc: kind === 'npc',
     })
     if (!forced && isDraftMode(mode)) created.getState().startDraft()
     return created
@@ -612,25 +648,36 @@ function LiveSheet({
     <>
       <LifecycleContext.Provider value={lifecycle}>
         <CreationContext.Provider value={creationValue}>
-          {/* O painel do NPC e a barra do narrador: fixos acima da ficha
+          {/* U-11 (P16-D): o estado da revelação das notas; o texto
+              revelado do dono fica só na memória */}
+          <RevealedProvider
+            characterId={id}
+            model={state.model}
+            roles={state.roles}
+            kind={kind}
+            ownerName={state.character.owner.username}
+            reveal={(state.character as { reveal?: unknown }).reveal}
+          >
+            {/* O painel do NPC e a barra do narrador: fixos acima da ficha
               fora do celular; no celular, rolam com ela (T-27) */}
-          <SheetView
-            store={store}
-            editable
-            // T-40: puxar rebusca a ficha; a resposta passa pelo received
-            onRefresh={() =>
-              queryClient.invalidateQueries(
-                { queryKey: sheetKeys.character(id) },
-                { cancelRefetch: false }
-              )
-            }
-            header={
-              <>
-                <NpcVisibilityBar state={state} />
-                <StorytellerBar ownerName={state.character.owner.username} />
-              </>
-            }
-          />
+            <SheetView
+              store={store}
+              editable
+              // T-40: puxar rebusca a ficha; a resposta passa pelo received
+              onRefresh={() =>
+                queryClient.invalidateQueries(
+                  { queryKey: sheetKeys.character(id) },
+                  { cancelRefetch: false }
+                )
+              }
+              header={
+                <>
+                  <NpcVisibilityBar state={state} />
+                  <StorytellerBar ownerName={state.character.owner.username} />
+                </>
+              }
+            />
+          </RevealedProvider>
           <LeaveGuard store={store} />
           <DraftRecovery
             persistence={persistence}

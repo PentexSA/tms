@@ -47,6 +47,7 @@ import {
   CreationPanel,
   CreationStatusPanel,
   useCreating,
+  useCreationReview,
 } from './creation/CreationPanel'
 import { type GuideTarget, MISSING_TARGET, POINTS_TAB } from './creation/guide'
 import {
@@ -78,6 +79,7 @@ import { blockedBy, useLifecycle } from './policy'
 import { SectionView } from './SectionView'
 import { SheetNav } from './SheetNav'
 import { createSheetStore, type SheetStore } from './store/sheetStore'
+import { useRevealed } from './storyteller/revealed'
 
 // A ficha montada pelo template (doc/arquitetura §6.1): identidade, "Em jogo"
 // e as 3 abas fixas por zona (Ficha · Poderes · Sobre, com o rótulo do
@@ -121,12 +123,18 @@ export type SheetViewProps =
 const TAB_ZONES = new Set(['build', 'powers', 'lore'])
 const BUDGET_TAB = POINTS_TAB
 
-function readableZones(model: SheetModel, roles: readonly RoleName[]) {
+function readableZones(
+  model: SheetModel,
+  roles: readonly RoleName[],
+  // U-11 (P16-D): a seção revelada ao dono também conta
+  revealed?: ReadonlySet<string>
+) {
   return model.zones.filter(
     z =>
       TAB_ZONES.has(z.id) &&
       z.sections.some(
-        s => s.fieldIds.length > 0 && canReadSection(model, s.id, roles)
+        s =>
+          s.fieldIds.length > 0 && canReadSection(model, s.id, roles, revealed)
       )
   )
 }
@@ -202,7 +210,11 @@ function SheetBody({
 }) {
   const pull = usePullRefresh(() => onRefresh?.())
   const { model, roles } = store.getState()
-  const zones = useMemo(() => readableZones(model, roles), [model, roles])
+  const revealed = useRevealed()?.sections
+  const zones = useMemo(
+    () => readableZones(model, roles, revealed),
+    [model, roles, revealed]
+  )
   const lifecycle = useLifecycle()
   // Travada ou arquivada, o dono não muda de modo: a política tirou o Editar
   const writer = useMemo(
@@ -220,8 +232,12 @@ function SheetBody({
   // recusas e as "Regras da casa") continua só na Criação
   const narrator = roles.includes('storyteller') && !roles.includes('owner')
   const budgetEdit = editable && mode === 'create' && creating
+  // P09-D (D-10): também em `pending`, para o narrador conferir a conta
+  // antes de aprovar ou devolver (POA-20)
+  const reviewing = useCreationReview()
   const budget =
-    budgetEdit || (editable && mode === 'read' && creating && narrator)
+    budgetEdit ||
+    (editable && mode === 'read' && (creating || reviewing) && narrator)
   const onBudget = budget && tab === BUDGET_TAB
   const active: CompiledZone | undefined = onBudget
     ? undefined
@@ -286,10 +302,22 @@ function SheetBody({
     },
     [groupTabs.store, showTab]
   )
-  // "Ver Pontos" nos avisos da recusa (T-07): só com a aba Pontos
+  const { reduceMotion } = useTheme()
+  // "Ver Pontos" nos avisos da recusa (T-07) e no "Aguardando aprovação":
+  // só com a aba Pontos. Vindo de um aviso acima das abas (a rolagem ainda
+  // não chegou nelas), leva até elas: no celular, a aba trocava fora da tela
   const openBudget = useMemo(
-    () => (budget ? () => showTab(BUDGET_TAB) : null),
-    [budget, showTab]
+    () =>
+      budget
+        ? () => {
+            groupTabs.store.cancelJump()
+            showTab(BUDGET_TAB)
+            const top = groupTabs.store.panelTop()
+            if (groupTabs.store.scrollY() < top)
+              scrollRef.current?.scrollTo({ y: top, animated: !reduceMotion })
+          }
+        : null,
+    [budget, showTab, groupTabs.store, reduceMotion]
   )
   // O "ir ao grupo" do "O que falta" (P05-D, R-18): a aba, a sub-aba e a
   // âncora da seção (ou do grupo); a rolagem e o foco vêm quando a âncora é
@@ -357,7 +385,6 @@ function SheetBody({
       if (play !== null) placePlay(play)
     })
   }, [groupTabs.store, placePlay])
-  const { reduceMotion } = useTheme()
   useEffect(
     () =>
       groupTabs.store.onJump((y, focus) => {

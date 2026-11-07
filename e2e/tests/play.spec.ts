@@ -79,6 +79,38 @@ test('no computador: gastar Sangue e levar dano pelos sheets, recarregar e confe
 test.describe('no celular', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
+  // T-53 (P13): a folha do Sangue numa ficha nova diz o efetivo no aviso, e
+  // o Histórico do desfazer diz "9 → 10", não "9 → —"
+  test('a folha do Sangue: "Gastar 1" diz 10 → 9, e o desfazer fica 9 → 10 no Histórico', async ({
+    page,
+  }) => {
+    const character = await newCharacter(page)
+    await page.goto(`/characters/${character.id}`)
+    await page
+      .getByRole('button', { name: /^Pontos de Sangue, 10 de 10\./ })
+      .click()
+    const spent = saved(page)
+    await page.getByRole('button', { name: 'Gastar 1', exact: true }).click()
+    await spent
+    await expect(page.getByText('Sangue 10 → 9', { exact: true })).toBeVisible()
+    // No web, o aviso ainda fica por baixo da folha aberta (o ModalToastHost
+    // só vale no nativo; o P12 o leva para dentro da folha): fecha a folha e
+    // desfaz pelo aviso, que continua à vista
+    await close(page)
+    const undone = saved(page)
+    await page.getByRole('button', { name: 'Desfazer' }).click()
+    await undone
+    await page.getByRole('button', { name: 'Mais opções' }).click()
+    await page.getByRole('button', { name: 'Histórico', exact: true }).click()
+    await expect(
+      page.getByText('Sangue: 9 → 10', { exact: true })
+    ).toBeVisible()
+    await expect(
+      page.getByText('Sangue: 10 → 9', { exact: true })
+    ).toBeVisible()
+    await expect(page.getByText(/→ —/)).toHaveCount(0)
+  })
+
   test('o dock: toque longo gasta Sangue, com Desfazer', async ({ page }) => {
     const character = await newCharacter(page)
     await page.goto(`/characters/${character.id}`)

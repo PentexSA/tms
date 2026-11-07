@@ -15,6 +15,12 @@ import { StyleSheet, View } from 'react-native'
 // Enquanto ela sai, a tela continua segura: um segundo "voltar" não navega
 // de novo (a saída combinada já vai navegar). Se o aviso de saída não vier,
 // a saída acontece assim mesmo, depois de EXIT_FALLBACK_MS.
+//
+// Toda saída liberada (o `repeat`) desliga a prevenção no mesmo handler
+// (`released`): com a tela ainda montada durante a animação de saída, o
+// `when` do pai pode seguir verdadeiro (a ficha recém-criada, o "Salvar e
+// sair" que ainda grava), e o usePreventRemove avisaria que o estado e a
+// prop ficaram fora de sincronia.
 
 /** Teto para esperar a folha sair (a animação leva ~300 ms). */
 export const EXIT_FALLBACK_MS = 2000
@@ -53,15 +59,23 @@ export function UnsavedChangesGuard({
   const exit = useRef<(() => void) | null>(null)
   // Saindo: a folha fecha e a saída espera por ela
   const [leaving, setLeaving] = useState(false)
+  // A saída foi liberada: a prevenção desliga junto com o `repeat`
+  const [released, setReleased] = useState(false)
   // Dois toques no mesmo quadro gravam uma vez só
   const saving = useRef(false)
   const { breakpoint, stacked } = useLayout()
   const column = breakpoint === 'compact' || stacked
 
-  usePreventRemove(when || leaving, ({ repeat }) => {
+  // Sem nada a perder, a próxima alteração volta a proteger a tela
+  useEffect(() => {
+    if (!when && !leaving) setReleased(false)
+  }, [when, leaving])
+
+  usePreventRemove((when || leaving) && !released, ({ repeat }) => {
     // Outro "voltar" enquanto a folha sai: a saída combinada já navega
     if (exit.current) return
     if (allowLeave?.current) {
+      setReleased(true)
       repeat()
       return
     }
@@ -109,6 +123,7 @@ export function UnsavedChangesGuard({
     saving.current = false
     if (!go) return
     // A prevenção desliga junto com a saída (o repeat também a desliga)
+    setReleased(true)
     setLeaving(false)
     go()
   }, [])

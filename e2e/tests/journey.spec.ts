@@ -165,6 +165,11 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   // despertar e desfazer. Tudo vale na hora e sincroniza ao reconectar
   await page.context().setOffline(true)
   await expect(page.getByText('Sem conexão')).toBeVisible()
+  // A folha "Salvar 7 alterações?" ainda sai (a animação do Modal): um toque
+  // que começa com ela montada perde o toque longo e vira toque. Antes do P12
+  // o aviso "Salvo" cobria o dock e o clique esperava; com o aviso acima do
+  // dock (T-43), o spec espera a folha sair
+  await expect(page.getByTestId('bottom-sheet-root')).toHaveCount(0)
   await blood.click({ delay: 800 })
   await expect(page.getByText('Sangue 15 → 14')).toBeVisible()
 
@@ -176,6 +181,10 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   ).toBeVisible()
 
   await blood.click()
+  // Desde o P12 (T-43) o aviso do dano acompanha a folha aberta. Sem
+  // rodapé, a folha abre o espaço dele no fim, e "Curar" fica acima; o
+  // ponteiro parado em cima do aviso seguraria o prazo (T-76), então ele sai
+  await page.mouse.move(0, 0)
   await page
     .getByRole('button', { name: 'Curar 1 nível de dano (1 Sangue)' })
     .click()

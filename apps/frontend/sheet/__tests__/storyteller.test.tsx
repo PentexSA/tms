@@ -337,6 +337,87 @@ describe('Notas do Narrador privadas (R-09)', () => {
   })
 })
 
+// U-10 (P15-D, D-16): a História / Prelúdio, que o dono e o narrador leem,
+// separada das Notas do Narrador, que continuam privadas
+describe('História / Prelúdio (U-10)', () => {
+  const STORY = 'Texto de teste da história, sem conteúdo de jogo.'
+  // O servidor manda ao dono a ficha sem as Notas (stripRestricted); o
+  // fake repete isso pelo sheetFor com os papéis
+  const withStory = (roles: RoleName[]) => {
+    const base = sheetFor('helena', roles).sheet
+    const data = character(roles).data as Record<string, unknown>
+    return ok({
+      ...data,
+      sheet: { ...base, values: { ...base.values, backstory: STORY } },
+    })
+  }
+
+  it('na Leitura, o dono lê a História e não vê as Notas do Narrador', async () => {
+    calls.characterGet.mockResolvedValue(withStory(['owner']))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByLabelText(/^Destreza, 2 de 5/)
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    expect(screen.getByText('História / Prelúdio')).toBeTruthy()
+    expect(screen.getByText(STORY)).toBeTruthy()
+    expect(screen.queryByText(/Notas do Narrador/)).toBeNull()
+  })
+
+  it('na Leitura do narrador, só as Notas levam "privadas"', async () => {
+    calls.characterGet.mockResolvedValue(withStory(['storyteller']))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    await screen.findByLabelText(/^Destreza, 2 de 5/)
+    fireEvent.press(screen.getByRole('tab', { name: 'Sobre' }))
+    expect(screen.getByText('História / Prelúdio')).toBeTruthy()
+    expect(screen.getByText(STORY)).toBeTruthy()
+    expect(
+      screen.getByText('Notas do Narrador · privadas: o jogador não vê')
+    ).toBeTruthy()
+    expect(screen.queryByText(/^História \/ Prelúdio · privadas/)).toBeNull()
+  })
+
+  it('saída A: a História não é só do narrador (sem botão na barra)', () => {
+    for (const system of ['vtm-v20', 'mta-m20', 'wta-w20'])
+      expect(storytellerOnlyText(modelOf(system)).map(f => f.id)).not.toContain(
+        'backstory'
+      )
+  })
+
+  // A barra do narrador abre a mesma folha para qualquer texto que só ele
+  // escreve; se ele for lido pelo dono (um template com "write" só do
+  // narrador, como a saída B da D-16), a folha diz que o jogador lê
+  it('a folha da barra diz "O jogador lê este texto." num texto que o dono lê', async () => {
+    const t = templateJson('vtm-v20')
+    const sections = t.sections as {
+      id: string
+      permissions?: Record<string, string[]>
+    }[]
+    const story = sections.find(s => s.id === 'backstory')
+    if (!story) throw new Error('sem a seção')
+    story.permissions = {
+      read: ['owner', 'storyteller'],
+      write: ['storyteller'],
+    }
+    calls.templateGet.mockResolvedValue(ok(t))
+    calls.characterGet.mockResolvedValue(withStory(['storyteller']))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Editar como narrador' })
+    )
+    // O nome do botão é o texto visível, sem o aviso de privado
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Editar História / Prelúdio' })
+    )
+    expect(screen.getByText('O jogador lê este texto.')).toBeTruthy()
+    expect(
+      screen.queryByText('Privadas: o jogador não vê estas notas.')
+    ).toBeNull()
+    const field = screen
+      .getAllByLabelText('História / Prelúdio')
+      .find(e => typeof e.props.onChangeText === 'function')
+    expect(field?.props.accessibilityHint).toBe('O jogador lê este texto.')
+  })
+})
+
 // T-33 (P09-C): o narrador revisa em Leitura, com a conta, e só edita pelo
 // "Editar como narrador", que abre a edição de fato
 describe('Leitura do narrador com a conta (T-33)', () => {
@@ -431,6 +512,49 @@ describe('Leitura do narrador com a conta (T-33)', () => {
     expect(screen.getByRole('radio', { name: 'Editar' })).toBeChecked()
     // Sem conta, sem a aba Pontos, em qualquer modo
     expect(screen.queryByRole('tab', { name: 'Pontos' })).toBeNull()
+  })
+
+  // P09-D (D-10, POA-20): a conta também em `pending`, para o narrador
+  // conferir antes de aprovar ou devolver; nada edita
+  const pendingSheet = (roles: ('owner' | 'storyteller')[] = ['storyteller']) =>
+    ok({
+      ...character(roles).data,
+      ...(
+        creating({ name: 'Nova', clan: 'tremere', strength: 3 }) as {
+          data: Record<string, unknown>
+        }
+      ).data,
+      roles,
+      status: 'pending',
+    })
+
+  it('em pending, a aba Pontos em Leitura, e "Ver Pontos" no aviso leva a ela', async () => {
+    const post = jest.fn(async () => ({ status: 200, body: null }))
+    calls.characterGet.mockResolvedValue(pendingSheet())
+    renderWithSession(<SheetScreen id={ID} />, await signedIn(), {
+      post: post as never,
+    })
+    const points = await screen.findByRole('button', { name: 'Ver Pontos' })
+    expect(screen.getByTestId('creation-pending')).toBeTruthy()
+    expect(screen.queryByTestId('creation-panel')).toBeNull()
+    fireEvent.press(points)
+    expect(screen.getByRole('tab', { name: 'Pontos' })).toBeSelected()
+    expect(screen.getByTestId('creation-panel')).toBeTruthy()
+    expect(screen.getByTestId('creation-freebies')).toBeTruthy()
+    // Nada que grave: sem "Regras da casa", sem a troca de fase, sem lote
+    expect(screen.queryByText('Regras da casa')).toBeNull()
+    expect(screen.queryByTestId('creation-budget')).toBeNull()
+    expect(screen.queryByTestId('creation-phase-switch')).toBeNull()
+    expect(screen.queryAllByRole('adjustable')).toHaveLength(0)
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('o dono em pending continua sem a aba Pontos e sem "Ver Pontos"', async () => {
+    calls.characterGet.mockResolvedValue(pendingSheet(['owner']))
+    renderWithSession(<SheetScreen id={ID} />, await signedIn())
+    expect(await screen.findByTestId('creation-pending')).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'Pontos' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ver Pontos' })).toBeNull()
   })
 
   it('narratorTarget: Criação, Editar ou Jogo', () => {

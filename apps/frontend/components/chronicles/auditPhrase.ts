@@ -124,6 +124,11 @@ export const PHRASES: Record<HistoryAction, (item: PhraseItem) => string> = {
   'character.creation.adjust': item => `Ajuste pedido em ${sheet(item)}`,
   'character.creation.ready': item =>
     `O dono de ${sheet(item)} avisou que terminou`,
+  // U-11 (P16-D): sem o texto das notas e sem o id da seção
+  'character.section.reveal': item =>
+    `Notas privadas de ${sheet(item)} reveladas ao jogador`,
+  'character.section.hide': item =>
+    `Notas de ${sheet(item)} voltaram a ser privadas`,
   // Membros
   'member.remove': item => {
     const count = n(item.detail.characters)

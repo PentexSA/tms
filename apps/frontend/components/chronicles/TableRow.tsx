@@ -7,12 +7,13 @@ import {
   Text,
   ThemeProvider,
   tokens,
+  useLayout,
   useTheme,
 } from '@tms/ui'
-import { memo } from 'react'
+import { Fragment, memo } from 'react'
 import { StyleSheet, View } from 'react-native'
-
 import { SheetProvider } from '../../sheet/context'
+import { fitProgress, progressSpoken } from '../../sheet/creation/progress'
 import { FieldSlot } from '../../sheet/FieldSlot'
 import { unsupportedShort } from '../../sheet/UnsupportedTemplate'
 import { changeLabel, type TableItem } from './tableItems'
@@ -26,8 +27,13 @@ import { changeLabel, type TableItem } from './tableItems'
 // 2 linhas; o selo de identidade com os selos da ficha (a visibilidade do NPC
 // do P11, o estado do P04-D e os alertas) numa linha que quebra quando não
 // cabe; e quem alterou. Embaixo, os recursos do dock numa linha só, na
-// largura inteira do cartão, como o CombatDock da ficha. O progresso do
-// P09-D ganha uma linha livre.
+// largura inteira do cartão, como o CombatDock da ficha.
+//
+// P09-D (D-10, R-15): o progresso da criação por pontos numa linha própria,
+// na largura inteira do cartão, entre o texto e o dock, em até 2 linhas sem
+// cortar ("✓ 4 de 5 · Habilidades: faltam 4 · Bônus: restam 2 de 15"). O
+// que impede salvar fica em `danger`, e o texto já diz "acima" ou "para
+// corrigir". O nome acessível leva o progresso inteiro, com palavras.
 
 export const TableRow = memo(function TableRow({
   item,
@@ -36,6 +42,7 @@ export const TableRow = memo(function TableRow({
   selected = false,
   onSelect,
   framed = false,
+  width,
 }: {
   readonly item: TableItem
   readonly onOpen: (id: string) => void
@@ -45,9 +52,20 @@ export const TableRow = memo(function TableRow({
   // Na grade (telas largas), o cartão tem borda e raio; na coluna única, o
   // separador entre as linhas
   readonly framed?: boolean
+  // A largura do texto do cartão (a célula menos o recuo), para o progresso
+  // caber sem cortar; sem ela, a da janela
+  readonly width?: number
 }) {
-  const { row, model, store, alerts, state, visibility } = item
+  const { row, model, store, alerts, state, visibility, progress } = item
   const { colors } = useTheme()
+  const layout = useLayout()
+  const fit = progress
+    ? fitProgress(
+        progress,
+        width ?? layout.width - 2 * tokens.layout.gutter,
+        layout.fontScale
+      )
+    : null
   const resolved = store?.getState()
   const identity = resolved ? identityOf(resolved.resolved) : null
   const dock = model?.template.dock ?? []
@@ -72,6 +90,7 @@ export const TableRow = memo(function TableRow({
     [row.name, identity?.chip].filter(Boolean).join(', '),
     visibility,
     state?.label,
+    progress ? progressSpoken(progress) : null,
     ...alerts.map(a => a.label),
     ...described,
     problem,
@@ -157,7 +176,15 @@ export const TableRow = memo(function TableRow({
                 ))}
               </View>
             ) : null}
-            <Text variant="caption" color="inkMuted">
+            {/* Uma linha só: o nome de usuário vai até 24 caracteres, e
+                quebrar aqui passava o cartão de 210 a 360 (R-15). O nome
+                acessível do cartão leva a frase inteira */}
+            <Text
+              variant="caption"
+              color="inkMuted"
+              numberOfLines={1}
+              testID={`table-meta-${row.id}`}
+            >
               {meta}
             </Text>
             {problem ? (
@@ -167,6 +194,26 @@ export const TableRow = memo(function TableRow({
             ) : null}
           </View>
         </View>
+        {fit ? (
+          <Text
+            variant="caption"
+            color="inkMuted"
+            testID={`table-progress-${row.id}`}
+          >
+            {fit.shown.map((part, i) => (
+              <Fragment key={part.key}>
+                {i ? ' · ' : ''}
+                {part.kind === 'blocking' ? (
+                  <Text variant="caption" color="danger">
+                    {part.text}
+                  </Text>
+                ) : (
+                  part.text
+                )}
+              </Fragment>
+            ))}
+          </Text>
+        ) : null}
         {store ? (
           <SheetProvider store={store}>
             <View style={styles.chips} testID={`table-dock-${row.id}`}>

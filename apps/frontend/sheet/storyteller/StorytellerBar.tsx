@@ -1,6 +1,5 @@
 import {
   type CompiledField,
-  canWrite,
   type FieldId,
   jsonEqual,
   type SheetMode,
@@ -17,10 +16,15 @@ import { useModeBarActions } from '../evolve/ModeBar'
 import { useCommit } from '../useCommit'
 import {
   ADJUST_HINT,
+  barEdits,
+  editorNotice,
   hiddenFromOwner,
+  inRevealed,
   PRIVATE_NOTE_A11Y,
-  PRIVATE_NOTE_SHEET,
+  revealedNoteA11y,
+  revealedNoteSheet,
 } from './privacy'
+import { useRevealed } from './revealed'
 
 // O narrador abre a ficha de um jogador em Leitura; editar é explícito
 // ("Editar como narrador", design/telas/prototipo.js) e fica assinado no
@@ -32,12 +36,7 @@ import {
  * permissões das seções do template: nada aqui conhece sistema.
  */
 export function storytellerOnlyText(model: SheetModel): CompiledField[] {
-  return [...model.fields.values()].filter(
-    f =>
-      (f.type === 'text' || f.type === 'longText') &&
-      canWrite(model, f.id, ['storyteller']) &&
-      !canWrite(model, f.id, ['owner'])
-  )
+  return [...model.fields.values()].filter(f => barEdits(model, f.id))
 }
 
 export const NARRATING_NOTICE = 'As alterações ficam assinadas no histórico.'
@@ -63,6 +62,7 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
   const creation = useCreation()
   const [editing, setEditing] = useState<FieldId | null>(null)
   const notes = useMemo(() => storytellerOnlyText(model), [model])
+  const reveal = useRevealed()
   // A ficha do próprio narrador é dele: vale o fluxo do dono
   if (!roles.has('storyteller') || roles.has('owner')) return null
   const narrating = mode !== 'read'
@@ -103,7 +103,11 @@ export function StorytellerBar({ ownerName }: { readonly ownerName: string }) {
                 // a dica não chega ao DOM no web
                 accessibilityLabel={
                   hiddenFromOwner(model, f.id)
-                    ? `Editar ${f.def.label}. ${PRIVATE_NOTE_A11Y}`
+                    ? `Editar ${f.def.label}. ${
+                        reveal && inRevealed(model, f.id, reveal.sections)
+                          ? revealedNoteA11y(reveal.ownerName)
+                          : PRIVATE_NOTE_A11Y
+                      }`
                     : undefined
                 }
                 onPress={() => setEditing(f.id)}
@@ -133,12 +137,22 @@ function TextFieldSheet({
   readonly id: FieldId
   readonly onClose: () => void
 }) {
-  const { model } = useSheet()
+  const { model, roles } = useSheet()
   const commit = useCommit()
   const creating = useCreation()?.status === 'creating'
   const noticeId = `${useId()}-privacy`
+  const reveal = useRevealed()
   const field = model.fields.get(id)
   const stored = useSheetSelector(s => s.values.values[id])
+  const npc = useSheetSelector(s => s.npc)
+  // Três casos (onda-5.md §4.4): U-11, revelada, o dono lê o que for salvo
+  // aqui (revelação viva); R-09, privada (as Notas do Narrador); U-10, "O
+  // jogador lê este texto."
+  const notice =
+    reveal && inRevealed(model, id, reveal.sections)
+      ? revealedNoteSheet(reveal.ownerName)
+      : editorNotice(model, id, roles, npc)
+  const secret = hiddenFromOwner(model, id)
   const [text, setText] = useState(typeof stored === 'string' ? stored : '')
   if (!field) return null
   const save = () => {
@@ -161,12 +175,12 @@ function TextFieldSheet({
         </>
       }
     >
-      {hiddenFromOwner(model, id) ? (
+      {notice ? (
         <View style={styles.notice}>
           <Text variant="caption" nativeID={noticeId}>
-            {PRIVATE_NOTE_SHEET}
+            {notice}
           </Text>
-          {creating ? (
+          {creating && secret ? (
             <Text variant="caption" color="inkMuted">
               {ADJUST_HINT}
             </Text>
@@ -178,11 +192,7 @@ function TextFieldSheet({
         def={field.def}
         value={text}
         onChange={next => setText(String(next))}
-        note={
-          hiddenFromOwner(model, id)
-            ? { id: noticeId, text: PRIVATE_NOTE_SHEET }
-            : undefined
-        }
+        note={notice ? { id: noticeId, text: notice } : undefined}
       />
     </BottomSheet>
   )

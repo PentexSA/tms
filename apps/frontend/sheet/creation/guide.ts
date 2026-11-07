@@ -240,6 +240,10 @@ const CAPTION = 13
 const EM_PER_CHAR = 0.6
 const SEP = ' · '
 
+/** Quantos caracteres de `caption` cabem numa linha de `width` dp. */
+export const captionChars = (width: number, fontScale: number): number =>
+  width / (CAPTION * (fontScale > 0 ? fontScale : 1) * EM_PER_CHAR)
+
 /** "Faltam:" com dois ou mais itens, "Falta:" com um. */
 export const guidePrefix = (total: number): string =>
   total === 1 ? 'Falta:' : 'Faltam:'
@@ -262,8 +266,7 @@ export function fitGuide(
   fontScale: number
 ): { readonly shown: readonly GuideItem[]; readonly more: number } {
   if (!items.length) return { shown: [], more: 0 }
-  const capacity =
-    width / (CAPTION * (fontScale > 0 ? fontScale : 1) * EM_PER_CHAR)
+  const capacity = captionChars(width, fontScale)
   const prefix = `${guidePrefix(items.length)} `
   let used = prefix.length
   const shown: GuideItem[] = []
@@ -307,11 +310,17 @@ export function noticeItems(
  * Disciplina fora do clã, Esfera fora da Tradição (D-07, D-09; o
  * `creationAdvice` do core, pelo `useCreationAdvice`). Eles aparecem na aba
  * Pontos ("Para confirmar com o narrador") e na confirmação de concluir,
- * nunca no "Faltam" da barra. Só com a ficha em criação.
+ * nunca no "Faltam" da barra. Com a ficha em criação e, para o narrador,
+ * também em `pending` (P09-D).
  */
 export function useCreationNotices(): readonly GuideItem[] {
   const { model, roles } = useSheet()
-  const notices = useCreationAdvice(useCreation()?.status === 'creating')
+  const status = useCreation()?.status
+  // P09-D: também em `pending` para o narrador, que confirma na revisão o
+  // que o aviso pede
+  const notices = useCreationAdvice(
+    status === 'creating' || (status === 'pending' && roles.has('storyteller'))
+  )
   return useMemo(
     () => noticeItems(model, roles, notices),
     [model, roles, notices]

@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native'
 import { WithHelp } from './HelpButton'
 import { Pressable } from './Pressable'
 import { useRovingFocus } from './roving'
+import { markSoftDisabled } from './Stepper'
 import { Text } from './Text'
 import { useTheme } from './theme'
 import { tokens } from './tokens'
@@ -15,6 +16,12 @@ export interface ChoiceOption {
   readonly spoken?: string
   /** Frase curta de ajuda da opção: um "?" ao lado do rádio (R-19). */
   readonly help?: string
+  /**
+   * Bloqueada pela previsão (o servidor recusaria): a cara de indisponível e
+   * `aria-disabled`, mas **continua tocável** (o `onChange` chega, e quem
+   * escolhe explica o motivo). O foco itinerante não pula a opção.
+   */
+  readonly blocked?: boolean
 }
 
 export interface ChoiceProps {
@@ -88,18 +95,35 @@ export function Choice({
     >
       {options.map((o, i) => {
         const checked = o.id === value
+        const soft = !disabled && o.blocked === true
+        const item = roving(i)
+        // No web, o aria-disabled da opção bloqueada vai direto no elemento
+        // (o react-native-web a tiraria do toque e do foco); no app, o
+        // leitor de tela diz "indisponível", e o toque continua
+        const softProps =
+          os === 'web'
+            ? {
+                ref: (node: unknown) => {
+                  item.ref?.(node)
+                  if (!disabled) markSoftDisabled(node, soft)
+                },
+              }
+            : soft
+              ? { 'aria-disabled': true }
+              : {}
         const radio = (
           <Pressable
             key={o.id}
-            {...roving(i)}
+            {...item}
+            {...softProps}
             accessibilityRole="radio"
             accessibilityLabel={
               o.spoken ?? (o.meta ? `${o.label}, ${o.meta}` : o.label)
             }
             aria-checked={checked}
-            disabled={disabled}
+            disabled={soft && os !== 'web' ? undefined : disabled}
             onPress={() => onChange(o.id)}
-            style={[styles.row, !o.help && cell]}
+            style={[styles.row, !o.help && cell, soft && styles.blocked]}
           >
             <View
               style={[
@@ -183,4 +207,5 @@ const styles = StyleSheet.create({
   },
   dot: { width: 12, height: 12, borderRadius: tokens.radius.pill },
   text: { flex: 1 },
+  blocked: { opacity: 0.5 },
 })

@@ -23,13 +23,17 @@ import { usePullRefresh, useRefetchOnFocus } from '../../lib/queries/focus'
 /**
  * "Narrador: ana · 2 personagens · Última sessão: 01/11 · Convite para
  * narrar". A última sessão é data civil (U-04); a proposta, só para quem a
- * recebeu (U-03).
+ * recebeu (U-03). Para o narrador, "2 fichas em criação" (a vez do jogador,
+ * P09-D) antes de "1 ficha aguarda revisão" (a vez dele): as duas contagens
+ * não se sobrepõem, e só ele as recebe.
  */
 function chronicleMeta(item: {
   readonly role: 'storyteller' | 'player' | 'former'
   readonly storyteller: { readonly username: string }
   readonly characterCount: number
   readonly pendingReview: number
+  // Ausente na API antiga: vale como 0
+  readonly creatingCount?: number
   readonly lastSession?: string | null
   readonly transferOffer?: unknown
 }) {
@@ -43,6 +47,9 @@ function chronicleMeta(item: {
         ? 'Você saiu'
         : `Narrador: ${item.storyteller.username}`,
     plural(item.characterCount, 'personagem', 'personagens'),
+    item.role === 'storyteller' && item.creatingCount
+      ? `${plural(item.creatingCount, 'ficha', 'fichas')} em criação`
+      : null,
     item.pendingReview
       ? `${plural(item.pendingReview, 'ficha aguarda', 'fichas aguardam')} revisão`
       : null,
@@ -62,17 +69,21 @@ export default function ChroniclesScreen() {
   useRefetchOnFocus(() => chronicles.refetch({ cancelRefetch: false }))
   const pull = usePullRefresh(() => chronicles.refetch())
 
+  // As ações principais ficam no topo da lista (T-51, P12): com 7 crônicas no
+  // iPhone SE, o rodapé ficava fora da primeira tela. Na lista vazia, quem
+  // chega por convite vê "Entrar com convite" primeiro (R-30)
+  const create = () => router.push('/chronicles/new')
+  const join = () => router.push('/join')
   const actions = (
     <View style={styles.actions}>
-      <Button
-        title="Criar crônica"
-        onPress={() => router.push('/chronicles/new')}
-      />
-      <Button
-        title="Entrar com convite"
-        variant="secondary"
-        onPress={() => router.push('/join')}
-      />
+      <Button title="Criar crônica" onPress={create} />
+      <Button title="Entrar com convite" variant="secondary" onPress={join} />
+    </View>
+  )
+  const emptyActions = (
+    <View style={styles.actions}>
+      <Button title="Entrar com convite" onPress={join} />
+      <Button title="Criar crônica" variant="secondary" onPress={create} />
     </View>
   )
 
@@ -92,8 +103,8 @@ export default function ChroniclesScreen() {
     body = (
       <EmptyState
         title="Você ainda não participa de nenhuma crônica"
-        message="Crie uma crônica para narrar ou entre com o convite que o narrador enviou."
-        actions={actions}
+        message="Recebeu um link ou um código do narrador? Entre com o convite. Para narrar, crie uma crônica."
+        actions={emptyActions}
       />
     )
   else
@@ -116,6 +127,7 @@ export default function ChroniclesScreen() {
                 />
               ) : null
             )}
+            {actions}
             <SectionHeader title="Suas crônicas" />
           </View>
         }
@@ -128,7 +140,6 @@ export default function ChroniclesScreen() {
             onPress={() => router.push(`/chronicles/${item.id}`)}
           />
         )}
-        ListFooterComponent={<View style={styles.footer}>{actions}</View>}
       />
     )
 
@@ -158,7 +169,6 @@ const styles = StyleSheet.create({
     paddingTop: tokens.space[4],
     gap: tokens.space[3],
   },
-  footer: { padding: tokens.layout.gutter },
   bar: { flexDirection: 'row', gap: tokens.space[1] },
   actions: {
     flexDirection: 'row',

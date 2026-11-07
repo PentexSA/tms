@@ -3,6 +3,7 @@ import {
   poolOptions,
   poolRollOf,
   resolve,
+  revealableSections,
   type SheetData,
 } from '@tms/sheet-core'
 import { template } from './factories'
@@ -21,8 +22,15 @@ export interface SystemCase {
   readonly slots: Readonly<Record<string, string>>
   /** O campo de texto de uma seção que só o narrador lê. */
   readonly notesField: string
+  /**
+   * O texto longo de uma seção que o dono e o narrador leem e o `viewer` não
+   * (a História / Prelúdio, D-16).
+   */
+  readonly sharedTextField: string
   /** Um traço (`rating`) da zona de construção: o alvo de um pedido de XP. */
   readonly ratingField: string
+  /** A seção restrita que o narrador pode revelar ao dono (U-11). */
+  readonly revealSection: string
 }
 
 export function systemCase(system: string): SystemCase {
@@ -45,16 +53,40 @@ export function systemCase(system: string): SystemCase {
       const t = model.fields.get(id)?.def.type
       return t === 'text' || t === 'longText'
     })
+  const sharedTextField = [...model.sections.values()]
+    .filter(s => {
+      const read = s.def.permissions?.read
+      return (
+        read?.includes('owner') &&
+        read.includes('storyteller') &&
+        !read.includes('viewer')
+      )
+    })
+    .flatMap(s => s.fieldIds)
+    .find(id => model.fields.get(id)?.def.type === 'longText')
   const ratingField = [...model.fields.values()].find(
     f => f.type === 'rating' && f.zone === 'build'
   )?.id
-  if (!textField || !slot || !option || !notesField || !ratingField)
+  const revealSection = revealableSections(model).find(id =>
+    model.sections.get(id)?.fieldIds.includes(notesField ?? '')
+  )
+  if (
+    !textField ||
+    !slot ||
+    !option ||
+    !notesField ||
+    !sharedTextField ||
+    !ratingField ||
+    !revealSection
+  )
     throw new Error(`${system}: o template não tem o que a matriz precisa`)
   return {
     system,
     textField,
     slots: { [slot.id]: option.key },
     notesField,
+    sharedTextField,
     ratingField,
+    revealSection,
   }
 }

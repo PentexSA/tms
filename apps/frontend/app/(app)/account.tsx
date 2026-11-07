@@ -86,7 +86,9 @@ export default function AccountScreen() {
                     key={c.id}
                     title={`Abrir ${c.name}`}
                     variant="secondary"
-                    onPress={() => router.push(`/chronicles/${c.id}`)}
+                    // replace: a Conta sai e a crônica fica com a lista por
+                    // baixo, e o "‹ Crônicas" dela volta à lista (P12)
+                    onPress={() => router.replace(`/chronicles/${c.id}`)}
                   />
                 ))}
               </View>

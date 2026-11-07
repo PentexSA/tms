@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import type { RandomSource, RoleName, SheetData } from '@tms/sheet-core'
-import { AccessibilityInfo } from 'react-native'
+import { useState } from 'react'
+import { AccessibilityInfo, Platform } from 'react-native'
 
 import * as apiModule from '../../../lib/api'
 import { type createFakeApi, fail, ok } from '../../../test/fake-api'
@@ -12,6 +13,7 @@ import {
   testSession,
   tokens,
 } from '../../../test/session'
+import { LifecycleContext, type SheetLifecycle } from '../../policy'
 import { createSheetStore } from '../../store/sheetStore'
 import { DiceButton } from '../DiceButton'
 import { fold, matches } from '../fold'
@@ -63,16 +65,26 @@ function storeFor(
 
 async function open(
   store = storeFor().store,
-  random: RandomSource = faces(10, 6)
+  random: RandomSource = faces(10, 6),
+  lifecycle?: SheetLifecycle
 ) {
   let n = 0
-  renderWithSession(
+  const button = (
     <DiceButton
       characterId={ID}
       store={store}
       random={random}
       uuid={() => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`}
-    />,
+    />
+  )
+  renderWithSession(
+    lifecycle ? (
+      <LifecycleContext.Provider value={lifecycle}>
+        {button}
+      </LifecycleContext.Provider>
+    ) : (
+      button
+    ),
     await signedIn()
   )
   fireEvent.press(screen.getByRole('button', { name: 'Dados' }))
@@ -491,6 +503,216 @@ describe('o sheet Dados do Lobisomem (v2)', () => {
     expect(screen.getByTestId('preset-help')).toHaveTextContent(
       'Parada de Fúria permanente.'
     )
+  })
+})
+
+// T-79: o resultado do topo é o da parada na tela, e a lista do slot separa
+// os grupos do template
+describe('Dados: o resultado e os grupos do slot (T-79)', () => {
+  it('rolar e trocar o Atributo: o resultado sai do topo e fica em "Nesta sessão"; rolar de novo põe o novo no topo', async () => {
+    calls.rollsPost
+      .mockResolvedValueOnce(serverRoll())
+      .mockResolvedValueOnce(
+        serverRoll({ id: 'r2', text: 'Falha', faces: [3], outcome: 'failure' })
+      )
+    await open()
+    pick('Atributo', 'des', /^Destreza, 2/)
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(screen.getByText('Dados: 10 · 6')).toBeTruthy()
+    expect(screen.queryByText('Nesta sessão')).toBeNull()
+
+    pick('Atributo', 'for', /^Força, /)
+    expect(screen.queryByText('Dados: 10 · 6')).toBeNull()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+    expect(screen.getByText('2 sucessos')).toBeTruthy()
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(screen.getByText('Dados: 3')).toBeTruthy()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+  })
+
+  it('a resposta que chega depois de a parada mudar não volta ao topo', async () => {
+    let answer: (value: unknown) => void = () => undefined
+    calls.rollsPost.mockImplementationOnce(
+      () => new Promise(resolve => (answer = resolve))
+    )
+    await open()
+    pick('Atributo', 'des', /^Destreza, 2/)
+    fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    // Ainda sem resposta, a pessoa troca o Atributo
+    pick('Atributo', 'for', /^Força, /)
+    await act(async () => {
+      answer(serverRoll())
+    })
+    expect(screen.queryByText('Dados: 10 · 6')).toBeNull()
+    expect(screen.getByText('Nesta sessão')).toBeTruthy()
+  })
+
+  const headers = () =>
+    screen.queryAllByRole('header').map(h => h.props.children as string)
+
+  it('V20: o slot "Atributo" tem um grupo só, sem cabeçalho', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).not.toContain('Atributos')
+  })
+
+  it('W20: "Atributos" e "Em jogo", com a Força de Vontade no segundo', async () => {
+    const { sheet } = sheetFor('iara', ['owner'])
+    await open(storeFor(['owner'], sheet, 'wta-w20').store)
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).toEqual(expect.arrayContaining(['Atributos', 'Em jogo']))
+    const names = screen
+      .getAllByRole('button')
+      .map(b => b.props.accessibilityLabel as string)
+    const playAt = headers().indexOf('Em jogo')
+    expect(playAt).toBeGreaterThan(headers().indexOf('Atributos'))
+    // A FdV vem depois de todos os Atributos
+    const strength = names.findIndex(n => n?.startsWith('Força,'))
+    const willpower = names.findIndex(n => n?.startsWith('Força de Vontade,'))
+    const wits = names.findIndex(n => n?.startsWith('Raciocínio,'))
+    expect(willpower).toBeGreaterThan(wits)
+    expect(willpower).toBeGreaterThan(strength)
+  })
+
+  it('M20: "Atributos" e "Esferas"', async () => {
+    const { sheet } = sheetFor('tomas', ['owner'])
+    await open(storeFor(['owner'], sheet, 'mta-m20').store)
+    fireEvent.press(screen.getByRole('button', { name: /^Atributo:/ }))
+    expect(headers()).toEqual(expect.arrayContaining(['Atributos', 'Esferas']))
+  })
+})
+
+// T-77: o gasto que o servidor recusaria (SHEET_LOCKED) fica bloqueado com
+// o motivo, e a rolagem sem gasto continua
+describe('o boost na ficha travada (T-77)', () => {
+  const locked: SheetLifecycle = {
+    status: 'active',
+    locked: true,
+    member: true,
+  }
+
+  it('dona: "Gastar 1 Força de Vontade" com aria-disabled e o motivo; tocar não liga; "Rolar no app" manda boosts vazios', async () => {
+    calls.rollsPost.mockResolvedValue(serverRoll())
+    await open(storeFor().store, faces(10, 6), locked)
+    pick('Atributo', 'des', /^Destreza, 2/)
+    pick('Habilidade ou Disciplina', 'esport', /^Esportes, 1/)
+    const boost = screen.getByRole('checkbox', { name: /^Gastar 1 Força/ })
+    expect(boost.props.accessibilityState).toMatchObject({
+      disabled: true,
+      checked: false,
+    })
+    const reason = 'O narrador travou a ficha: a rolagem sai sem gastar.'
+    expect(screen.getByText(reason)).toBeTruthy()
+    fireEvent.press(boost)
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: false })
+    expect(screen.getByRole('alert')).toHaveTextContent(reason)
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+      reason
+    )
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(calls.rollsPost).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ boosts: [] })
+    )
+  })
+
+  it('o boost ligado antes da trava: a caixa fica desmarcada, e o pedido sai sem ele', async () => {
+    calls.rollsPost.mockResolvedValue(serverRoll())
+    let lock: (next: SheetLifecycle) => void = () => undefined
+    function Harness() {
+      const [value, setValue] = useState<SheetLifecycle>({
+        status: 'active',
+        locked: false,
+        member: true,
+      })
+      lock = setValue
+      let n = 0
+      return (
+        <LifecycleContext.Provider value={value}>
+          <DiceButton
+            characterId={ID}
+            store={storeFor().store}
+            random={faces(10, 6)}
+            uuid={() =>
+              `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
+            }
+          />
+        </LifecycleContext.Provider>
+      )
+    }
+    renderWithSession(<Harness />, await signedIn())
+    fireEvent.press(screen.getByRole('button', { name: 'Dados' }))
+    pick('Atributo', 'des', /^Destreza, 2/)
+    fireEvent.press(screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: true })
+    act(() => lock({ status: 'active', locked: true, member: true }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: false, disabled: true })
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Rolar no app' }))
+    })
+    expect(calls.rollsPost).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ boosts: [] })
+    )
+  })
+
+  it('arquivada: o boost não diz "sai sem gastar" (o servidor recusa a rolagem inteira)', async () => {
+    await open(storeFor().store, faces(10, 6), {
+      status: 'archived',
+      locked: false,
+      member: true,
+    })
+    expect(screen.queryByText(/a rolagem sai sem gastar/)).toBeNull()
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ disabled: false })
+  })
+
+  it('narrador na mesma ficha travada: o boost liga', async () => {
+    const { store } = storeFor(
+      ['storyteller'],
+      sheetFor('helena', ['storyteller']).sheet
+    )
+    await open(store, faces(10, 6), locked)
+    fireEvent.press(screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }))
+    expect(
+      screen.getByRole('checkbox', { name: /^Gastar 1 Força/ }).props
+        .accessibilityState
+    ).toMatchObject({ checked: true })
+    expect(
+      screen.queryByText('O narrador travou a ficha: a rolagem sai sem gastar.')
+    ).toBeNull()
+  })
+
+  it('no web, o boost bloqueado não vira `disabled` e continua tocável', async () => {
+    const real = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      await open(storeFor().store, faces(10, 6), locked)
+      const boost = screen.getByRole('checkbox', { name: /^Gastar 1 Força/ })
+      expect(boost.props.accessibilityDisabled).toBeUndefined()
+      fireEvent.press(boost)
+      expect(screen.getByRole('alert')).toBeTruthy()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: real, configurable: true })
+    }
   })
 })
 

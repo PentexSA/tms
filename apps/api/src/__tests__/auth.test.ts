@@ -1,8 +1,11 @@
 /// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { createHash } from 'node:crypto'
 import { createPGliteTestDb } from '@tms/db/testing'
 import { SignJWT } from 'jose'
 import { sql } from 'kysely'
+import { REFRESH_REUSE_GRACE_MS } from '../auth/sessions'
 import { createRateLimiter } from '../http/rate-limit'
 import { logger } from '../logger'
 import { defaultLimits } from '../options'
@@ -351,6 +354,8 @@ describe('POST /auth/refresh e /auth/logout', () => {
     const first = body.refreshToken ?? ''
     const second = ((await (await refresh(first)).json()) as Session)
       .refreshToken
+    // Depois da tolerância do token anterior (describe abaixo)
+    ctx.clock.advance(REFRESH_REUSE_GRACE_MS + 1)
     expect((await refresh(first)).status).toBe(401)
     // O token novo também morreu: quem roubou e quem tinha perdem a sessão
     expect((await refresh(second ?? '')).status).toBe(401)
@@ -598,6 +603,205 @@ describe('POST /auth/refresh e /auth/logout', () => {
 
   it('logout sem sessão é idempotente', async () => {
     expect((await post('/auth/logout', {}, NATIVE)).status).toBe(204)
+  })
+})
+
+// O app encerrado com um refresh em voo (onda 5, seção 11.6): a API girou o
+// token, e o app reaberto apresenta o anterior. Até 30 s depois do giro, e só
+// se o sucessor nunca foi usado nem revogado, o anterior ganha um novo
+// sucessor uma vez; fora disso, o reuso revoga a família como sempre.
+describe('POST /auth/refresh: tolerância do token anterior', () => {
+  const SECOND = 1000
+  const refresh = (refreshToken: string) =>
+    post('/auth/refresh', { refreshToken }, NATIVE)
+  const tokenOf = async (res: Response) => {
+    expect(res.status).toBe(200)
+    return ((await res.json()) as Session).refreshToken ?? ''
+  }
+  const rowOf = (raw: string) =>
+    ctx.db
+      .selectFrom('refresh_tokens')
+      .selectAll()
+      .where('token_hash', '=', createHash('sha256').update(raw).digest('hex'))
+      .executeTakeFirstOrThrow()
+  const alive = async () =>
+    (
+      await ctx.db
+        .selectFrom('refresh_tokens')
+        .select('id')
+        .where('revoked_at', 'is', null)
+        .execute()
+    ).length
+  // O token T do login e o sucessor S, que o app não chegou a receber
+  const rotated = async () => {
+    const { body } = await register()
+    const old = body.refreshToken ?? ''
+    const successor = await tokenOf(await refresh(old))
+    return { old, successor }
+  }
+
+  it('o token anterior, com o sucessor sem uso, ganha um novo sucessor na mesma família', async () => {
+    const info = spyOn(logger, 'info')
+    try {
+      const { old, successor } = await rotated()
+      ctx.clock.advance(5 * SECOND)
+      const res = await refresh(old)
+      const fresh = await tokenOf(res)
+      expect(fresh).not.toBe(successor)
+      expect(fresh).not.toBe(old)
+      const [t, s, n] = await Promise.all([
+        rowOf(old),
+        rowOf(successor),
+        rowOf(fresh),
+      ])
+      expect(n.family_id).toBe(t.family_id)
+      // O anterior continua apontando para S; S sai revogado e sem sucessor
+      expect(t.replaced_by).toBe(s.id)
+      expect(s.revoked_at).not.toBeNull()
+      expect(s.replaced_by).toBeNull()
+      expect(n.revoked_at).toBeNull()
+      expect(await alive()).toBe(1)
+      // O novo token segue a rotação normal
+      expect((await refresh(fresh)).status).toBe(200)
+      // Mensagem fixa, sem token, hash nem id
+      const calls = info.mock.calls.filter(
+        c => c[1] === 'refresh dentro da tolerância'
+      )
+      expect(calls).toEqual([
+        [{ event: 'auth.refresh_grace' }, 'refresh dentro da tolerância'],
+      ])
+      const logged = JSON.stringify(info.mock.calls)
+      for (const secret of [old, successor, fresh, t.token_hash, t.user_id])
+        expect(logged).not.toContain(secret)
+    } finally {
+      info.mockRestore()
+    }
+  })
+
+  it('a janela é de 30 s contados do giro: no limite entra', async () => {
+    const { old } = await rotated()
+    ctx.clock.advance(REFRESH_REUSE_GRACE_MS)
+    expect(REFRESH_REUSE_GRACE_MS).toBe(30 * SECOND)
+    expect((await refresh(old)).status).toBe(200)
+  })
+
+  it('1 ms depois da janela, o reuso revoga a família', async () => {
+    const { old, successor } = await rotated()
+    ctx.clock.advance(REFRESH_REUSE_GRACE_MS + 1)
+    expect((await refresh(old)).status).toBe(401)
+    expect((await refresh(successor)).status).toBe(401)
+    expect(await alive()).toBe(0)
+  })
+
+  it('um token revogado por logout nunca entra na tolerância', async () => {
+    const { body } = await register()
+    const token = body.refreshToken ?? ''
+    expect(
+      (await post('/auth/logout', { refreshToken: token }, NATIVE)).status
+    ).toBe(204)
+    expect((await rowOf(token)).replaced_by).toBeNull()
+    expect((await refresh(token)).status).toBe(401)
+  })
+
+  it('o sucessor revogado por logout: o anterior não entra na tolerância', async () => {
+    const { old, successor } = await rotated()
+    expect(
+      (await post('/auth/logout', { refreshToken: successor }, NATIVE)).status
+    ).toBe(204)
+    ctx.clock.advance(SECOND)
+    expect((await refresh(old)).status).toBe(401)
+    expect(await alive()).toBe(0)
+  })
+
+  it('o sucessor já usado: o anterior revoga a família, mesmo dentro da janela', async () => {
+    const { old, successor } = await rotated()
+    ctx.clock.advance(SECOND)
+    const next = await tokenOf(await refresh(successor))
+    ctx.clock.advance(SECOND)
+    expect((await refresh(old)).status).toBe(401)
+    expect((await refresh(next)).status).toBe(401)
+    expect(await alive()).toBe(0)
+  })
+
+  it('a tolerância é de uso único: a segunda apresentação do anterior revoga a família', async () => {
+    const { old } = await rotated()
+    ctx.clock.advance(SECOND)
+    const fresh = await tokenOf(await refresh(old))
+    ctx.clock.advance(SECOND)
+    expect((await refresh(old)).status).toBe(401)
+    expect((await refresh(fresh)).status).toBe(401)
+    expect(await alive()).toBe(0)
+  })
+
+  it('o sucessor apresentado depois da tolerância revoga a família (detecção de roubo)', async () => {
+    const { old, successor } = await rotated()
+    ctx.clock.advance(SECOND)
+    const fresh = await tokenOf(await refresh(old))
+    // Quem tinha S (o cliente legítimo ou um atacante) derruba a família
+    ctx.clock.advance(SECOND)
+    expect((await refresh(successor)).status).toBe(401)
+    expect((await refresh(fresh)).status).toBe(401)
+    expect(await alive()).toBe(0)
+  })
+
+  it('a tolerância não estende a sessão: mesma family_expires_at, e o novo token não vive mais que S', async () => {
+    const { body } = await register()
+    const family = (await rowOf(body.refreshToken ?? '')).family_expires_at
+    let token = body.refreshToken ?? ''
+    for (let i = 0; i < 3; i++) {
+      ctx.clock.advance(29 * DAY)
+      token = await tokenOf(await refresh(token))
+    }
+    // 10 s antes do limite absoluto: T gira para S, e o app não recebe S
+    ctx.clock.advance(3 * DAY - 10 * SECOND)
+    const successor = await tokenOf(await refresh(token))
+    ctx.clock.advance(5 * SECOND)
+    const fresh = await tokenOf(await refresh(token))
+    const [s, n] = await Promise.all([rowOf(successor), rowOf(fresh)])
+    expect(n.family_expires_at).toEqual(family)
+    expect(s.family_expires_at).toEqual(family)
+    expect(n.expires_at.getTime()).toBeLessThanOrEqual(s.expires_at.getTime())
+    expect(n.expires_at.getTime()).toBeLessThanOrEqual(family.getTime())
+    // Ainda dentro dos 30 s do giro, mas a família venceu
+    ctx.clock.advance(6 * SECOND)
+    expect((await refresh(fresh)).status).toBe(401)
+  })
+
+  it('o sucessor substituído não vive mais que S, mesmo longe do limite da família', async () => {
+    const { old, successor } = await rotated()
+    ctx.clock.advance(20 * SECOND)
+    const fresh = await tokenOf(await refresh(old))
+    const [s, n] = await Promise.all([rowOf(successor), rowOf(fresh)])
+    expect(n.expires_at).toEqual(s.expires_at)
+  })
+
+  it('o token anterior vencido não entra na tolerância', async () => {
+    const { body } = await register()
+    const old = body.refreshToken ?? ''
+    // T vence em 30 dias: gira 10 s antes e é reapresentado depois de vencer
+    ctx.clock.advance(30 * DAY - 10 * SECOND)
+    const successor = await tokenOf(await refresh(old))
+    ctx.clock.advance(15 * SECOND)
+    expect((await refresh(old)).status).toBe(401)
+    expect((await refresh(successor)).status).toBe(401)
+  })
+
+  it('no web, o cookie anterior também tem a tolerância', async () => {
+    const { res } = await register(ana, WEB)
+    const old = `tms_refresh=${cookieValue(res)}`
+    const ok = await post('/auth/refresh', undefined, { ...WEB, cookie: old })
+    expect(ok.status).toBe(200)
+    ctx.clock.advance(SECOND)
+    const again = await post('/auth/refresh', undefined, {
+      ...WEB,
+      cookie: old,
+    })
+    expect(again.status).toBe(200)
+    expect(cookieValue(again)).not.toBe(cookieValue(ok))
+    const stale = `tms_refresh=${cookieValue(ok)}`
+    expect(
+      (await post('/auth/refresh', undefined, { ...WEB, cookie: stale })).status
+    ).toBe(401)
   })
 })
 

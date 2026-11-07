@@ -1,4 +1,80 @@
-import { civilDate } from '../format'
+import { civilDate, excerpt, paragraphs } from '../format'
+
+/**
+ * O trecho da Apresentação (P14-D): o leitor de tela recebe no máximo `max`
+ * pontos de código e o "…", nunca o texto inteiro.
+ */
+describe('excerpt', () => {
+  it('should return a short text unchanged, without the ellipsis', () => {
+    expect(excerpt('  Uma mesa curta.  ', 140)).toBe('Uma mesa curta.')
+  })
+
+  it('should cut at the last space before the limit and add the ellipsis', () => {
+    expect(excerpt('alfa beta gama delta', 12)).toBe('alfa beta…')
+  })
+
+  it('should collapse line breaks and repeated spaces before cutting', () => {
+    expect(excerpt('um\n\ndois   três\r\nquatro', 140)).toBe(
+      'um dois três quatro'
+    )
+    // Os parágrafos em branco não gastam o trecho
+    expect(excerpt(`alfa\n\n\n\n${'beta '.repeat(5)}`, 12)).toBe('alfa beta…')
+  })
+
+  it('should keep the last word when the limit falls right before a space', () => {
+    // "alfa beta" tem 9 pontos, e o 10º é espaço: a palavra está inteira
+    expect(excerpt('alfa beta gama', 9)).toBe('alfa beta…')
+  })
+
+  it('should cut at the limit when there is no space', () => {
+    expect(excerpt('a'.repeat(200), 140)).toBe(`${'a'.repeat(140)}…`)
+  })
+
+  it('should never split an emoji or a surrogate pair', () => {
+    const cut = excerpt('🜏'.repeat(150), 140)
+    expect(Array.from(cut)).toHaveLength(141)
+    expect(cut.endsWith('🜏…')).toBe(true)
+  })
+
+  it('should keep the excerpt within max code points plus the ellipsis', () => {
+    const text = 'Parágrafo de teste do roteiro, número 1. '.repeat(100)
+    expect(Array.from(excerpt(text, 140)).length).toBeLessThanOrEqual(141)
+  })
+})
+
+describe('paragraphs', () => {
+  it('should split on blank lines, keeping single line breaks', () => {
+    expect(paragraphs('um\nainda um\n\ndois')).toEqual(['um\nainda um', 'dois'])
+  })
+
+  it('should accept CRLF and lines with only spaces between paragraphs', () => {
+    expect(paragraphs('um\r\n\r\ndois\n  \t\ntrês')).toEqual([
+      'um',
+      'dois',
+      'três',
+    ])
+  })
+
+  it('should treat a line with only Unicode spaces (NBSP and others) as blank', () => {
+    expect(paragraphs('um\n \ndois\r\n 　\r\ntrês')).toEqual([
+      'um',
+      'dois',
+      'três',
+    ])
+    // Sem linha em branco, a quebra simples continua no parágrafo
+    expect(paragraphs('um\n dois')).toEqual(['um\n dois'])
+  })
+
+  it('should drop extra blank lines and empty paragraphs', () => {
+    expect(paragraphs('\n\num\n\n\n\ndois\n\n')).toEqual(['um', 'dois'])
+    expect(paragraphs('   ')).toEqual([])
+  })
+
+  it('should keep markup characters literal', () => {
+    const line = '*não é negrito* [nem link](https://exemplo.test)'
+    expect(paragraphs(line)).toEqual([line])
+  })
+})
 
 /**
  * Data civil (T-16): corta o texto, sem Date, então o resultado é o mesmo em

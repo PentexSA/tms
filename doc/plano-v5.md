@@ -438,7 +438,7 @@ Cobrir replay com acesso revogado, chave divergente, alvos de outra crônica, re
 
 ### 6.3 Concorrência em Postgres real
 
-Usar conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos testes existentes. Incluir novos arquivos no job `postgres` do CI; preservar os testes anteriores. PGLite e skip sem `PG_TEST_URL` não provam as travas.
+Usar conexões independentes e bancos descartáveis terminados em `_test`, no padrão dos testes existentes. Incluir novos arquivos no job `postgres` do CI; preservar os testes anteriores. **Revisto:** o job saiu do CI no PR #49; os `*.pg.test` rodam à mão (ver a D-00 no registro do [plano-v0.md](plano-v0.md)). PGLite e skip sem `PG_TEST_URL` não provam as travas.
 
 | Disputa | Resultado obrigatório |
 |---|---|

@@ -5,12 +5,15 @@ import {
   screen,
   within,
 } from '@testing-library/react-native'
+import { type ComponentRef, createRef } from 'react'
 import {
   AccessibilityInfo,
   Modal,
   Platform,
   Text as RNText,
+  ScrollView,
   StyleSheet,
+  View,
   type ViewStyle,
 } from 'react-native'
 import {
@@ -128,6 +131,12 @@ describe('Button e IconButton', () => {
       expect(screen.getByRole('button', { name: 'Ok' })).toBeOnTheScreen()
     }
   )
+
+  it('Button: o ref chega à vista do botão, para o foco por programa (P12)', () => {
+    const ref = createRef<ComponentRef<typeof View>>()
+    render(<Button ref={ref} title="Revogar" onPress={() => undefined} />)
+    expect(ref.current).not.toBeNull()
+  })
 
   it('IconButton: o nome acessível é o rótulo, não o glifo', () => {
     const onPress = jest.fn()
@@ -665,6 +674,184 @@ describe('Toast', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Desfazer' }))
     expect(undo).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+  })
+
+  // P12, T-43: no web o Modal é um portal depois da raiz, e o aviso da raiz
+  // ficava embaixo da folha. Agora fica dentro do painel também no web
+  it('no web, o aviso também fica dentro da folha e volta à raiz ao fechar', async () => {
+    const os = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    try {
+      const undo = jest.fn()
+      const content = (visible: boolean) => (
+        <ToastProvider>
+          <BottomSheet
+            visible={visible}
+            title="Recurso"
+            onClose={() => undefined}
+          >
+            <Trigger onUndo={undo} />
+          </BottomSheet>
+        </ToastProvider>
+      )
+      const { rerender } = render(content(true))
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+      expect(
+        within(screen.UNSAFE_getByType(Modal)).getByText('Sangue 10 → 9')
+      ).toBeTruthy()
+      expect(screen.getAllByText('Sangue 10 → 9')).toHaveLength(1)
+      rerender(content(false))
+      expect(screen.getByText('Sangue 10 → 9')).toBeTruthy()
+      act(() => jest.advanceTimersByTime(TOAST_MS))
+      expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: os, configurable: true })
+    }
+  })
+
+  it('dentro da folha, o aviso fica acima do rodapé medido', async () => {
+    render(
+      <ToastProvider>
+        <BottomSheet
+          visible
+          title="Remover"
+          onClose={() => undefined}
+          footer={<RNText>Rodapé</RNText>}
+        >
+          <Trigger onUndo={() => undefined} />
+        </BottomSheet>
+      </ToastProvider>
+    )
+    await act(async () => undefined)
+    fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+    const bottom = () =>
+      StyleSheet.flatten(screen.getByTestId('toast-host').props.style).bottom
+    // Sem medida ainda: só a folga de 8 (space[2]) acima do fundo
+    const base = bottom()
+    act(() =>
+      fireEvent(screen.getByTestId('bottom-sheet-footer'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 56 } },
+      })
+    )
+    // Medido: os 56 do rodapé somam à folga
+    expect(bottom()).toBe(base + 56)
+    // Com rodapé, o conteúdo não ganha espaço: o aviso já fica acima dele
+    act(() =>
+      fireEvent(screen.getByTestId('toast'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 358, height: 52 } },
+      })
+    )
+    expect(
+      screen.queryByTestId('bottom-sheet-toast-space', {
+        includeHiddenElements: true,
+      })
+    ).toBeNull()
+  })
+
+  // T-43 (decisão do PO): na folha sem rodapé, o aviso cobria a última ação
+  // até sumir. Enquanto ele aparece, o fim do conteúdo ganha a altura medida
+  // dele mais a folga de 8 (space[2]), e o espaço sai com ele
+  describe('folha sem rodapé', () => {
+    const sheet = (top = false) => (
+      <ToastProvider>
+        <BottomSheet visible title="Vitalidade" onClose={() => undefined}>
+          <Trigger onUndo={() => undefined} />
+        </BottomSheet>
+        <BottomSheet visible={top} title="Acima" onClose={() => undefined}>
+          <RNText>Segundo modal</RNText>
+        </BottomSheet>
+      </ToastProvider>
+    )
+    // O espaço é aria-hidden: não é conteúdo para o leitor de tela
+    const space = () =>
+      screen.queryByTestId('bottom-sheet-toast-space', {
+        includeHiddenElements: true,
+      })
+    const heightOf = (el: ReturnType<typeof screen.getByTestId>) =>
+      StyleSheet.flatten(el.props.style).height
+    const measure = (height: number) =>
+      act(() =>
+        fireEvent(screen.getByTestId('toast'), 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 358, height } },
+        })
+      )
+    const spend = async () => {
+      await act(async () => undefined)
+      fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+    }
+
+    it('o fim do conteúdo ganha a altura do aviso enquanto ele aparece', async () => {
+      render(sheet())
+      await act(async () => undefined)
+      expect(space()).toBeNull()
+      fireEvent.press(screen.getByRole('button', { name: 'Gastar' }))
+      // O espaço é o medido, não um número fixo: o texto quebra em linhas
+      measure(52)
+      expect(heightOf(space()!)).toBe(52 + 8)
+      measure(76)
+      expect(heightOf(space()!)).toBe(76 + 8)
+      // O aviso continua no fundo da folha, sem offset
+      expect(
+        StyleSheet.flatten(screen.getByTestId('toast-host').props.style).bottom
+      ).toBe(16)
+      act(() => jest.advanceTimersByTime(TOAST_MS))
+      expect(screen.queryByText('Sangue 10 → 9')).toBeNull()
+      expect(space()).toBeNull()
+    })
+
+    it('o espaço sai quando o aviso passa para o modal de cima', async () => {
+      const { rerender } = render(sheet())
+      await spend()
+      measure(52)
+      expect(space()).not.toBeNull()
+      rerender(sheet(true))
+      // O aviso está no de cima (também sem rodapé), que ainda não o mediu
+      expect(
+        within(screen.UNSAFE_getAllByType(Modal)[1]!).getByText('Sangue 10 → 9')
+      ).toBeTruthy()
+      expect(
+        screen.queryAllByTestId('bottom-sheet-toast-space', {
+          includeHiddenElements: true,
+        })
+      ).toHaveLength(0)
+    })
+
+    it('rolada até o fim, a folha acompanha o espaço e a última ação sobe', async () => {
+      render(sheet())
+      const view = screen.UNSAFE_getAllByType(ScrollView)[0]!
+      const toEnd = jest.spyOn(view.instance, 'scrollToEnd')
+      // Na altura máxima, rolada até o fim
+      fireEvent.scroll(view, {
+        nativeEvent: {
+          contentOffset: { x: 0, y: 500 },
+          contentSize: { width: 358, height: 900 },
+          layoutMeasurement: { width: 358, height: 400 },
+        },
+      })
+      await spend()
+      measure(52)
+      fireEvent(view, 'contentSizeChange', 358, 960)
+      expect(toEnd).toHaveBeenCalledTimes(1)
+    })
+
+    it('rolada no meio, a folha não pula para o fim', async () => {
+      render(sheet())
+      const view = screen.UNSAFE_getAllByType(ScrollView)[0]!
+      const toEnd = jest.spyOn(view.instance, 'scrollToEnd')
+      fireEvent.scroll(view, {
+        nativeEvent: {
+          contentOffset: { x: 0, y: 100 },
+          contentSize: { width: 358, height: 900 },
+          layoutMeasurement: { width: 358, height: 400 },
+        },
+      })
+      await spend()
+      measure(52)
+      fireEvent(view, 'contentSizeChange', 358, 960)
+      expect(toEnd).not.toHaveBeenCalled()
+      expect(space()).not.toBeNull()
+    })
   })
 
   it('só o modal superior apresenta o aviso, que acompanha o fechamento da pilha', async () => {

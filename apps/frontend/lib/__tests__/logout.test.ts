@@ -1,6 +1,12 @@
 import * as SecureStore from 'expo-secure-store'
 import { createMemoryStorage } from '../../sheet/sync/kv'
 import { json, memoryStore, testSession, tokens } from '../../test/session'
+import {
+  clearPendingInvite,
+  hasPendingInvite,
+  peekPendingInvite,
+  setPendingInvite,
+} from '../invite/pending'
 import { MAX_PENDING_LOGOUTS, type SessionUser } from '../session/session'
 import {
   createSessionMarker,
@@ -527,5 +533,41 @@ describe('logout no web: marcador de sessão no IndexedDB', () => {
     await marker.write('signed-in', 'abc-123')
     expect(storage.data.get(SESSION_MARKER_KEY)).toBe('signed-in:abc-123')
     expect(await marker.read()).toEqual({ state: 'signed-in', id: 'abc-123' })
+  })
+})
+
+// P12, D-14: o convite que chegou por link sobrevive à abertura sem sessão
+// (o caminho do login) e sai no "Sair" explícito
+describe('convite pendente e a sessão', () => {
+  afterEach(() => clearPendingInvite())
+
+  it('a abertura sem sessão não apaga; o logout apaga', async () => {
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    const store = memoryStore(true, null)
+    const { session } = testSession(noContent, store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedOut')
+    expect(peekPendingInvite()).not.toBeNull()
+    await session.logout()
+    expect(peekPendingInvite()).toBeNull()
+  })
+
+  it('o signOut de uma sessão aberta (conta excluída, refresh recusado) apaga', async () => {
+    const store = memoryStore(true, 'refresh-0')
+    const { session } = testSession(() => json(200, tokens()), store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedIn')
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    await session.signOut()
+    expect(hasPendingInvite()).toBe(false)
+  })
+
+  it('a abertura com o refresh recusado (401) não apaga o link que chegou', async () => {
+    setPendingInvite('ABCD2345EFGH6789JKMN0PQRST')
+    const store = memoryStore(true, 'refresh-velho')
+    const { session } = testSession(() => json(401, { error: 'x' }), store)
+    await session.restore()
+    expect(session.getState().status).toBe('signedOut')
+    expect(hasPendingInvite()).toBe(true)
   })
 })

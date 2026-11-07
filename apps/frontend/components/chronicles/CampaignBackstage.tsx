@@ -279,6 +279,11 @@ function SessionComposer({ chronicleId }: { readonly chronicleId: string }) {
   )
 }
 
+// O público da Descrição, ao lado do "privadas: o jogador não vê" das Notas
+// do Narrador e do "Nunca são enviadas aos jogadores." das notas da sessão
+const DESCRIPTION_HINT =
+  'Os jogadores da crônica leem este texto. Segredos ficam nas notas privadas.'
+
 function SettingsForm({ chronicle }: { readonly chronicle: ChronicleInfo }) {
   const update = useUpdateChronicle(chronicle.id)
   const key = useRef<string | null>(null)
@@ -316,8 +321,11 @@ function SettingsForm({ chronicle }: { readonly chronicle: ChronicleInfo }) {
           }}
           maxLength={80}
         />
+        {/* D-15: os jogadores leem a Descrição (bloco "Apresentação" e
+            "Ler tudo" na crônica); o aviso diz isso a quem escreve */}
         <TextArea
           label="Descrição"
+          hint={DESCRIPTION_HINT}
           value={description}
           onChangeText={value => {
             changed()

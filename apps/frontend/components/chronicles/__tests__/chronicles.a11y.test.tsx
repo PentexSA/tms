@@ -49,6 +49,10 @@ async function renderSettings() {
     />,
     session
   )
+  // P09-D (T-36): com as regras salvas, o painel abre recolhido
+  fireEvent.press(
+    await screen.findByRole('button', { name: 'Editar regras da criação' })
+  )
   await screen.findByTestId('creation-settings-budgets')
 }
 
@@ -80,6 +84,32 @@ describe('Regras da crônica: título visível nos grupos de escolha (T-09)', ()
     await renderSettings()
     expect(screen.getByText('Aprovação do narrador')).toBeTruthy()
     expect(screen.getByText('Modo padrão')).toBeTruthy()
+  })
+})
+
+describe('Regras da crônica recolhidas (P09-D, T-36)', () => {
+  it('o resumo é texto, e "Editar" tem o nome que começa pelo visível', async () => {
+    const { session } = testSession(
+      () => json(200, tokens()),
+      memoryStore(true, 'r')
+    )
+    await session.restore()
+    renderWithSession(
+      <CreationSettings
+        chronicleId={CHRONICLE}
+        systemCode="vtm-v20"
+        creation={{ approval: true, defaults: {}, revision: 1 }}
+      />,
+      session
+    )
+    expect(
+      await screen.findByText(/^Criação por pontos · .* · aprovação ligada$/)
+    ).toBeTruthy()
+    const edit = screen.getByRole('button', {
+      name: 'Editar regras da criação',
+    })
+    expect(edit).toHaveTextContent('Editar')
+    expect(screen.queryByText('Aprovação do narrador')).toBeNull()
   })
 })
 
@@ -144,6 +174,7 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
       ok([
         {
           id: 'i1',
+          number: 1,
           createdAt: '2026-10-18T12:00:00Z',
           expiresAt: '2026-10-25T12:00:00Z',
           maxUses: 10,
@@ -166,10 +197,12 @@ describe('Convites ativos: Revogar alcançável no leitor de tela (T-41)', () =>
       />,
       session
     )
-    const revoke = await screen.findByRole('button', { name: 'Revogar' })
+    const revoke = await screen.findByRole('button', {
+      name: 'Revogar convite 1',
+    })
     expect(insideAccessible(revoke)).toBe(false)
     expect(
-      screen.getByLabelText(/^Criado em .*, 8 usos restantes/)
+      screen.getByLabelText(/^Convite 1 · criado em .*, 8 usos restantes/)
     ).toBeTruthy()
   })
 })

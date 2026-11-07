@@ -77,6 +77,10 @@ O contrato não expressa estas regras, então elas não entram na conta. O narra
 - **M20:** a Esfera de afinidade deveria ter pelo menos 1 ponto. A Quintessência (1 ponto de bônus a cada 4) fica na roda, fora da conta. Rotinas, Ressonância e Maravilhas ficam fora da conta (`untracked`).
 - **W20:** os 3 Dons iniciais deveriam vir da Raça, do Augúrio e da Tribo. O XP do Dom depende do nível (nível × 3, ou × 5 fora do grupo), e o item da lista não tem nível numérico: o pedido de XP de Dom fica indisponível. Renome não se compra na criação. Posto, Ritos, Fetiches e Cicatrizes ficam fora da conta.
 
+A tela recomenda sem cobrar (onda 4, P07-D; D-07 e D-09): no V20, as Disciplinas do clã vêm primeiro, com o selo "do clã"; no M20, a Esfera da Tradição tem o selo "da Tradição"; no W20, o catálogo de Dons de nível 1 destaca os da Raça, do Augúrio e da Tribo, e um Dom acima do Posto 1 pede "confirme com o narrador". A escolha de fora avisa e não bloqueia, e a conta continua sem cobrar nenhuma dessas regras.
+
+O catálogo de Dons e o mapa Tradição → Esferas são rascunho do time: o catálogo foi compilado de memória e precisa ser conferido contra o livro ([onda-4.md](planos-pacotes/onda-4.md) §12.7).
+
 ## Fontes
 
 - V20, criação e bônus: [Magic City MUX, Chargen](http://v20.wikidot.com/chargen) e [LA in Anarchy, New Player Guide](http://lainanarchy.wikidot.com/new-player-guide)

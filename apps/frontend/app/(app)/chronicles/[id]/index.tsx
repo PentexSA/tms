@@ -25,6 +25,7 @@ import {
 } from 'react-native'
 import { CampaignBackstage } from '../../../../components/chronicles/CampaignBackstage'
 import { CharacterList } from '../../../../components/chronicles/CharacterList'
+import { ChronicleAbout } from '../../../../components/chronicles/ChronicleAbout'
 import {
   type ChronicleCreationInfo,
   CreationSettings,
@@ -44,6 +45,7 @@ import { TransferOffer } from '../../../../components/chronicles/TransferOffer'
 import { rememberScroll, scrollOf } from '../../../../lib/chronicleScroll'
 import { messageOf, statusOf } from '../../../../lib/errors'
 import { shortDate } from '../../../../lib/format'
+import { useBackTo } from '../../../../lib/navigation'
 import { useTransfer } from '../../../../lib/queries/backstage'
 import {
   chronicleKeys,
@@ -74,6 +76,7 @@ export default function ChronicleScreen() {
   const params = useLocalSearchParams<{ id: string; view?: string }>()
   const { id } = params
   const router = useRouter()
+  const backToList = useBackTo('/')
   const queryClient = useQueryClient()
   const chronicle = useChronicle(id)
   // T-40: o foco e o puxar rebuscam a crônica e o que a aba aberta mostra
@@ -134,7 +137,10 @@ export default function ChronicleScreen() {
       restore()
     }, [restore])
   )
-  const back = { label: 'Crônicas', onPress: () => router.replace('/') }
+  // Volta pela pilha; o replace('/') de antes punha uma segunda lista em
+  // cima da primeira, e o voltar do Android pedia um toque a mais (P12,
+  // achado 6 da onda 3). Sem tela de baixo (link direto), a lista
+  const back = { label: 'Crônicas', onPress: backToList }
 
   if (chronicle.isPending)
     return (
@@ -175,6 +181,17 @@ export default function ChronicleScreen() {
   // A Mesa é do narrador: para o jogador a aba nem aparece (e a API dá 404)
   const showing: ChronicleView = former ? 'sheets' : viewOf(view, narrating)
   scrollKey.current = showing
+  // D-15: a Apresentação, depois de sistema e narrador e antes do painel da
+  // criação e das abas (onda-5.md §4.1). O ex-membro não a vê (defesa em
+  // profundidade; quem decide é a API). A1: quem narra escreveu o texto e
+  // vê só "Apresentação · Ler tudo", sem o trecho
+  const about = former ? null : (
+    <ChronicleAbout
+      chronicleId={c.id}
+      description={c.description ?? ''}
+      compact={narrating}
+    />
+  )
   return (
     <Screen>
       <AppBar title={c.name} back={back} />
@@ -214,15 +231,26 @@ export default function ChronicleScreen() {
               testID="former-banner"
             />
           ) : null}
-          <View style={styles.info}>
-            <Text variant="caption" color="inkMuted">
-              {c.system.name}
-            </Text>
-            <Text>
-              {narrating
-                ? 'Você narra esta crônica.'
-                : `Narrador: ${c.storyteller.username}`}
-            </Text>
+          <View
+            style={[styles.info, narrating && c.creation && styles.infoTight]}
+          >
+            {/* A1 (onda-5.md §11.6): para quem narra, a linha "Apresentação ·
+                Ler tudo" fica ao lado de sistema e narrador quando cabe (no
+                web largo) e quebra para baixo quando não cabe */}
+            <View style={narrating ? styles.top : styles.lines}>
+              <View style={styles.lines}>
+                <Text variant="caption" color="inkMuted">
+                  {c.system.name}
+                </Text>
+                <Text>
+                  {narrating
+                    ? 'Você narra esta crônica.'
+                    : `Narrador: ${c.storyteller.username}`}
+                </Text>
+              </View>
+              {narrating ? about : null}
+            </View>
+            {narrating ? null : about}
           </View>
 
           {c.role === 'player' && transfer.data?.available ? (
@@ -341,6 +369,8 @@ interface ChronicleData {
   readonly id: string
   readonly system: { readonly code: string }
   readonly storyteller: { readonly username: string }
+  // A Apresentação (D-15): o narrador e os membros leem
+  readonly description?: string
   // As regras da criação (o ex-membro não recebe)
   readonly creation?: ChronicleCreationInfo
   readonly members: readonly {
@@ -406,7 +436,9 @@ function SheetsPanel({
       {c.members.length === 0 ? (
         <Text color="inkMuted" style={styles.empty}>
           {narrating
-            ? 'Ninguém entrou ainda. Convide os jogadores com um código.'
+            ? // Vale para "nunca entrou" e para "saiu" ou "foi removido": a
+              // lista não distingue os dois (T-82, P12)
+              'Nenhum jogador agora. Convide os jogadores com um link.'
             : 'Você é o primeiro jogador.'}
         </Text>
       ) : (
@@ -452,6 +484,17 @@ function SheetsPanel({
 const styles = StyleSheet.create({
   content: { gap: tokens.space[2], paddingBottom: tokens.space[12] },
   info: { gap: tokens.space[1], padding: tokens.layout.gutter },
+  // O painel "Criação de fichas" logo abaixo já abre com o próprio respiro
+  infoTight: { paddingBottom: tokens.space[2] },
+  lines: { gap: tokens.space[1] },
+  top: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: tokens.space[3],
+    rowGap: tokens.space[1],
+  },
   empty: { paddingHorizontal: tokens.layout.gutter },
   header: { paddingHorizontal: tokens.layout.gutter },
   danger: {

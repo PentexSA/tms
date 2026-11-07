@@ -52,7 +52,12 @@ it('modo desconhecido na URL é ignorado; sem parâmetro, nada a limpar', () => 
 // não aparece.
 
 describe('ErrorBoundary da ficha', () => {
-  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+  const router = {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    canGoBack: jest.fn(() => false),
+  }
   beforeEach(() => {
     jest.mocked(useRouter).mockReturnValue(router as never)
   })
@@ -91,6 +96,18 @@ describe('ErrorBoundary da ficha', () => {
       screen.getByRole('button', { name: 'Voltar para Crônicas' })
     )
     expect(router.replace).toHaveBeenCalledWith('/')
+  })
+
+  it('voltar com histórico volta pela pilha (useBackTo, P12)', () => {
+    router.canGoBack.mockReturnValue(true)
+    render(
+      <ErrorBoundary error={new Error('x')} retry={() => Promise.resolve()} />
+    )
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Voltar para Crônicas' })
+    )
+    expect(router.back).toHaveBeenCalledTimes(1)
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('o expo-router desenha o boundary no lugar da rota que quebrou', () => {

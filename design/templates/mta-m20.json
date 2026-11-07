@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.7.0",
+  "templateVersion": "1.8.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz nomes de traços, regras numéricas e frases curtas do time (ajuda e Esferas), escritas com palavras próprias. Nenhum texto do livro é embutido.",
@@ -767,6 +767,12 @@
     },
 
     "notes": { "type": "longText", "label": "Notas", "maxLength": 4000 },
+    "backstory": {
+      "type": "longText",
+      "label": "História / Prelúdio",
+      "maxLength": 8000,
+      "help": "A história do personagem antes da crônica."
+    },
     "storytellerNotes": {
       "type": "longText",
       "label": "Notas do Narrador",
@@ -990,6 +996,14 @@
       "title": "Sobre",
       "layout": "text",
       "fields": ["quote", "notes"]
+    },
+    {
+      "id": "backstory",
+      "zone": "lore",
+      "title": "História",
+      "layout": "text",
+      "fields": ["backstory"],
+      "permissions": { "read": ["owner", "storyteller"] }
     },
     {
       "id": "storyteller",

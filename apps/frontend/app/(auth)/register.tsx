@@ -11,6 +11,9 @@ import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { ScrollView, StyleSheet, type TextInputInstance } from 'react-native'
 
+import { authMessage } from '../../lib/authMessages'
+import { hasPendingInvite } from '../../lib/invite/pending'
+import { usePendingInvite } from '../../lib/invite/usePendingInvite'
 import { nextField } from '../../lib/keyboard'
 import { AuthError } from '../../lib/session'
 import { useSession } from '../../lib/session/SessionProvider'
@@ -18,12 +21,15 @@ import {
   type FieldErrors,
   PASSWORD_MIN,
   type RegisterInput,
+  registerFieldError,
   validateRegister,
 } from '../../lib/validation'
 
 export default function RegisterScreen() {
   const { session } = useSession()
   const router = useRouter()
+  // Um convite chegou por link (P12): o aviso, sem o código nem a crônica
+  const invite = usePendingInvite() !== null
   const [form, setForm] = useState<RegisterInput>({
     email: '',
     username: '',
@@ -32,16 +38,27 @@ export default function RegisterScreen() {
   const [fields, setFields] = useState<FieldErrors<RegisterInput>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Depois do primeiro envio, ou com o campo já com erro, o erro daquele
+  // campo acompanha a digitação: some quando fica certo, muda quando o
+  // problema muda (T-73). Antes do primeiro envio, nada aparece
+  const [submitted, setSubmitted] = useState(false)
   const usernameInput = useRef<TextInputInstance>(null)
   const passwordInput = useRef<TextInputInstance>(null)
-  const set = (key: keyof RegisterInput) => (value: string) =>
+  // Funcional: o preenchimento automático muda dois campos no mesmo lote, e
+  // o `form` do fechamento perderia o primeiro. O erro de um campo só
+  // depende do valor dele
+  const set = (key: keyof RegisterInput) => (value: string) => {
     setForm(f => ({ ...f, [key]: value }))
+    if (submitted || fields[key])
+      setFields(f => ({ ...f, [key]: registerFieldError(key, value) }))
+  }
 
   // `latest`: o valor que chega com o Enter da senha. No app, o "Ir" pode
   // vir antes do último onChangeText, e a conta seria criada com a senha
   // cortada (mais fraca do que a digitada)
   const submit = async (latest: Partial<typeof form> = {}) => {
     const current = { ...form, ...latest }
+    setSubmitted(true)
     const problems = validateRegister(current)
     setFields(problems)
     if (Object.keys(problems).length) return
@@ -53,10 +70,12 @@ export default function RegisterScreen() {
         current.username,
         current.password
       )
-      router.replace('/')
+      router.replace(hasPendingInvite() ? '/join' : '/')
     } catch (e) {
       setError(
-        e instanceof AuthError ? e.message : 'Não foi possível criar a conta'
+        e instanceof AuthError
+          ? authMessage('register', e.status, e.message, e.requestId)
+          : 'Não foi possível criar a conta'
       )
     } finally {
       setBusy(false)
@@ -74,6 +93,12 @@ export default function RegisterScreen() {
           <Text variant="displayLg" accessibilityRole="header">
             Criar conta
           </Text>
+          {invite ? (
+            <Banner
+              tone="info"
+              message="Você recebeu um convite para uma crônica. Entre ou crie sua conta para continuar."
+            />
+          ) : null}
           {error ? <Banner tone="danger" message={error} /> : null}
           <TextField
             label="E-mail"

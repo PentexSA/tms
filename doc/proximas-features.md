@@ -4,7 +4,7 @@
 
 A v0 à v5 entregaram a ficha, a Mesa, a criação por pontos, o XP e os Bastidores. Comparado aos apps parecidos, o que falta agora não é regra de ficha: é **a mesa ao vivo** (o que acontece aparece na hora), **a ficha fora do app** (Discord, PDF, TV da mesa presencial) e **a narrativa entre as sessões** (relações, diário do jogador). A recomendação é fazer nessa ordem, como v6, v7 e v8, e deixar um sistema novo (V5) para a v9 como teste de fogo do motor agnóstico.
 
-O que já está decidido como "Depois do painel" (migração de fichas entre versões de template, recuperar senha e roteiro de deploy, em [`painel-narrador.md`](painel-narrador.md) §9) continua antes de tudo isto: sem ele não existe primeiro grupo de verdade.
+O que já está decidido como "Depois do painel" (migração de fichas entre versões de template, recuperar senha e roteiro de deploy, em [`painel-narrador.md`](painel-narrador.md) §9) continua antes de tudo isto: sem ele não existe primeiro grupo de verdade. As fichas criadas numa versão anterior do template ficam sem o que a versão nova trouxe; o caso, em aberto, está no [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 9.
 
 ## 1. O que os apps parecidos fazem
 
@@ -55,7 +55,7 @@ Nenhum deles junta o que o TMS já tem: a política de escrita por estado, o XP 
 
 6. **Discord por webhook.** O narrador cola o webhook de um canal nos Bastidores e escolhe o que vai: rolagens visíveis, resumo público da sessão, "Dano aplicado em 2 personagens". Os bots de WoD mostram que a mesa online vive no Discord. Só sai o que um membro já poderia ler, e o webhook é tratado como segredo.
 7. **PDF e link de leitura.** Exportar a ficha para imprimir (mesa presencial, arquivo do jogador). O link de leitura vale para alguém fora da crônica, como um narrador convidado, com a mesma projeção `viewer` da v5, expiração e revogação.
-8. **Notificações push.** Pelo Expo Notifications: "o narrador aprovou sua Destreza 3", "sua ficha foi devolvida", "novo pedido de XP", "transferência proposta". O texto da notificação nunca leva dado oculto.
+8. **Notificações push.** Pelo Expo Notifications: "o narrador aprovou sua Destreza 3", "sua ficha foi devolvida", "novo pedido de XP", "transferência proposta", "o jogador avisou que terminou" (D-03; §5.2). O texto da notificação nunca leva dado oculto.
 9. **Modo espectador.** Uma tela para a TV da mesa presencial: o feed visível, a iniciativa e os alertas públicos, sem login de jogador. Usa as mesmas projeções públicas.
 
 ### 2.3 Narrativa entre as sessões (v8)
@@ -64,6 +64,7 @@ Nenhum deles junta o que o TMS já tem: a política de escrita por estado, o XP 
 11. **Diário e notas do jogador.** Notas privadas por ficha, só do dono, e o relato do jogador por sessão ao lado do resumo público do narrador.
 12. **Upload de retrato.** A v5 aceita só uma URL HTTPS. Com o deploy definido, entra o upload com limite de tamanho, tipo conferido e redimensionamento no servidor.
 13. **Ajuda no traço.** Tocar num traço mostra a descrição que o template declara. **Atenção aos direitos:** o texto dos livros é da Paradox; o template leva só resumos próprios curtos ou a página do livro, e o narrador pode escrever a sua.
+    - **Em parte na onda 4** (P10-D, D-11): o "?" com uma frase curta do time nos campos, nas opções e nas Disciplinas, Dons e Esferas, na Nova ficha, na Criação e no Editar. Falta tocar no traço em Jogo e Leitura.
 14. **Planejar a evolução.** O jogador monta uma fila de pedidos futuros ("Destreza 3, depois Esquiva 2") e vê o custo somado com o `costOf` da v4, sem reservar XP e sem mudar a regra de um nível por pedido.
 
 ### 2.4 Um sistema novo (v9)
@@ -83,3 +84,26 @@ Nenhum deles junta o que o TMS já tem: a política de escrita por estado, o XP 
 - A primeira mesa real joga online (o Discord pesa mais) ou presencial (o PDF e o modo espectador pesam mais)? A resposta reordena a v6 e a v7.
 - O V5 entra como sistema novo ao lado do V20 ou há interesse em outro sistema primeiro (Changeling, Hunter)?
 - Onde o app vai hospedar arquivos? A resposta decide o upload de retrato e o PDF gerado no servidor.
+
+## 5. Adiadas pelas decisões do teste com personas (01/11/2026)
+
+O teste com personas ([matriz de achados](testes/2026-11-01/matriz-achados.md)) levou a decisões que deixam partes para depois. Elas ficam aqui, com o que precisa ser decidido antes do desenho.
+
+### 5.1 Reabrir criação (D-04)
+
+O narrador voltar uma ficha concluída para a criação. A D-04 a deixou fora deste ciclo. Antes de desenhar, é preciso decidir:
+
+- **A transição.** O [plano-v4.md](plano-v4.md) §3.4 proíbe hoje `active/archived/dead → creating`, e a confirmação de concluir diz "Não dá para voltar à criação" (`apps/frontend/sheet/creation/completion.ts`). Os dois mudam juntos.
+- **Quem pode.** Só o narrador da crônica, validado no servidor, com registro no Histórico e na auditoria, como o "Pedir ajuste".
+- **O que acontece com o que a ficha ganhou depois de concluir:** o XP concedido e o gasto, o `creationFreeze` gravado ao concluir, a aprovação e os pedidos de XP pendentes.
+- **A alternativa que já existe:** o narrador edita a ficha ativa pelo "Editar como narrador", sem voltar à criação.
+
+### 5.2 Push do "Avisar que terminei" (D-03)
+
+A D-03 pôs o selo na Mesa e deixou o push para depois. Ele entra na lista do item 8 ("Notificações push").
+
+### 5.3 Revelar uma Nota do Narrador ao jogador (D-17)
+
+Entrou na onda 5 ([P16-D](planos-pacotes/P16-D-revelar-nota-narrador.md)), com a revelação viva: o narrador toca "Revelar ao jogador" nas Notas do Narrador de uma ficha de jogador, confirma, e o dono passa a ler a nota inteira, só em leitura, enquanto for membro, inclusive o que o narrador salvar depois. "Deixar privadas" esconde de novo. Cada passo fica no Histórico. O texto chega por uma rota própria e não fica no cache do aparelho; sair da crônica, ser removido ou a transferência da narração zera a revelação. O NPC não tem revelação.
+
+Ficam para depois: uma lista de notas (hoje é um texto só por ficha), um retrato do texto no momento da revelação, e um selo ou notificação para o jogador.

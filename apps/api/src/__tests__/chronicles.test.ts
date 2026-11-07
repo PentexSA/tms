@@ -1,11 +1,13 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { sleep } from 'bun'
 import {
   hashInviteCode,
   newInviteCode,
   normalizeInviteCode,
 } from '../chronicles/invite-code'
 import { createRateLimiter } from '../http/rate-limit'
+import { logger } from '../logger'
 import { defaultLimits } from '../options'
 import {
   addMember,
@@ -362,6 +364,40 @@ describe('GET /chronicles/:id', () => {
     expect(foreign.status).toBe(404)
     expect(await missing.json()).toEqual(await foreign.json())
   })
+
+  // P14-D (U-09, D-15): o convite não cria vínculo; quem ainda não entrou
+  // não lê a Descrição, e quem entrou lê
+  it('o convidado que não entrou recebe 404 sem a Descrição; depois do aceite, lê', async () => {
+    const marker = 'marca-descricao-convite-91b2'
+    await ctx.db
+      .updateTable('chronicles')
+      .set({ description: `Abertura. ${marker}` })
+      .where('id', '=', chronicleId)
+      .execute()
+    const invite = await newInvite()
+    const before = await as(ctx, stranger, 'GET', `/chronicles/${chronicleId}`)
+    const missing = await as(
+      ctx,
+      stranger,
+      'GET',
+      `/chronicles/${crypto.randomUUID()}`
+    )
+    expect(before.status).toBe(404)
+    const text = await before.text()
+    expect(text).not.toContain(marker)
+    expect(text).toEqual(await missing.text())
+    const accepted = await as(ctx, stranger, 'POST', '/invites/accept', {
+      code: invite.code,
+    })
+    expect(accepted.status).toBe(200)
+    expect(await accepted.text()).not.toContain(marker)
+    const after = await as(ctx, stranger, 'GET', `/chronicles/${chronicleId}`)
+    expect(after.status).toBe(200)
+    expect(await after.json()).toMatchObject({
+      role: 'player',
+      description: `Abertura. ${marker}`,
+    })
+  })
 })
 
 describe('convites', () => {
@@ -381,6 +417,58 @@ describe('convites', () => {
     expect(list).toHaveLength(1)
     expect(JSON.stringify(list)).not.toContain(invite.code)
     expect(list[0]).toMatchObject({ uses: 0, maxUses: 10, active: true })
+  })
+
+  it('cada convite tem o número na crônica, estável depois de revogar (T-45)', async () => {
+    const first = await newInvite()
+    ctx.clock.advance(1000)
+    const second = await newInvite()
+    ctx.clock.advance(1000)
+    const third = await newInvite()
+    await as(
+      ctx,
+      storyteller,
+      'DELETE',
+      `/chronicles/${chronicleId}/invites/${second.id}`
+    )
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { id: string; number: number; active: boolean }[]
+    // A lista vem da mais nova para a mais velha
+    expect(list.map(i => [i.id, i.number, i.active])).toEqual([
+      [third.id, 3, true],
+      [second.id, 2, false],
+      [first.id, 1, true],
+    ])
+    // Um convite de outra crônica não muda a contagem desta
+    const other = await createChronicle(ctx, storyteller, 'vtm-v20', 'Segunda')
+    await as(ctx, storyteller, 'POST', `/chronicles/${other}/invites`)
+    const again = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { number: number }[]
+    expect(again.map(i => i.number)).toEqual([3, 2, 1])
+    // O jogador não lê a lista (nem o número): 403, como antes
+    const denied = await as(
+      ctx,
+      player,
+      'GET',
+      `/chronicles/${chronicleId}/invites`
+    )
+    expect(denied.status).toBe(403)
+    expect(await denied.text()).not.toContain('number')
+  })
+
+  it('o número é contado antes do limite de 50: o 51º continua 51', async () => {
+    for (let i = 0; i < 51; i++) {
+      await newInvite()
+      ctx.clock.advance(1000)
+    }
+    const list = (await (
+      await as(ctx, storyteller, 'GET', `/chronicles/${chronicleId}/invites`)
+    ).json()) as { number: number }[]
+    expect(list).toHaveLength(50)
+    expect(list[0]?.number).toBe(51)
+    expect(list.at(-1)?.number).toBe(2)
   })
 
   it('aceitar põe o usuário na crônica como jogador', async () => {
@@ -513,6 +601,42 @@ describe('convites', () => {
       code: newInviteCode(),
     })
     expect(res.status).toBe(429)
+  })
+})
+
+describe('o aceite não deixa o código no log', () => {
+  // O código vai no corpo do POST (o link o leva no fragmento, que o navegador
+  // não manda). O log de acesso não tem corpo; este teste prende isso para o
+  // código e para o hash dele, com o aceite que entra e com o que falha.
+  const LEVELS = ['error', 'warn', 'info', 'debug'] as const
+
+  it('nem o código nem o hash aparecem em nenhuma linha, em nenhum nível', async () => {
+    const invite = await newInvite()
+    const wrong = newInviteCode()
+    const spies = LEVELS.map(level => spyOn(logger, level))
+    try {
+      const ok = await as(ctx, stranger, 'POST', '/invites/accept', {
+        code: invite.code,
+      })
+      expect(ok.status).toBe(200)
+      const bad = await as(ctx, player, 'POST', '/invites/accept', {
+        code: wrong,
+      })
+      expect(bad.status).toBe(404)
+      // O log de acesso sai no onAfterResponse, depois da resposta
+      await sleep(10)
+      const logged = JSON.stringify(spies.map(spy => spy.mock.calls))
+      expect(logged).toContain('/invites/accept')
+      for (const secret of [
+        invite.code,
+        wrong,
+        hashInviteCode(invite.code),
+        hashInviteCode(wrong),
+      ])
+        expect(logged).not.toContain(secret)
+    } finally {
+      for (const spy of spies) spy.mockRestore()
+    }
   })
 })
 

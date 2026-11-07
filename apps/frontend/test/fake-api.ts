@@ -70,6 +70,9 @@ export function createFakeApi() {
     statusPost: jest.fn(),
     // Visibilidade do NPC (v5): só o narrador
     visibilityPost: jest.fn(),
+    // U-11 (P16-D): revelar e esconder as notas; a leitura do dono
+    revealPost: jest.fn(),
+    revealedGet: jest.fn(),
     lockPost: jest.fn(),
     lockDelete: jest.fn(),
     templateGet: jest.fn(),
@@ -126,6 +129,8 @@ export function createFakeApi() {
       visibility: {
         post: (...a: unknown[]) => calls.visibilityPost(id, ...a),
       },
+      reveal: { post: (...a: unknown[]) => calls.revealPost(id, ...a) },
+      revealed: { get: (...a: unknown[]) => calls.revealedGet(id, ...a) },
       lock: {
         post: (...a: unknown[]) => calls.lockPost(id, ...a),
         delete: (...a: unknown[]) => calls.lockDelete(id, ...a),

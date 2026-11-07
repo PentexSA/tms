@@ -52,6 +52,13 @@ const SECRET = 'marca-secreta-do-narrador-7f3a'
 // O nome do NPC oculto do cenário: nenhuma resposta a quem não narra o traz
 // (lista, Mesa, auditoria, identidade)
 const HIDDEN_NPC = 'NPC oculto'
+// A Descrição da crônica do cenário (P14-D, D-15): chega ao narrador e aos
+// membros no GET /chronicles/:id e a nenhuma resposta de quem não é membro,
+// inclusive o ex-membro
+const DESCRIPTION = 'marca-descricao-da-cronica-5c1e'
+// U-10 (D-16): marca única na História / Prelúdio da ficha da dona. O
+// narrador e a dona a recebem; nenhuma resposta a outro ator pode trazê-la
+const SHARED = 'marca-compartilhada-da-historia-2c9e'
 
 interface Scenario {
   readonly ctx: TestContext
@@ -59,6 +66,8 @@ interface Scenario {
   readonly chronicleId: string
   readonly characterId: string
   readonly npcId: string
+  /** A ficha do ex-membro, na crônica de que ele saiu. */
+  readonly formerCharacterId: string
   readonly inviteId: string
   readonly requestId: string
   readonly sessionId: string
@@ -91,6 +100,11 @@ async function scenario(s: SystemCase): Promise<Scenario> {
   await addMember(ctx, chronicleId, users.owner)
   await addMember(ctx, chronicleId, users.player)
   await createChronicle(ctx, users.otherStoryteller, s.system, 'Outra')
+  await ctx.db
+    .updateTable('chronicles')
+    .set({ description: `Apresentação da mesa. ${DESCRIPTION}` })
+    .where('id', '=', chronicleId)
+    .execute()
   const characterId = await createCharacter(ctx, users.owner, chronicleId)
   // A matriz é de AuthZ, não da conta da criação
   await freeCreation(ctx, characterId)
@@ -103,7 +117,12 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     .where('id', '=', npcId)
     .execute()
   // O ex-membro: tem ficha na crônica e não tem mais o vínculo
-  await createCharacter(ctx, users.former, chronicleId, { name: 'Antiga' })
+  const formerCharacterId = await createCharacter(
+    ctx,
+    users.former,
+    chronicleId,
+    { name: 'Antiga' }
+  )
   const notes = await as(
     ctx,
     users.storyteller,
@@ -111,7 +130,10 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     `/characters/${characterId}/events`,
     {
       clientBatchId: crypto.randomUUID(),
-      events: [{ path: `values.${s.notesField}`, from: null, to: SECRET }],
+      events: [
+        { path: `values.${s.notesField}`, from: null, to: SECRET },
+        { path: `values.${s.sharedTextField}`, from: null, to: SHARED },
+      ],
     }
   )
   expect(notes.status).toBe(200)
@@ -168,6 +190,7 @@ async function scenario(s: SystemCase): Promise<Scenario> {
     chronicleId,
     characterId,
     npcId,
+    formerCharacterId,
     inviteId: invite.id,
     requestId: request.id,
     sessionId: session.id,
@@ -233,6 +256,15 @@ async function check(
     expect(text).not.toContain(SECRET)
     expect(text).not.toContain(HIDDEN_NPC)
   }
+  // A Descrição: o narrador e os membros a leem no detalhe da crônica; quem
+  // não é membro (o ex-membro também, D-15) não a recebe em rota nenhuma
+  const member =
+    actor === 'storyteller' || actor === 'owner' || actor === 'player'
+  const detail = row.method === 'GET' && row.route === '/chronicles/:id'
+  if (member && detail) expect(text).toContain(DESCRIPTION)
+  if (!member) expect(text).not.toContain(DESCRIPTION)
+  if (actor !== 'storyteller' && actor !== 'owner')
+    expect(text).not.toContain(SHARED)
   // O ex-membro não recebe os membros nem a ficha de ninguém além das dele
   if (actor === 'former')
     for (const other of [sc.users.owner.id, sc.users.player.id, sc.characterId])
@@ -306,6 +338,125 @@ for (const system of MATRIX_SYSTEMS) {
       }
       expect(JSON.stringify(rows)).not.toContain('created_by')
     })
+
+    // P09-D (R-15): a entrada da conta da criação (escolhas e camada) sai só
+    // na Mesa, só para o narrador, e nunca para o NPC oculto
+    it('a Mesa do narrador: creationInput só para ele, nunca no NPC', async () => {
+      const reason = 'motivo-do-ajuste-da-matriz-p09d'
+      const layer = {
+        choices: {
+          priorities: { attributes: ['mental', 'social', 'physical'] },
+        },
+        config: { freebies: 13 },
+      }
+      const points = await createCharacter(
+        shared.ctx,
+        shared.users.owner,
+        shared.chronicleId,
+        { name: 'Por pontos' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({
+          creation: JSON.stringify({
+            ...layer,
+            adjust: { reason, at: '2026-11-05T10:00:00Z' },
+          }),
+        })
+        .where('id', '=', points)
+        .execute()
+      const path = `/chronicles/${shared.chronicleId}/table`
+      const res = await as(shared.ctx, shared.users.storyteller, 'GET', path)
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      // O motivo do ajuste não sai nem para o narrador, pela Mesa
+      expect(text).not.toContain(reason)
+      const rows = JSON.parse(text) as {
+        id: string
+        creationInput: unknown
+      }[]
+      expect(rows.find(r => r.id === points)?.creationInput).toEqual(layer)
+      // O NPC oculto e a ficha da criação livre não têm entrada
+      expect(rows.find(r => r.id === shared.npcId)?.creationInput).toBeNull()
+      expect(
+        rows.find(r => r.id === shared.characterId)?.creationInput
+      ).toBeNull()
+      for (const actor of [
+        'owner',
+        'player',
+        'former',
+        'otherStoryteller',
+        'stranger',
+      ] as const) {
+        const denied = await as(shared.ctx, shared.users[actor], 'GET', path)
+        expect(denied.status).toBe(404)
+        const body = await denied.text()
+        expect(body).not.toContain('creationInput')
+        expect(body).not.toContain('mental')
+      }
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', '=', points)
+        .execute()
+    })
+
+    // P09-D (R-15): "N fichas em criação" na lista só para o narrador; o NPC
+    // (oculto ou revelado) nunca entra, e quem o lê como viewer recebe 0
+    it('a lista de crônicas: creatingCount só para o narrador, sem NPC', async () => {
+      const countOf = async (actor: Exclude<Actor, 'anonymous'>) => {
+        const res = await as(
+          shared.ctx,
+          shared.users[actor],
+          'GET',
+          '/chronicles'
+        )
+        expect(res.status).toBe(200)
+        const rows = (await res.json()) as {
+          id: string
+          creatingCount: number
+        }[]
+        return rows.find(r => r.id === shared.chronicleId)?.creatingCount
+      }
+      // As linhas da matriz que criam ficha mudam o cenário: a prova é a
+      // diferença. Uma ficha nova de jogador conta; o NPC, não
+      const base = await countOf('storyteller')
+      expect(base).toBeGreaterThanOrEqual(1)
+      const extra = await createCharacter(
+        shared.ctx,
+        shared.users.player,
+        shared.chronicleId,
+        { name: 'Mais uma' }
+      )
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      for (const actor of ['owner', 'player', 'former'] as const)
+        expect(await countOf(actor)).toBe(0)
+      for (const actor of ['otherStoryteller', 'stranger'] as const)
+        expect(await countOf(actor)).toBeUndefined()
+      const revealed = await createCharacter(
+        shared.ctx,
+        shared.users.storyteller,
+        shared.chronicleId,
+        { name: 'NPC revelado' }
+      )
+      await shared.ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility: 'full' })
+        .where('id', '=', revealed)
+        .execute()
+      const seen = await as(
+        shared.ctx,
+        shared.users.player,
+        'GET',
+        `/characters/${revealed}`
+      )
+      expect(await seen.json()).toMatchObject({ roles: ['viewer'] })
+      expect(await countOf('player')).toBe(0)
+      expect(await countOf('storyteller')).toBe((base ?? 0) + 1)
+      await shared.ctx.db
+        .deleteFrom('characters')
+        .where('id', 'in', [revealed, extra])
+        .execute()
+    })
   })
 
   describe(`matriz de AuthZ: ${system}, linhas que mudam o estado`, () => {
@@ -314,6 +465,168 @@ for (const system of MATRIX_SYSTEMS) {
         it(`${row.method} ${row.route} como ${actor} → ${status}`, async () => {
           await check(await scenario(s), s, row, actor, status)
         })
+  })
+
+  // U-10 (D-16): a História / Prelúdio. O narrador e a dona leem e escrevem
+  // (saída A); outro jogador, ex-membro (na ficha alheia), `viewer` de NPC
+  // revelado, outro narrador e estranho não leem. O cenário é próprio: os
+  // casos mudam o estado da ficha e revelam o NPC.
+  describe(`U-10: a História do personagem (${system})`, () => {
+    let sc: Scenario
+    beforeAll(async () => {
+      sc = await scenario(s)
+    })
+    const sheet = async (actor: Exclude<Actor, 'anonymous'>, id: string) => {
+      const res = await as(sc.ctx, sc.users[actor], 'GET', `/characters/${id}`)
+      return { status: res.status, text: await res.text() }
+    }
+    const write = (
+      actor: Exclude<Actor, 'anonymous'>,
+      id: string,
+      from: string | null,
+      to: string
+    ) =>
+      as(sc.ctx, sc.users[actor], 'POST', `/characters/${id}/events`, {
+        clientBatchId: crypto.randomUUID(),
+        events: [{ path: `values.${s.sharedTextField}`, from, to }],
+      })
+
+    it('quem lê: o narrador e a dona; mais ninguém', async () => {
+      const storyteller = await sheet('storyteller', sc.characterId)
+      expect(storyteller.status).toBe(200)
+      expect(storyteller.text).toContain(SHARED)
+      expect(storyteller.text).toContain(SECRET)
+
+      const owner = await sheet('owner', sc.characterId)
+      expect(owner.status).toBe(200)
+      expect(owner.text).toContain(SHARED)
+      expect(owner.text).not.toContain(SECRET)
+
+      for (const actor of [
+        'player',
+        'former',
+        'otherStoryteller',
+        'stranger',
+      ] as const) {
+        const res = await sheet(actor, sc.characterId)
+        expect(res.status).toBe(404)
+        expect(res.text).not.toContain(SHARED)
+      }
+    })
+
+    it('NPC: a História não chega ao membro, oculto ou revelado por inteiro', async () => {
+      const NPC_STORY = `historia-do-npc-${system}`
+      expect(
+        (await write('storyteller', sc.npcId, null, NPC_STORY)).status
+      ).toBe(200)
+      const hidden = await sheet('player', sc.npcId)
+      expect(hidden.status).toBe(404)
+      expect(hidden.text).not.toContain(NPC_STORY)
+
+      for (const [visibility, revision] of [
+        ['identity', 0],
+        ['full', 1],
+      ] as const) {
+        const res = await as(
+          sc.ctx,
+          sc.users.storyteller,
+          'POST',
+          `/characters/${sc.npcId}/visibility`,
+          { clientCommandId: crypto.randomUUID(), visibility, revision }
+        )
+        expect(res.status).toBe(200)
+      }
+      const full = await as(
+        sc.ctx,
+        sc.users.player,
+        'GET',
+        `/characters/${sc.npcId}`
+      )
+      const body = (await full.json()) as {
+        roles: string[]
+        sheet: { values: Record<string, unknown> }
+      }
+      expect(full.status).toBe(200)
+      expect(body.roles).toEqual(['viewer'])
+      expect(Object.hasOwn(body.sheet.values, s.sharedTextField)).toBe(false)
+      expect(JSON.stringify(body)).not.toContain(NPC_STORY)
+      // O narrador continua lendo
+      expect((await sheet('storyteller', sc.npcId)).text).toContain(NPC_STORY)
+      // O `viewer` nunca escreve
+      expect(
+        (await write('player', sc.npcId, NPC_STORY, 'do-membro')).status
+      ).toBe(404)
+    })
+
+    it('quem escreve: a dona conforme o estado, o narrador sempre', async () => {
+      let current: string = SHARED
+      const step = async (
+        actor: 'owner' | 'storyteller',
+        expected: number,
+        code?: Record<string, string>
+      ) => {
+        const to = `${actor}-${crypto.randomUUID()}`
+        const res = await write(actor, sc.characterId, current, to)
+        expect(res.status).toBe(expected)
+        if (code) expect(await res.json()).toMatchObject(code)
+        if (expected === 200) current = to
+      }
+      await setStatus(sc.ctx, sc.characterId, 'creating')
+      await step('owner', 200)
+      await setStatus(sc.ctx, sc.characterId, 'pending')
+      await step('owner', 403, { reason: 'pending' })
+      await step('storyteller', 200)
+      await setStatus(sc.ctx, sc.characterId, 'active')
+      await step('owner', 200)
+      await setStatus(sc.ctx, sc.characterId, 'active', true)
+      await step('owner', 403, { code: 'SHEET_LOCKED' })
+      await step('storyteller', 200)
+      await setStatus(sc.ctx, sc.characterId, 'active')
+      // Outro jogador e estranho: 404, e nada muda
+      for (const actor of ['player', 'otherStoryteller', 'stranger'] as const)
+        expect((await write(actor, sc.characterId, current, 'x')).status).toBe(
+          404
+        )
+      expect((await sheet('owner', sc.characterId)).text).toContain(current)
+    })
+
+    it('o ex-membro lê a História da própria ficha e não a escreve', async () => {
+      const OLD_STORY = `historia-antiga-${system}`
+      expect(
+        (await write('storyteller', sc.formerCharacterId, null, OLD_STORY))
+          .status
+      ).toBe(200)
+      const own = await sheet('former', sc.formerCharacterId)
+      expect(own.status).toBe(200)
+      expect(own.text).toContain(OLD_STORY)
+      const res = await write('former', sc.formerCharacterId, OLD_STORY, 'x')
+      expect(res.status).toBe(403)
+      expect(await res.json()).toMatchObject({ code: 'NOT_MEMBER' })
+    })
+
+    it('o Histórico da dona: o lote do narrador na História, sem o texto', async () => {
+      const res = await as(
+        sc.ctx,
+        sc.users.owner,
+        'GET',
+        `/characters/${sc.characterId}/history`
+      )
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      const { items } = JSON.parse(text) as {
+        items: { byRole: string; changes: { label: string }[] }[]
+      }
+      const label = 'História / Prelúdio'
+      expect(
+        items.some(
+          i =>
+            i.byRole === 'storyteller' && i.changes.some(c => c.label === label)
+        )
+      ).toBe(true)
+      expect(text).not.toContain(SHARED)
+      expect(text).not.toContain(SECRET)
+      expect(text).not.toContain('Notas do Narrador')
+    })
   })
 }
 

@@ -92,7 +92,7 @@ test('o POST de sessão manda a versão da raiz', async ({ page }) => {
   await page.getByLabel('Senha').fill('qualquer senha errada')
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page.getByRole('alert')).toContainText(
-    'e-mail ou senha incorretos'
+    'E-mail ou senha incorretos'
   )
   await expect.poll(() => sent.get('POST /auth/login')).toBe(ROOT_VERSION)
 })

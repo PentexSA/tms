@@ -15,6 +15,7 @@ import {
   type SheetEvent,
   type SheetModel,
   withEffectiveFrom,
+  withEffectiveTo,
   writePolicy,
 } from '@tms/sheet-core'
 import { Elysia, t } from 'elysia'
@@ -223,7 +224,12 @@ export async function writeBatch(
   await trx
     .insertInto('character_events')
     .values(
-      withEffectiveFrom(c.model, c.sheet, args.events).map((e, seq) => {
+      // O "de" e o "para" efetivos, como no endpoint de eventos (T-53)
+      withEffectiveTo(
+        c.model,
+        args.sheet,
+        withEffectiveFrom(c.model, c.sheet, args.events)
+      ).map((e, seq) => {
         const hide = contentFree(c.model, e.path)
         return {
           batch_id: batch.id,
@@ -232,6 +238,8 @@ export async function writeBatch(
           from_value: hide ? null : JSON.stringify(e.from ?? null),
           to_value: hide ? null : JSON.stringify(e.to ?? null),
           from_absent: (args.events[seq]?.from ?? null) === null,
+          // O "para" cru era vazio: o to_value guarda o efetivo (T-53)
+          to_absent: (args.events[seq]?.to ?? null) === null,
         }
       })
     )
@@ -581,7 +589,13 @@ export function operationRoutes(
                 const c = locked.get(b.character_id) as Locked
                 const events = await trx
                   .selectFrom('character_events')
-                  .select(['path', 'from_value', 'to_value', 'from_absent'])
+                  .select([
+                    'path',
+                    'from_value',
+                    'to_value',
+                    'from_absent',
+                    'to_absent',
+                  ])
                   .where('batch_id', '=', b.id)
                   .orderBy('seq')
                   .execute()
@@ -594,6 +608,7 @@ export function operationRoutes(
                       from: e.from_value,
                       to: e.to_value,
                       fromAbsent: e.from_absent,
+                      toAbsent: e.to_absent,
                     })
                   )
                 )

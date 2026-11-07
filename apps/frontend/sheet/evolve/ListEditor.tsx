@@ -31,6 +31,7 @@ import {
   ListHeader,
 } from '../views/ListView'
 import type { FieldViewProps } from '../views/types'
+import { BlockedNote } from './BlockedNote'
 import { DraftNoticeText } from './DraftNoticeText'
 import { fieldHelp, nameHelp } from './help'
 import {
@@ -175,9 +176,14 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
     <View testID={`editor-${list.id}`} style={styles.wrap}>
       {headed ? null : <EditorListHeader list={list} sheet={sheet} />}
       {blocked && def.item.value ? (
-        <Text variant="caption" color="inkMuted" style={styles.empty}>
-          {blocked}
-        </Text>
+        // Um atalho para a lista toda: abre a busca pelo nome dela (U-01)
+        <View style={styles.empty}>
+          <BlockedNote
+            text={blocked}
+            to={{ query: def.label, field: list.id }}
+            subject={def.label}
+          />
+        </View>
       ) : null}
       {list.items.map(item =>
         def.item.value ? (

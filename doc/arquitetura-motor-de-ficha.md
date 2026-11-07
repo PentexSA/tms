@@ -461,7 +461,7 @@ Table users {
 Table refresh_tokens {                      // 0009: sessão
   id uuid [pk]
   user_id uuid [not null, ref: > users.id]  // on delete cascade
-  family_id uuid [not null]                 // reuso revoga a família inteira
+  family_id uuid [not null]                 // reuso revoga a família inteira (tolerância de 30 s: onda 5)
   token_hash text [not null, unique]        // sha256; o token opaco não é guardado
   expires_at timestamptz [not null]         // 30 dias por token
   family_expires_at timestamptz [not null]  // 90 dias absolutos
@@ -559,7 +559,7 @@ Resumo. Os detalhes do contrato estão em [`design/templates/README.md`](../desi
 | Estilo injetado | Cor só por `accent-N`; números que viram estilo têm faixa. |
 | Prototype pollution | `Object.hasOwn`, allowlist de chaves, ids proibidos. |
 | Jogador edita a ficha de outro (IDOR) | AuthZ por crônica em toda rota, com papel resolvido no servidor; testes de IDOR. |
-| Jogador lê as notas do narrador | O servidor remove seções restritas em toda saída: ficha, mesa, histórico e cache. |
+| Jogador lê as notas do narrador | O servidor remove seções restritas em toda saída: ficha, mesa, histórico e cache. A única exceção é a revelação explícita do narrador da crônica ao dono da ficha (U-11): só de seção restrita ao narrador e só de texto, só em leitura, enquanto o dono for membro, por uma rota própria (`GET /characters/:id/revealed`) cujo texto o app nunca grava no disco; as saídas de hoje continuam sem a seção. Revelar e esconder ficam no Histórico e no registro da crônica, sem o texto. |
 | Cliente adulterado manda valor fora da regra | O servidor revalida cada lote com o mesmo core. O modo da UI não é controle de acesso. |
 | Reenvio duplicado da fila offline | Idempotência por `(ficha, lote)`. |
 | Abuso do endpoint de eventos | Rate limit por usuário e por ficha; limite de corpo e de eventos por lote. |

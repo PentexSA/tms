@@ -26,10 +26,32 @@ const MAX_FRAMES = 30
 const MAX_FRAME = 300
 const MAX_CAUSE_DEPTH = 3
 
+// O alfabeto do código (invite-code.ts) em qualquer caixa, sem o U, mais O, I e
+// L, que o aceite normaliza. Cru (26 seguidos) ou formatado (4 × 6 + 2).
+export const INVITE_CHAR = '[0-9A-TV-Za-tv-z]'
+const INVITE_CODE = new RegExp(
+  `(^|[^0-9A-Za-z])(?:${INVITE_CHAR}{26}|${INVITE_CHAR}{4}(?:[ -]${INVITE_CHAR}{4}){5}[ -]${INVITE_CHAR}{2})(?![0-9A-Za-z])`,
+  'g'
+)
+// O fragmento de uma URL ou de um caminho ("/join#…"): num token sem espaço
+// nem aspas, o que vem depois do primeiro "#" que tem um "/" antes. O "#"
+// de um método privado no stack ("at Foo.#bar") não tem "/" antes. Um passe
+// por token, linear: a regex com o prefixo opcional era quadrática num
+// token longo de "/"
+const TOKEN = /[^\s'"<>]+/g
+export const redactFragments = (text: string): string =>
+  text.replace(TOKEN, token => {
+    const hash = token.indexOf('#')
+    if (hash < 1 || hash === token.length - 1) return token
+    return token.lastIndexOf('/', hash) === -1
+      ? token
+      : `${token.slice(0, hash)}#[convite]`
+  })
+
 /** Redação por padrão, para mensagem e frames. */
 export function redact(text: string): string {
   return (
-    text
+    redactFragments(text)
       // Antes do e-mail, porque o usuário e a senha da URL podem ter "@"
       .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s'"<>]*@/gi, '$1[credencial]@')
       .replace(/\beyJ[\w-]+\.[\w-]+(?:\.[\w-]*)?/g, '[jwt]')
@@ -39,6 +61,11 @@ export function redact(text: string): string {
         /[^\s@'"<>(),:;=/[\]]+@([\p{L}\p{N}.-]+)/gu,
         (match, domain: string) => (/^[\d.]+$/.test(domain) ? match : '[email]')
       )
+      // O código de convite (P12): 26 caracteres do base32 Crockford, cru ou
+      // no formato da tela (grupos de 4), e o fragmento de URL que o link leva.
+      // Toda sequência do alfabeto conta: um falso positivo só apaga texto de
+      // diagnóstico. Sem lookbehind, que nem todo motor de regex do app tem
+      .replace(INVITE_CODE, '$1[convite]')
   )
 }
 

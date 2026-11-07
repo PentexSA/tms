@@ -18,7 +18,7 @@
   },
   "templates": {
     "vtm-v20": {
-      "templateVersion": "1.9.0",
+      "templateVersion": "1.10.0",
       "fields": {
         "concept": {
           "label": "Conceito",
@@ -190,7 +190,7 @@
       }
     },
     "wta-w20": {
-      "templateVersion": "1.7.0",
+      "templateVersion": "1.8.0",
       "fields": {
         "concept": {
           "label": "Conceito",
@@ -382,7 +382,7 @@
       }
     },
     "mta-m20": {
-      "templateVersion": "1.7.0",
+      "templateVersion": "1.8.0",
       "fields": {
         "concept": {
           "label": "Conceito",

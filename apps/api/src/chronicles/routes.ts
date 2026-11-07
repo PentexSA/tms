@@ -89,12 +89,26 @@ export function chronicleRoutes(
         .execute()
       const now = options.now()
       const ids = characters.map(c => c.id)
-      if (ids.length)
+      if (ids.length) {
         await trx
           .updateTable('characters')
           .set({ status: 'archived', locked_at: null, updated_at: now })
           .where('id', 'in', ids)
           .execute()
+        // U-11 (P16-D): a revelação das notas termina com o vínculo. Quem
+        // volta à crônica não lê o que o narrador escreveu depois; o
+        // narrador revela de novo se quiser. A revisão sobe para descartar
+        // pedido feito antes
+        await trx
+          .updateTable('characters')
+          .set({
+            revealed_sections: [],
+            reveal_revision: sql`reveal_revision + 1`,
+          })
+          .where('id', 'in', ids)
+          .where(sql<boolean>`cardinality(revealed_sections) > 0`)
+          .execute()
+      }
       await trx
         .deleteFrom('chronicle_members')
         .where('chronicle_id', '=', chronicleId)
@@ -380,6 +394,22 @@ export function chronicleRoutes(
             )
             .where('c.storyteller_id', '=', me)
             .as('pendingReview'),
+          // P09-D (R-15): os PCs de outras pessoas ainda em criação, na vez
+          // do jogador (sem o "terminei", que já está no pendingReview). O
+          // NPC fica fora, oculto ou não. Só o narrador recebe a conta
+          eb
+            .selectFrom('characters as ch')
+            .select(eb.fn.countAll<string>().as('n'))
+            .whereRef('ch.chronicle_id', '=', 'c.id')
+            .where('ch.deleted_at', 'is', null)
+            .where('ch.kind', '=', 'pc')
+            .where('ch.user_id', '<>', me)
+            .where('ch.status', '=', 'creating')
+            .where(
+              sql<boolean>`jsonb_typeof(ch.creation -> 'ready' -> 'at') is distinct from 'string'`
+            )
+            .where('c.storyteller_id', '=', me)
+            .as('creatingCount'),
           // A data civil da última sessão (U-04), no formato do sessionDate.
           // O índice chronicle_sessions_recent_idx atende
           eb
@@ -409,6 +439,7 @@ export function chronicleRoutes(
           storyteller: { username: r.storyteller },
           characterCount: Number(r.characterCount ?? 0),
           pendingReview: Number(r.pendingReview ?? 0),
+          creatingCount: Number(r.creatingCount ?? 0),
           // Só narrador e membro: o ex-membro não acompanha a crônica
           // (plano v5 §3.5)
           lastSession: role === 'former' ? null : (r.lastSession ?? null),
@@ -457,14 +488,18 @@ export function chronicleRoutes(
           name: c.name,
           system: { code: c.systemCode, name: c.systemName },
           storyteller: { id: c.storytellerId, username: c.storyteller },
-          description: c.description,
-          imageUrl: c.image_url,
           options: model ? effectiveChronicleOptions(model, c.options) : {},
           settingsRevision: c.settings_revision,
         }
-        // O ex-membro não recebe os membros
+        // O ex-membro não recebe os membros nem a Apresentação: a Descrição
+        // e a Imagem só chegam a quem é membro (D-15; plano-v5: ele lê só as
+        // próprias fichas arquivadas), como o lastSession da lista
         if (role === 'former')
           return { ...head, role: 'former' as const, members: [] }
+        const presentation = {
+          description: c.description,
+          imageUrl: c.image_url,
+        }
         const members = await db
           .selectFrom('chronicle_members as m')
           .innerJoin('users as u', 'u.id', 'm.user_id')
@@ -482,6 +517,7 @@ export function chronicleRoutes(
           .executeTakeFirst()
         return {
           ...head,
+          ...presentation,
           // Configuração da criação (v4): o narrador ajusta; o jogador vê se
           // a ficha nova passa por aprovação e o orçamento padrão
           creation: {
@@ -613,7 +649,10 @@ export function chronicleRoutes(
         const me = requireUser(userId)
         await requireStoryteller(me, params.id)
         const now = options.now()
-        const rows = await db
+        // O número do convite na crônica (1 = o primeiro gerado nela),
+        // contado antes do limite: o 51º continua 51. Convites não são
+        // apagados (só revogados), então o número não muda (P12, T-45)
+        const numbered = db
           .selectFrom('chronicle_invites')
           .select([
             'id',
@@ -622,13 +661,20 @@ export function chronicleRoutes(
             'max_uses',
             'uses',
             'revoked_at',
+            sql<number>`(row_number() over (order by created_at, id))::int`.as(
+              'number'
+            ),
           ])
           .where('chronicle_id', '=', params.id)
+        const rows = await db
+          .selectFrom(numbered.as('i'))
+          .selectAll()
           .orderBy('created_at', 'desc')
           .limit(50)
           .execute()
         return rows.map(r => ({
           id: r.id,
+          number: r.number,
           createdAt: r.created_at,
           expiresAt: r.expires_at,
           maxUses: r.max_uses,

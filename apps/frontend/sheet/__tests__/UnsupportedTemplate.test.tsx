@@ -58,9 +58,15 @@ describe('storeUrl', () => {
 })
 
 describe('UnsupportedTemplate', () => {
-  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() }
+  const router = {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    canGoBack: jest.fn(() => true),
+  }
   beforeEach(() => {
     jest.mocked(useRouter).mockReturnValue(router as never)
+    router.canGoBack.mockReturnValue(true)
   })
 
   it('no app: "Atualize o app", "Voltar" e nenhuma loja sem link configurado', () => {
@@ -70,6 +76,15 @@ describe('UnsupportedTemplate', () => {
     expect(screen.queryByRole('button', { name: 'Abrir a loja' })).toBeNull()
     fireEvent.press(screen.getByRole('button', { name: 'Voltar' }))
     expect(router.back).toHaveBeenCalled()
+  })
+
+  // T-30 (P12): sem tela de baixo, o back não faz nada; vai para a lista
+  it('no app, sem tela de baixo, "Voltar" abre a lista', () => {
+    router.canGoBack.mockReturnValue(false)
+    render(<UnsupportedTemplate />)
+    fireEvent.press(screen.getByRole('button', { name: 'Voltar' }))
+    expect(router.back).not.toHaveBeenCalled()
+    expect(router.replace).toHaveBeenCalledWith('/')
   })
 
   it('no app, "Voltar" usa a saída da tela quando ela é dada', () => {

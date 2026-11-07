@@ -6,6 +6,7 @@ import {
   createCharacter,
   createChronicle,
   createUser,
+  freeCreation,
   publish,
   setStatus,
   type TestUser,
@@ -42,6 +43,10 @@ interface TableRow {
   returned: boolean
   adjust: boolean
   ready: boolean
+  creationInput: {
+    choices: { priorities?: Record<string, string[]> }
+    config: Record<string, unknown>
+  } | null
   activatedAt: string | null
   lockedAt: string | null
   updatedAt: string
@@ -113,6 +118,8 @@ describe('GET /chronicles/:id/table', () => {
       returned: false,
       adjust: false,
       ready: false,
+      // P09-D (R-15): a entrada da conta, vazia na ficha recém-criada
+      creationInput: { choices: {}, config: {} },
       activatedAt: null,
       lockedAt: null,
       updatedAt: expect.any(String),
@@ -393,5 +400,95 @@ describe('GET /chronicles/:id/table', () => {
         expect(text).not.toContain('segredo')
       }
     })
+  })
+
+  // P09-D (R-15): a Mesa manda ao narrador as escolhas e a camada da
+  // criação, para o app fazer a conta do cartão, nos três sistemas
+  describe('creationInput', () => {
+    const secretReturned = 'motivo-da-devolucao-p09d'
+    const secretAdjust = 'motivo-do-ajuste-p09d'
+    const setCreation = (id: string, creation: unknown) =>
+      ctx.db
+        .updateTable('characters')
+        .set({ creation: JSON.stringify(creation) })
+        .where('id', '=', id)
+        .execute()
+    const setNpc = (id: string, visibility: 'hidden' | 'identity' | 'full') =>
+      ctx.db
+        .updateTable('characters')
+        .set({ kind: 'npc', visibility })
+        .where('id', '=', id)
+        .execute()
+
+    for (const system of ['vtm-v20', 'mta-m20', 'wta-w20'] as const)
+      it(`${system}: só no PC por pontos em creating e pending, sem o motivo`, async () => {
+        if (system !== 'vtm-v20') await publish(ctx, system)
+        const id =
+          system === 'vtm-v20'
+            ? chronicleId
+            : await createChronicle(ctx, storyteller, system)
+        if (system !== 'vtm-v20') await addMember(ctx, id, owner)
+        const choices = {
+          priorities: { attributes: ['social', 'physical', 'mental'] },
+        }
+        const config = { freebies: 10 }
+        const fresh = await createCharacter(ctx, owner, id, { name: 'Nova' })
+        const chosen = await createCharacter(ctx, owner, id, {
+          name: 'Escolhida',
+        })
+        await setCreation(chosen, {
+          choices,
+          config,
+          returned: { reason: secretReturned, at: '2026-11-01T10:00:00Z' },
+          adjust: { reason: secretAdjust, at: '2026-11-02T10:00:00Z' },
+          ready: { at: '2026-11-03T10:00:00Z' },
+        })
+        const sent = await createCharacter(ctx, owner, id, { name: 'Enviada' })
+        await setCreation(sent, { choices, config })
+        await setStatus(ctx, sent, 'pending')
+        const active = await createCharacter(ctx, owner, id, { name: 'Ativa' })
+        await setCreation(active, { choices, config })
+        await setStatus(ctx, active, 'active')
+        const free = await createCharacter(ctx, owner, id, { name: 'Livre' })
+        await freeCreation(ctx, free)
+        // Escolha fora do formato, gravada direto no banco: sai como ausente
+        const broken = await createCharacter(ctx, owner, id, {
+          name: 'Quebrada',
+        })
+        await setCreation(broken, {
+          choices: { priorities: { attributes: ['x'] } },
+          config: { freebies: -3 },
+        })
+        const hidden = await createCharacter(ctx, storyteller, id, {
+          name: 'Oculto',
+        })
+        await setNpc(hidden, 'hidden')
+        const revealed = await createCharacter(ctx, storyteller, id, {
+          name: 'Revelado',
+        })
+        await setNpc(revealed, 'identity')
+
+        const res = await table(storyteller, id)
+        expect(res.status).toBe(200)
+        const text = await res.text()
+        expect(text).not.toContain(secretReturned)
+        expect(text).not.toContain(secretAdjust)
+        expect(text).not.toContain('reason')
+        const rows = JSON.parse(text) as TableRow[]
+        const input = (rowId: string) =>
+          rows.find(r => r.id === rowId)?.creationInput
+        expect(input(fresh)).toEqual({ choices: {}, config: {} })
+        expect(input(chosen)).toEqual({ choices, config })
+        expect(input(sent)).toEqual({ choices, config })
+        expect(input(broken)).toEqual({ choices: {}, config: {} })
+        for (const none of [active, free, hidden, revealed])
+          expect(input(none)).toBeNull()
+        // A dona e o outro jogador continuam sem a Mesa
+        for (const user of [owner, player]) {
+          const denied = await table(user, id)
+          expect(denied.status).toBe(404)
+          expect(await denied.text()).not.toContain('creationInput')
+        }
+      })
   })
 })

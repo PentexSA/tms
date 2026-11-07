@@ -1,10 +1,10 @@
 import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import {
-  AccessibilityInfo,
   type HostInstance,
   type LayoutChangeEvent,
   Platform,
 } from 'react-native'
+import { focusView } from '../../lib/focus'
 import { useGroupTabsContext } from './groupTabsState'
 
 // As âncoras do "ir ao grupo" (P05-D, R-18): cada seção do painel (e cada
@@ -28,17 +28,8 @@ export interface AnchorTarget {
   readonly tabIndex?: -1
 }
 
-/** O foco programático: no web, o elemento; no app, o leitor de tela. */
-export function focusView(view: HostInstance | null) {
-  if (!view) return
-  if (Platform.OS === 'web') {
-    ;(view as unknown as { focus?: (o?: object) => void }).focus?.({
-      preventScroll: true,
-    })
-    return
-  }
-  AccessibilityInfo.sendAccessibilityEvent(view, 'focus')
-}
+// O foco programático mora em lib/focus.ts (P12); daqui, reexportado
+export { focusView } from '../../lib/focus'
 
 /**
  * O `y` de uma vista dentro da vista-mãe, lido na hora. Só no web: lá, o
