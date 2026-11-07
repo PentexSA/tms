@@ -734,7 +734,7 @@ O roteiro manual rodou em 06/11, na ordem da seção 10.5: web (Playwright, Chro
 1. **A1, o topo da crônica do narrador.** Com o bloco "Apresentação" (de 92 a 96) e o painel "Criação de fichas" recolhido, as abas passam do limite do `table-creation.spec.ts` nas três plataformas (ver X-cronica). O bloco sozinho cabe no limite dele. A saída da seção 4.1, encurtar o trecho, não basta: mesmo com uma linha a menos, o topo fica acima de 340 a 390. As outras saídas são o resumo das regras sem rótulos (P09-D) ou a Apresentação recolhida para o narrador, que já conhece o texto. Código não mudado.
 2. **T-43, o aviso dentro de uma folha sem rodapé.** O aviso cobre a última ação até sumir, e o ponteiro em cima segura o prazo (T-76). Foi visto na Vitalidade no web e no Android, e no Sangue no iOS. É o desenho do T-43 (`offset` 0 sem rodapé).
 3. **P16-D, a nota depois de "Deixar privadas".** A tela do dono que já estava aberta mostra a nota até a próxima busca da ficha: trocar de aba não busca de novo, mas recarregar ou voltar ao app, sim. Sem rede, a nota não aparece. É o desenho (consulta, sem push), e o aviso do narrador diz "Quem já leu continua sabendo."
-4. **P13, "pedido pendente".** Na lista de evolução, essa opção é `disabled` de verdade (não tocável e com o motivo no nome acessível). Já a opção acima do saldo é tocável e diz o motivo. Falta decidir se as duas devem se comportar igual.
+4. **P13, "pedido pendente".** *(Leitura errada do roteiro, ver seção 11.7: no código, a opção já era tocável.)* Na lista de evolução, essa opção é `disabled` de verdade (não tocável e com o motivo no nome acessível). Já a opção acima do saldo é tocável e diz o motivo. Falta decidir se as duas devem se comportar igual.
 
 **Achados técnicos em aberto** (nenhum é regressão da onda):
 
@@ -774,3 +774,34 @@ Nos três, `grep -c` pelo código deu 0 na API, no Metro e no logcat. O log do s
   - AVD: densidade e teclado restaurados, `adb reverse` removido e AVD desligado;
   - iOS: simuladores desligados e `idb_companion` encerrado, sem nada escutando;
   - o `pip-audit` do venv do idb não achou vulnerabilidades.
+
+### 11.7 As correções depois do roteiro
+
+Em 06/11, o PO decidiu os quatro pontos da seção 11.6 e pediu para corrigir todos, inclusive os dois achados técnicos. Foram três branches `correcao/*` sobre `91957f8`, implementadas em paralelo, cada uma no seu worktree, e um commit direto na onda. Os merges entraram com `--no-ff`, em série.
+
+| Merge ou commit | O quê | Decisão |
+|---|---|---|
+| `aac680d` (`correcao/a1-topo`) | **A1:** para quem narra, a Apresentação vira uma linha "Apresentação · Ler tudo", sem o trecho, ao lado de sistema e narrador quando cabe. O resumo das regras do painel recolhido fica numa linha, com o texto inteiro no nome acessível (no app) e no DOM (no web). O respiro abaixo do bloco cai de 16 para 8 quando o painel vem logo depois. O jogador e o ex-membro não mudam. Na conta do agente, as abas do narrador vão a ~286 px a 390 e a ~238 px a 1280. O caso E2E novo em `table-creation.spec.ts` mede com os limites de sempre (340 e 260) | Recolher para o narrador o que ele já conhece |
+| `b839672` (`correcao/sessao`) | **Sessão:** até 30 s depois do giro (`REFRESH_REUSE_GRACE_MS`), o token anterior ganha um sucessor uma única vez, e só se ele foi revogado por rotação e o sucessor nunca foi usado nem revogado. O sucessor é revogado sem `replaced_by`, e o token novo herda a `family_expires_at` e não vive mais que o sucessor. Uma segunda apresentação, o sucessor apresentado depois, o logout e qualquer revogação explícita seguem revogando a família. A rotação trava a pessoa, o token e o sucessor, nessa ordem (`FOR UPDATE`): a ordem antiga dava deadlock no `auth.pg.test.ts`. O log é fixo (`auth.refresh_grace`). Atualizados o checklist de segurança, o plano-v0 e a arquitetura | Tolerância curta, de uso único |
+| `468595e` (`correcao/telas`) | **T-43:** numa folha sem rodapé, enquanto o aviso aparece, o fim do conteúdo ganha um espaço `aria-hidden` da altura medida do aviso. A folha cresce, ou rola até o fim se já estava no fim. **P16-D:** a consulta `/revealed` fica acima das abas, e voltar ao Sobre não a rebuscava; agora o bloco revelado pede a rebusca ao aparecer. A rebusca de 30 s e a volta ao primeiro plano já valiam. **P13:** a opção "pedido pendente" já era `blocked` (tocável, `aria-disabled`, sem `disabled`), como a acima do saldo. O "desabilitada de verdade" da seção 11.6 foi o Playwright e o idb lendo o `aria-disabled`. A única diferença era a frase, e agora o motivo é o do servidor. Caso E2E novo em `xp.spec.ts` | Espaço embaixo; tocável com o motivo |
+| `63ba670` e `86d9e4b` | **Activity do Android:** um config plugin (`plugins/withConfigChanges.js`) põe `density\|fontScale` no `android:configChanges`, e mudar o tamanho da tela ou da fonte do sistema não recria mais a Activity. Conferido no AVD com o APK novo: `wm density 480` e `font_scale 1.3` refazem o layout sem um novo `Running "main"` e sem os erros do Expo Router, e a navegação funciona depois da mudança. As duas frases do Expo Router saíram do `devLogs.ts`: com a causa resolvida, escondê-las apagaria um sinal real | Técnica (sem ponto para o PO) |
+
+**O E2E depois das correções.** Na primeira rodada completa, três casos falharam, e nenhuma das falhas era regra quebrada:
+
+- **`creation-state` (R-13 e R-14), nos dois navegadores, `dc78258`.** O aviso "Criação concluída. Subir um traço…" acompanha a folha do Histórico. Com o espaço da T-43, ele fica sob o ponteiro parado, que segura o prazo (T-76), e o `getByText` sem `exact` casava com ele. A busca ficou exata, e uma asserção nova confere que o aviso some quando o ponteiro sai. O A/B confirmou a causa: com o `Toast` e o `BottomSheet` de antes, o spec antigo passava.
+- **U-02 a 1280, no WebKit, `dc78258` e `5bbf7e5`.** Nenhum caso do `xp.spec` fechava o contexto do jogador. Com um worker só, as páginas abertas se acumulavam, e o botão "Conceder XP" nunca ficava estável para o clique; o caso novo do "pedido pendente" piorou isso. Agora um `afterEach` fecha os contextos.
+- **R-15 a 360, nos dois navegadores, `7ab8b58`.** Bug de produto: a linha "`<usuário>` · alterada às HH:MM" quebrava com um nome de usuário comprido, e o cartão ia a 219 (limite 210). Nomes de até 24 caracteres são válidos, e no E2E completo o nome gerado ganhou um dígito. A linha agora fica numa linha só (`numberOfLines`), e o nome acessível do cartão continua com a frase inteira. Teste Jest com um nome de 24 caracteres. O spec também passou a esperar o layout depois de trocar a largura (`expect.poll`), com o mesmo limite.
+
+**Suítes no fim**, na ponta `5bbf7e5`, todas sem falha:
+- `pnpm test`: `@tms/sheet-core` 1165, `@tms/config` 38, `@tms/db` 46, `@tms/api` 2101, `@tms/ui` 239 e frontend 1864;
+- `bun test .pg.test` em Postgres real: 49 de 49, com o `auth.pg.test.ts` da tolerância;
+- E2E completo: **250 de 250** no Chromium e no WebKit (14,1 min).
+
+**Fica para o próximo roteiro manual:**
+- o topo do narrador no Android e no iOS;
+- o espaço do aviso nas folhas de Vitalidade e de Sangue, no app;
+- a sessão mantida ao reabrir o app em menos de 30 s depois de um refresh interrompido, e o login depois disso;
+- a nota escondida sumindo ao voltar ao Sobre.
+
+O iOS não muda com o plugin. O `@tms/ui` mudou só em JS, e o Metro o serve do `src`.
+

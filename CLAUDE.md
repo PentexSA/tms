@@ -123,10 +123,10 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 #### Key Features
 
 - **@tms/sheet-core**: 1165 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
-- **@tms/api**: 2089 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
+- **@tms/api**: 2101 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
 - **@tms/db**: 46 tests (Bun): migrations sobem e descem, banco de teste restaurável
-- **@tms/ui**: 235 tests (Jest)
-- **frontend**: 1856 tests (Jest + React Native Testing Library)
+- **@tms/ui**: 239 tests (Jest)
+- **frontend**: 1864 tests (Jest + React Native Testing Library)
 - Metas de cobertura por pacote (`bunfig.toml` e `jest.config.js`), aplicadas no CI
 
 #### E2E (Playwright, Chromium e WebKit)
