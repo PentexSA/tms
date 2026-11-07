@@ -71,6 +71,7 @@ npx pnpm dev:api                   # API only (builds its packages first, hot re
 npx pnpm dev:web                   # Web only (Metro reads @tms/sheet-core and @tms/ui from src)
 npx pnpm dev:expo                  # Expo dev server (tunnel)
 npx pnpm seed:roteiro              # Test-script accounts and chronicles (API in process)
+npx pnpm metrics:funnel --from 2026-10-01 --to 2026-11-01   # Funnel/retention report (METRICS_DATABASE_URL, restricted role: scripts/metrics-role.sql)
 
 # Individual apps
 cd apps/api && bun run dev     # API only (hot reload)
@@ -123,7 +124,7 @@ npx pnpm test                      # Runs Bun (backend) + Jest (frontend)
 #### Key Features
 
 - **@tms/sheet-core**: 1165 tests (Bun), incluindo property tests (fast-check), a contabilização da v4 e as projeções/opções da v5
-- **@tms/api**: 2101 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
+- **@tms/api**: 2116 tests (Bun) em PGLite, com a matriz de AuthZ nos três sistemas (inclui `viewer`, NPC oculto e transferência); testes de concorrência em Postgres separados
 - **@tms/db**: 46 tests (Bun): migrations sobem e descem, banco de teste restaurável
 - **@tms/ui**: 239 tests (Jest)
 - **frontend**: 1864 tests (Jest + React Native Testing Library)

@@ -2,7 +2,9 @@
 
 Como adicionar monitoramento, logs, error tracking, analytics, traces e
 métricas ao TMS, do mais simples ao mais complicado, sempre com plano gratuito.
-Cada fase entrega valor sozinha e cabe em um PR. Pode parar em qualquer uma.
+Cada fase entrega valor sozinha, com PRs menores quando necessário. Pode parar
+em qualquer uma. A Fase 5 foi revisada em 05/11/2026 para começar pelos dados
+existentes e adiar a integração externa até haver uma necessidade concreta.
 
 Diagnóstico de 03/11/2026. Os limites gratuitos foram lidos nessa data nas
 páginas oficiais (§8) e mudam com o tempo: confira antes de contar com eles.
@@ -16,15 +18,16 @@ As estimativas de esforço são aproximadas.
 | 2 | Logs que explicam um erro 500 | Pino (já instalado) | meio dia |
 | 3 | Error tracking da API e do web | Sentry | 1–2 dias |
 | 4 | Logs centralizados e pesquisáveis | Sentry Logs | meio dia |
-| 5 | Analytics de produto e funis | PostHog | 1–2 dias |
+| 5a | Funis e retenção sobre dados existentes, sob demanda | SQL + script local | 0,5–1 dia, a validar pelas consultas |
+| 5b | Analytics contínuo, quando necessário | PostHog pela API | 3–5 dias, a reestimar após prova do transporte |
 | 6 | Traces do app até o banco | Sentry Tracing | 1 dia |
 | 7 | Métricas, painéis e alertas | Sentry Metrics | 1–2 dias |
-| 8 | Crashes e analytics no app nativo | Sentry + PostHog | 1–2 dias, quando for distribuir o app |
+| 8 | Crashes e analytics no app nativo | Sentry + coletor da 5b, se ativo | 1–2 dias, quando for distribuir o app |
 | 9 | Opcional: stack própria com OpenTelemetry | Grafana Cloud | só com um dos gatilhos da fase |
 
-São três ferramentas no caminho principal: UptimeRobot, Sentry e PostHog. A
-página do PostHog diz que o plano grátis não pede cartão; as do Sentry e do
-UptimeRobot não dizem, então confira ao criar a conta.
+O caminho inicial usa UptimeRobot e Sentry; o PostHog entra somente na Fase 5b.
+Na consulta original, a página do PostHog dizia que o plano grátis não pede
+cartão; conferir condições, cotas e retenção antes de ativar a integração.
 
 ## 2. Ponto de partida
 
@@ -87,17 +90,19 @@ no Neon free. Quatro restrições moldam as escolhas:
 ## 3. Regras para todas as fases
 
 1. **O que nunca sai do servidor ou do aparelho:** conteúdo de ficha, notas,
-   NPC oculto, rolagem oculta, e-mail, nome, senha, tokens, cookies e código de
+   NPC oculto, conteúdo de rolagem oculta, e-mail, nome, senha, tokens, cookies e código de
    convite. O plano v5 trata vazamento de dado oculto como risco principal, e isso
    vale também para a telemetria.
 2. **Sem session replay**, mesmo com cota grátis. A tela do narrador mostra o que
    o jogador não pode ver, e o replay copiaria isso para um terceiro.
-3. **Um único ponto de entrada.** O código chama `lib/telemetry` e
-   `lib/analytics`, nunca o SDK direto, com `.web.ts` e `.native.ts` como em
-   `sheet/sync/storage`. Trocar de ferramenta vira mudança em um arquivo.
-4. **Sem DSN ou chave, tudo desligado.** Desenvolvimento, Jest, Bun test e E2E
-   não enviam nada. Variáveis opcionais em `packages/config/src/env.ts` e
-   `.env.example`.
+3. **Um único ponto de entrada por integração.** No app, `lib/telemetry` e
+   `lib/analytics`, com resolução por plataforma como em `sheet/sync/storage`.
+   Na Fase 5b, o app fala só com o coletor da API, e a fachada do servidor
+   concentra o transporte PostHog; nenhuma rota importa o provedor diretamente.
+4. **Sem DSN ou chave, envio externo desligado.** Desenvolvimento, Jest, Bun test
+   e E2E não enviam a provedores reais. Variáveis opcionais em
+   `packages/config/src/env.ts` e `.env.example`. O relatório local da Fase 5a
+   usa uma credencial própria de banco, com leitura restrita.
 5. **Teste canário de privacidade.** Cada integração ganha um teste que passa um
    valor marcado (e-mail, token, texto de nota) pelo filtro de saída e prova que
    ele não sai.
@@ -492,53 +497,36 @@ dependem da conta do Sentry.
 
 ### Fase 5. Analytics de produto
 
-**Ferramenta:** PostHog, com hospedagem na UE: 1 milhão de eventos por mês, 1 ano
-de retenção, sem limite de usuários no painel, sem cartão.
+**Plano de implementação e contrato dos eventos:**
+[relatório local, coletor na API, testes e ativação](plano-observabilidade-fase-5.md).
 
-**Antes de instalar**
+**5a — Agora:** criar `pnpm metrics:funnel`, sob demanda, com consultas fixas
+e role de leitura restrita sobre cadastro, vínculos, auditoria e rolagens.
+Saída agregada, sem `payload`, conteúdo de ficha ou dados identificáveis.
+Separar narrador e jogador, mostrar uso por família e retenção semanal observada.
+Não instalar SDK nem criar coleta nova. Exclusões, vínculos removidos e o início
+da auditoria limitam o histórico; tentativa de envio não é operação confirmada.
 
-1. O app **não tem aviso de privacidade**. Criar uma tela que diga o que é coletado
-   e por quem, e uma opção de desligar em Conta. A base legal (consentimento ou
-   legítimo interesse) é a decisão 2 do §7.
-2. Identificar o usuário só por id opaco, sem e-mail ou nome como propriedade.
-3. Ligar o `DELETE /me` à exclusão da pessoa no PostHog (LGPD art. 18, VI), como
-   a exclusão de conta já decide em `doc/plano-v0.md`.
+**5b — Quando houver necessidade concreta:** PostHog na UE, com eventos de
+negócio enviados pela API após commit, filtro por lista permitida e verificação
+de consentimento no despacho. Somente abertura de criação e, se necessária,
+navegação chegam pelo coletor autenticado do cliente. Sem SDK no app, domínio
+PostHog na CSP, replay ou duplicação do Sentry.
 
-**Instalação**
+Antes de ativar a 5b: aviso público, escolha em Conta/cadastro (proposta: opt-in),
+identidade opaca e remoção de pessoa **e eventos** ligada ao `DELETE /me`, com
+tarefa persistida. Aceite de convite só conta entrada nova (`joined: true`);
+submissão, aviso de criação livre e ativação são eventos distintos. Refresh
+falho fica no diagnóstico técnico da API e na Fase 7, fora do funil inicial.
 
-1. `posthog-react-native` atrás de `lib/analytics`. A documentação prevê uso no web
-   e no Expo. Validar com a CSP. Plano B no web: `posthog-js` com
-   `disable_external_dependency_loading`.
-2. `captureTouches` desligado, session replay desligado e **error tracking do
-   PostHog desligado**, para não duplicar o Sentry.
-3. O Expo Router usa React Navigation 7, então `captureScreens: false` e
-   `posthog.screen()` manual, com o template da rota (`useSegments`), sem UUID.
-4. Acrescentar `https://eu.i.posthog.com` à CSP.
+Eventos de produto têm envio de melhor esforço, sem outbox; exclusão externa
+tem retomada e coordenação com envios em voo. Conferir cotas/retenção do plano
+gratuito antes da contratação. O PostHog mede apenas o período após ativação
+e quem autorizou; o relatório local também não recupera dados já apagados.
 
-**Eventos iniciais.** Poucos, nomeados e só com propriedades categóricas:
-
-| Evento | Propriedades |
-|---|---|
-| `signup_completed` | — |
-| `chronicle_created` | `system_family` |
-| `invite_created`, `invite_accepted` | — |
-| `character_creation_started`, `_submitted`, `_completed` | `system_family`, `mode` |
-| `roll_made` | `system_family`, `hidden`, sem resultado nem nome |
-| `xp_request_created` | — |
-| `session_refresh_failed` | `reason` |
-
-O último ajuda a investigar o "reinicio a página e sou deslogado" anotado em
-`pontos-de-melhoria.md`.
-
-**Histórico e conferência:** o PostHog só conta a partir da instalação e não vê
-quem não autorizou a coleta. Se um dia precisar do passado ou do total real, a
-`chronicle_audit` responde com uma consulta avulsa, usando um role só de leitura
-e sem a coluna `payload`.
-
-**Primeiros painéis:** o funil cadastro → crônica → convite aceito → ficha
-concluída → primeira rolagem, retenção semanal e o uso por sistema.
-
-**Pronto quando:** o funil aparece no painel e o usuário consegue desligar a coleta.
+**Pronto na 5a:** relatório reproduzível, conciliado com fixtures e executável
+com permissões restritas. **Pronto na 5b:** funis por papel conferidos, revogação
+efetiva no servidor, exclusão externa verificada e canário de privacidade passando.
 
 ### Fase 6. Traces
 
@@ -587,7 +575,8 @@ tem uma ação clara.
 
 **Gatilho:** quando o app for distribuído. Hoje não há `eas.json`, e o CI não compila
 o nativo desde o PR #49 (04/11/2026): o build de debug roda à mão, na integração de
-cada onda. Se a loja vier antes, esta fase sobe na ordem, logo depois da Fase 5.
+cada onda. Se a loja vier antes, esta fase sobe na ordem, logo depois da Fase 5a; a
+captura de crashes não depende de ativar o analytics da 5b.
 
 1. `@sentry/react-native` com `npx expo install`, plugin no `app.json` e
    `getSentryExpoConfig` no `metro.config.js`, mantendo o `withNativeWind` e o
@@ -599,7 +588,9 @@ cada onda. Se a loja vier antes, esta fase sobe na ordem, logo depois da Fase 5.
    está com o PO, [onda-4.md](planos-pacotes/onda-4.md) §6, ponto 16).
 4. Conferir que o header da Fase 2 sai com a versão do build instalado no aparelho,
    e não com a da última release.
-5. Upload de símbolos nativos no build de distribuição, e ligar o PostHog no nativo.
+5. Upload de símbolos nativos no build de distribuição. Se a Fase 5b estiver
+   ativa, habilitar a fachada nativa para o mesmo coletor autenticado. Eventos
+   de negócio já saem da API; não instalar SDK que duplique a captura.
 
 **Pronto quando:** um crash JS e um nativo forçados chegam legíveis, nas duas
 plataformas.
@@ -633,7 +624,7 @@ carga com k6 no banco descartável.
 | Logs | Sentry Logs | Better Stack via Render Log Stream | Retenção de 3 dias contra 30 |
 | Traces | Sentry | Grafana Tempo com OpenTelemetry | Mais trabalho no Bun com bundle; fica para a Fase 9 |
 | Métricas | Sentry Metrics | Grafana Cloud | Melhor produto, mas mais uma ferramenta e 14 dias de retenção |
-| Analytics | PostHog | Plausible, Umami | Focados em site; o TMS precisa de funil e de nativo |
+| Analytics | SQL sob demanda (5a); PostHog pela API quando necessário (5b) | Plausible, Umami | Os dados existentes bastam para começar; painel de produto pode justificar PostHog depois |
 
 **Descartados por agora**
 
@@ -649,7 +640,7 @@ carga com k6 no banco descartável.
 |---|---|---|
 | Sentry | 5 mil erros por mês, 1 usuário | Ignorar 4xx e falha de rede; rate limit por DSN; Spike Protection; sem orçamento pay-as-you-go |
 | Sentry | 5 GB de logs | Sem `debug`, sem `/health`; revisar na primeira semana |
-| PostHog | 1 milhão de eventos | Só eventos nomeados, sem autocapture de toque |
+| PostHog (5b) | Conferir cota na ativação; referência original: 1 milhão de eventos | Só eventos nomeados pela API, sem autocapture e sem replay |
 | Neon | 100 CU-h | Nada frequente no banco; `/ready` com banco, se criado, só sob demanda (uma vez por hora já custa cerca de 16 CU-h por mês) |
 | Render | 750 h por workspace | Um serviço free só |
 
@@ -658,7 +649,7 @@ carga com k6 no banco descartável.
 | # | Decisão | Quando | Sugestão |
 |---|---|---|---|
 | 1 | Quantas pessoas precisam ver os erros? | Antes da Fase 3 | Sentry se for 1. Se forem mais, PostHog para erros e deixar traces para a Fase 9 |
-| 2 | Base legal do analytics: consentimento (opt-in) ou legítimo interesse com opt-out | Antes da Fase 5 | Opt-in é o caminho mais seguro, com menos dados. Vale uma revisão jurídica se o app abrir ao público |
+| 2 | Base legal da coleta externa: consentimento (opt-in) ou legítimo interesse com opt-out | Antes de ativar a Fase 5b | Proposta: opt-in. A 5a começa com acesso interno restrito e saída agregada; isso não dispensa os cuidados de privacidade |
 | 3 | Manter o serviço sempre acordado pelo ping? | Fase 1 | Sim, enquanto houver um único serviço free |
 | 4 | Quando o app nativo será distribuído? | Define a posição da Fase 8 | Depois da Fase 7, salvo se a loja vier antes |
 
@@ -668,7 +659,7 @@ Consultadas em 03/11/2026.
 
 - [Sentry: preços](https://sentry.io/pricing/) e [cotas](https://docs.sentry.io/pricing/quotas/)
 - [Sentry para Elysia](https://docs.sentry.io/platforms/javascript/guides/elysia/), [Expo](https://docs.sentry.io/platforms/react-native/manual-setup/expo/) e [integração com Pino](https://docs.sentry.io/platforms/javascript/guides/bun/configuration/integrations/pino/)
-- [PostHog: preços](https://posthog.com/pricing.md) e [SDK React Native](https://posthog.com/docs/libraries/react-native)
+- [PostHog: preços](https://posthog.com/pricing.md); [API de captura](https://posthog.com/docs/api/capture) e [exclusão de pessoas/eventos](https://posthog.com/docs/api/persons) conferidas na revisão da Fase 5 em 05/11/2026
 - [Grafana Cloud: preços](https://grafana.com/pricing/) e [descarte acima dos limites](https://community.grafana.com/t/what-happens-when-my-usage-exceed-the-free-plan-limitations/102795)
 - [UptimeRobot: preços](https://uptimerobot.com/pricing/)
 - [Better Stack: preços](https://betterstack.com/pricing)
