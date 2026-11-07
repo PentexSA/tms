@@ -183,6 +183,57 @@ Pendente: rodar no Neon do deploy de teste com o role e registrar o custo com
 os dados de lá (inclusive o tempo de acordar a compute). Sem índice ou mudança
 de schema antes disso.
 
+### Próximo: criação de ficha (tempo e toques)
+
+Pergunta de produto (05/11/2026): quanto tempo uma pessoa leva para criar uma
+ficha e quantos toques/cliques ela precisa para finalizá-la. Boa parte se
+responde sem a 5b: cada salvamento da criação já fica em `character_batches`
+(com horário) e cada alteração de traço em `character_events`. No seed local,
+as 37 PCs têm 61 lotes e 247 alterações antes do envio, mas só uma foi
+concluída: o número só diz algo com os dados do Neon.
+
+São duas perguntas diferentes, com fontes diferentes:
+
+1. **Tempo de criação**, seção nova no relatório da 5a (cerca de 0,5 dia).
+   Por PC, do rascunho até o primeiro `character.creation.submit`,
+   `complete` ou `approve`:
+   - **Tempo corrido:** criação do rascunho até o envio ou ativação; mostra
+     se a ficha sai numa sentada ou em vários dias.
+   - **Tempo ativo aproximado:** soma dos intervalos entre lotes seguidos,
+     descartando pausas maiores que um limite fixo (proposta: 10 min), e o
+     número de sessões que isso forma.
+   - **Retrabalho:** o mesmo traço alterado várias vezes, sinal melhor de
+     hesitação ou confusão do que o total de toques. Contar sem exportar o
+     caminho nem o valor.
+   - Mediana e faixa por família, com contagens absolutas (amostra pequena).
+
+   Pontos cegos: o tempo entre abrir o formulário e o primeiro salvamento
+   (só `character_creation_started`, na 5b, cobre) e a tela aberta parada,
+   que distorce o tempo ativo. Grants novos no role: `character_batches (id)`
+   e as colunas de `character_events` necessárias para contar por lote e por
+   traço (`batch_id`; `path` só se o retrabalho for calculado no banco, sem
+   sair no relatório). Atualizar `ALLOWED_COLUMNS`, `metrics-role.sql` e os
+   testes do role juntos.
+2. **Toques que o fluxo exige**, medidos no E2E (cerca de 0,5 dia). É uma
+   propriedade do design, não do usuário: as jornadas do Playwright já criam
+   ficha em cada sistema. Contar cliques e preenchimentos de uma ficha de
+   referência por sistema e registrar o número como linha de base, para que
+   uma mudança que alongue o caminho apareça. Sem dado de pessoa nem
+   consentimento.
+
+**Toques reais das pessoas** ficam fora: exigem instrumentar o cliente, e a 5b
+proíbe autocapture. Se um dia valer, seria um contador agregado na tela de
+criação, enviado uma vez no envio, com toda a 5b ativa (opt-in, aviso e
+exclusão). É caro para o estágio atual.
+
+Com poucos usuários, o que mais ensina é **observar 3 a 5 pessoas criando uma
+ficha** com as contas de `pnpm seed:roteiro`: dá tempo, toques e, principalmente,
+onde e por que elas travam, o que nenhum número mostra.
+
+Ordem proposta: (1) contagem de toques no E2E, (2) tempo e retrabalho no
+relatório, rodados no Neon, (3) teste observado, (4) a 5b só se depois disso
+for preciso acompanhar toques reais continuamente.
+
 ## 3. Gatilho e prova da Fase 5b
 
 Iniciar a 5b quando houver necessidade concreta de painel contínuo, abandono
