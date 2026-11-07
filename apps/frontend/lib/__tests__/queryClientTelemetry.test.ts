@@ -1,9 +1,29 @@
-import { createQueryClient } from '../queryClient'
+import type { QueryClient } from '@tanstack/react-query'
+
+import { createQueryClient as create } from '../queryClient'
 import { captureError } from '../telemetry'
 
 jest.mock('../telemetry', () => ({ captureError: jest.fn() }))
 
+// Sem observer, cada query e mutation arma um timer de GC real (5 min); com o
+// arquivo no processo principal do Jest (sozinho, ou sob o turbo), ele
+// esperava esses timers para sair. O MutationCache.clear() não os cancela:
+// destroy() em cada uma.
+const clients: QueryClient[] = []
+const createQueryClient = () => {
+  const client = create()
+  clients.push(client)
+  return client
+}
+
 beforeEach(() => jest.mocked(captureError).mockClear())
+afterEach(() => {
+  for (const client of clients.splice(0)) {
+    for (const mutation of client.getMutationCache().getAll())
+      mutation.destroy()
+    client.clear()
+  }
+})
 
 describe('createQueryClient: error tracking', () => {
   it('query que falhou de vez vai com a queryKey', async () => {
