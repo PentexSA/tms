@@ -349,6 +349,11 @@ test('R-15: o progresso no cartão do V20, o filtro e a altura, a 390 e 360', as
       for (const id of [fresh.id, asked.id]) {
         const card = page.getByTestId(`table-row-${id}`)
         await card.scrollIntoViewIfNeeded()
+        // A medida espera o layout da largura nova (sob carga, a troca do
+        // viewport chega depois); o limite é o mesmo
+        await expect
+          .poll(async () => (await card.boundingBox())?.height ?? 999)
+          .toBeLessThan(210)
         const box = await card.boundingBox()
         expect(box?.height ?? 999).toBeLessThan(210)
         expect((box?.x ?? 0) + (box?.width ?? 999)).toBeLessThanOrEqual(width)

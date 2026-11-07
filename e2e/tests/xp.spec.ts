@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { type Browser, expect, type Page, test } from '@playwright/test'
+import {
+  type Browser,
+  type BrowserContext,
+  expect,
+  type Page,
+  test,
+} from '@playwright/test'
 import { apiAs, completeCreation, freeCreation, signUp } from '../support/users'
 
 // P13: a lista de evolução (T-50), o "Enviar pedido" bloqueado com o motivo
@@ -8,6 +14,14 @@ import { apiAs, completeCreation, freeCreation, signUp } from '../support/users'
 // `disabled` no <button>. Contas e fichas fictícias, pela API.
 
 /** Narradora, jogadora que entrou e uma ficha concluída com `xp` de saldo. */
+// Os contextos do jogador abertos pelo sheetWithXp fecham depois de cada
+// caso: com um worker só, as páginas abertas (a ficha, as rebuscas) se
+// acumulavam no WebKit até o Playwright não ver mais o botão parado (U-02)
+const opened: BrowserContext[] = []
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map(c => c.close()))
+})
+
 async function sheetWithXp(browser: Browser, page: Page, xp: number) {
   const desk = page.context()
   const storyteller = await signUp(desk, 'narra_p13')
@@ -44,6 +58,7 @@ async function sheetWithXp(browser: Browser, page: Page, xp: number) {
     reason: 'Sessão 1',
     targets: [{ characterId: id }],
   })
+  opened.push(playerContext)
   const playerPage = await playerContext.newPage()
   return { id, playerPage, playerContext, player }
 }
