@@ -176,7 +176,15 @@ export const TableRow = memo(function TableRow({
                 ))}
               </View>
             ) : null}
-            <Text variant="caption" color="inkMuted">
+            {/* Uma linha só: o nome de usuário vai até 24 caracteres, e
+                quebrar aqui passava o cartão de 210 a 360 (R-15). O nome
+                acessível do cartão leva a frase inteira */}
+            <Text
+              variant="caption"
+              color="inkMuted"
+              numberOfLines={1}
+              testID={`table-meta-${row.id}`}
+            >
               {meta}
             </Text>
             {problem ? (

@@ -124,6 +124,33 @@ describe('T-48: cartão da Mesa', () => {
     ).toHaveLength(1)
   })
 
+  it('R-15: quem alterou numa linha só, com a frase inteira no nome do cartão', () => {
+    // Nome de usuário no máximo (24): quebrar a linha passava o cartão de
+    // 210 a 360 (E2E, R-15)
+    const longo = 'u'.repeat(24)
+    const c = example('helena')
+    const it24 = buildItem(
+      {
+        id: HELENA,
+        name: String(c.sheet.values.name),
+        owner: { id: 'u-dona', username: longo },
+        systemCode: 'vtm-v20',
+        templateVersion: '1.0.0',
+        sheetVersion: 2,
+        status: 'creating',
+        updatedAt: new Date().toISOString(),
+        sheet: sheetFor('helena', ['storyteller']).sheet,
+      },
+      modelOf('vtm-v20')
+    )
+    render(<TableRow item={it24} onOpen={jest.fn()} />)
+    const meta = screen.getByTestId(`table-meta-${HELENA}`)
+    expect(meta.props.numberOfLines).toBe(1)
+    expect(meta).toHaveTextContent(longo, { exact: false })
+    const card = screen.getByTestId(`table-row-${HELENA}`)
+    expect(card.props.accessibilityLabel).toContain(longo)
+  })
+
   it('a grade: 1 coluna a 390, 2 a 750, 3 a 1280; fonte grande, 1', () => {
     expect(tableColumns(390, false)).toBe(1)
     expect(tableColumns(750, false)).toBe(2)
