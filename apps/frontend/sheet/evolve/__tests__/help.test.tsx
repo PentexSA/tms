@@ -379,3 +379,34 @@ describe('revisão: a frase do item, as sugestões e o título do grupo', () => 
     expect(screen.getByRole('header', { name: 'Qualidades' })).toBeTruthy()
   })
 })
+
+// P17 (N-01, N-02): no Lobisomem, Nome de feito, Seita e Campo ganham a
+// frase no template, e o "?" aparece sozinho (o editor de texto o desenha a
+// partir do `help`). O rótulo "Nome de feito" fica (decisão 1 do P17)
+describe('W20: o "?" de Nome de feito, Seita e Campo', () => {
+  const w20 = modelOf('wta-w20')
+  const sheet: SheetData = {
+    values: {
+      name: 'Iara',
+      breed: 'hominideo',
+      auspice: 'galliard',
+      tribe: 'fianna',
+    },
+    specialties: {},
+  }
+  it.each([
+    ['deedName', 'Nome de feito', /feito marcante/],
+    ['sept', 'Seita', /caern/],
+    ['camp', 'Campo', /facção dentro da tribo/],
+  ])('%s: o "?" abre a frase do time', async (id, label, text) => {
+    expect(w20.fields.get(id)?.def.label).toBe(label)
+    expect(w20.fields.get(id)?.def.help).toMatch(text)
+    await renderLive(
+      { model: w20, sheet, mode: 'evolve' },
+      fakeServer(w20, sheet).post
+    )
+    const help = screen.getByRole('button', { name: `Ajuda: ${label}` })
+    fireEvent.press(help)
+    expect(screen.getByText(text)).toBeTruthy()
+  })
+})

@@ -1,6 +1,15 @@
 import { Tabs, tokens, useTheme } from '@tms/ui'
-import { StyleSheet, View } from 'react-native'
+import { useEffect, useMemo, useRef } from 'react'
+import { AccessibilityInfo, StyleSheet, View } from 'react-native'
+import { useSheet, useSheetSelector } from './context'
 import { CreationCounter } from './creation/CreationCounter'
+import { basicsDone } from './creation/creation'
+import {
+  guideItems,
+  nextTab,
+  nextTabAnnouncement,
+  pendingTabs,
+} from './creation/guide'
 import { GroupTabsBar } from './layouts/groupTabs'
 import {
   useCurrentStripSection,
@@ -18,16 +27,75 @@ import {
 // mantêm o id (aria-controls aponta para o painel no corpo), "aba N de M" e
 // as setas. A troca da seção atual não é anunciada.
 
+type NavTab = { readonly id: string; readonly label: string }
+
+/**
+ * P17 (N-03): o selo "a seguir" na próxima aba com pendência quando a aba à
+ * vista acaba (`nextTab`), e o anúncio quando ela acaba com o jogador nela:
+ * não na montagem nem ao trocar de aba, e não na passagem em que o aviso dos
+ * bônus abre (a folha já anuncia). Só na criação por pontos do dono.
+ */
+function useNextTab(
+  tabs: readonly NavTab[],
+  selected: string,
+  guided: boolean
+): string | null {
+  const { model, roles } = useSheet()
+  const check = useSheetSelector(s => s.check)
+  const resolved = useSheetSelector(s => s.resolved)
+  const items = useMemo(
+    () => (guided ? guideItems(model, check, roles, resolved) : []),
+    [guided, model, check, roles, resolved]
+  )
+  const next = nextTab({
+    items,
+    tabs,
+    current: selected,
+    freebies: check?.freebies ?? null,
+    active: guided,
+  })
+  const label = next ? tabs.find(t => t.id === next.id)?.label : undefined
+  const here = guided && pendingTabs(items, tabs).tabs.has(selected)
+  const bonus = guided && basicsDone(check)
+  const was = useRef<{
+    readonly tab: string
+    readonly here: boolean
+    readonly bonus: boolean
+  } | null>(null)
+  useEffect(() => {
+    const before = was.current
+    was.current = { tab: selected, here, bonus }
+    if (!before || before.tab !== selected || !before.here || here) return
+    if (bonus && !before.bonus) return
+    if (next && label)
+      AccessibilityInfo.announceForAccessibility(
+        nextTabAnnouncement(next.done, label)
+      )
+  }, [selected, here, bonus, next, label])
+  return next?.id ?? null
+}
+
 export function SheetNav({
   tabs,
   selected,
   onSelect,
+  guided = false,
 }: {
-  readonly tabs: readonly { readonly id: string; readonly label: string }[]
+  readonly tabs: readonly NavTab[]
   readonly selected: string
   readonly onSelect: (id: string) => void
+  // A criação por pontos na tela do dono: o selo "a seguir" (P17, N-03)
+  readonly guided?: boolean
 }) {
   const { colors } = useTheme()
+  const next = useNextTab(tabs, selected, guided)
+  const items = useMemo(
+    () =>
+      next
+        ? tabs.map(t => (t.id === next ? { ...t, attention: 'a seguir' } : t))
+        : tabs,
+    [tabs, next]
+  )
   const shared = useGroupTabsContext()
   const store = shared?.store
   const strip = useCurrentStripSection(store)
@@ -49,7 +117,7 @@ export function SheetNav({
         <Tabs
           id="sheet-parts"
           accessibilityLabel="Partes da ficha"
-          items={tabs}
+          items={items}
           selected={selected}
           onSelect={onSelect}
         />

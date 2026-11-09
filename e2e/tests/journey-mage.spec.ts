@@ -98,21 +98,35 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
   await page
     .getByRole('button', { name: 'Adicionar “Bobina de bolso”' })
     .click()
-  await expect(page.getByText('Editando · 4 alterações')).toBeVisible()
+  // P17 (N-07): o catálogo de Qualidades do M20, publicado. Tríade Sombria
+  // tem custo fixo: entra num toque, com o Custo 3 do catálogo
+  // A folha da Rotina sai antes de a da Qualidade abrir (no WebKit, abrir
+  // durante a animação de saída perde a folha nova)
+  await expect(page.getByTestId('add-sheet-rotes')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
+  await page.getByLabel('Buscar Qualidade').fill('tríade')
+  await page
+    .getByRole('button', { name: 'Tríade Sombria, Custo 3', exact: true })
+    .click()
+  await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0)
+  await expect(page.getByText('Editando · 5 alterações')).toBeVisible()
 
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
     .click()
-  await expect(page.getByText('Salvar 4 alterações?')).toBeVisible()
+  await expect(page.getByText('Salvar 5 alterações?')).toBeVisible()
   await expect(
     page.getByLabel('Forças, 1 inativo, máx. pelo Arete 2')
   ).toBeVisible()
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   const evolveBatch = (await evolved).request().postDataJSON() as {
-    events: unknown[]
+    events: { path: string; to?: unknown }[]
   }
-  expect(evolveBatch.events).toHaveLength(4)
+  expect(evolveBatch.events).toHaveLength(5)
+  expect(
+    evolveBatch.events.find(e => e.path === 'values.merits')?.to
+  ).toMatchObject([{ name: 'Tríade Sombria', meta: { cost: 3 } }])
 
   // 5. Jogo: o dock com Vitalidade, a roda e a FdV. Quintessência pela roda
   await page.getByRole('radio', { name: 'Jogo' }).click()

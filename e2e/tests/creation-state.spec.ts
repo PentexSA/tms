@@ -154,7 +154,7 @@ test('R-12: o selo na lista, sob o nome, concluída e na Mesa', async ({
     await expect(
       page.getByRole('tablist', { name: 'Partes da ficha' })
     ).toBeVisible()
-    await page.getByRole('tab', { name: 'Pontos', exact: true }).click()
+    await page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ }).click()
     await expect(page.getByTestId('sheet-state')).toBeVisible()
 
     // Concluída pela API: "Concluída em dd/mm" na lista e sob o nome

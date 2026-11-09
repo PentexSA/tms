@@ -21,7 +21,13 @@ import {
 import { type ReactNode, useMemo, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import { useSheet, useSheetSelector, useSheetStore } from '../context'
-import { addAdvice, metaAdvice } from '../creation/creation'
+import {
+  addAdvice,
+  addPreview,
+  metaAdvice,
+  pricedInCatalog,
+  priceMeta,
+} from '../creation/creation'
 import { useHeadedList } from '../layouts/headedList'
 import {
   describeItem,
@@ -52,6 +58,9 @@ import {
 } from './recommend'
 import { byLabel, fold, nextItemId, noneOf } from './text'
 import { useRowFeedback } from './useRowFeedback'
+
+// O meta escolhido ao adicionar (o Custo do passo do custo, P17 N-08)
+type ItemMeta = Readonly<Record<string, number>>
 
 // list em Evoluir (DS: Repeater / ListEditor). O esquema do item vem do
 // template (`item.value`, `specialty`, `notes`, `meta`): Disciplinas do
@@ -139,7 +148,11 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
     store.getState().clearNotice()
     setEditing(id)
   }
-  const add = (name: string): Write => {
+  // O item como o "Adicionar" o cria. O meta escolhido no passo do custo
+  // (P17, N-08) entra antes dos padrões: o catálogo e o mínimo só preenchem
+  // meta ausente, então o valor escolhido prevalece e o resto (o tipo) fica
+  // com o padrão
+  const build = (name: string, meta?: ItemMeta): ListItem => {
     const id = nextItemId(items)
     // Aspecto (Fate) é só texto; o resto tem nome e, se o esquema pede, valor
     const value = def.item.value
@@ -147,13 +160,18 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
       : undefined
     // Com o meta do catálogo (o Posto do Dom, T-24) e o mínimo dos metas
     // numéricos: o valor que o editor mostra (T-23)
-    const item = withItemDefaults(
+    return withItemDefaults(
       def,
       withCatalogDefaults(
         def,
-        def.item.aspect ? { id, text: name } : { id, name, value }
+        def.item.aspect
+          ? { id, text: name }
+          : { id, name, value, ...(meta ? { meta: { ...meta } } : {}) }
       )
     )
+  }
+  const add = (name: string, meta?: ItemMeta): Write => {
+    const item = build(name, meta)
     const refused = write([...items, item])
     if (!refused) setAdding(false)
     return refused
@@ -248,6 +266,7 @@ export function ListEditor({ resolved, sheet }: FieldViewProps) {
         identity={identity}
         onClose={() => setAdding(false)}
         onAdd={add}
+        build={build}
       />
       {current ? (
         <ItemSheet
@@ -387,13 +406,17 @@ function AddItemSheet({
   identity,
   onClose,
   onAdd,
+  build,
 }: {
   readonly visible: boolean
   readonly list: ResolvedList
   readonly identity: IdentityAdvice
   readonly onClose: () => void
-  readonly onAdd: (name: string) => Write
+  readonly onAdd: (name: string, meta?: ItemMeta) => Write
+  // O item que o "Adicionar" criaria, para a prévia da conta (N-08)
+  readonly build: (name: string, meta?: ItemMeta) => ListItem
 }) {
+  const { model } = useSheet()
   // A prévia do item novo (T-08; nota do P07-C), só na Criação com a conta
   const preview = useSheetSelector(s =>
     s.mode === 'create' && s.check
@@ -422,9 +445,51 @@ function AddItemSheet({
     }
   }
   const { options, exact, custom } = match(query)
+  // P17 (N-08): a lista com meta de preço (o Custo da Qualidade, o Bônus do
+  // Defeito) pede o valor na própria folha quando o nome não tem custo no
+  // catálogo (nome de custo variável, ou digitado), com a prévia da conta
+  const price = useMemo(() => priceMeta(model, list.id), [model, list.id])
+  const [cost, setCost] = useState<{
+    readonly name: string
+    readonly value: number
+  } | null>(null)
+  const store = useSheetStore()
+  // Refeita a cada mudança do valor e da conta: o `check` é a conta da
+  // ficha à vista, e o componente redesenha quando ela muda
+  const check = useSheetSelector(s => s.check)
+  const creation = useSheetSelector(s =>
+    s.mode === 'create' ? s.creation : null
+  )
+  const costPreview =
+    cost && price && creation && check
+      ? addPreview(
+          model,
+          store.getState().shownSheet(),
+          creation,
+          list.id,
+          build(cost.name, { [price.id]: cost.value })
+        )
+      : null
+  const confirmCost = () => {
+    if (!cost || !price) return
+    setGuide(null)
+    if (onAdd(cost.name, { [price.id]: cost.value })) {
+      setAt('cost')
+      return
+    }
+    setCost(null)
+    setQuery('')
+    setAt(null)
+  }
   // Recusado, o nome digitado fica (QAA-05); só limpa o que entrou
   const pick = (name: string, where: string) => {
     setGuide(null)
+    if (price && !pricedInCatalog(model, list.id, price.id, name)) {
+      notice.clear()
+      setAt(null)
+      setCost({ name, value: price.min })
+      return
+    }
     if (onAdd(name)) {
       setAt(where)
       return
@@ -519,75 +584,132 @@ function AddItemSheet({
         setQuery('')
         setAt(null)
         setGuide(null)
+        setCost(null)
         notice.clear()
         onClose()
       }}
     >
-      <View style={styles.sheet}>
-        <TextField
-          label={def.catalog?.length ? `Buscar ${def.itemLabel}` : 'Nome'}
-          value={query}
-          onChangeText={text => {
-            setQuery(text)
-            setAt(null)
-            setGuide(null)
-            notice.clear()
-          }}
-          maxLength={ITEM_NAME_MAX}
-          autoFocus
-          // Recusado pelo Enter, o aviso é o erro do próprio campo (marcado
-          // inválido e ligado à frase), com o foco nele
-          error={guide ?? (at === 'field' ? notice.notice?.text : null)}
-          returnKeyType="done"
-          submitBehavior="submit"
-          {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
-          onSubmitEditing={e => submit(e?.nativeEvent?.text ?? query)}
-        />
-        {preview ? (
-          <Text variant="caption" color="inkMuted" testID="add-preview">
-            {preview}
-          </Text>
-        ) : null}
-        {choose ? (
-          <Text variant="caption" color="inkMuted">
-            {choose}
-          </Text>
-        ) : null}
-        {blocks.map(block => (
-          <View key={block.key} testID={`add-block-${block.key}`}>
-            {block.title && block.names.length ? (
-              <Text variant="fieldLabel" accessibilityRole="header">
-                {block.title}
-              </Text>
-            ) : null}
-            {block.names.map(option)}
-          </View>
-        ))}
-        {!query.trim() && shown < (def.catalog?.length ?? 0) ? (
-          <Text variant="caption" color="inkMuted">
-            Busque pelo nome para ver o restante da lista.
-          </Text>
-        ) : null}
-        {custom && !exact ? (
-          <View style={styles.sheet}>
-            {have.has(fold(custom)) ? (
-              <Text variant="caption" color="inkMuted" testID="add-repeated">
-                {`Já há “${custom}” na ficha.`}
-              </Text>
-            ) : null}
+      {cost && price ? (
+        <View style={styles.sheet} testID={`add-cost-${list.id}`}>
+          <View style={styles.costName}>
+            <Text variant="title" style={styles.flex}>
+              {cost.name}
+            </Text>
             <Button
-              title={
-                have.has(fold(custom))
-                  ? `Adicionar outro “${custom}”`
-                  : `Adicionar “${custom}”`
-              }
-              variant="secondary"
-              onPress={() => pick(custom, 'custom')}
+              title="Trocar"
+              variant="ghost"
+              accessibilityLabel={`Trocar ${cost.name}`}
+              onPress={() => {
+                // Volta à busca, com o texto preservado, sem adicionar
+                setCost(null)
+                setAt(null)
+                notice.clear()
+              }}
             />
-            {noticeAt('custom')}
           </View>
-        ) : null}
-      </View>
+          {/* A faixa do catálogo (catalogHelp), onde o valor é escolhido */}
+          {nameHelp(def.catalogHelp, cost.name)?.text ? (
+            <Text variant="caption" color="inkMuted" testID="add-cost-help">
+              {nameHelp(def.catalogHelp, cost.name)?.text}
+            </Text>
+          ) : null}
+          <Stepper
+            label={price.label}
+            showLabel
+            value={cost.value}
+            min={price.min}
+            max={price.max}
+            size="sheet"
+            onChange={value => {
+              setCost({ ...cost, value })
+              setAt(null)
+              notice.clear()
+            }}
+            testID="add-cost-value"
+          />
+          {costPreview ? (
+            <Text
+              variant="caption"
+              color={costPreview.short ? 'danger' : 'inkMuted'}
+              testID="add-cost-preview"
+            >
+              {costPreview.text}
+            </Text>
+          ) : null}
+          <Button
+            title={`Adicionar ${def.itemLabel}`}
+            onPress={confirmCost}
+            testID="add-cost-confirm"
+          />
+          {noticeAt('cost')}
+        </View>
+      ) : (
+        <View style={styles.sheet}>
+          <TextField
+            label={def.catalog?.length ? `Buscar ${def.itemLabel}` : 'Nome'}
+            value={query}
+            onChangeText={text => {
+              setQuery(text)
+              setAt(null)
+              setGuide(null)
+              notice.clear()
+            }}
+            maxLength={ITEM_NAME_MAX}
+            autoFocus
+            // Recusado pelo Enter, o aviso é o erro do próprio campo (marcado
+            // inválido e ligado à frase), com o foco nele
+            error={guide ?? (at === 'field' ? notice.notice?.text : null)}
+            returnKeyType="done"
+            submitBehavior="submit"
+            {...(Platform.OS === 'web' ? { blurOnSubmit: false } : {})}
+            onSubmitEditing={e => submit(e?.nativeEvent?.text ?? query)}
+          />
+          {preview ? (
+            <Text variant="caption" color="inkMuted" testID="add-preview">
+              {preview}
+            </Text>
+          ) : null}
+          {choose ? (
+            <Text variant="caption" color="inkMuted">
+              {choose}
+            </Text>
+          ) : null}
+          {blocks.map(block => (
+            <View key={block.key} testID={`add-block-${block.key}`}>
+              {block.title && block.names.length ? (
+                <Text variant="fieldLabel" accessibilityRole="header">
+                  {block.title}
+                </Text>
+              ) : null}
+              {block.names.map(option)}
+            </View>
+          ))}
+          {!query.trim() && shown < (def.catalog?.length ?? 0) ? (
+            <Text variant="caption" color="inkMuted">
+              Busque pelo nome para ver o restante da lista.
+            </Text>
+          ) : null}
+          {custom && !exact ? (
+            <View style={styles.sheet}>
+              {have.has(fold(custom)) ? (
+                <Text variant="caption" color="inkMuted" testID="add-repeated">
+                  {`Já há “${custom}” na ficha.`}
+                </Text>
+              ) : null}
+              <Button
+                title={
+                  have.has(fold(custom))
+                    ? `Adicionar outro “${custom}”`
+                    : `Adicionar “${custom}”`
+                }
+                variant="secondary"
+                onPress={() => pick(custom, 'custom')}
+              />
+              {noticeAt('custom')}
+            </View>
+          ) : null}
+        </View>
+      )}
     </BottomSheet>
   )
 }
@@ -896,6 +1018,11 @@ function ItemSheet({
 
 const styles = StyleSheet.create({
   wrap: { width: '100%' },
+  costName: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.space[2],
+  },
   headerRow: { paddingRight: tokens.layout.gutter },
   headerHelp: { paddingHorizontal: tokens.layout.gutter },
   row: {

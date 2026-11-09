@@ -33,17 +33,25 @@ export function SectionHeader({
           </Text>
         ) : null}
       </View>
-      {right}
+      {right != null ? <View style={styles.right}>{right}</View> : null}
     </View>
   )
 }
 
+// P17 (N-06): o título nunca é espremido pelo `right` (o contador da conta,
+// que cresce com ela). A base do título é o tamanho dele: a linha só leva
+// título e contador juntos se os dois couberem inteiros; senão o contador
+// desce para a linha de baixo, à direita. O título só encolhe quando ele,
+// sozinho, passa da coluna, e aí quebra entre palavras. Sem largura mínima
+// fixa: ela quebraria com fonte ampliada e com título longo.
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: tokens.space[3],
     paddingVertical: tokens.space[2],
   },
-  text: { flex: 1 },
+  text: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' },
+  right: { marginLeft: 'auto', maxWidth: '100%' },
 })

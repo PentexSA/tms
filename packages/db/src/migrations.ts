@@ -25,6 +25,7 @@ import * as m0023 from './migrations/0023_templates_onda4'
 import * as m0024 from './migrations/0024_character_events_to_absent'
 import * as m0025 from './migrations/0025_templates_onda5'
 import * as m0026 from './migrations/0026_character_reveal'
+import * as m0027 from './migrations/0027_templates_criacao'
 
 /**
  * Fonte única das migrations, em ordem. O `migrate.ts` (Postgres) e o PGLite
@@ -58,6 +59,7 @@ export const migrations: Readonly<Record<string, Migration>> = {
   '0024_character_events_to_absent': m0024,
   '0025_templates_onda5': m0025,
   '0026_character_reveal': m0026,
+  '0027_templates_criacao': m0027,
 }
 
 export const migrationProvider: MigrationProvider = {
