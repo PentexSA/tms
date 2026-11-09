@@ -411,7 +411,7 @@ test('R-15: o progresso no cartão do V20, o filtro e a altura, a 390 e 360', as
     await page.goto(`/characters/${sent.id}`)
     await page.getByTestId('creation-pending-points').click()
     await expect(
-      page.getByRole('tab', { name: 'Pontos', exact: true })
+      page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
     ).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByTestId('creation-freebies')).toBeVisible()
     await expect(page.getByText('Regras da casa')).toHaveCount(0)

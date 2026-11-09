@@ -223,7 +223,7 @@ for (const state of STATES)
     const id = await werewolf(browser, page.context(), state)
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto(`/characters/${id}?mode=create`)
-    await page.getByRole('tab', { name: 'Ficha', exact: true }).click()
+    await page.getByRole('tab', { name: /^Ficha(, a seguir)?$/ }).click()
     if (state === 'bonus') await spendBonus(page)
     for (const width of [1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 })
