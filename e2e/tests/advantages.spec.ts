@@ -106,6 +106,12 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
     .getByRole('textbox', { name: 'Nome', exact: true })
     .fill('Inimigo')
   await page.keyboard.press('Enter')
+  // P17 (N-08): o nome digitado pede o Bônus, com a prévia da conta
+  const flawCost = page.getByTestId('add-cost-flaws')
+  await expect(flawCost.getByTestId('add-cost-preview')).toHaveText(
+    'Devolve 1 de bônus.'
+  )
+  await flawCost.getByTestId('add-cost-confirm').click()
   await expect(
     page.getByRole('button', { name: /^Inimigo, Bônus 1/ })
   ).toBeVisible()
@@ -117,6 +123,10 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
     .getByRole('textbox', { name: 'Nome', exact: true })
     .fill('Ambidestro')
   await page.keyboard.press('Enter')
+  await page
+    .getByTestId('add-cost-merits')
+    .getByTestId('add-cost-confirm')
+    .click()
   await expect(
     page.getByRole('button', { name: /^Ambidestro, Custo 1/ })
   ).toBeVisible()

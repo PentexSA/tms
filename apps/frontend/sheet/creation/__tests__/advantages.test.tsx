@@ -147,6 +147,8 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
     fireEvent.changeText(textInput('Nome'), 'Inimigo')
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Inimigo”' }))
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(
       within(screen.getByTestId('editor-flaws')).getByText('Bônus 1')
     ).toBeTruthy()
@@ -164,6 +166,8 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
     )
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     const merits = within(screen.getByTestId('editor-merits'))
     expect(merits.getByText('Custo 1')).toBeTruthy()
     expect(
@@ -378,10 +382,13 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
     )
-    expect(textInput('Nome').props.value).toBe('Ambidestro')
+    // P17 (N-08): o passo do custo; a recusa do lote aparece nele
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(alertsIn('add-sheet-merits')).toHaveLength(1)
     expect(alertsIn('add-sheet-merits')[0]).toHaveTextContent(/bônus/i)
-    fireEvent.changeText(textInput('Nome'), 'Ambidestra')
+    // "Trocar" volta à busca com o nome digitado, sem a frase
+    fireEvent.press(screen.getByRole('button', { name: 'Trocar Ambidestro' }))
+    expect(textInput('Nome').props.value).toBe('Ambidestro')
     expect(alertsIn('add-sheet-merits')).toHaveLength(0)
   })
 
@@ -425,6 +432,11 @@ describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
     )
+    // P17 (N-08): a prévia do passo do custo avisa antes; o toque continua
+    expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
+      'Faltaria 1 de bônus: custa 1, restam 0.'
+    )
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(alertsIn('add-sheet-merits')).toHaveLength(1)
   })
 
@@ -735,5 +747,48 @@ describe('T-58: um título e um contador por bloco, na criação', () => {
     expect(screen.getByTestId('items-disciplines')).toHaveTextContent('3 itens')
     const advantages = within(screen.getByTestId('groups-advantages'))
     expect(advantages.queryByText('3')).toBeNull()
+  })
+})
+
+// P17 (N-08): na Criação, o passo do custo mostra o efeito na conta, refeito
+// a cada mudança do valor
+describe('N-08: a prévia do passo do custo na Criação', () => {
+  it('Defeito digitado: "Devolve 1", depois "Devolve 3"; entra com o Bônus escolhido', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
+    fireEvent.changeText(textInput('Nome'), 'Inimigo')
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Inimigo”' }))
+    expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
+      'Devolve 1 de bônus.'
+    )
+    for (let i = 0; i < 2; i++)
+      fireEvent(
+        screen.getByRole('adjustable', { name: 'Bônus' }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'increment' } }
+      )
+    expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
+      'Devolve 3 de bônus.'
+    )
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
+    expect(
+      within(screen.getByTestId('editor-flaws')).getByText('Bônus 3')
+    ).toBeTruthy()
+    tab('Pontos')
+    expect(screen.getByTestId('creation-freebies')).toHaveTextContent(
+      /\b18 de 18\b/
+    )
+  })
+
+  it('Qualidade digitada: "Custa 1 de bônus; restam 14."', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Nome'), 'Ambidestro')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
+    )
+    expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
+      'Custa 1 de bônus; restam 14.'
+    )
   })
 })
