@@ -42,7 +42,12 @@
   },
   "fields": {
     "name": { "type": "text", "label": "Nome", "maxLength": 80 },
-    "deedName": { "type": "text", "label": "Nome de feito", "maxLength": 80 },
+    "deedName": {
+      "type": "text",
+      "label": "Nome de feito",
+      "maxLength": 80,
+      "help": "O nome que o personagem ganhou por um feito marcante, dado pela seita ou pela matilha (ex.: Canta-Tempestade). Pode ficar vazio no começo."
+    },
     "concept": {
       "type": "text",
       "label": "Conceito",
@@ -201,10 +206,20 @@
       },
       "help": "A posição na sociedade. Começa em 1 e sobe com o Renome. Dom acima do Posto pede a confirmação do narrador."
     },
-    "sept": { "type": "text", "label": "Seita", "maxLength": 80 },
+    "sept": {
+      "type": "text",
+      "label": "Seita",
+      "maxLength": 80,
+      "help": "A comunidade de lobisomens que guarda um caern, um lugar sagrado onde o mundo espiritual fica perto. Tem cargos próprios, do Guardião ao Mestre do Rito, e é a casa do personagem entre os Garou."
+    },
     "totem": { "type": "text", "label": "Totem da matilha", "maxLength": 60 },
     "packName": { "type": "text", "label": "Nome da matilha", "maxLength": 80 },
-    "camp": { "type": "text", "label": "Campo", "maxLength": 80 },
+    "camp": {
+      "type": "text",
+      "label": "Campo",
+      "maxLength": 80,
+      "help": "Uma facção dentro da tribo, com ideias e deveres próprios: política, mística ou guerreira. Muda como o personagem vê a tribo e o que ela espera dele. Opcional."
+    },
     "metisDeformity": {
       "type": "text",
       "label": "Deformidade",
