@@ -11,6 +11,7 @@ import {
   modelOf,
   templateJson,
   templateWithIdentity,
+  templateWithoutMeritCatalog,
 } from '../../../test/fixtures'
 import { textInput } from '../../../test/queries'
 import {
@@ -78,6 +79,9 @@ interface Options {
   readonly mode?: 'points' | 'free'
   // O template com `recommend` e `creation.advice` de teste (P07-D)
   readonly identity?: boolean
+  // Sem o catálogo de Qualidades e Defeitos (P17, N-07): o mecanismo da
+  // lista sem catálogo (campo "Nome", texto livre, o mínimo do meta)
+  readonly plain?: boolean
 }
 
 const character = (
@@ -123,7 +127,13 @@ async function open(values?: Record<string, unknown>, options: Options = {}) {
   calls.characterGet.mockResolvedValue(character(values, options))
   const system = options.system ?? 'vtm-v20'
   calls.templateGet.mockResolvedValue(
-    ok(options.identity ? templateWithIdentity(system) : templateJson(system))
+    ok(
+      options.identity
+        ? templateWithIdentity(system)
+        : options.plain
+          ? templateWithoutMeritCatalog(system)
+          : templateJson(system)
+    )
   )
   const { session } = testSession(
     () => json(200, tokens()),
@@ -143,7 +153,7 @@ const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
 
 describe('T-23: o Defeito vale o que a folha mostra', () => {
   it('Defeito novo nasce com Bônus 1, e o saldo passa a 16 de 16', async () => {
-    await open()
+    await open({}, { plain: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
     fireEvent.changeText(textInput('Nome'), 'Inimigo')
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Inimigo”' }))
@@ -160,7 +170,7 @@ describe('T-23: o Defeito vale o que a folha mostra', () => {
   })
 
   it('Qualidade nasce com Custo 1, paga com bônus (D-06 pela regra do template)', async () => {
-    await open()
+    await open({}, { plain: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     fireEvent.changeText(textInput('Nome'), 'Ambidestro')
     fireEvent.press(
@@ -376,7 +386,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
   })
 
   it('recusa do texto livre mantém o nome digitado; mudar a busca apaga a frase', async () => {
-    await open({ merits: SPENT })
+    await open({ merits: SPENT }, { plain: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     fireEvent.changeText(textInput('Nome'), 'Ambidestro')
     fireEvent.press(
@@ -417,7 +427,7 @@ describe('T-19: a recusa aparece dentro da folha tocada', () => {
 
 describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
   it('"Adicionar Qualidade" diz o custo e o saldo antes do toque', async () => {
-    await open()
+    await open({}, { plain: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     expect(screen.getByTestId('add-preview')).toHaveTextContent(
       /Custa o Custo do item em bônus \(começa em 1\); restam 15\./
@@ -425,7 +435,7 @@ describe('T-08 e as notas do P07-C: a prévia do item novo', () => {
   })
 
   it('sem saldo: "restam 0", e o toque continua dando a recusa na folha', async () => {
-    await open({ merits: SPENT })
+    await open({ merits: SPENT }, { plain: true })
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     expect(screen.getByTestId('add-preview')).toHaveTextContent(/restam 0/)
     fireEvent.changeText(textInput('Nome'), 'Ambidestro')
@@ -753,11 +763,15 @@ describe('T-58: um título e um contador por bloco, na criação', () => {
 // P17 (N-08): na Criação, o passo do custo mostra o efeito na conta, refeito
 // a cada mudança do valor
 describe('N-08: a prévia do passo do custo na Criação', () => {
-  it('Defeito digitado: "Devolve 1", depois "Devolve 3"; entra com o Bônus escolhido', async () => {
+  it('Defeito do catálogo de custo variável: "Devolve 1", depois "Devolve 3"; entra com o Bônus escolhido', async () => {
     await open()
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
-    fireEvent.changeText(textInput('Nome'), 'Inimigo')
-    fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Inimigo”' }))
+    fireEvent.changeText(textInput('Buscar Defeito'), 'Inimigo')
+    fireEvent.press(screen.getByRole('button', { name: 'Inimigo' }))
+    // A faixa do anexo, na ajuda do catálogo
+    expect(screen.getByTestId('add-cost-help')).toHaveTextContent(
+      'Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.'
+    )
     expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
       'Devolve 1 de bônus.'
     )
@@ -783,12 +797,31 @@ describe('N-08: a prévia do passo do custo na Criação', () => {
   it('Qualidade digitada: "Custa 1 de bônus; restam 14."', async () => {
     await open()
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
-    fireEvent.changeText(textInput('Nome'), 'Ambidestro')
+    fireEvent.changeText(textInput('Buscar Qualidade'), 'Qualidade Inventada')
     fireEvent.press(
-      screen.getByRole('button', { name: 'Adicionar “Ambidestro”' })
+      screen.getByRole('button', { name: 'Adicionar “Qualidade Inventada”' })
     )
     expect(screen.getByTestId('add-cost-preview')).toHaveTextContent(
       'Custa 1 de bônus; restam 14.'
+    )
+  })
+})
+
+// P17 (N-07): o catálogo do produto na Criação: o nome de custo fixo entra
+// num toque, com o custo do anexo (Ambidestro, 1 no V20)
+describe('N-07: o catálogo de Qualidades do V20', () => {
+  it('Ambidestro entra num toque, com Custo 1, e o saldo cai para 14', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Buscar Qualidade'), 'ambidest')
+    fireEvent.press(screen.getByRole('button', { name: 'Ambidestro, Custo 1' }))
+    expect(screen.queryByTestId('add-cost-merits')).toBeNull()
+    expect(
+      within(screen.getByTestId('editor-merits')).getByText('Custo 1')
+    ).toBeTruthy()
+    tab('Pontos')
+    expect(screen.getByTestId('creation-freebies')).toHaveTextContent(
+      /\b14 de 15\b/
     )
   })
 })

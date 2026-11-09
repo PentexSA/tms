@@ -607,6 +607,12 @@ function AddItemSheet({
               }}
             />
           </View>
+          {/* A faixa do catálogo (catalogHelp), onde o valor é escolhido */}
+          {nameHelp(def.catalogHelp, cost.name)?.text ? (
+            <Text variant="caption" color="inkMuted" testID="add-cost-help">
+              {nameHelp(def.catalogHelp, cost.name)?.text}
+            </Text>
+          ) : null}
           <Stepper
             label={price.label}
             showLabel

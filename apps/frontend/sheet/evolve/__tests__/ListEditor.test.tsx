@@ -4,6 +4,7 @@ import {
   example,
   GIFTS,
   modelOf,
+  modelWithoutMeritCatalog,
   templateJson,
   templateWithIdentity,
 } from '../../../test/fixtures'
@@ -16,11 +17,15 @@ import { textInput } from '../../../test/queries'
 
 const vtm = modelOf('vtm-v20')
 
-async function helenaInEvolve() {
+// P17 (N-07): as Qualidades e os Defeitos do produto têm catálogo; os
+// casos da lista sem catálogo (campo "Nome", texto livre) usam este
+const plain = modelWithoutMeritCatalog('vtm-v20')
+
+async function helenaInEvolve(model = vtm) {
   const helena = example('helena').sheet
   const live = await renderLive(
-    { model: vtm, sheet: helena, mode: 'evolve' },
-    fakeServer(vtm, helena).post
+    { model, sheet: helena, mode: 'evolve' },
+    fakeServer(model, helena).post
   )
   fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
   const disciplines = () =>
@@ -202,8 +207,8 @@ describe('ListEditor', () => {
       },
     }
     const { store } = await renderLive(
-      { model: vtm, sheet, mode: 'evolve' },
-      fakeServer(vtm, sheet).post
+      { model: plain, sheet, mode: 'evolve' },
+      fakeServer(plain, sheet).post
     )
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
@@ -308,7 +313,7 @@ describe('T-23: o item nasce com o valor que o editor mostra', () => {
       .find(e => e.path === 'values.flaws')?.to as ListItem[] | undefined
 
   it('Defeito novo grava o Bônus 1 que a folha mostra; a linha diz "Bônus 1"', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
     fireEvent.changeText(textInput('Nome'), 'Pesadelos')
     fireEvent.press(
@@ -390,7 +395,7 @@ describe('T-62: Enter e "✓" adicionam', () => {
     })
 
   it('lista sem catálogo (Qualidade): o Enter adiciona o texto livre', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     const name = textInput('Nome')
     expect(name.props.returnKeyType).toBe('done')
@@ -411,7 +416,7 @@ describe('T-62: Enter e "✓" adicionam', () => {
   // Integração da onda 2, no AVD: o "✓" chegou antes do último
   // onChangeText, e a Qualidade entrou como "Ambi"
   it('o Enter usa o texto que chega com ele, não o do último onChangeText', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     fireEvent.changeText(textInput('Nome'), 'Ambi')
     enter('Nome', 'Ambidestro')
@@ -463,7 +468,7 @@ describe('T-62: Enter e "✓" adicionam', () => {
   })
 
   it('campo vazio: o Enter não faz nada', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     enter('Nome')
     expect(eventFor(live, 'merits')).toBeUndefined()
@@ -911,6 +916,7 @@ describe('N-08: o passo do custo ao adicionar', () => {
       ...fields.merits,
       catalog: ['Fixa de Três', 'Livre'],
       catalogDefaults: [{ meta: 'cost', value: 3, items: ['Fixa de Três'] }],
+      catalogHelp: { Livre: 'Custo de 1 a 10, escolhido ao adicionar.' },
     }
     return compileTemplate(t)
   }
@@ -954,6 +960,10 @@ describe('N-08: o passo do custo ao adicionar', () => {
     const { merits } = await open()
     fireEvent.press(screen.getByRole('button', { name: 'Livre' }))
     expect(screen.getByTestId('add-cost-merits')).toBeTruthy()
+    // A faixa do catálogo (catalogHelp) fica onde o valor é escolhido
+    expect(screen.getByTestId('add-cost-help')).toHaveTextContent(
+      'Custo de 1 a 10, escolhido ao adicionar.'
+    )
     expect(merits()).toBeUndefined()
     press('increment', 2)
     fireEvent.press(screen.getByTestId('add-cost-confirm'))
