@@ -974,6 +974,164 @@
       "type": "list",
       "label": "Qualidades",
       "itemLabel": "Qualidade",
+      "catalog": [
+        "Visão Lupina",
+        "Sentido Aguçado",
+        "Tolerância ao Álcool",
+        "Ambidestro",
+        "Juntas Duplas",
+        "Multi-Metamorfo",
+        "Equilíbrio Perfeito",
+        "Gosto Ruim",
+        "Glabro Bonito",
+        "Inodoro",
+        "Fisicamente Impressionante",
+        "Temerário",
+        "Corredor de Longa Distância",
+        "Armas Naturais",
+        "Corpo Grande",
+        "Metamorfo",
+        "Bom Senso",
+        "Aptidão com Computadores",
+        "Concentração",
+        "Motorista Experiente",
+        "Língua",
+        "Aptidão Mecânica",
+        "Cálculo Relâmpago",
+        "Noção Exata do Tempo",
+        "Berserker",
+        "Temperamento Calmo",
+        "Código de Honra",
+        "Vontade de Ferro",
+        "Memória Eidética",
+        "Força Interior",
+        "Linguista Nato",
+        "Dorme Pouco",
+        "Faz-Tudo",
+        "Autoconfiante",
+        "Indomável",
+        "Apoio da Família",
+        "Digno de Pena",
+        "Favor",
+        "Boa Vontade de um Campo",
+        "Magnetismo Animal",
+        "Líder Nato",
+        "Linhagem Notável",
+        "Companheiro Sobrenatural",
+        "Reputação",
+        "Inspirador",
+        "Mensageiro Reconhecido",
+        "Ancestral Aliado",
+        "Vínculo Lunar",
+        "Ímã de Espíritos",
+        "Noção do Perigo",
+        "Sorte",
+        "Canal Natural",
+        "Amor Verdadeiro",
+        "Imune às Emanações da Wyrm",
+        "Tolerância à Prata"
+      ],
+      "catalogDefaults": [
+        {
+          "meta": "cost",
+          "value": 1,
+          "items": [
+            "Visão Lupina",
+            "Sentido Aguçado",
+            "Tolerância ao Álcool",
+            "Ambidestro",
+            "Juntas Duplas",
+            "Equilíbrio Perfeito",
+            "Bom Senso",
+            "Aptidão com Computadores",
+            "Concentração",
+            "Motorista Experiente",
+            "Língua",
+            "Aptidão Mecânica",
+            "Cálculo Relâmpago",
+            "Noção Exata do Tempo",
+            "Apoio da Família",
+            "Digno de Pena",
+            "Boa Vontade de um Campo",
+            "Ancestral Aliado",
+            "Vínculo Lunar",
+            "Ímã de Espíritos"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 2,
+          "items": [
+            "Gosto Ruim",
+            "Glabro Bonito",
+            "Inodoro",
+            "Fisicamente Impressionante",
+            "Berserker",
+            "Código de Honra",
+            "Memória Eidética",
+            "Força Interior",
+            "Linguista Nato",
+            "Dorme Pouco",
+            "Magnetismo Animal",
+            "Líder Nato",
+            "Linhagem Notável",
+            "Reputação",
+            "Inspirador"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 3,
+          "items": [
+            "Temerário",
+            "Corredor de Longa Distância",
+            "Temperamento Calmo",
+            "Vontade de Ferro",
+            "Faz-Tudo",
+            "Companheiro Sobrenatural",
+            "Mensageiro Reconhecido",
+            "Noção do Perigo",
+            "Sorte",
+            "Canal Natural"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 4,
+          "items": [
+            "Corpo Grande",
+            "Amor Verdadeiro"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 5,
+          "items": [
+            "Autoconfiante",
+            "Indomável"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 6,
+          "items": [
+            "Imune às Emanações da Wyrm"
+          ]
+        },
+        {
+          "meta": "cost",
+          "value": 7,
+          "items": [
+            "Metamorfo",
+            "Tolerância à Prata"
+          ]
+        }
+      ],
+      "catalogHelp": {
+        "Multi-Metamorfo": "Custo 1 ou 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Armas Naturais": "Custo 3 para Lupino ou Impuro, 4 para Hominídeo, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Favor": "Custo de 1 a 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador."
+      },
       "item": {
         "meta": [
           { "id": "kind", "type": "text", "label": "Tipo" },
@@ -987,6 +1145,182 @@
       "type": "list",
       "label": "Defeitos",
       "itemLabel": "Defeito",
+      "catalog": [
+        "Almíscar Animal",
+        "Anosmia",
+        "Deficiência Auditiva",
+        "Visão Monocromática",
+        "Sem Transformação Parcial",
+        "Estatura Baixa",
+        "Estritamente Carnívoro",
+        "Caolho",
+        "Deficiência Visual",
+        "Deformidade",
+        "Risco Duplo",
+        "Aleijado",
+        "Surdez",
+        "Mudo",
+        "Cegueira",
+        "Monstruoso",
+        "Um Braço Só",
+        "Compulsão",
+        "Impaciente",
+        "Intolerância",
+        "Pesadelos",
+        "Excesso de Confiança",
+        "Timidez",
+        "Coração Mole",
+        "Dificuldade de Fala",
+        "Amnésia",
+        "Curiosidade",
+        "Mentalidade de Matilha",
+        "Fobia",
+        "Cabeça Quente",
+        "Bairrismo",
+        "Vingativo",
+        "Ódio",
+        "Vontade Fraca",
+        "Deficiência em Habilidade",
+        "Perturbação Mental",
+        "Flashbacks",
+        "Distraído",
+        "Objetivo Obsessivo",
+        "Segredo Sombrio",
+        "Conspirador",
+        "Inimigo",
+        "Ingênuo",
+        "Educação Distorcida",
+        "Inimizade com um Campo",
+        "Crédulo",
+        "Pais Persistentes",
+        "Notoriedade",
+        "Dependente",
+        "Caçado",
+        "Filho Impuro",
+        "Transformação Proibida",
+        "Amaldiçoado",
+        "Inimigo do Passado",
+        "Travessia Involuntária",
+        "Dócil",
+        "Transformação Forçada",
+        "Marca do Predador",
+        "Ancestral Insano",
+        "Sinal do Lobo",
+        "Véu Perfurado",
+        "Propenso ao Harano",
+        "Futuro Negro",
+        "Mácula da Corrupção"
+      ],
+      "catalogDefaults": [
+        {
+          "meta": "bonus",
+          "value": 1,
+          "items": [
+            "Almíscar Animal",
+            "Anosmia",
+            "Deficiência Auditiva",
+            "Visão Monocromática",
+            "Sem Transformação Parcial",
+            "Estatura Baixa",
+            "Estritamente Carnívoro",
+            "Compulsão",
+            "Impaciente",
+            "Intolerância",
+            "Pesadelos",
+            "Excesso de Confiança",
+            "Timidez",
+            "Coração Mole",
+            "Dificuldade de Fala",
+            "Segredo Sombrio",
+            "Conspirador",
+            "Ingênuo",
+            "Educação Distorcida",
+            "Inimizade com um Campo",
+            "Travessia Involuntária",
+            "Ancestral Insano"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 2,
+          "items": [
+            "Caolho",
+            "Amnésia",
+            "Curiosidade",
+            "Mentalidade de Matilha",
+            "Cabeça Quente",
+            "Bairrismo",
+            "Vingativo",
+            "Crédulo",
+            "Pais Persistentes",
+            "Marca do Predador",
+            "Sinal do Lobo"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 3,
+          "items": [
+            "Deficiência Visual",
+            "Deformidade",
+            "Risco Duplo",
+            "Aleijado",
+            "Monstruoso",
+            "Um Braço Só",
+            "Ódio",
+            "Vontade Fraca",
+            "Perturbação Mental",
+            "Distraído",
+            "Objetivo Obsessivo",
+            "Notoriedade",
+            "Dependente",
+            "Véu Perfurado"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 4,
+          "items": [
+            "Surdez",
+            "Mudo",
+            "Caçado",
+            "Filho Impuro",
+            "Propenso ao Harano"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 5,
+          "items": [
+            "Deficiência em Habilidade",
+            "Futuro Negro"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 6,
+          "items": [
+            "Cegueira",
+            "Flashbacks"
+          ]
+        },
+        {
+          "meta": "bonus",
+          "value": 7,
+          "items": [
+            "Mácula da Corrupção"
+          ]
+        }
+      ],
+      "catalogHelp": {
+        "Fobia": "Bônus 2 ou 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Inimigo": "Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Transformação Proibida": "Bônus de 1 a 6, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Amaldiçoado": "Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Inimigo do Passado": "Bônus de 1 a 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Dócil": "Bônus de 1 a 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
+        "Transformação Forçada": "Bônus 1 ou 2, escolhido ao adicionar. O app não confere o valor: combine com o narrador."
+      },
       "item": {
         "meta": [
           { "id": "kind", "type": "text", "label": "Tipo" },

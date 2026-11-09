@@ -48,6 +48,8 @@ Alcance: N-03 a N-06 e N-08 são código e valem para toda ficha. N-01, N-02 e N
 
 O rótulo `Nome de feito` fica (§5, decisão 1), então `apps/frontend/sheet/__tests__/sheet.layout.test.tsx:154` e `e2e/tests/journey-werewolf.spec.ts:69` não mudam.
 
+**Na execução:** o `sheet.layout.test.tsx` não mudou, mas o `journey-werewolf.spec.ts:69` mudou. O "?" novo tem o nome acessível "Ajuda: Nome de feito", e o `getByLabel('Nome de feito')` (que casa por trecho) passou a achar o botão e o campo. O spec agora busca o `textbox` pelo nome exato.
+
 ### 2.2 N-03 · Destaque da próxima aba
 
 **Confirmado no código.**
@@ -283,6 +285,14 @@ O `addAdvice` (a linha genérica "Custa o Custo do item em bônus", `creation.ts
 - E2E, um caso por sistema, conferindo o saldo de bônus depois de cada inclusão:
   - `journey-werewolf.spec.ts`: uma Qualidade do catálogo (custo fixo) e um Defeito de custo livre;
   - `journey.spec.ts` (Vampiro) e `journey-mage.spec.ts`: uma Qualidade do catálogo de custo fixo, para provar que o catálogo de cada template foi publicado.
+
+**Na execução (N-07 e N-08):**
+
+- **Fonte da validação.** O anexo (`P17-qualidades-defeitos.md` e `.json`) ficou fora do git, aguardando a revisão das fontes (os links para cópias dos livros). Os templates foram gerados a partir do `.json` sem mudar nenhum nome. A validação de conteúdo lê a fixture `packages/sheet-core/src/__tests__/p17-catalogo.json`, com nome, nome original e custos de cada linha, sem fontes. O commit 6 (§4) fica pendente dessa decisão; quando o anexo entrar, o teste pode passar a lê-lo direto, como o `onda-4-content.test.ts`.
+- **Ajuda das opções variáveis.** Cada nome de custo variável ganhou `catalogHelp` com os valores do anexo ("Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador."). Valores discretos ficam como "1 ou 5", e Armas Naturais (W20) e Fé Verdadeira (M20) têm frases próprias. O passo do custo (N-08) mostra a mesma frase acima do seletor.
+- **Testes que usavam as Qualidades como "lista sem catálogo".** Os testes do mecanismo (campo "Nome", texto livre, o mínimo do meta) passaram a usar `templateWithoutMeritCatalog`, uma fixture do frontend sem o catálogo de Qualidades e Defeitos. Os do produto passaram a usar o catálogo real.
+- **E2E do saldo de bônus.** As jornadas (`journey*.spec.ts`) criam em modo livre, sem saldo de bônus. Nelas, o catálogo é conferido no lote do Editar: a Qualidade de custo fixo nos três sistemas e, no Lobisomem, também o Defeito de custo variável com o Bônus escolhido. O saldo depois de cada inclusão é conferido num caso novo de criação por pontos do W20, em `advantages.spec.ts`.
+- **O store** ganhou `shownSheet()`: a ficha à vista (valores com o rascunho), que a prévia do N-08 precisa. A `ResolvedSheet` que o editor recebe não guarda os valores crus.
 
 ## 3. Versão do template, migração e alcance
 

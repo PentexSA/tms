@@ -130,18 +130,29 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await expect(
     page.getByRole('button', { name: /^Geração, 5 de 5/ })
   ).toBeVisible()
-  await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
+  // P17 (N-07): o catálogo de Qualidades do V20, publicado. Ambidestro tem
+  // custo fixo: entra num toque, com o Custo 1 do catálogo
+  await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
+  await page.getByLabel('Buscar Qualidade').fill('ambidest')
+  await page
+    .getByRole('button', { name: 'Ambidestro, Custo 1', exact: true })
+    .click()
+  await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0)
+  await expect(page.getByText('Editando · 8 alterações')).toBeVisible()
 
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
     .click()
-  await expect(page.getByText('Salvar 7 alterações?')).toBeVisible()
+  await expect(page.getByText('Salvar 8 alterações?')).toBeVisible()
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   const evolveBatch = (await evolved).request().postDataJSON() as {
-    events: unknown[]
+    events: { path: string; to?: unknown }[]
   }
-  expect(evolveBatch.events).toHaveLength(7)
+  expect(evolveBatch.events).toHaveLength(8)
+  expect(
+    evolveBatch.events.find(e => e.path === 'values.merits')?.to
+  ).toMatchObject([{ name: 'Ambidestro', meta: { cost: 1 } }])
 
   // 6. Jogo (identidade, 3 abas e o dock: Vitalidade, Sangue, FdV). A dona não
   // tem Leitura: Jogo já mostra a ficha inteira

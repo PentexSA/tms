@@ -8,7 +8,11 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
-import { modelOf, templateJson } from '../../../test/fixtures'
+import {
+  modelOf,
+  modelWithoutMeritCatalog,
+  templateJson,
+} from '../../../test/fixtures'
 import {
   addAdvice,
   addPreview,
@@ -938,8 +942,9 @@ describe('addAdvice: a prévia do item novo', () => {
   })
 
   it('Qualidade: o Custo do item em bônus; Defeito: o crédito até 7', () => {
+    // P17 (N-07): as Qualidades do produto têm catálogo com custo
     expect(addAdvice(vtm, at({}), 'basics', 'merits')).toBe(
-      'Custa o Custo do item em bônus (começa em 1); restam 15.'
+      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
     )
     expect(addAdvice(vtm, at({}), 'basics', 'flaws')).toBe(
       'Devolve o Bônus do item, até 7 no total.'
@@ -950,22 +955,14 @@ describe('addAdvice: a prévia do item novo', () => {
     expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
   })
 
-  it('com o Custo no catálogo, a prévia não promete o mínimo (code review)', () => {
-    const t = templateJson('vtm-v20')
-    const fields = t.fields as Record<string, Record<string, unknown>>
-    if (fields.merits) {
-      fields.merits.catalog = ['Qualidade A']
-      fields.merits.catalogDefaults = [
-        { meta: 'cost', value: 3, items: ['Qualidade A'] },
-      ]
-    }
-    const m = compileTemplate(t)
+  it('sem o Custo no catálogo, a prévia diz o mínimo (code review)', () => {
+    const m = modelWithoutMeritCatalog('vtm-v20')
     const check = checkCreation(m, { values: {} } as SheetData, {
       config: effectiveCreationConfig(m),
       choices: WOD_PRIORITIES,
     })
     expect(addAdvice(m, check, 'basics', 'merits')).toBe(
-      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
+      'Custa o Custo do item em bônus (começa em 1); restam 15.'
     )
   })
 })
