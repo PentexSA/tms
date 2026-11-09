@@ -81,7 +81,7 @@ test.describe('a 390', () => {
     await expect(
       page.getByRole('tablist', { name: 'Partes da ficha' })
     ).toBeVisible()
-    const budget = page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
+    const budget = page.getByRole('tab', { name: 'Pontos', exact: true })
     await budget.scrollIntoViewIfNeeded()
     await budget.click()
     await expect(page.getByTestId('creation-freebies')).toBeVisible()

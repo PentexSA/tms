@@ -511,9 +511,6 @@ export function BonusNotice({ onBudget }: { readonly onBudget: () => void }) {
       visible={open}
       title="Começaram os pontos de bônus"
       onClose={() => setOpen(false)}
-      // O aviso aparece uma vez por ficha: o toque fora não o perde (P17,
-      // N-05). O ×, o Esc e o voltar do Android continuam fechando
-      dismissOnScrim={false}
       onClosed={() => {
         if (!toPoints.current) return
         toPoints.current = false

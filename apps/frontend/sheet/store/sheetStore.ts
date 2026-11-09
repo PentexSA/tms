@@ -298,11 +298,6 @@ export interface SheetActions {
   setCreationPhase(phase: CreationPhase): void
   /** Apaga o aviso do toque recusado (a folha mudou o que estava tentando). */
   clearNotice(): void
-  /**
-   * A ficha que a tela mostra: os valores com o rascunho por cima, a mesma
-   * da conta (`check`). Para a prévia do item novo (P17, N-08).
-   */
-  shownSheet(): SheetData
 }
 
 export type SheetStore = StoreApi<SheetState & SheetActions>
@@ -1028,11 +1023,6 @@ export function createSheetStore(init: SheetStoreInit): SheetStore {
       clearNotice() {
         tried = null
         if (get().notice) set({ notice: null })
-      },
-
-      shownSheet() {
-        const s = get()
-        return shown(s.values, s.draft)
       },
     }
   })

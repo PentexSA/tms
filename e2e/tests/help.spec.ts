@@ -73,7 +73,7 @@ test.describe('a 390 px', () => {
     )
     expect(scroll).toBeLessThanOrEqual(390)
 
-    await page.getByRole('tab', { name: /^Vantagens(, a seguir)?$/ }).click()
+    await page.getByRole('tab', { name: 'Vantagens', exact: true }).click()
     const virtue = helpIn(page, 'editor-conscience', 'Consciência')
     await virtue.click()
     await expect(virtue).toHaveAttribute('aria-expanded', 'true')

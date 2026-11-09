@@ -137,13 +137,6 @@ export interface BottomSheetProps {
    * seguinte guarda o gatilho certo para devolver o foco.
    */
   readonly onClosed?: () => void
-  /**
-   * O toque (ou clique) no fundo fecha a folha. Padrão `true`. Com `false`,
-   * o fundo continua cobrindo a tela, mas o toque nele não faz nada: a folha
-   * que não pode sumir por acidente (o aviso dos bônus, P17 N-05). O ×, o
-   * Esc e o voltar do Android continuam fechando.
-   */
-  readonly dismissOnScrim?: boolean
 }
 
 export function BottomSheet({
@@ -154,7 +147,6 @@ export function BottomSheet({
   footer,
   testID,
   onClosed,
-  dismissOnScrim = true,
 }: BottomSheetProps) {
   const { colors, reduceMotion } = useTheme()
   const insets = useInsets()
@@ -289,7 +281,7 @@ export function BottomSheet({
           <View
             aria-hidden
             testID="bottom-sheet-scrim"
-            {...{ onClick: dismissOnScrim ? onClose : undefined }}
+            {...{ onClick: onClose }}
             style={scrimStyle}
           />
         ) : (
@@ -298,7 +290,7 @@ export function BottomSheet({
             aria-hidden
             accessibilityLabel="Fechar"
             testID="bottom-sheet-scrim"
-            onPress={dismissOnScrim ? onClose : undefined}
+            onPress={onClose}
             minTarget={false}
             style={scrimStyle}
           />

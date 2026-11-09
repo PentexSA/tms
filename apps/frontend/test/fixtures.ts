@@ -29,27 +29,6 @@ export const templateJson = (system: string): Json =>
 export const modelOf = (system: string): SheetModel =>
   compileTemplate(templates[system])
 
-/**
- * O template sem o catálogo de Qualidades e Defeitos (P17, N-07): para os
- * testes do mecanismo da lista sem catálogo (o campo "Nome", o texto livre,
- * o mínimo do meta), que antes usavam essas listas do produto.
- */
-export function templateWithoutMeritCatalog(system: string): Json {
-  const t = templateJson(system)
-  const fields = t.fields as Record<string, Json>
-  for (const id of ['merits', 'flaws']) {
-    const f = fields[id]
-    if (!f) continue
-    delete f.catalog
-    delete f.catalogDefaults
-    delete f.catalogHelp
-  }
-  return t
-}
-
-export const modelWithoutMeritCatalog = (system: string): SheetModel =>
-  compileTemplate(templateWithoutMeritCatalog(system))
-
 // Dons fictícios (P07-D): os testes do mecanismo usam nomes inventados, com
 // Posto e recomendação, para não depender do catálogo do produto (onda 4),
 // que tem os próprios casos com `templateJson('wta-w20')`

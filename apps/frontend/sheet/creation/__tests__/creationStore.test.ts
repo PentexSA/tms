@@ -118,7 +118,7 @@ describe('trava da criação a cada toque', () => {
         {
           path: 'values.dex',
           message:
-            'Físicos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).',
+            'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
         },
       ],
     })

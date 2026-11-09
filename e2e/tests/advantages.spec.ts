@@ -26,7 +26,7 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
   await page.getByRole('radio', { name: 'Tremere' }).click()
   await page.getByRole('button', { name: 'Criar ficha' }).click()
   await expect(
-    page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
+    page.getByRole('tab', { name: 'Pontos', exact: true })
   ).toBeVisible()
   await page.getByRole('tab', { name: 'Vantagens' }).click()
 
@@ -97,47 +97,32 @@ test('Vantagens a 390 px: recusa na folha, Enter, Defeito no saldo e títulos', 
     'fora do clã: confirme com o narrador'
   )
 
-  // T-62 e T-23: Enter adiciona o Defeito, com o Bônus que a folha mostra
+  // T-62 e T-23: Enter adiciona o Defeito, com o Bônus 1 que a folha mostra
   // Cada folha pelo testID: a anterior ainda sai (animação) quando a
   // próxima abre, e as duas têm um campo "Nome"
   await page.getByRole('button', { name: 'Adicionar Defeito' }).click()
-  const flawSearch = page
+  await page
     .getByTestId('add-sheet-flaws')
-    .getByRole('textbox', { name: 'Buscar Defeito', exact: true })
-  await flawSearch.fill('Inimigo')
-  await flawSearch.press('Enter')
-  // P17 (N-07, N-08): Inimigo é do catálogo, de custo variável: o Enter
-  // pede o Bônus, com a prévia da conta
-  const flawCost = page.getByTestId('add-cost-flaws')
-  await expect(flawCost.getByTestId('add-cost-preview')).toHaveText(
-    'Devolve 1 de bônus.'
-  )
-  await flawCost.getByTestId('add-cost-confirm').click()
+    .getByRole('textbox', { name: 'Nome', exact: true })
+    .fill('Inimigo')
+  await page.keyboard.press('Enter')
   await expect(
     page.getByRole('button', { name: /^Inimigo, Bônus 1/ })
   ).toBeVisible()
 
-  // A Qualidade entra com o Custo 1 do catálogo, paga com bônus
+  // A Qualidade entra com o Custo 1 do template, paga com bônus
   await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
-  const meritSearch = page
+  await page
     .getByTestId('add-sheet-merits')
-    .getByRole('textbox', { name: 'Buscar Qualidade', exact: true })
-  // P17 (N-07): Ambidestro tem custo fixo no catálogo: o Enter adiciona. O
-  // foco da folha modal pode chegar depois do Enter (a folha do Defeito
-  // acabou de fechar): repete até a folha fechar, como na jornada do Mago
-  await expect(async () => {
-    await meritSearch.fill('Ambidestro')
-    await meritSearch.press('Enter')
-    await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0, {
-      timeout: 1000,
-    })
-  }).toPass()
+    .getByRole('textbox', { name: 'Nome', exact: true })
+    .fill('Ambidestro')
+  await page.keyboard.press('Enter')
   await expect(
     page.getByRole('button', { name: /^Ambidestro, Custo 1/ })
   ).toBeVisible()
 
   // O crédito do Defeito entra no saldo: 15 + 1, menos 1 da Qualidade
-  await page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ }).click()
+  await page.getByRole('tab', { name: 'Pontos', exact: true }).click()
   await expect(page.getByTestId('creation-freebies')).toContainText(
     /\b15 de 16\b/
   )
@@ -177,87 +162,4 @@ test('R-26 a 390 px: Brujah, as do clã primeiro, e Dominação de fora', async 
   )
   // Nada bloqueou: o ponto entrou e a conta seguiu
   await expect(page.getByTestId('counter-disciplines')).toHaveText('1/3')
-})
-
-// P17 (N-07, N-08): o catálogo de Qualidades e Defeitos do W20 na criação por
-// pontos. A Qualidade de custo fixo entra num toque; o Defeito de custo
-// livre pede o Bônus, com a prévia; o saldo de bônus confere cada inclusão
-test('W20 a 390 px: catálogo de Qualidades e Defeitos e o saldo de bônus', async ({
-  browser,
-  page,
-}) => {
-  const desk = await browser.newContext()
-  const storyteller = await signUp(desk, 'narra_catalogo')
-  const chronicle = await apiAs<{ id: string }>(
-    desk,
-    storyteller,
-    'POST',
-    '/chronicles',
-    { name: 'Crônica do catálogo', systemCode: 'wta-w20' }
-  )
-  const { code } = await apiAs<{ code: string }>(
-    desk,
-    storyteller,
-    'POST',
-    `/chronicles/${chronicle.id}/invites`
-  )
-  await desk.close()
-  const context = page.context()
-  const user = await signUp(context, 'joga_catalogo')
-  await apiAs(context, user, 'POST', '/invites/accept', { code })
-  const character = await apiAs<{ id: string }>(
-    context,
-    user,
-    'POST',
-    `/chronicles/${chronicle.id}/characters`,
-    {
-      values: {
-        name: 'Uiva Longe',
-        breed: 'hominideo',
-        auspice: 'galliard',
-        tribe: 'fianna',
-      },
-    }
-  )
-  await page.goto(`/characters/${character.id}?mode=create`)
-  const freebies = async (text: RegExp) => {
-    await page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ }).click()
-    await expect(page.getByTestId('creation-freebies')).toContainText(text)
-    await page.getByRole('tab', { name: /^Vantagens(, a seguir)?$/ }).click()
-  }
-  await page.getByRole('tab', { name: /^Vantagens(, a seguir)?$/ }).click()
-
-  // Ambidestro: custo fixo 1 no W20, num toque
-  await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
-  await page.getByLabel('Buscar Qualidade').fill('ambidest')
-  await page
-    .getByRole('button', { name: 'Ambidestro, Custo 1', exact: true })
-    .click()
-  await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0)
-  await expect(
-    page.getByRole('button', { name: /^Ambidestro, Custo 1/ })
-  ).toBeVisible()
-  await freebies(/\b14 de 15\b/)
-
-  // Um Defeito digitado (fora do catálogo): o Bônus na folha, com a prévia
-  await page.getByRole('button', { name: 'Adicionar Defeito' }).click()
-  await page.getByLabel('Buscar Defeito').fill('Medo de altura')
-  await page
-    .getByRole('button', { name: 'Adicionar “Medo de altura”', exact: true })
-    .click()
-  const cost = page.getByTestId('add-cost-flaws')
-  await expect(cost.getByTestId('add-cost-preview')).toHaveText(
-    'Devolve 1 de bônus.'
-  )
-  await cost.getByRole('button', { name: 'Aumentar Bônus' }).click()
-  await cost.getByRole('button', { name: 'Aumentar Bônus' }).click()
-  await expect(cost.getByTestId('add-cost-preview')).toHaveText(
-    'Devolve 3 de bônus.'
-  )
-  await cost.getByTestId('add-cost-confirm').click()
-  await expect(page.getByTestId('add-sheet-flaws')).toHaveCount(0)
-  await expect(
-    page.getByRole('button', { name: /^Medo de altura, Bônus 3/ })
-  ).toBeVisible()
-  await freebies(/\b17 de 18\b/)
 })

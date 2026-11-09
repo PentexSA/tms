@@ -15,10 +15,6 @@ import {
   guidePrefix,
   LEDGER_TARGET,
   moreText,
-  type NextTabInput,
-  nextTab,
-  nextTabAnnouncement,
-  POINTS_TAB,
 } from '../guide'
 
 // P05-D (D-05, R-18): os itens do "O que falta" saem dos `problems` do
@@ -285,113 +281,5 @@ describe('confirmNote', () => {
     expect(confirmNote(2)).toBe(
       '2 itens para confirmar com o narrador; veja em Pontos.'
     )
-  })
-})
-
-// P17 (N-03): o selo "a seguir" na aba seguinte com pendência
-describe('nextTab', () => {
-  const TABS = [
-    { id: 'build', label: 'Ficha' },
-    { id: 'powers', label: 'Vantagens' },
-    { id: 'lore', label: 'Sobre' },
-    { id: POINTS_TAB, label: 'Pontos' },
-  ]
-  const item = (
-    tab: string | null,
-    kind: GuideItem['kind'] = 'missing'
-  ): GuideItem => ({
-    key: `${kind}:${tab}`,
-    kind,
-    short: 'x',
-    text: 'x',
-    target:
-      tab === null ? null : { tab, section: null, group: null, path: null },
-  })
-  const input = (over: Partial<NextTabInput>): NextTabInput => ({
-    items: [],
-    tabs: TABS,
-    current: 'build',
-    freebies: { remaining: 15 },
-    active: true,
-    ...over,
-  })
-
-  it('a aba Ficha acaba: o selo vai para Vantagens, e o anúncio usa "Ficha"', () => {
-    const next = nextTab(input({ items: [item('powers'), item('lore')] }))
-    expect(next).toEqual({ id: 'powers', done: 'Ficha' })
-    expect(nextTabAnnouncement(next!.done, 'Vantagens')).toBe(
-      'Ficha: nada falta. A seguir: Vantagens.'
-    )
-  })
-
-  it('Vantagens acaba com a Ficha ainda pendente: dá a volta até a Ficha', () => {
-    expect(nextTab(input({ current: 'lore', items: [item('build')] }))).toEqual(
-      { id: 'build', done: 'Sobre' }
-    )
-    expect(
-      nextTab(input({ current: 'powers', items: [item('build')] }))
-    ).toEqual({ id: 'build', done: 'Vantagens' })
-  })
-
-  it('a aba à vista com pendência: nenhum selo', () => {
-    expect(
-      nextTab(input({ items: [item('build'), item('powers')] }))
-    ).toBeNull()
-    // Também com o que impede salvar
-    expect(nextTab(input({ items: [item('build', 'blocking')] }))).toBeNull()
-  })
-
-  it('tudo feito: Pontos com bônus sobrando; nenhum com saldo zero ou sem bônus', () => {
-    expect(nextTab(input({}))).toEqual({ id: POINTS_TAB, done: 'Ficha' })
-    expect(nextTab(input({ freebies: { remaining: 0 } }))).toBeNull()
-    expect(nextTab(input({ freebies: null }))).toBeNull()
-    // Já em Pontos: nada a destacar
-    expect(nextTab(input({ current: POINTS_TAB }))).toBeNull()
-    // Sem a aba Pontos: nada
-    expect(
-      nextTab(input({ tabs: TABS.filter(t => t.id !== POINTS_TAB) }))
-    ).toBeNull()
-  })
-
-  it('item sem alvo (seção que o papel não lê) conta para Pontos', () => {
-    expect(nextTab(input({ items: [item(null)] }))).toEqual({
-      id: POINTS_TAB,
-      done: 'Ficha',
-    })
-    expect(
-      nextTab(input({ current: POINTS_TAB, items: [item(null)] }))
-    ).toBeNull()
-  })
-
-  it('item fora das abas ("Em jogo") e nada nas abas: nenhum selo, nem em Pontos', () => {
-    expect(nextTab(input({ items: [item('play')] }))).toBeNull()
-    // Com uma aba pendente, o selo vai para ela
-    expect(nextTab(input({ items: [item('play'), item('lore')] }))).toEqual({
-      id: 'lore',
-      done: 'Ficha',
-    })
-  })
-
-  it('só itens para confirmar: tratados como nada pendente', () => {
-    expect(nextTab(input({ items: [item('powers', 'confirm')] }))).toEqual({
-      id: POINTS_TAB,
-      done: 'Ficha',
-    })
-    expect(
-      nextTab(input({ items: [item('powers', 'confirm')], freebies: null }))
-    ).toBeNull()
-  })
-
-  it('fora da criação (Leitura, criação enviada): null', () => {
-    expect(
-      nextTab(input({ active: false, items: [item('powers')] }))
-    ).toBeNull()
-    expect(nextTab(input({ active: false }))).toBeNull()
-  })
-
-  it('a aba à vista fora das abas: null', () => {
-    expect(
-      nextTab(input({ current: 'nenhuma', items: [item('powers')] }))
-    ).toBeNull()
   })
 })
