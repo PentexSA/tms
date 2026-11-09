@@ -4,6 +4,8 @@ Sistema de gerenciamento de fichas de personagem para RPG de mesa. A proposta é
 
 Monorepo fullstack com Turborepo, Expo (React Native + Web), Elysia (Bun) e PostgreSQL.
 
+O histórico de versões está no [CHANGELOG.md](CHANGELOG.md).
+
 ## 🎲 Sobre o Projeto
 
 - **Usuários** criam personagens e participam de **crônicas** (campanhas) conduzidas por um **Storyteller** (narrador).
