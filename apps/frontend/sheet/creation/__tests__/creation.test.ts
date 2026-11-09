@@ -11,6 +11,7 @@ import {
 import { modelOf, templateJson } from '../../../test/fixtures'
 import {
   addAdvice,
+  addPreview,
   adviceNotices,
   basicsClosed,
   basicsDone,
@@ -30,6 +31,8 @@ import {
   freebiesLeftNote,
   freebiesNotes,
   groupFor,
+  pricedInCatalog,
+  priceMeta,
   priorityNote,
   problemText,
   reorder,
@@ -1464,5 +1467,89 @@ describe('"falta 1 ponto básico" (B2)', () => {
     expect(basicsSpentText({ ...g, price: null }, true)).toBe(
       'Conhecimentos: os 5 pontos básicos já foram usados.'
     )
+  })
+})
+
+// P17 (N-08): a prévia da inclusão de uma Qualidade ou de um Defeito com o
+// custo escolhido, pela conta inteira (antes e depois)
+describe('addPreview', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = (mode: 'points' | 'free' = 'points') => ({
+    config: { ...effectiveCreationConfig(vtm), mode },
+    choices: {},
+  })
+  const sheet = (values: Record<string, unknown>): SheetData => ({
+    values: { name: 'Nova', clan: 'tremere', ...values },
+    specialties: {},
+  })
+  const merit = (cost: number) => ({ id: 'n', name: 'Nova', meta: { cost } })
+  const flaw = (bonus: number) => ({ id: 'n', name: 'Nova', meta: { bonus } })
+  const merits = (...costs: number[]) =>
+    costs.map((cost, i) => ({ id: `m${i}`, name: `Q${i}`, meta: { cost } }))
+  const flaws = (...bonus: number[]) =>
+    bonus.map((b, i) => ({ id: `f${i}`, name: `D${i}`, meta: { bonus: b } }))
+
+  it('o meta de preço: o Custo na Qualidade, o Bônus no Defeito; Disciplinas não têm', () => {
+    expect(priceMeta(vtm, 'merits')).toMatchObject({
+      id: 'cost',
+      label: 'Custo',
+      min: 1,
+    })
+    expect(priceMeta(vtm, 'flaws')).toMatchObject({ id: 'bonus', min: 1 })
+    expect(priceMeta(vtm, 'disciplines')).toBeNull()
+    expect(pricedInCatalog(vtm, 'merits', 'cost', 'Nome inventado')).toBe(false)
+  })
+
+  it('Qualidade de 5 com saldo 8: custa 5, restam 3', () => {
+    expect(
+      addPreview(vtm, sheet({ merits: merits(7) }), input(), 'merits', merit(5))
+    ).toEqual({ text: 'Custa 5 de bônus; restam 3.', short: false })
+  })
+
+  it('Qualidade de 5 com saldo 3: faltariam 2', () => {
+    expect(
+      addPreview(
+        vtm,
+        sheet({ merits: merits(7, 5) }),
+        input(),
+        'merits',
+        merit(5)
+      )
+    ).toEqual({
+      text: 'Faltariam 2 de bônus: custa 5, restam 3.',
+      short: true,
+    })
+  })
+
+  it('Defeito de 3: devolve 3; com o crédito em 6, só 1; em 7, nada', () => {
+    expect(addPreview(vtm, sheet({}), input(), 'flaws', flaw(3))).toEqual({
+      text: 'Devolve 3 de bônus.',
+      short: false,
+    })
+    expect(
+      addPreview(vtm, sheet({ flaws: flaws(6) }), input(), 'flaws', flaw(3))
+    ).toEqual({
+      text: 'Devolve só 1 de bônus: o crédito chega a 7.',
+      short: false,
+    })
+    expect(
+      addPreview(vtm, sheet({ flaws: flaws(4, 3) }), input(), 'flaws', flaw(3))
+    ).toEqual({
+      text: 'Não devolve bônus: o crédito já está em 7.',
+      short: false,
+    })
+  })
+
+  it('sem conta de bônus (criação livre) ou lista sem preço: null', () => {
+    expect(
+      addPreview(vtm, sheet({}), input('free'), 'merits', merit(3))
+    ).toBeNull()
+    expect(
+      addPreview(vtm, sheet({}), input(), 'disciplines', {
+        id: 'd',
+        name: 'Taumaturgia',
+        value: 1,
+      })
+    ).toBeNull()
   })
 })
