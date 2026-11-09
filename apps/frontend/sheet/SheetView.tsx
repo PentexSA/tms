@@ -468,6 +468,7 @@ function SheetBody({
           tabs={tabs}
           selected={shownTab ?? ''}
           onSelect={selectTab}
+          guided={budgetEdit}
         />
       ) : null,
       <View

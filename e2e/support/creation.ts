@@ -138,7 +138,13 @@ export const tab = async (page: Page, name: string) => {
         scroller.getBoundingClientRect().top -
         below
     })
-  await page.getByRole('tab', { name, exact: true }).click()
+  // A aba da zona pode levar o selo "a seguir" no nome (P17, N-03)
+  await page
+    .getByRole('tab', {
+      name: section ? name : new RegExp(`^${name}(, a seguir)?$`),
+      exact: section ? true : undefined,
+    })
+    .click()
 }
 
 export const plus = (page: Page, trait: string) =>

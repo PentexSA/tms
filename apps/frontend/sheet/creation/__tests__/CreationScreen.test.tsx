@@ -630,6 +630,53 @@ describe('aba Pontos; Salvar sempre', () => {
   })
 })
 
+// P17 (N-03): quando a aba à vista acaba, a seguinte com pendência ganha o
+// selo "a seguir", e o anúncio diz a aba que acabou
+describe('o selo "a seguir" na aba seguinte (N-03)', () => {
+  // Só a Ficha (Atributos e Habilidades), sem Disciplinas, Antecedentes e
+  // Virtudes: a aba Vantagens continua pendente
+  const {
+    disciplines: _d,
+    backgrounds: _b,
+    conscience: _c,
+    selfControl: _s,
+    courage: _v,
+    ...SHEET_ONLY
+  } = ALMOST
+  const said = () =>
+    jest
+      .mocked(AccessibilityInfo.announceForAccessibility)
+      .mock.calls.map(([text]) => text)
+      .filter(text => text.includes('nada falta'))
+
+  it('a Ficha acaba: o selo vai para Vantagens; desfazer tira o selo, sem anúncio', async () => {
+    await open(PRIORITIES, SHEET_ONLY)
+    expect(screen.queryByTestId('tab-attention-powers')).toBeNull()
+    step('Vigor')
+    expect(
+      screen.getByRole('tab', { name: 'Vantagens, a seguir' })
+    ).toBeTruthy()
+    expect(said()).toEqual(['Ficha: nada falta. A seguir: Vantagens.'])
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Vigor' }),
+      'accessibilityAction',
+      {
+        nativeEvent: { actionName: 'decrement' },
+      }
+    )
+    expect(screen.queryByTestId('tab-attention-powers')).toBeNull()
+    expect(said()).toHaveLength(1)
+  })
+
+  it('tudo feito com bônus sobrando: o selo vai para Pontos, e o aviso dos bônus é o único anúncio', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Pontos, a seguir' })).toBeTruthy()
+    expect(said()).toEqual([])
+  })
+})
+
 // P17 (N-05): o aviso dos bônus aparece uma vez por ficha; o toque fora
 // não o fecha (fechado sem querer, ele nunca mais voltava). "Entendi" e o ×
 // fecham.
