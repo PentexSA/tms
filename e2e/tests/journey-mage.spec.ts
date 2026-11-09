@@ -100,6 +100,9 @@ test('a jornada da v1: o Mago, da crônica à magia', async ({
     .click()
   // P17 (N-07): o catálogo de Qualidades do M20, publicado. Tríade Sombria
   // tem custo fixo: entra num toque, com o Custo 3 do catálogo
+  // A folha da Rotina sai antes de a da Qualidade abrir (no WebKit, abrir
+  // durante a animação de saída perde a folha nova)
+  await expect(page.getByTestId('add-sheet-rotes')).toHaveCount(0)
   await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
   await page.getByLabel('Buscar Qualidade').fill('tríade')
   await page
