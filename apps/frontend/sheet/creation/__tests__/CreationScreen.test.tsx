@@ -630,6 +630,37 @@ describe('aba Pontos; Salvar sempre', () => {
   })
 })
 
+// P17 (N-05): o aviso dos bônus aparece uma vez por ficha; o toque fora
+// não o fecha (fechado sem querer, ele nunca mais voltava). "Entendi" e o ×
+// fecham.
+describe('o aviso dos bônus não fecha pelo fundo (N-05)', () => {
+  // A única folha aberta é o aviso
+  const scrim = () =>
+    screen.getByTestId('bottom-sheet-scrim', { includeHiddenElements: true })
+
+  it('o toque no fundo deixa o aviso aberto; "Entendi" fecha', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    fireEvent.press(scrim())
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    await waitFor(() => expect(screen.queryByTestId('bonus-notice')).toBeNull())
+  })
+
+  it('o × fecha', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(scrim())
+    fireEvent.press(
+      within(screen.getByTestId('bonus-notice')).getByRole('button', {
+        name: 'Fechar',
+      })
+    )
+    await waitFor(() => expect(screen.queryByTestId('bonus-notice')).toBeNull())
+  })
+})
+
 // P03-D (T-04, D-01): salvar o progresso sem concluir, em qualquer fase
 describe('Salvar e Concluir lado a lado (D-01)', () => {
   const saved = () =>
