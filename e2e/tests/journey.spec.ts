@@ -112,54 +112,36 @@ test('a jornada da v0, da conta à rolagem', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await stepper(page, 'Aumentar Força de Vontade permanente').click()
   await page.getByRole('tab', { name: 'Vantagens' }).click()
-  // Cada folha só abre depois que a anterior saiu da tela: no WebKit, abrir
-  // (ou reabrir a mesma) durante a animação de saída perde a folha nova
-  const sheetGone = (list: string) =>
-    expect(page.getByTestId(`add-sheet-${list}`)).toHaveCount(0)
   await page.getByRole('button', { name: 'Adicionar Disciplina' }).click()
   await page.getByLabel('Buscar Disciplina').fill('tauma')
   await page
     .getByRole('button', { name: 'Taumaturgia, do clã', exact: true })
     .click()
-  await sheetGone('disciplines')
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('rebanho')
   await page.getByRole('button', { name: 'Rebanho', exact: true }).click()
-  await sheetGone('backgrounds')
   // Geração 5 (da 13ª para a 8ª): Sangue máximo 15. Mesmo caminho
   // (values.backgrounds) do Rebanho: segue sendo 1 alteração
   await page.getByRole('button', { name: 'Adicionar Antecedente' }).click()
   await page.getByLabel('Buscar Antecedente').fill('gera')
   await page.getByRole('button', { name: 'Geração', exact: true }).click()
-  await sheetGone('backgrounds')
   // R-25: o valor sobe na própria linha, sem abrir a folha do item
   for (let i = 0; i < 4; i++) await stepper(page, 'Aumentar Geração').click()
   await expect(
     page.getByRole('button', { name: /^Geração, 5 de 5/ })
   ).toBeVisible()
-  // P17 (N-07): o catálogo de Qualidades do V20, publicado. Ambidestro tem
-  // custo fixo: entra num toque, com o Custo 1 do catálogo
-  await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
-  await page.getByLabel('Buscar Qualidade').fill('ambidest')
-  await page
-    .getByRole('button', { name: 'Ambidestro, Custo 1', exact: true })
-    .click()
-  await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0)
-  await expect(page.getByText('Editando · 8 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 7 alterações')).toBeVisible()
 
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
     .click()
-  await expect(page.getByText('Salvar 8 alterações?')).toBeVisible()
+  await expect(page.getByText('Salvar 7 alterações?')).toBeVisible()
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   const evolveBatch = (await evolved).request().postDataJSON() as {
-    events: { path: string; to?: unknown }[]
+    events: unknown[]
   }
-  expect(evolveBatch.events).toHaveLength(8)
-  expect(
-    evolveBatch.events.find(e => e.path === 'values.merits')?.to
-  ).toMatchObject([{ name: 'Ambidestro', meta: { cost: 1 } }])
+  expect(evolveBatch.events).toHaveLength(7)
 
   // 6. Jogo (identidade, 3 abas e o dock: Vitalidade, Sangue, FdV). A dona não
   // tem Leitura: Jogo já mostra a ficha inteira

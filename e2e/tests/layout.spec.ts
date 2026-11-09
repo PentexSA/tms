@@ -185,7 +185,7 @@ test('T-27 e T-59 a 390: "Em jogo" recolhido; abas e sub-abas fixas na Criação
     await expect(groups).toBeVisible()
     await inViewport(page, groups)
     await inViewport(page, page.getByRole('tab', { name: 'Perícias' }))
-    const budget = page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
+    const budget = page.getByRole('tab', { name: 'Pontos', exact: true })
     await inViewport(page, budget)
     // "Pontos" sem voltar ao topo
     await budget.click()

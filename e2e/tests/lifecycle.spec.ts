@@ -128,7 +128,7 @@ test('T-05: a ficha em criação abre na montagem pela lista e depois de recarre
     await page.getByRole('button', { name: /^Isadora Vex,/ }).click()
     await expect(radio(page, 'Criação')).toBeChecked()
     await expect(
-      page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
+      page.getByRole('tab', { name: 'Pontos', exact: true })
     ).toBeVisible()
     // Recarregar: Criação de novo (EW-08)
     await page.reload()

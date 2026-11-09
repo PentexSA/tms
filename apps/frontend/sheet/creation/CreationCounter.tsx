@@ -59,9 +59,11 @@ export function CreationCounter({
   const over = group.budget !== null && group.extra > 0
   const counter =
     pickable && group.budget === null ? (
+      // Ao lado do título do grupo, a frase não espreme o título
       <WithHelp
         help={CREATION_HELP.priority}
         testID={`priority-help-${group.id}`}
+        style={line ? undefined : styles.narrow}
       >
         <Text variant="caption" color="action">
           Prioridade
@@ -129,13 +131,9 @@ function PriorityPicker({
 }
 
 const styles = StyleSheet.create({
-  // No cabeçalho, o contador que não cabe ao lado do título desce de linha
-  // (SectionHeader); lá, ele quebra por dentro (texto acima dos chips) em vez
-  // de passar da coluna (P17, N-06)
+  narrow: { maxWidth: 220, alignItems: 'flex-end' },
   row: {
     flexShrink: 1,
-    minWidth: 0,
-    maxWidth: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',

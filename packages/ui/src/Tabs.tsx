@@ -15,12 +15,6 @@ import { tokens } from './tokens'
 export interface TabItem {
   readonly id: string
   readonly label: string
-  /**
-   * Um selo curto abaixo do rótulo ("a seguir"), com um ponto na cor da
-   * ação. Nunca só a cor: o texto aparece e entra no nome acessível
-   * ("Vantagens, a seguir").
-   */
-  readonly attention?: string
 }
 
 export interface TabsProps {
@@ -122,9 +116,7 @@ export function Tabs({
             key={item.id}
             {...roving(index)}
             accessibilityRole="tab"
-            accessibilityLabel={
-              item.attention ? `${item.label}, ${item.attention}` : item.label
-            }
+            accessibilityLabel={item.label}
             aria-selected={active}
             {...(id ? { nativeID: tabId(id, item.id) } : {})}
             {...(id && active && os === 'web'
@@ -151,19 +143,6 @@ export function Tabs({
             >
               {item.label}
             </Text>
-            {item.attention ? (
-              <View
-                style={styles.attention}
-                testID={`tab-attention-${item.id}`}
-              >
-                <View
-                  style={[styles.dot, { backgroundColor: colors.action }]}
-                />
-                <Text variant="caption" color="action">
-                  {item.attention}
-                </Text>
-              </View>
-            ) : null}
           </Pressable>
         )
       })}
@@ -183,10 +162,4 @@ const styles = StyleSheet.create({
   },
   tabSm: { borderBottomWidth: 2 },
   label: { textAlign: 'center' },
-  attention: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.space[1],
-  },
-  dot: { width: 6, height: 6, borderRadius: tokens.radius.pill },
 })

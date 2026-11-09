@@ -100,7 +100,7 @@ test.describe('a 390', () => {
     expect(body).toContain(STORY)
     expect(body).not.toContain(SECRET)
 
-    await ownerPage.getByRole('tab', { name: /^Sobre(, a seguir)?$/ }).click()
+    await ownerPage.getByRole('tab', { name: 'Sobre', exact: true }).click()
     await expect(
       ownerPage.getByText('História / Prelúdio', { exact: true })
     ).toBeVisible()
@@ -148,7 +148,7 @@ test.describe('a 390', () => {
     await page.goto(`/characters/${id}`)
     await page.getByRole('button', { name: 'Editar como narrador' }).click()
     await page.getByRole('radio', { name: 'Editar', exact: true }).click()
-    await page.getByRole('tab', { name: /^Sobre(, a seguir)?$/ }).click()
+    await page.getByRole('tab', { name: 'Sobre', exact: true }).click()
     await page.getByTestId('editor-backstory').first().click()
     const field = page.getByRole('textbox', {
       name: 'História / Prelúdio',
@@ -178,7 +178,7 @@ test.describe('a 390', () => {
     const ownerPage = await owner.context.newPage()
     await ownerPage.goto(`/characters/${id}`)
     await ownerPage.getByRole('radio', { name: 'Editar', exact: true }).click()
-    await ownerPage.getByRole('tab', { name: /^Sobre(, a seguir)?$/ }).click()
+    await ownerPage.getByRole('tab', { name: 'Sobre', exact: true }).click()
     await ownerPage.getByTestId('editor-backstory').first().click()
     const own = ownerPage.getByRole('textbox', {
       name: 'História / Prelúdio',

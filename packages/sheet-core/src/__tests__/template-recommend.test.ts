@@ -407,12 +407,7 @@ const v20: Mutation[] = [
   [
     'recommend numa lista sem catálogo',
     t => {
-      // As Qualidades ganharam catálogo no P17: aqui, sem ele
-      const merits = fieldsOf(t).merits as Json
-      delete merits.catalog
-      delete merits.catalogDefaults
-      delete merits.catalogHelp
-      merits.recommend = {
+      ;(fieldsOf(t).merits as Json).recommend = {
         outside: 'fora',
         by: [
           { from: 'clan', label: 'do clã', map: { brujah: ['Ambidestro'] } },

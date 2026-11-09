@@ -4,7 +4,7 @@
   "name": "Mago: A Ascensão — Edição de 20º Aniversário",
   "family": "wod",
   "edition": "M20",
-  "templateVersion": "1.9.0",
+  "templateVersion": "1.8.0",
   "locale": "pt-BR",
   "skin": "wod",
   "license": "O template traz nomes de traços, regras numéricas e frases curtas do time (ajuda e Esferas), escritas com palavras próprias. Nenhum texto do livro é embutido.",
@@ -721,61 +721,6 @@
       "type": "list",
       "label": "Qualidades",
       "itemLabel": "Qualidade",
-      "catalog": [
-        "Sentidos Aguçados",
-        "Berserker",
-        "Tríade Sombria",
-        "Língua",
-        "Guardião da Tempestade / Viajante Quântico",
-        "Laços Sociais",
-        "Duro Demais para Morrer",
-        "Fé Verdadeira",
-        "Afinidade Umbral"
-      ],
-      "catalogDefaults": [
-        {
-          "meta": "cost",
-          "value": 1,
-          "items": [
-            "Língua"
-          ]
-        },
-        {
-          "meta": "cost",
-          "value": 3,
-          "items": [
-            "Tríade Sombria",
-            "Laços Sociais"
-          ]
-        },
-        {
-          "meta": "cost",
-          "value": 4,
-          "items": [
-            "Berserker",
-            "Afinidade Umbral"
-          ]
-        },
-        {
-          "meta": "cost",
-          "value": 5,
-          "items": [
-            "Duro Demais para Morrer"
-          ]
-        },
-        {
-          "meta": "cost",
-          "value": 7,
-          "items": [
-            "Fé Verdadeira"
-          ]
-        }
-      ],
-      "catalogHelp": {
-        "Sentidos Aguçados": "Custo 1 ou 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Guardião da Tempestade / Viajante Quântico": "Custo 3 ou 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Fé Verdadeira": "Custa 7 por nível. O catálogo entra com 1 nível (7); mais níveis passam do limite da ficha: combine com o narrador."
-      },
       "item": {
         "meta": [
           { "id": "kind", "type": "text", "label": "Tipo" },
@@ -789,40 +734,6 @@
       "type": "list",
       "label": "Defeitos",
       "itemLabel": "Defeito",
-      "catalog": [
-        "Vício",
-        "Construto",
-        "Amaldiçoado",
-        "Perturbação Mental",
-        "Ecos",
-        "Inimigo",
-        "Estresse Pós-Traumático",
-        "Atavismo de Estresse"
-      ],
-      "catalogDefaults": [
-        {
-          "meta": "bonus",
-          "value": 2,
-          "items": [
-            "Construto"
-          ]
-        },
-        {
-          "meta": "bonus",
-          "value": 4,
-          "items": [
-            "Atavismo de Estresse"
-          ]
-        }
-      ],
-      "catalogHelp": {
-        "Vício": "Bônus 1 ou 3, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Amaldiçoado": "Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Perturbação Mental": "Bônus 3 ou 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Ecos": "Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Inimigo": "Bônus de 1 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador.",
-        "Estresse Pós-Traumático": "Bônus de 2 a 5, escolhido ao adicionar. O app não confere o valor: combine com o narrador."
-      },
       "item": {
         "meta": [
           { "id": "kind", "type": "text", "label": "Tipo" },

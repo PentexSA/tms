@@ -66,10 +66,7 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
   await page.getByRole('button', { name: 'Entrar na crônica' }).click()
   await page.getByRole('button', { name: 'Nova ficha' }).click()
   await page.getByLabel('Nome (obrigatório)').fill('Iara Moreira')
-  // O campo, não o "?" dele ("Ajuda: Nome de feito", P17 N-01)
-  await page
-    .getByRole('textbox', { name: 'Nome de feito', exact: true })
-    .fill('Canta-Tempestade')
+  await page.getByLabel('Nome de feito').fill('Canta-Tempestade')
   await page
     .getByLabel('Conceito', { exact: true })
     .fill('Contadora de histórias')
@@ -115,42 +112,17 @@ test('a jornada da v2: o Lobisomem, da crônica à forma Crinos', async ({
     .getByRole('button', { name: 'Adicionar “Faro do Asfalto”', exact: true })
     .click()
   await expect(giftSheet).toHaveCount(0)
-  // P17 (N-07, N-08): o catálogo de Qualidades e Defeitos do W20. A
-  // Qualidade de custo fixo entra num toque; o Defeito de custo variável
-  // (Inimigo, 1 a 5) pede o Bônus na folha
-  await page.getByRole('button', { name: 'Adicionar Qualidade' }).click()
-  await page.getByLabel('Buscar Qualidade').fill('ambidest')
-  await page
-    .getByRole('button', { name: 'Ambidestro, Custo 1', exact: true })
-    .click()
-  await expect(page.getByTestId('add-sheet-merits')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Adicionar Defeito' }).click()
-  await page.getByLabel('Buscar Defeito').fill('inimigo')
-  await page.getByRole('button', { name: 'Inimigo', exact: true }).click()
-  const flawCost = page.getByTestId('add-cost-flaws')
-  await expect(flawCost.getByTestId('add-cost-help')).toContainText(
-    'Bônus de 1 a 5'
-  )
-  await flawCost.getByRole('button', { name: 'Aumentar Bônus' }).click()
-  await flawCost.getByTestId('add-cost-confirm').click()
-  await expect(page.getByTestId('add-sheet-flaws')).toHaveCount(0)
-  await expect(page.getByText('Editando · 4 alterações')).toBeVisible()
+  await expect(page.getByText('Editando · 2 alterações')).toBeVisible()
   await page
     .getByRole('button', { name: 'Salvar alterações', exact: true })
     .click()
-  await expect(page.getByText('Salvar 4 alterações?')).toBeVisible()
+  await expect(page.getByText('Salvar 2 alterações?')).toBeVisible()
   const evolved = batchSaved(page, id)
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   const evolveBatch = (await evolved).request().postDataJSON() as {
     events: { path: string; to?: unknown }[]
   }
-  expect(evolveBatch.events).toHaveLength(4)
-  expect(
-    evolveBatch.events.find(e => e.path === 'values.merits')?.to
-  ).toMatchObject([{ name: 'Ambidestro', meta: { cost: 1 } }])
-  expect(
-    evolveBatch.events.find(e => e.path === 'values.flaws')?.to
-  ).toMatchObject([{ name: 'Inimigo', meta: { bonus: 2 } }])
+  expect(evolveBatch.events).toHaveLength(2)
   expect(
     evolveBatch.events.find(e => e.path === 'values.gifts')?.to
   ).toMatchObject([
