@@ -82,6 +82,10 @@ test('Pontos básicos: motivo certo, ao lado do toque, e some com a causa (T-07,
   await pressBlocked(page, 'Raciocínio')
   const wits = page.getByTestId('notice-wits')
   await expect(wits).toContainText('Mentais: os 3 pontos básicos')
+  // P17 (N-04): os bônus só começam quando todos os grupos fecharem
+  await expect(wits).toContainText(
+    'Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
+  )
   await expect(wits).toBeInViewport()
 
   // Talentos (Primária, 13): o 4º ponto em Prontidão diz o teto, não o

@@ -288,7 +288,7 @@ describe('trava da distribuição', () => {
     step('Vigor')
     expect(
       screen.getByText(
-        'Físicos: os 7 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+        'Físicos: os 7 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
       )
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
@@ -342,7 +342,7 @@ describe('aviso ao lado do toque', () => {
     const column = screen.getByTestId('editor-wits-label')
     expect(within(column).getByText('Raciocínio')).toBeTruthy()
     expect(within(column).getByTestId('notice-wits')).toHaveTextContent(
-      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+      'Mentais: os 3 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
     )
     // "Ver Pontos" leva à aba da fase
     expect(screen.getByTestId('notice-wits-budget')).toBeTruthy()
@@ -385,7 +385,7 @@ describe('"+" com a previsão da conta', () => {
     for (let i = 0; i < 3; i++) step('Raciocínio')
     const wits = screen.getByRole('adjustable', { name: 'Raciocínio' })
     expect(wits.props.accessibilityHint).toBe(
-      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+      'Mentais: os 3 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
     )
     // Não é disabled: o toque chega à conta, que explica
     expect(wits.props['aria-disabled']).toBe(false)

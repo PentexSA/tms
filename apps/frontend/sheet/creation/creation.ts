@@ -691,7 +691,11 @@ export function draftRefusal(
           text: capText(model, capped, g, freebies),
           ...action,
         }
-      return { cause: 'budget', text: basicsSpentText(g, freebies), ...action }
+      return {
+        cause: 'budget',
+        text: basicsSpentText(g, freebies, basicsClosed(checks.after)),
+        ...action,
+      }
     }
   return null
 }
@@ -882,7 +886,7 @@ export function stepAdvice(
   if (c.value < c.initial) return advice(null, null, 0)
   if (g) {
     if (g.measure === 'cost') return pointBuyAdvice(model, at.budget, g, c)
-    return groupAdvice(g, c, phase, freebies)
+    return groupAdvice(g, c, phase, freebies, basicsClosed(check))
   }
   const { price } = at.line
   if (price === undefined || !freebies) return null
@@ -931,7 +935,8 @@ function groupAdvice(
   g: CreationGroup,
   c: CreationComponent,
   phase: CreationPhase,
-  freebies: CreationCheck['freebies']
+  freebies: CreationCheck['freebies'],
+  closed: boolean
 ): StepAdvice {
   const atCap = c.cap !== undefined && c.value >= c.cap
   const price = freebies !== null ? g.price : null
@@ -947,7 +952,7 @@ function groupAdvice(
         inline
       )
     if (g.missing === 0)
-      return advice('budget', basicsSpentText(g, freebies !== null))
+      return advice('budget', basicsSpentText(g, freebies !== null, closed))
     return advice(null, null, 0)
   }
   if (!atCap && g.missing > 0) return advice(null, null, 0)
@@ -995,7 +1000,8 @@ export function addAdvice(
       return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
     if (g.missing > 0)
       return `Entra com os pontos básicos (${g.missing === 1 ? 'falta' : 'faltam'} ${g.missing} de ${g.budget}).`
-    if (phase === 'basics') return basicsSpentText(g, freebies !== null)
+    if (phase === 'basics')
+      return basicsSpentText(g, freebies !== null, basicsClosed(check))
     if (g.price === null || !freebies)
       return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
     return g.measure === 'items'
@@ -1292,16 +1298,28 @@ export function basicsClosed(check: CreationCheck | null): boolean {
   )
 }
 
-/** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
-export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
+/**
+ * "Físicos: os 7 pontos básicos já foram usados." e, com bônus no sistema,
+ * quando eles começam. Na fase dos básicos, os bônus só vêm depois que todos
+ * os grupos fecharem (a fase passa sozinha, `basicsDone`), e o texto diz
+ * isso (P17, N-04). `closed`: todos os grupos já fecharam (a fase foi trocada
+ * à mão para os básicos): aí o bônus já está ao alcance.
+ */
+export function basicsSpentText(
+  g: CreationGroup,
+  freebies: boolean,
+  closed = false
+): string {
   const items = g.measure === 'items'
   const spent =
     g.budget === 1
       ? `${g.label}: o ${basicUnits(1, items)} já foi usado.`
       : `${g.label}: os ${basicUnits(g.budget ?? 0, items)} já foram usados.`
-  return freebies && g.price !== null
-    ? `${spent} Para passar disso, use os pontos de bônus (${g.price} por ${items ? 'item' : 'ponto'}).`
-    : spent
+  if (!freebies || g.price === null) return spent
+  const price = `${g.price} por ${items ? 'item' : 'ponto'}`
+  return closed
+    ? `${spent} Para passar disso, use os pontos de bônus (${price}).`
+    : `${spent} Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (${price}).`
 }
 
 /** O corpo de um erro da API (`error.value`), ou null. */

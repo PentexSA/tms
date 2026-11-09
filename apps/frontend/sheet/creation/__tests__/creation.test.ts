@@ -236,10 +236,20 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     expect(why?.text).not.toContain('já foram usados')
   })
 
-  it('Básicos: o grupo cheio sem teto diz o orçamento e o preço', () => {
+  it('Básicos, com tudo fechado (fase trocada à mão): o grupo cheio diz o orçamento e o preço', () => {
     expect(refusalOf(COMPLETE, { ...COMPLETE, str: 4 })).toEqual({
       cause: 'budget',
       text: 'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
+      action: 'budget',
+    })
+  })
+
+  // P17 (N-04): os bônus só começam quando todos os grupos fecham
+  it('Básicos, com outro grupo aberto: o texto diz quando os bônus começam', () => {
+    const open = { ...COMPLETE, brawl: 1 }
+    expect(refusalOf(open, { ...open, str: 4 })).toEqual({
+      cause: 'budget',
+      text: 'Físicos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).',
       action: 'budget',
     })
   })
@@ -401,6 +411,12 @@ describe('stepAdvice: o que o próximo ponto faria', () => {
       blocked: 'budget',
       text: 'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
       inline: false,
+    })
+    // P17 (N-04): com outro grupo aberto, o texto diz quando os bônus
+    // começam
+    expect(adviceOf({ ...COMPLETE, brawl: 1 }, 'values.str')).toMatchObject({
+      blocked: 'budget',
+      text: 'Físicos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).',
     })
     // Com básico sobrando, passa sem custo
     expect(adviceOf({ ...COMPLETE, str: 2 }, 'values.dex')).toEqual({
@@ -1419,6 +1435,34 @@ describe('"falta 1 ponto básico" (B2)', () => {
     expect(basicsSpentText(g, false)).toBe('Fé: o 1 ponto básico já foi usado.')
     expect(basicsSpentText({ ...g, budget: 3 }, false)).toBe(
       'Fé: os 3 pontos básicos já foram usados.'
+    )
+  })
+
+  // P17 (N-04): na fase dos básicos, o bônus só vem quando todos os grupos
+  // fecham; com todos fechados (a fase trocada à mão), o texto antigo
+  it('com bônus, o texto diz quando eles começam; com tudo fechado, como usar', () => {
+    const g = {
+      id: 'knowledges',
+      label: 'Conhecimentos',
+      budget: 5,
+      measure: 'points' as const,
+      invested: 5,
+      eligible: 5,
+      basic: 5,
+      missing: 0,
+      extra: 0,
+      price: 2,
+      freebieCost: 0,
+      components: [],
+    }
+    expect(basicsSpentText(g, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (2 por ponto).'
+    )
+    expect(basicsSpentText(g, true, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (2 por ponto).'
+    )
+    expect(basicsSpentText({ ...g, price: null }, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados.'
     )
   })
 })
