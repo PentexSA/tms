@@ -999,3 +999,55 @@ describe('a barra de modos não remonta a ficha quando a política muda', () => 
     expect(screen.queryByText('Salvar 1 alteração?')).toBeNull()
   })
 })
+
+// P17 (N-06): o contador da conta ao lado do título do grupo crescia com a
+// conta ("13/13 · +1 bônus · +1 = 2 bônus" e os chips) e espremia o título
+// até uma letra por linha. Jest não mede layout: isto só impede a volta do
+// estilo antigo (`flex: 1` no título, linha sem quebra). A medida de verdade
+// é o E2E group-headers.spec.ts.
+describe('N-06: o título do grupo não encolhe pelo contador', () => {
+  const { SectionHeader, Text: UIText } = jest.requireActual('@tms/ui')
+  const { AnchorHeader } = jest.requireActual('../layouts/AnchorHeader')
+  const headers = {
+    SectionHeader: (right: React.ReactNode) => (
+      <SectionHeader title="Talentos" level="group" right={right} />
+    ),
+    AnchorHeader: (right: React.ReactNode) => (
+      <AnchorHeader title="Talentos" level="group" right={right} target={{}} />
+    ),
+  }
+  it.each(Object.keys(headers))(
+    '%s: a linha quebra, o título tem a base no próprio tamanho e o contador desce à direita',
+    name => {
+      const right = <UIText testID="counter">13/13 · +1 bônus</UIText>
+      const tree = render(
+        <ThemeProvider>
+          {headers[name as keyof typeof headers](right)}
+        </ThemeProvider>
+      ).toJSON() as unknown as {
+        props: { style: unknown }
+        children: { props: { style: unknown } }[]
+      }
+      const row = StyleSheet.flatten(tree.props.style as never)
+      const [text, side] = tree.children.map(c =>
+        StyleSheet.flatten(c.props.style as never)
+      )
+      expect(row).toMatchObject({ flexDirection: 'row', flexWrap: 'wrap' })
+      expect(text).toMatchObject({
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 'auto',
+      })
+      expect(text).not.toHaveProperty('flex')
+      expect(side).toMatchObject({ marginLeft: 'auto', maxWidth: '100%' })
+      expect(screen.getByTestId('counter')).toBeTruthy()
+    }
+  )
+
+  it('sem o `right`, nenhum contêiner vazio à direita', () => {
+    const tree = render(
+      <ThemeProvider>{headers.SectionHeader(undefined)}</ThemeProvider>
+    ).toJSON() as unknown as { children: unknown[] }
+    expect(tree.children).toHaveLength(1)
+  })
+})

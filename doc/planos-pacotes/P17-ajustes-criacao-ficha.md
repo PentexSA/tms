@@ -172,6 +172,23 @@ Descartada: a opção B (sem ×, sem voltar do Android, só os botões do rodap�
 - Larguras: 1024, 1280 e 1440 px (desktop, colunas lado a lado); 390 × 844 (celular, com as abas por grupo e o contador na faixa fixa: a linha `creation-line-*` contida na tela); e 1280 px com zoom de 200% (`page.evaluate` com `document.body.style.zoom` no Chromium ou viewport de 640 px com `deviceScaleFactor: 2`), que é como o web mostra texto ampliado.
 - Fonte ampliada no app nativo (Android, tamanho de fonte máximo): o CI não roda o nativo, então fica como item manual no roteiro de validação (§4), com captura de tela no PR.
 
+**Na execução (reprodução antes da correção, `group-headers.spec.ts` no Chromium, export web da `main` em `123e823`):**
+
+| Estado | 1024 | 1280 | 1440 |
+|---|---|---|---|
+| Sem prioridade | Talentos e Perícias com 176 px de altura (uma letra por linha), Conhecimentos com 286 px, os três cortados | Talentos e Perícias em 2 linhas (44 px), Conhecimentos em 3 (66 px) | igual a 1280 |
+| Prioridades escolhidas | Conhecimentos em 2 linhas | inteiros | inteiros |
+| Básicos fechados e 1 bônus | igual a "sem prioridade" | Talentos com 176 px e cortado; Perícias em 2 linhas, Conhecimentos em 3 | igual a 1280 |
+
+Contador, chips e "?" ficaram dentro da coluna em todos os casos, e a página não rolou de lado: nenhum outro elemento vazava. A 390 e com zoom de 200% (640 px, `deviceScaleFactor: 2`), as abas por grupo já punham o contador na faixa, e nada quebrava.
+
+Duas divergências em relação ao desenho acima:
+
+- O estado "sem prioridade" **também** quebrava. O `maxWidth: 220` do `narrow` não basta numa coluna de ~330 px: com o "?" do grupo, sobram menos de 100 px para o título. A correção do cabeçalho resolve os três estados igualmente.
+- Os grupos de **Atributos** não passam pelo `SectionHeader`/`AnchorHeader`: são desenhados pelo `GridLayout` (`apps/frontend/sheet/layouts/GridLayout.tsx`), com o rótulo em caixa alta e o contador já na linha de baixo, e não quebravam. O problema era só das Habilidades (`GroupsLayout`). O E2E mede os dois layouts.
+
+Depois da correção, os 7 casos passam no Chromium. O WebKit não rodou localmente: faltam bibliotecas do sistema para o navegador, e rodá-lo num contêiner exigiria expor um servidor do Playwright. Fica para o CI.
+
 ### 2.6 N-07 e N-08 · Qualidades e Defeitos
 
 **Confirmado no código.**
