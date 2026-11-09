@@ -589,6 +589,19 @@ describe('BottomSheet', () => {
     expect(screen.getByRole('button', { name: 'Aplicar' })).toBeTruthy()
   })
 
+  it('sem dismissOnScrim, o fundo fecha como sempre (o padrão é true)', () => {
+    const onClose = jest.fn()
+    render(
+      <BottomSheet visible title="Vitalidade" onClose={onClose}>
+        <RNText>x</RNText>
+      </BottomSheet>
+    )
+    fireEvent.press(
+      screen.getByTestId('bottom-sheet-scrim', { includeHiddenElements: true })
+    )
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('com reduzir movimento, abre sem animar', () => {
     render(
       <ThemeProvider reduceMotion>
