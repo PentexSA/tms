@@ -87,7 +87,7 @@ describe('ficha de Mago', () => {
       sheet: { values: Record<string, unknown> }
     }
     expect(body.systemCode).toBe('mta-m20')
-    expect(body.templateVersion).toBe('1.8.0')
+    expect(body.templateVersion).toBe('1.9.0')
     expect(body.sheet.values).toEqual({
       name: 'Otto Brandt',
       tradition: 'filhos-do-eter',

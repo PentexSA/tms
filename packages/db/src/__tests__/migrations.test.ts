@@ -974,6 +974,187 @@ describe('migrations', () => {
     })
   })
 
+  // P17 (§3): a 0027 grava as versões com o catálogo de Qualidades e
+  // Defeitos e a ajuda de Nome de feito, Seita e Campo, num banco que já tem
+  // as anteriores, e não toca em ficha
+  describe('0027: as versões do P17', () => {
+    const MINE = '0027_templates_criacao'
+    const prior = files[files.indexOf(MINE) - 1] ?? ''
+    const current = (system: string) =>
+      (productTemplate(system) as { templateVersion: string }).templateVersion
+    const previousOf = (v: string) => {
+      const [major, minor, patch] = v.split('.').map(Number)
+      return `${major}.${(minor ?? 1) - 1}.${patch}`
+    }
+    type Fields = Record<string, Record<string, unknown>>
+    // O banco "de antes": cada template na minor anterior, sem o que o P17
+    // acrescentou (o catálogo e as três frases do Lobisomem)
+    const beforeP17 = (system: string) => {
+      const t = structuredClone(productTemplate(system)) as {
+        templateVersion: string
+        fields: Fields
+      }
+      for (const id of ['merits', 'flaws']) {
+        const f = t.fields[id]
+        if (!f) continue
+        delete f.catalog
+        delete f.catalogDefaults
+        delete f.catalogHelp
+      }
+      if (system === 'wta-w20')
+        for (const id of ['deedName', 'sept', 'camp']) delete t.fields[id]?.help
+      t.templateVersion = previousOf(current(system))
+      return t as unknown as Record<string, unknown>
+    }
+
+    it('os arquivos de hoje têm o catálogo; a minor de antes, não', () => {
+      for (const system of PRODUCT_TEMPLATES) {
+        const fields = (productTemplate(system) as { fields: Fields }).fields
+        expect(fields.merits?.catalog).toBeArray()
+        expect(fields.flaws?.catalogDefaults).toBeArray()
+        const old = (beforeP17(system) as { fields: Fields }).fields
+        expect(old.merits?.catalog).toBeUndefined()
+        expect(old.flaws?.catalog).toBeUndefined()
+      }
+      const w20 = (productTemplate('wta-w20') as { fields: Fields }).fields
+      expect(w20.sept?.help).toBeString()
+    })
+
+    it('a ficha da versão anterior fica como estava, com a versão dela', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
+        // Como em produção antes do P17: só as versões anteriores no banco
+        await db.deleteFrom('trait_templates').execute()
+        for (const system of PRODUCT_TEMPLATES)
+          expect((await storeTemplate(db, beforeP17(system))).status).toBe(
+            'published'
+          )
+        const user = await db
+          .insertInto('users')
+          .values({
+            username: 'u27',
+            email: 'u27@x.test',
+            hashed_password: 'h',
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow()
+        for (const system of PRODUCT_TEMPLATES) {
+          const { id: systemId } = await db
+            .selectFrom('game_systems')
+            .select('id')
+            .where('code', '=', system)
+            .executeTakeFirstOrThrow()
+          const chronicle = await db
+            .insertInto('chronicles')
+            .values({
+              name: system,
+              storyteller_id: user.id,
+              system_id: systemId,
+            })
+            .returning('id')
+            .executeTakeFirstOrThrow()
+          await db
+            .insertInto('characters')
+            .values({
+              name: 'Antiga',
+              chronicle_id: chronicle.id,
+              system_id: systemId,
+              user_id: user.id,
+              template_version: previousOf(current(system)),
+              sheet_data: JSON.stringify({
+                values: {
+                  name: 'Antiga',
+                  merits: [
+                    { id: 'm1', name: 'Qualidade livre', meta: { cost: 2 } },
+                  ],
+                },
+                specialties: {},
+              }),
+            })
+            .execute()
+        }
+        const read = () =>
+          db
+            .selectFrom('characters')
+            .select([
+              'id',
+              'template_version',
+              sql<string>`sheet_data::text`.as('data'),
+            ])
+            .orderBy('id')
+            .execute()
+        const before = await read()
+
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+
+        // A ficha: a mesma versão e o mesmo jsonb
+        expect(await read()).toEqual(before)
+        // As anteriores ficam; as novas entram, e a mais nova é a de hoje
+        for (const system of PRODUCT_TEMPLATES) {
+          const versions = await db
+            .selectFrom('trait_templates as t')
+            .innerJoin('game_systems as g', 'g.id', 't.system_id')
+            .select(['t.version'])
+            .where('g.code', '=', system)
+            .orderBy('t.published_at', 'desc')
+            .execute()
+          expect(versions.map(v => v.version)).toEqual([
+            current(system),
+            previousOf(current(system)),
+          ])
+          expect(
+            (await storeTemplate(db, productTemplate(system))).status
+          ).toBe('unchanged')
+        }
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('a 0027 recusa a versão já gravada com outro conteúdo', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        expect((await migrator.migrateTo(prior)).error).toBeUndefined()
+        await db.deleteFrom('trait_templates').execute()
+        const wta = productTemplate('wta-w20') as Record<string, unknown>
+        await storeTemplate(db, { ...wta, name: 'Outro conteúdo' })
+        const result = await migrator.migrateToLatest()
+        expect(String(result.error)).toContain(
+          'já está no banco com outro conteúdo'
+        )
+      } finally {
+        await destroy()
+      }
+    })
+
+    it('descer a 0027 não apaga versão publicada', async () => {
+      const { db, destroy } = await createPGliteTestDb()
+      try {
+        const count = async () =>
+          Number(
+            (
+              await db
+                .selectFrom('trait_templates')
+                .select(db.fn.countAll().as('n'))
+                .executeTakeFirstOrThrow()
+            ).n
+          )
+        const before = await count()
+        const migrator = new Migrator({ db, provider: migrationProvider })
+        const down = await migrator.migrateTo(prior)
+        expect(down.error).toBeUndefined()
+        expect(down.results?.map(r => r.migrationName)).toEqual([MINE])
+        expect(await count()).toBe(before)
+        expect((await migrator.migrateToLatest()).error).toBeUndefined()
+      } finally {
+        await destroy()
+      }
+    })
+  })
+
   // T-47: a hora da Mesa vinha 3 h no futuro e a ordem por última alteração
   // errava, porque as colunas das migrations 0002 a 0005 não tinham fuso
   it('0021: nenhuma coluna timestamp sem fuso no schema', async () => {
