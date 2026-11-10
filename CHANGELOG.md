@@ -10,12 +10,25 @@ entradas para uma seção com a versão e a data do lançamento.
 
 ## Não lançado
 
+## [1.5.0] - 2026-11-09
+
+### Adicionado
+
+- Catálogo de Qualidades e Defeitos em Vampiro V20, Lobisomem W20 e Mago M20, com entrada em um toque para itens de custo fixo e faixa de custo na ajuda dos itens de custo variável.
+- Escolha do custo ao adicionar Qualidade ou Defeito de custo livre, com seletor entre o mínimo e o máximo e prévia do efeito na conta da criação.
+- Selo “a seguir” na próxima aba com pendência quando a aba atual fica completa, com anúncio de acessibilidade.
+- Ajuda contextual nos campos Nome de feito, Seita e Campo do Lobisomem.
+
 ### Alterado
 
+- Aviso de início dos pontos de bônus deixa de fechar com toque fora; o ×, o Esc e o voltar do Android continuam fechando.
+- Templates de Vampiro V20, Lobisomem W20 e Mago M20 atualizados para `1.11.0`, `1.9.0` e `1.9.0`, respectivamente.
 - Documentação de observabilidade com a ordem das próximas entregas e o planejamento das medidas de tempo e toques na criação de ficha.
 
 ### Corrigido
 
+- Aviso dos pontos básicos informa que os bônus começam depois que todos os grupos da ficha fecham os básicos.
+- Título dos grupos deixa de ser espremido pelo contador da conta em telas estreitas; o contador passa para a linha de baixo.
 - Limpeza dos timers de validade do convite e de coleta de lixo do QueryClient nos testes, permitindo que o Jest encerre após a execução.
 
 ## [1.4.0] - 2026-11-06
@@ -156,6 +169,7 @@ entradas para uma seção com a versão e a data do lançamento.
 - Interface para web e dispositivos móveis com Expo, componentes compartilhados e testes automatizados.
 - Deploy de teste no Render com PostgreSQL no Neon e fluxo de publicação por versões.
 
+[1.5.0]: https://github.com/PentexSA/tms/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/PentexSA/tms/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/PentexSA/tms/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/PentexSA/tms/compare/v1.2.1...v1.2.2
