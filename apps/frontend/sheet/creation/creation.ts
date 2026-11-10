@@ -8,10 +8,12 @@ import {
   type CreationInput,
   type CreationProblem,
   type CreationRefusalCode,
+  checkCreation,
   checkCreationBatch,
   conditionHolds,
   type FieldId,
   type FreebieLine,
+  type ListItem,
   type PointBuyBudget,
   type PriorityBudget,
   type ResolvedSheet,
@@ -691,7 +693,11 @@ export function draftRefusal(
           text: capText(model, capped, g, freebies),
           ...action,
         }
-      return { cause: 'budget', text: basicsSpentText(g, freebies), ...action }
+      return {
+        cause: 'budget',
+        text: basicsSpentText(g, freebies, basicsClosed(checks.after)),
+        ...action,
+      }
     }
   return null
 }
@@ -882,7 +888,7 @@ export function stepAdvice(
   if (c.value < c.initial) return advice(null, null, 0)
   if (g) {
     if (g.measure === 'cost') return pointBuyAdvice(model, at.budget, g, c)
-    return groupAdvice(g, c, phase, freebies)
+    return groupAdvice(g, c, phase, freebies, basicsClosed(check))
   }
   const { price } = at.line
   if (price === undefined || !freebies) return null
@@ -931,7 +937,8 @@ function groupAdvice(
   g: CreationGroup,
   c: CreationComponent,
   phase: CreationPhase,
-  freebies: CreationCheck['freebies']
+  freebies: CreationCheck['freebies'],
+  closed: boolean
 ): StepAdvice {
   const atCap = c.cap !== undefined && c.value >= c.cap
   const price = freebies !== null ? g.price : null
@@ -947,7 +954,7 @@ function groupAdvice(
         inline
       )
     if (g.missing === 0)
-      return advice('budget', basicsSpentText(g, freebies !== null))
+      return advice('budget', basicsSpentText(g, freebies !== null, closed))
     return advice(null, null, 0)
   }
   if (!atCap && g.missing > 0) return advice(null, null, 0)
@@ -995,7 +1002,8 @@ export function addAdvice(
       return `${g.label}: escolha a prioridade antes de distribuir os pontos.`
     if (g.missing > 0)
       return `Entra com os pontos básicos (${g.missing === 1 ? 'falta' : 'faltam'} ${g.missing} de ${g.budget}).`
-    if (phase === 'basics') return basicsSpentText(g, freebies !== null)
+    if (phase === 'basics')
+      return basicsSpentText(g, freebies !== null, basicsClosed(check))
     if (g.price === null || !freebies)
       return `${g.label}: os pontos básicos acabaram, e o grupo não se compra com bônus.`
     return g.measure === 'items'
@@ -1061,6 +1069,113 @@ export function metaAdvice(
         1
       )
     : advice(null, `${bonus(1)}; ${restam(freebies.remaining)}.`, 1)
+}
+
+/**
+ * O meta de preço de uma lista (P17, N-08): o `meta` de uma regra
+ * `item-meta` (o Custo da Qualidade) ou `credit` (o Bônus do Defeito) do
+ * `costs.freebie` que aponta a lista, com a faixa do template. Lista sem
+ * essa regra (Dons, Antecedentes): null.
+ */
+export function priceMeta(
+  model: SheetModel,
+  list: FieldId
+): {
+  readonly id: string
+  readonly label: string
+  readonly min: number
+  readonly max: number
+} | null {
+  const rule = model.template.costs?.freebie?.find(
+    r =>
+      (r.rule === 'item-meta' || r.rule === 'credit') &&
+      r.meta !== undefined &&
+      r.targets.includes(list)
+  )
+  const def = model.fields.get(list)?.def
+  if (!rule?.meta || def?.type !== 'list') return null
+  const meta = def.item.meta?.find(m => m.id === rule.meta)
+  if (meta?.type !== 'number') return null
+  const min = meta.min ?? 0
+  return { id: meta.id, label: meta.label, min, max: meta.max ?? min }
+}
+
+/**
+ * O nome tem o meta de preço no `catalogDefaults` (entra num toque, com o
+ * custo do catálogo). Nome de custo variável e nome digitado: não.
+ */
+export function pricedInCatalog(
+  model: SheetModel,
+  list: FieldId,
+  meta: string,
+  name: string
+): boolean {
+  const def = model.fields.get(list)?.def
+  if (def?.type !== 'list' || !def.catalog?.includes(name)) return false
+  return (def.catalogDefaults ?? []).some(
+    d => d.meta === meta && d.items.includes(name)
+  )
+}
+
+/**
+ * O que a inclusão do item faria na conta, pela conta inteira (P17, N-08):
+ * `checkCreation` antes e depois do item na lista, a mesma conta do store e
+ * do servidor. Na Qualidade (`item-meta`), o gasto e o saldo; no Defeito
+ * (`credit`), o crédito, já limitado pelo `max`. `short`: o saldo não cobre
+ * (o "Adicionar" continua: quem recusa é a conta exata do lote). Sem conta
+ * de bônus (criação livre, Editar) ou sem regra de preço na lista: null.
+ */
+export function addPreview(
+  model: SheetModel,
+  sheet: SheetData,
+  input: CreationInput,
+  list: FieldId,
+  item: ListItem
+): { readonly text: string; readonly short: boolean } | null {
+  const rule = model.template.costs?.freebie?.find(
+    r =>
+      (r.rule === 'item-meta' || r.rule === 'credit') &&
+      r.targets.includes(list)
+  )
+  if (!rule) return null
+  const before = checkCreation(model, sheet, input)
+  if (!before.freebies) return null
+  const items = (sheet.values[list] as readonly ListItem[] | undefined) ?? []
+  const after = checkCreation(
+    model,
+    { ...sheet, values: { ...sheet.values, [list]: [...items, item] } },
+    input
+  )
+  if (!after.freebies) return null
+  if (rule.rule === 'credit') {
+    const credit = (c: CreationCheck) =>
+      c.lines.find(l => l.id === rule.id)?.cost ?? 0
+    const gain = credit(after) - credit(before)
+    const max = rule.max ?? 0
+    const asked = Number(item.meta?.[rule.meta ?? ''] ?? 0)
+    if (gain <= 0)
+      return {
+        text: `Não devolve bônus: o crédito já está em ${max}.`,
+        short: false,
+      }
+    if (gain < asked)
+      return {
+        text: `Devolve só ${gain} de bônus: o crédito chega a ${max}.`,
+        short: false,
+      }
+    return { text: `Devolve ${gain} de bônus.`, short: false }
+  }
+  const cost = after.freebies.spent - before.freebies.spent
+  const left = before.freebies.remaining
+  if (after.freebies.remaining < 0)
+    return {
+      text: `${-after.freebies.remaining === 1 ? 'Faltaria 1' : `Faltariam ${-after.freebies.remaining}`} de bônus: custa ${cost}, ${restam(Math.max(0, left))}.`,
+      short: true,
+    }
+  return {
+    text: `Custa ${cost} de bônus; ${restam(after.freebies.remaining)}.`,
+    short: false,
+  }
 }
 
 /** Point-buy (D&D): o degrau da tabela do template e o fim dela. */
@@ -1292,16 +1407,28 @@ export function basicsClosed(check: CreationCheck | null): boolean {
   )
 }
 
-/** "Físicos: os 7 pontos básicos já foram usados. Para passar disso, ..." */
-export function basicsSpentText(g: CreationGroup, freebies: boolean): string {
+/**
+ * "Físicos: os 7 pontos básicos já foram usados." e, com bônus no sistema,
+ * quando eles começam. Na fase dos básicos, os bônus só vêm depois que todos
+ * os grupos fecharem (a fase passa sozinha, `basicsDone`), e o texto diz
+ * isso (P17, N-04). `closed`: todos os grupos já fecharam (a fase foi trocada
+ * à mão para os básicos): aí o bônus já está ao alcance.
+ */
+export function basicsSpentText(
+  g: CreationGroup,
+  freebies: boolean,
+  closed = false
+): string {
   const items = g.measure === 'items'
   const spent =
     g.budget === 1
       ? `${g.label}: o ${basicUnits(1, items)} já foi usado.`
       : `${g.label}: os ${basicUnits(g.budget ?? 0, items)} já foram usados.`
-  return freebies && g.price !== null
-    ? `${spent} Para passar disso, use os pontos de bônus (${g.price} por ${items ? 'item' : 'ponto'}).`
-    : spent
+  if (!freebies || g.price === null) return spent
+  const price = `${g.price} por ${items ? 'item' : 'ponto'}`
+  return closed
+    ? `${spent} Para passar disso, use os pontos de bônus (${price}).`
+    : `${spent} Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (${price}).`
 }
 
 /** O corpo de um erro da API (`error.value`), ou null. */

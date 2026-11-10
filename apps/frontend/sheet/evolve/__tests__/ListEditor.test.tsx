@@ -4,6 +4,7 @@ import {
   example,
   GIFTS,
   modelOf,
+  modelWithoutMeritCatalog,
   templateJson,
   templateWithIdentity,
 } from '../../../test/fixtures'
@@ -16,11 +17,15 @@ import { textInput } from '../../../test/queries'
 
 const vtm = modelOf('vtm-v20')
 
-async function helenaInEvolve() {
+// P17 (N-07): as Qualidades e os Defeitos do produto têm catálogo; os
+// casos da lista sem catálogo (campo "Nome", texto livre) usam este
+const plain = modelWithoutMeritCatalog('vtm-v20')
+
+async function helenaInEvolve(model = vtm) {
   const helena = example('helena').sheet
   const live = await renderLive(
-    { model: vtm, sheet: helena, mode: 'evolve' },
-    fakeServer(vtm, helena).post
+    { model, sheet: helena, mode: 'evolve' },
+    fakeServer(model, helena).post
   )
   fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
   const disciplines = () =>
@@ -202,8 +207,8 @@ describe('ListEditor', () => {
       },
     }
     const { store } = await renderLive(
-      { model: vtm, sheet, mode: 'evolve' },
-      fakeServer(vtm, sheet).post
+      { model: plain, sheet, mode: 'evolve' },
+      fakeServer(plain, sheet).post
     )
     fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
@@ -220,6 +225,8 @@ describe('ListEditor', () => {
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar outro “ambidestro”' })
     )
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     const merits = store().getState().draftEvents()[0]?.to as ListItem[]
     expect(merits.map(m => m.name)).toEqual(['Ambidestro', 'ambidestro'])
   })
@@ -306,12 +313,14 @@ describe('T-23: o item nasce com o valor que o editor mostra', () => {
       .find(e => e.path === 'values.flaws')?.to as ListItem[] | undefined
 
   it('Defeito novo grava o Bônus 1 que a folha mostra; a linha diz "Bônus 1"', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Defeito' }))
     fireEvent.changeText(textInput('Nome'), 'Pesadelos')
     fireEvent.press(
       screen.getByRole('button', { name: 'Adicionar “Pesadelos”' })
     )
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(flawsOf(live)?.at(-1)).toEqual({
       id: 'i2',
       name: 'Pesadelos',
@@ -386,13 +395,15 @@ describe('T-62: Enter e "✓" adicionam', () => {
     })
 
   it('lista sem catálogo (Qualidade): o Enter adiciona o texto livre', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     const name = textInput('Nome')
     expect(name.props.returnKeyType).toBe('done')
     expect(name.props.submitBehavior).toBe('submit')
     fireEvent.changeText(name, ' Ambidestro ')
     enter('Nome')
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(eventFor(live, 'merits')?.at(-1)).toEqual({
       id: 'i2',
       name: 'Ambidestro',
@@ -405,10 +416,12 @@ describe('T-62: Enter e "✓" adicionam', () => {
   // Integração da onda 2, no AVD: o "✓" chegou antes do último
   // onChangeText, e a Qualidade entrou como "Ambi"
   it('o Enter usa o texto que chega com ele, não o do último onChangeText', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     fireEvent.changeText(textInput('Nome'), 'Ambi')
     enter('Nome', 'Ambidestro')
+    // P17 (N-08): nome sem custo no catálogo pede o custo; o mínimo fica
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
     expect(eventFor(live, 'merits')?.at(-1)).toEqual({
       id: 'i2',
       name: 'Ambidestro',
@@ -455,7 +468,7 @@ describe('T-62: Enter e "✓" adicionam', () => {
   })
 
   it('campo vazio: o Enter não faz nada', async () => {
-    const live = await helenaInEvolve()
+    const live = await helenaInEvolve(plain)
     fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
     enter('Nome')
     expect(eventFor(live, 'merits')).toBeUndefined()
@@ -889,5 +902,119 @@ describe('outros sistemas, o mesmo editor', () => {
     const added = events.find(e => e.path === 'values.aspects')
       ?.to as ListItem[]
     expect(added.at(-1)).toEqual({ id: 'i4', text: 'Café forte' })
+  })
+})
+
+// P17 (N-08): a Qualidade e o Defeito de custo variável (nome do catálogo
+// sem custo fixo, ou nome digitado) pedem o custo na própria folha. Nomes
+// fictícios: os mecanismos não dependem do catálogo do produto (N-07)
+describe('N-08: o passo do custo ao adicionar', () => {
+  const priced = () => {
+    const t = templateJson('vtm-v20')
+    const fields = t.fields as Record<string, Record<string, unknown>>
+    fields.merits = {
+      ...fields.merits,
+      catalog: ['Fixa de Três', 'Livre'],
+      catalogDefaults: [{ meta: 'cost', value: 3, items: ['Fixa de Três'] }],
+      catalogHelp: { Livre: 'Custo de 1 a 10, escolhido ao adicionar.' },
+    }
+    return compileTemplate(t)
+  }
+  async function open() {
+    const model = priced()
+    const helena = example('helena').sheet
+    const live = await renderLive(
+      { model, sheet: helena, mode: 'evolve' },
+      fakeServer(model, helena).post
+    )
+    fireEvent.press(screen.getByRole('tab', { name: 'Vantagens' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    const merits = () =>
+      live
+        .store()
+        .getState()
+        .draftEvents()
+        .find(e => e.path === 'values.merits')?.to as ListItem[] | undefined
+    return { ...live, merits }
+  }
+  const cost = () => screen.getByRole('adjustable', { name: 'Custo' })
+  const press = (actionName: 'increment' | 'decrement', times = 1) => {
+    for (let i = 0; i < times; i++)
+      fireEvent(cost(), 'accessibilityAction', { nativeEvent: { actionName } })
+  }
+
+  it('nome do catálogo com custo fixo entra num toque, com o custo do catálogo', async () => {
+    const { merits } = await open()
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Fixa de Três, Custo 3' })
+    )
+    expect(screen.queryByTestId('add-cost-merits')).toBeNull()
+    expect(merits()?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Fixa de Três',
+      meta: { cost: 3 },
+    })
+  })
+
+  it('nome do catálogo sem custo fixo abre o passo; o item entra com o valor escolhido e o tipo vazio', async () => {
+    const { merits } = await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Livre' }))
+    expect(screen.getByTestId('add-cost-merits')).toBeTruthy()
+    // A faixa do catálogo (catalogHelp) fica onde o valor é escolhido
+    expect(screen.getByTestId('add-cost-help')).toHaveTextContent(
+      'Custo de 1 a 10, escolhido ao adicionar.'
+    )
+    expect(merits()).toBeUndefined()
+    press('increment', 2)
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
+    // Só o custo: o tipo (texto) fica sem valor, como hoje
+    expect(merits()?.at(-1)).toEqual({
+      id: 'i2',
+      name: 'Livre',
+      meta: { cost: 3 },
+    })
+    expect(screen.queryByTestId('add-sheet-merits')).toBeNull()
+  })
+
+  it('nome digitado abre o passo; o seletor não sai da faixa do meta (1 a 10)', async () => {
+    const { merits } = await open()
+    fireEvent.changeText(textInput('Buscar Qualidade'), 'Inventada')
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Adicionar “Inventada”' })
+    )
+    // Abaixo do mínimo, fica em 1: três "−" e dois "+" dão 3
+    press('decrement', 3)
+    press('increment', 2)
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
+    expect(merits()?.at(-1)).toMatchObject({
+      name: 'Inventada',
+      meta: { cost: 3 },
+    })
+    // Acima do máximo, fica em 10
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar Qualidade' }))
+    fireEvent.changeText(textInput('Buscar Qualidade'), 'Outra')
+    fireEvent.press(screen.getByRole('button', { name: 'Adicionar “Outra”' }))
+    press('increment', 15)
+    fireEvent.press(screen.getByTestId('add-cost-confirm'))
+    expect(merits()?.at(-1)).toMatchObject({
+      name: 'Outra',
+      meta: { cost: 10 },
+    })
+  })
+
+  it('"Trocar" volta à busca sem adicionar, com o texto preservado', async () => {
+    const { merits } = await open()
+    fireEvent.changeText(textInput('Buscar Qualidade'), 'liv')
+    fireEvent.press(screen.getByRole('button', { name: 'Livre' }))
+    fireEvent.press(screen.getByRole('button', { name: 'Trocar Livre' }))
+    expect(screen.queryByTestId('add-cost-merits')).toBeNull()
+    expect(textInput('Buscar Qualidade').props.value).toBe('liv')
+    expect(merits()).toBeUndefined()
+  })
+
+  it('fora da Criação (Editar), o passo não mostra prévia de conta', async () => {
+    await open()
+    fireEvent.press(screen.getByRole('button', { name: 'Livre' }))
+    expect(screen.queryByTestId('add-cost-preview')).toBeNull()
   })
 })

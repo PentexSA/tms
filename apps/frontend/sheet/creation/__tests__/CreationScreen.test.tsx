@@ -288,7 +288,7 @@ describe('trava da distribuição', () => {
     step('Vigor')
     expect(
       screen.getByText(
-        'Físicos: os 7 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+        'Físicos: os 7 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
       )
     ).toBeTruthy()
     expect(screen.getByTestId('counter-physical').props.children).toBe('7/7')
@@ -342,7 +342,7 @@ describe('aviso ao lado do toque', () => {
     const column = screen.getByTestId('editor-wits-label')
     expect(within(column).getByText('Raciocínio')).toBeTruthy()
     expect(within(column).getByTestId('notice-wits')).toHaveTextContent(
-      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+      'Mentais: os 3 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
     )
     // "Ver Pontos" leva à aba da fase
     expect(screen.getByTestId('notice-wits-budget')).toBeTruthy()
@@ -385,7 +385,7 @@ describe('"+" com a previsão da conta', () => {
     for (let i = 0; i < 3; i++) step('Raciocínio')
     const wits = screen.getByRole('adjustable', { name: 'Raciocínio' })
     expect(wits.props.accessibilityHint).toBe(
-      'Mentais: os 3 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).'
+      'Mentais: os 3 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).'
     )
     // Não é disabled: o toque chega à conta, que explica
     expect(wits.props['aria-disabled']).toBe(false)
@@ -627,6 +627,84 @@ describe('aba Pontos; Salvar sempre', () => {
         expect.objectContaining({ revision: 1, sheetVersion: 2 })
       )
     )
+  })
+})
+
+// P17 (N-03): quando a aba à vista acaba, a seguinte com pendência ganha o
+// selo "a seguir", e o anúncio diz a aba que acabou
+describe('o selo "a seguir" na aba seguinte (N-03)', () => {
+  // Só a Ficha (Atributos e Habilidades), sem Disciplinas, Antecedentes e
+  // Virtudes: a aba Vantagens continua pendente
+  const {
+    disciplines: _d,
+    backgrounds: _b,
+    conscience: _c,
+    selfControl: _s,
+    courage: _v,
+    ...SHEET_ONLY
+  } = ALMOST
+  const said = () =>
+    jest
+      .mocked(AccessibilityInfo.announceForAccessibility)
+      .mock.calls.map(([text]) => text)
+      .filter(text => text.includes('nada falta'))
+
+  it('a Ficha acaba: o selo vai para Vantagens; desfazer tira o selo, sem anúncio', async () => {
+    await open(PRIORITIES, SHEET_ONLY)
+    expect(screen.queryByTestId('tab-attention-powers')).toBeNull()
+    step('Vigor')
+    expect(
+      screen.getByRole('tab', { name: 'Vantagens, a seguir' })
+    ).toBeTruthy()
+    expect(said()).toEqual(['Ficha: nada falta. A seguir: Vantagens.'])
+    fireEvent(
+      screen.getByRole('adjustable', { name: 'Vigor' }),
+      'accessibilityAction',
+      {
+        nativeEvent: { actionName: 'decrement' },
+      }
+    )
+    expect(screen.queryByTestId('tab-attention-powers')).toBeNull()
+    expect(said()).toHaveLength(1)
+  })
+
+  it('tudo feito com bônus sobrando: o selo vai para Pontos, e o aviso dos bônus é o único anúncio', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Pontos, a seguir' })).toBeTruthy()
+    expect(said()).toEqual([])
+  })
+})
+
+// P17 (N-05): o aviso dos bônus aparece uma vez por ficha; o toque fora
+// não o fecha (fechado sem querer, ele nunca mais voltava). "Entendi" e o ×
+// fecham.
+describe('o aviso dos bônus não fecha pelo fundo (N-05)', () => {
+  // A única folha aberta é o aviso
+  const scrim = () =>
+    screen.getByTestId('bottom-sheet-scrim', { includeHiddenElements: true })
+
+  it('o toque no fundo deixa o aviso aberto; "Entendi" fecha', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    fireEvent.press(scrim())
+    expect(screen.getByTestId('bonus-notice')).toBeTruthy()
+    fireEvent.press(screen.getByRole('button', { name: 'Entendi' }))
+    await waitFor(() => expect(screen.queryByTestId('bonus-notice')).toBeNull())
+  })
+
+  it('o × fecha', async () => {
+    await open(PRIORITIES, ALMOST)
+    step('Vigor')
+    fireEvent.press(scrim())
+    fireEvent.press(
+      within(screen.getByTestId('bonus-notice')).getByRole('button', {
+        name: 'Fechar',
+      })
+    )
+    await waitFor(() => expect(screen.queryByTestId('bonus-notice')).toBeNull())
   })
 })
 

@@ -818,6 +818,43 @@ describe('Tabs e TabPanel: teclado, painel e posição no iOS (T-35)', () => {
   })
 })
 
+// P17 (N-03): o selo "a seguir" tem texto e entra no nome acessível
+describe('Tabs: o selo de atenção', () => {
+  const items = [
+    { id: 'build', label: 'Ficha' },
+    { id: 'powers', label: 'Vantagens', attention: 'a seguir' },
+  ]
+  it('com `attention`, o texto aparece e entra no nome da aba', () => {
+    render(
+      <Tabs
+        items={items}
+        selected="build"
+        onSelect={() => undefined}
+        accessibilityLabel="Partes da ficha"
+      />
+    )
+    expect(
+      screen.getByRole('tab', { name: 'Vantagens, a seguir' })
+    ).toBeTruthy()
+    expect(screen.getByTestId('tab-attention-powers')).toHaveTextContent(
+      'a seguir'
+    )
+  })
+
+  it('sem `attention`, nada muda', () => {
+    render(
+      <Tabs
+        items={items.map(({ id, label }) => ({ id, label }))}
+        selected="build"
+        onSelect={() => undefined}
+        accessibilityLabel="Partes da ficha"
+      />
+    )
+    expect(screen.getByRole('tab', { name: 'Vantagens' })).toBeTruthy()
+    expect(screen.queryByTestId('tab-attention-powers')).toBeNull()
+  })
+})
+
 describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)', () => {
   const sheet = (visible: boolean, onClose = jest.fn()) => (
     <BottomSheet
@@ -845,6 +882,50 @@ describe('BottomSheet: um Fechar só, escape no iOS e foco de volta (T-71, T-35)
     expect(scrim.props.accessibilityRole).toBeUndefined()
     fireEvent(scrim, 'click')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // P17 (N-05): a folha que não pode sumir por acidente
+  describe('dismissOnScrim={false}: só o fundo deixa de fechar', () => {
+    const locked = (onClose: jest.Mock) => (
+      <BottomSheet
+        visible
+        title="Começaram os pontos de bônus"
+        onClose={onClose}
+        testID="sheet"
+        dismissOnScrim={false}
+      >
+        <RNText>conteúdo</RNText>
+      </BottomSheet>
+    )
+    const scrim = () =>
+      screen.getByTestId('bottom-sheet-scrim', { includeHiddenElements: true })
+
+    it('web: o clique no fundo não fecha; o × e o Esc fecham', () => {
+      setOS('web')
+      const onClose = jest.fn()
+      render(locked(onClose))
+      fireEvent(scrim(), 'click')
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+      expect(onClose).toHaveBeenCalledTimes(1)
+      fireEvent(screen.getByTestId('bottom-sheet-root'), 'keyDownCapture', {
+        nativeEvent: { key: 'Escape' },
+        preventDefault: jest.fn(),
+      })
+      expect(onClose).toHaveBeenCalledTimes(2)
+    })
+
+    it('app: o toque no fundo não fecha; o voltar do Android e o × fecham', () => {
+      setOS('android')
+      const onClose = jest.fn()
+      render(locked(onClose))
+      fireEvent.press(scrim())
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose')
+      expect(onClose).toHaveBeenCalledTimes(1)
+      fireEvent.press(screen.getByRole('button', { name: 'Fechar' }))
+      expect(onClose).toHaveBeenCalledTimes(2)
+    })
   })
 
   it('web: Esc fecha pela raiz da folha, a qualquer momento (um caminho só)', () => {

@@ -58,7 +58,7 @@ test('T-35 e T-71: abas com setas e Espaço; Esc devolve o foco; um Fechar', asy
   page,
 }) => {
   await sheetInEvolve(page, 'abas')
-  const ficha = page.getByRole('tab', { name: 'Ficha', exact: true })
+  const ficha = page.getByRole('tab', { name: /^Ficha(, a seguir)?$/ })
   const vantagens = page.getByRole('tab', { name: 'Vantagens' })
   await ficha.focus()
   // Ativação automática: a seta já seleciona

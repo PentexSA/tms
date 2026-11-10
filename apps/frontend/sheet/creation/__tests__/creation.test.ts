@@ -8,9 +8,14 @@ import {
   type SheetData,
   type SheetModel,
 } from '@tms/sheet-core'
-import { modelOf, templateJson } from '../../../test/fixtures'
+import {
+  modelOf,
+  modelWithoutMeritCatalog,
+  templateJson,
+} from '../../../test/fixtures'
 import {
   addAdvice,
+  addPreview,
   adviceNotices,
   basicsClosed,
   basicsDone,
@@ -30,6 +35,8 @@ import {
   freebiesLeftNote,
   freebiesNotes,
   groupFor,
+  pricedInCatalog,
+  priceMeta,
   priorityNote,
   problemText,
   reorder,
@@ -236,10 +243,20 @@ describe('o motivo certo da recusa (T-07, T-57)', () => {
     expect(why?.text).not.toContain('já foram usados')
   })
 
-  it('Básicos: o grupo cheio sem teto diz o orçamento e o preço', () => {
+  it('Básicos, com tudo fechado (fase trocada à mão): o grupo cheio diz o orçamento e o preço', () => {
     expect(refusalOf(COMPLETE, { ...COMPLETE, str: 4 })).toEqual({
       cause: 'budget',
       text: 'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
+      action: 'budget',
+    })
+  })
+
+  // P17 (N-04): os bônus só começam quando todos os grupos fecham
+  it('Básicos, com outro grupo aberto: o texto diz quando os bônus começam', () => {
+    const open = { ...COMPLETE, brawl: 1 }
+    expect(refusalOf(open, { ...open, str: 4 })).toEqual({
+      cause: 'budget',
+      text: 'Físicos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).',
       action: 'budget',
     })
   })
@@ -401,6 +418,12 @@ describe('stepAdvice: o que o próximo ponto faria', () => {
       blocked: 'budget',
       text: 'Físicos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (5 por ponto).',
       inline: false,
+    })
+    // P17 (N-04): com outro grupo aberto, o texto diz quando os bônus
+    // começam
+    expect(adviceOf({ ...COMPLETE, brawl: 1 }, 'values.str')).toMatchObject({
+      blocked: 'budget',
+      text: 'Físicos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (5 por ponto).',
     })
     // Com básico sobrando, passa sem custo
     expect(adviceOf({ ...COMPLETE, str: 2 }, 'values.dex')).toEqual({
@@ -919,8 +942,9 @@ describe('addAdvice: a prévia do item novo', () => {
   })
 
   it('Qualidade: o Custo do item em bônus; Defeito: o crédito até 7', () => {
+    // P17 (N-07): as Qualidades do produto têm catálogo com custo
     expect(addAdvice(vtm, at({}), 'basics', 'merits')).toBe(
-      'Custa o Custo do item em bônus (começa em 1); restam 15.'
+      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
     )
     expect(addAdvice(vtm, at({}), 'basics', 'flaws')).toBe(
       'Devolve o Bônus do item, até 7 no total.'
@@ -931,22 +955,14 @@ describe('addAdvice: a prévia do item novo', () => {
     expect(addAdvice(vtm, at({}), 'basics', 'naoExiste')).toBeNull()
   })
 
-  it('com o Custo no catálogo, a prévia não promete o mínimo (code review)', () => {
-    const t = templateJson('vtm-v20')
-    const fields = t.fields as Record<string, Record<string, unknown>>
-    if (fields.merits) {
-      fields.merits.catalog = ['Qualidade A']
-      fields.merits.catalogDefaults = [
-        { meta: 'cost', value: 3, items: ['Qualidade A'] },
-      ]
-    }
-    const m = compileTemplate(t)
+  it('sem o Custo no catálogo, a prévia diz o mínimo (code review)', () => {
+    const m = modelWithoutMeritCatalog('vtm-v20')
     const check = checkCreation(m, { values: {} } as SheetData, {
       config: effectiveCreationConfig(m),
       choices: WOD_PRIORITIES,
     })
     expect(addAdvice(m, check, 'basics', 'merits')).toBe(
-      'Custa o Custo do item em bônus (o de cada opção); restam 15.'
+      'Custa o Custo do item em bônus (começa em 1); restam 15.'
     )
   })
 })
@@ -1420,5 +1436,117 @@ describe('"falta 1 ponto básico" (B2)', () => {
     expect(basicsSpentText({ ...g, budget: 3 }, false)).toBe(
       'Fé: os 3 pontos básicos já foram usados.'
     )
+  })
+
+  // P17 (N-04): na fase dos básicos, o bônus só vem quando todos os grupos
+  // fecham; com todos fechados (a fase trocada à mão), o texto antigo
+  it('com bônus, o texto diz quando eles começam; com tudo fechado, como usar', () => {
+    const g = {
+      id: 'knowledges',
+      label: 'Conhecimentos',
+      budget: 5,
+      measure: 'points' as const,
+      invested: 5,
+      eligible: 5,
+      basic: 5,
+      missing: 0,
+      extra: 0,
+      price: 2,
+      freebieCost: 0,
+      components: [],
+    }
+    expect(basicsSpentText(g, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados. Os pontos de bônus vêm depois que todos os grupos da ficha fecharem os pontos básicos (2 por ponto).'
+    )
+    expect(basicsSpentText(g, true, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados. Para passar disso, use os pontos de bônus (2 por ponto).'
+    )
+    expect(basicsSpentText({ ...g, price: null }, true)).toBe(
+      'Conhecimentos: os 5 pontos básicos já foram usados.'
+    )
+  })
+})
+
+// P17 (N-08): a prévia da inclusão de uma Qualidade ou de um Defeito com o
+// custo escolhido, pela conta inteira (antes e depois)
+describe('addPreview', () => {
+  const vtm = modelOf('vtm-v20')
+  const input = (mode: 'points' | 'free' = 'points') => ({
+    config: { ...effectiveCreationConfig(vtm), mode },
+    choices: {},
+  })
+  const sheet = (values: Record<string, unknown>): SheetData => ({
+    values: { name: 'Nova', clan: 'tremere', ...values },
+    specialties: {},
+  })
+  const merit = (cost: number) => ({ id: 'n', name: 'Nova', meta: { cost } })
+  const flaw = (bonus: number) => ({ id: 'n', name: 'Nova', meta: { bonus } })
+  const merits = (...costs: number[]) =>
+    costs.map((cost, i) => ({ id: `m${i}`, name: `Q${i}`, meta: { cost } }))
+  const flaws = (...bonus: number[]) =>
+    bonus.map((b, i) => ({ id: `f${i}`, name: `D${i}`, meta: { bonus: b } }))
+
+  it('o meta de preço: o Custo na Qualidade, o Bônus no Defeito; Disciplinas não têm', () => {
+    expect(priceMeta(vtm, 'merits')).toMatchObject({
+      id: 'cost',
+      label: 'Custo',
+      min: 1,
+    })
+    expect(priceMeta(vtm, 'flaws')).toMatchObject({ id: 'bonus', min: 1 })
+    expect(priceMeta(vtm, 'disciplines')).toBeNull()
+    expect(pricedInCatalog(vtm, 'merits', 'cost', 'Nome inventado')).toBe(false)
+  })
+
+  it('Qualidade de 5 com saldo 8: custa 5, restam 3', () => {
+    expect(
+      addPreview(vtm, sheet({ merits: merits(7) }), input(), 'merits', merit(5))
+    ).toEqual({ text: 'Custa 5 de bônus; restam 3.', short: false })
+  })
+
+  it('Qualidade de 5 com saldo 3: faltariam 2', () => {
+    expect(
+      addPreview(
+        vtm,
+        sheet({ merits: merits(7, 5) }),
+        input(),
+        'merits',
+        merit(5)
+      )
+    ).toEqual({
+      text: 'Faltariam 2 de bônus: custa 5, restam 3.',
+      short: true,
+    })
+  })
+
+  it('Defeito de 3: devolve 3; com o crédito em 6, só 1; em 7, nada', () => {
+    expect(addPreview(vtm, sheet({}), input(), 'flaws', flaw(3))).toEqual({
+      text: 'Devolve 3 de bônus.',
+      short: false,
+    })
+    expect(
+      addPreview(vtm, sheet({ flaws: flaws(6) }), input(), 'flaws', flaw(3))
+    ).toEqual({
+      text: 'Devolve só 1 de bônus: o crédito chega a 7.',
+      short: false,
+    })
+    expect(
+      addPreview(vtm, sheet({ flaws: flaws(4, 3) }), input(), 'flaws', flaw(3))
+    ).toEqual({
+      text: 'Não devolve bônus: o crédito já está em 7.',
+      short: false,
+    })
+  })
+
+  it('sem conta de bônus (criação livre) ou lista sem preço: null', () => {
+    expect(
+      addPreview(vtm, sheet({}), input('free'), 'merits', merit(3))
+    ).toBeNull()
+    expect(
+      addPreview(vtm, sheet({}), input(), 'disciplines', {
+        id: 'd',
+        name: 'Taumaturgia',
+        value: 1,
+      })
+    ).toBeNull()
   })
 })

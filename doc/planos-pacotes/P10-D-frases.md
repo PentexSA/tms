@@ -35,7 +35,7 @@ Uma frase igual em dois sistemas conta nos dois: Natureza, Comportamento, Concei
 | Prioridade | Ordene os grupos: o primeiro recebe mais pontos para distribuir, o último recebe menos. Cada conjunto de grupos tem a sua própria ordem. | 136 |
 | Pontos de bônus | Pontos extras, gastos depois dos básicos. Cada característica cobra um preço diferente por ponto; a aba Pontos mostra quanto sobra. | 131 |
 
-## Vampiro (V20) · `vtm-v20` 1.10.0 (escrita sobre a 1.8.0; a 1.10.0 só acrescenta a História, P15-D)
+## Vampiro (V20) · `vtm-v20` 1.11.0 (escrita sobre a 1.8.0; a 1.10.0 acrescenta a História, P15-D, e a 1.11.0, o catálogo de Qualidades e Defeitos, P17)
 
 ### Campos (`fields.<id>.help`)
 
@@ -102,7 +102,7 @@ O formato no template é o da onda-4.md §4.3 (mapa por nome, recomendado, ou fo
 | Lacaios | Servos leais ao vampiro. Mais pontos: mais servos ou servos mais capazes. | 73 |
 | Status | A posição do vampiro na sociedade dos vampiros da cidade. | 57 |
 
-## Lobisomem (W20) · `wta-w20` 1.8.0 (escrita sobre a 1.6.0; a 1.8.0 só acrescenta a História, P15-D)
+## Lobisomem (W20) · `wta-w20` 1.9.0 (escrita sobre a 1.6.0; a 1.8.0 acrescenta a História, P15-D, e a 1.9.0, o catálogo de Qualidades e Defeitos e a ajuda de Nome de feito, Seita e Campo, P17)
 
 ### Campos (`fields.<id>.help`)
 
@@ -184,7 +184,7 @@ O formato no template é o da onda-4.md §4.3 (mapa por nome, recomendado, ou fo
 | Totem | O espírito protetor da matilha. Os pontos dos membros se somam para o totem. | 76 |
 | Raça Pura | Sangue de linhagem antiga e reconhecida. Os outros da espécie reagem com mais respeito. | 87 |
 
-## Mago (M20) · `mta-m20` 1.8.0 (escrita sobre a 1.6.0; a 1.8.0 só acrescenta a História, P15-D)
+## Mago (M20) · `mta-m20` 1.9.0 (escrita sobre a 1.6.0; a 1.8.0 acrescenta a História, P15-D, e a 1.9.0, o catálogo de Qualidades e Defeitos, P17)
 
 **Rótulo (D-12, U-06):** o campo `house` passa de "Casa" a "Casa ou subgrupo", com o `placeholder` "Opcional". Nenhum campo é escondido.
 

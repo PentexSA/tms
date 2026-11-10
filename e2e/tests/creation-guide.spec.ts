@@ -95,7 +95,7 @@ test.describe('a 390', () => {
     await sheet(browser, page, VIRTUES)
     await page.getByRole('button', { name: /^Virtudes 7:/ }).click()
     await expect(
-      page.getByRole('tab', { name: 'Vantagens', exact: true })
+      page.getByRole('tab', { name: /^Vantagens(, a seguir)?$/ })
     ).toHaveAttribute('aria-selected', 'true')
     const anchor = page.locator('#anchor-advantages-virtues')
     await expect(anchor).toBeFocused()
@@ -189,7 +189,7 @@ test('a 360: "e mais N" leva à aba Pontos, com o foco no "O que falta"', async 
   await expect(more).toBeVisible()
   await more.click()
   await expect(
-    page.getByRole('tab', { name: 'Pontos', exact: true })
+    page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
   ).toHaveAttribute('aria-selected', 'true')
   await expect(page.locator('#anchor-creation-missing')).toBeFocused()
   // A lista inteira, um botão por item
@@ -228,7 +228,7 @@ test('a 1280: a folha de bônus é o diálogo de 560; Esc fecha e o foco volta a
   await page.getByRole('button', { name: 'Ver Pontos' }).click()
   await expect(page.getByTestId('bonus-notice')).toHaveCount(0)
   await expect(
-    page.getByRole('tab', { name: 'Pontos', exact: true })
+    page.getByRole('tab', { name: /^Pontos(, a seguir)?$/ })
   ).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByTestId('creation-phase')).toHaveText(
     'Fase: pontos de bônus'
